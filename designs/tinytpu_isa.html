@@ -24,7 +24,7 @@
     <script src="../_static/js/petite-vue.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="The Unit Library: Composing a Region from Units" href="tinytpu_library.html" />
+    <link rel="next" title="TinyTPU-isa: The ISA" href="tinytpu_isa_spec.html" />
     <link rel="prev" title="User-Defined External Kernels" href="../backends/aie/feature/external-kernel.html" /> 
   </head><body data-dark_mode_code_blocks="true">
 
@@ -165,6 +165,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
@@ -174,8 +175,12 @@
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gemmini_results.html">TinyTPU-isa vs Gemmini: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="benchmarks.html">The Benchmark Set</a></li>
 <li class="toctree-l1"><a class="reference internal" href="workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_history.html">TinyTPU-isa: Design History</a></li>
@@ -186,9 +191,13 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia_results.html">CHIA Agentic Co-Design: Results</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia_codesign.html">The Original Co-Design Effort (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT and the TinyTPU-isa Mapper</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act_results.html">ACT: Results, Findings and Corrections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
 <ul>
@@ -218,60 +227,54 @@
             
   <section id="tinytpu-isa-a-programmable-gemm-accelerator">
 <h1>TinyTPU-isa: A Programmable GEMM Accelerator<a class="headerlink" href="#tinytpu-isa-a-programmable-gemm-accelerator" title="Link to this heading"><span>¶</span></a></h1>
-<p>TinyTPU-isa (<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/</span></code>) is an int8
+<p>TinyTPU-isa (<code class="docutils literal notranslate"><span class="pre">examples/tinytpu/</span></code>) is an int8
 instruction-programmable tiled-GEMM accelerator written in grid Allo
 (<code class="docutils literal notranslate"><span class="pre">&#64;df.region</span></code> / <code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code>) and taken through the Vitis HLS dataflow path to
 <strong>RTL co-simulation</strong>. Each of its units is a module of its own under
-<code class="docutils literal notranslate"><span class="pre">ip/units/</span></code>, composed into a region by <code class="docutils literal notranslate"><span class="pre">ip/compose.py</span></code>; that decomposition
+<code class="docutils literal notranslate"><span class="pre">ip/units/</span></code>, composed into a region by <code class="docutils literal notranslate"><span class="pre">allo/compose.py</span></code>; that decomposition
 is <a class="reference internal" href="tinytpu_library.html"><span class="doc">The Unit Library: Composing a Region from Units</span></a>, and <code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code> is the instantiation the
-numbers on this page were measured on. It is the machine the project’s requirements name: an ISA,
+published numbers were measured on. It is the machine the project’s requirements name: an ISA,
 a vector unit, a SIMD scratchpad, vector registers streaming to the array’s
 ports, and tiled GEMM as a <em>program</em> rather than as a fixed-function datapath.</p>
 <p>It is the only accelerator design left on <code class="docutils literal notranslate"><span class="pre">main</span></code>. Its predecessors, the
 optimisation history that produced the current numbers, and the superseded
 readings of those numbers are on <a class="reference internal" href="tinytpu_history.html"><span class="doc">TinyTPU-isa: Design History</span></a>. The data-type- and
-mesh-matched comparison against Gemmini is on <a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Headline, as of 2026-09-24 (<code class="docutils literal notranslate"><span class="pre">63ee6ec7</span></code>): one hardware build runs every
-shape as data, all five benchmark shapes are bit-exact in RTL
-co-simulation, and the design takes <strong>175 / 265 / 421 / 482 / 674</strong> cycles
-at 4x4x4 / 8x8x8 / 12x12x12 / 16x16x8 / 16x16x16 (Vitis <code class="docutils literal notranslate"><span class="pre">cosim</span></code>,
-<code class="docutils literal notranslate"><span class="pre">-m_axi_latency</span> <span class="pre">0</span></code>).</p>
-<p><strong>Those five are a ``T=4``, ``TPU_MAXDIM=16`` measurement</strong>, which is the
-configuration <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code> pins. The shipped default is <code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code>,
-and <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code> is the DRAM row stride of every operand, so the same shape
-costs more on the bigger build – 4x4x4 is 222 cycles at <code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code>
-against 175 at 16. The <code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code> sweep, and every shape large enough to
-reach steady state, are on <a class="reference internal" href="benchmarks.html"><span class="doc">The Benchmark Set</span></a>.</p>
-<p>Measured over the same window on both sides, the design was
-<strong>1.07-1.24x slower</strong> than Gemmini at these five shapes. Over ten shapes at
-<code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code> the deficit <strong>converged to 1.09x at 64x64x64</strong> at
-<strong>74.1 % of peak</strong>, and the two smallest shapes did not clear Gemmini’s
-measurement spread; see <a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>. <strong>Those figures were
-measured at the previous channel depth</strong> (<code class="docutils literal notranslate"><span class="pre">QD=8</span></code>), against the row that
-ended on 2026-09-24, and the sweep has <strong>not</strong> been re-run at <code class="docutils literal notranslate"><span class="pre">QD=16</span></code>, so
-they are the last measured comparison and not a statement about the shipped
-design. Nothing should be restated from them until the sweep is re-run;
-what was checked before landing is that no margin <em>flips</em>
-(<a class="reference internal" href="../developer/limitations.html#limitation-24-price"><span class="std std-ref">What QD=16 costs the shipped design</span></a>), which is a check and not a measurement.</p>
-<p>Until <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code> (2026-09-19) the shipped design took
-<strong>252 / 383 / 591 / 667 / 919</strong> (1.55-1.8x behind Gemmini). The step
-between the two is the gap attribution’s measured design stack, landed as
-the design (<a class="reference internal" href="#tinytpu-isa-landing"><span class="std std-ref">What landed in e24e433b</span></a>, <a class="reference internal" href="gemmini_comparison.html#gemmini-gap-attribution"><span class="std std-ref">Where the deficit came from, and what was landed</span></a>).
-The published row was <strong>172 / 262 / 418 / 484 / 686</strong> until 2026-09-22 and
-<strong>171 / 261 / 417 / 483 / 685</strong> from then until 2026-09-24; what moved it
-by one cycle at every shape, and what the channel depth then did to it, are
-in <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
-<p><strong>The price of the current row</strong> is <strong>+9.3 % flip-flops</strong> on FPGA at the
-shipped <code class="docutils literal notranslate"><span class="pre">T=4</span></code>/<code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code> (+9.5 % at the <code class="docutils literal notranslate"><span class="pre">MAXDIM=16</span></code> the five shapes
-are measured on), with BRAM, DSP and the 2.431 ns estimated period all
-unchanged. <strong>The ASIC price is unmeasured</strong>: what is recorded is a count
-from the RTL priced at this design’s own area per sequential cell, not a DC
-run (<a class="reference internal" href="../developer/limitations.html#limitation-24-price"><span class="std std-ref">What QD=16 costs the shipped design</span></a>).</p>
+mesh-matched comparison against Gemmini is on <a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>.
+Every cycle count, resource figure, correction and retraction is on
+<a class="reference internal" href="tinytpu_isa_results.html"><span class="doc">TinyTPU-isa: Results and History</span></a>.</p>
+<section id="quick-start">
+<h2>Quick start<a class="headerlink" href="#quick-start" title="Link to this heading"><span>¶</span></a></h2>
+<p>One command takes a clean checkout to the published cycle counts:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># One command, from a clean checkout: builds this checkout's MLIR bindings,</span>
+<span class="c1"># runs bench_isa + stress_isa, then the default cosim, and checks the five</span>
+<span class="c1"># cycle counts against 175 / 265 / 421 / 482 / 674 at the TPU_MAXDIM=16 it</span>
+<span class="c1"># pins. Exits nonzero otherwise.</span>
+examples/tinytpu/reproduce.sh<span class="w">            </span><span class="c1"># ~6 min, incl. a fresh mlir build</span>
+examples/tinytpu/reproduce.sh<span class="w"> </span>--no-cosim<span class="w"> </span><span class="c1"># functional, ~1 min</span>
+
+<span class="c1"># Or by hand, from examples/tinytpu (the env sets neither variable):</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">LLVM_BUILD_DIR</span><span class="o">=</span>/home/sk3463/llvm-allo-6b09f739/build<span class="w"> </span><span class="nv">OMP_NUM_THREADS</span><span class="o">=</span><span class="m">8</span>
+python<span class="w"> </span>bench_isa.py<span class="w">                   </span><span class="c1"># published functional setup: ALL EXACT</span>
+python<span class="w"> </span>bench_isa.py<span class="w"> </span><span class="m">8</span><span class="w"> </span><span class="m">8</span><span class="w"> </span><span class="m">8</span><span class="w">             </span><span class="c1"># one shape</span>
+python<span class="w"> </span>stress_isa.py<span class="w">                  </span><span class="c1"># correctness gate:          STRESS OK</span>
+python<span class="w"> </span>kpn_model.py<span class="w">                   </span><span class="c1"># channel protocol / deadlock model</span>
+python<span class="w"> </span>cosim.py<span class="w">                       </span><span class="c1"># default TB: the published cycle counts</span>
+<span class="nv">TPU_TB</span><span class="o">=</span>stress<span class="w"> </span><span class="nv">TPU_SHAPES</span><span class="o">=</span>4x4x4,16x16x16<span class="w"> </span>python<span class="w"> </span>cosim.py<span class="w">   </span><span class="c1"># correctness in RTL</span>
+python<span class="w"> </span>mutate.py<span class="w">                      </span><span class="c1"># does the harness catch a broken design? (~15 min)</span>
+python<span class="w"> </span>mutate.py<span class="w"> </span>--no-rtl<span class="w">             </span><span class="c1"># the same without the one cosim (~5 min)</span>
+<span class="nv">TPU_WRAP</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>python<span class="w"> </span>cosim.py<span class="w">            </span><span class="c1"># the old hoisted-argument variant, for comparison</span>
+</pre></div>
 </div>
-<section id="architecture">
-<h2>Architecture<a class="headerlink" href="#architecture" title="Link to this heading"><span>¶</span></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code> and <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code>’s default testbench use Gemmini’s <code class="docutils literal notranslate"><span class="pre">[-4,</span> <span class="pre">4]</span></code>
+operands so the comparison is like for like; they are <strong>performance</strong> checks
+and are blind to an int16 accumulator, a wrong clip boundary, or a unit ignoring
+a field GEMM never varies. <code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code> and <code class="docutils literal notranslate"><span class="pre">TPU_TB=stress</span></code> are the
+<strong>correctness</strong> checks; <code class="docutils literal notranslate"><span class="pre">mutate.py</span></code> prints which level catches which bug. Any
+<code class="docutils literal notranslate"><span class="pre">TPU_*</span></code> variable left set changes what <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code> measures. See
+<a class="reference internal" href="#tinytpu-isa-verify"><span class="std std-ref">The spec, and holding both consumers to it</span></a> for which gate to run after which kind of change.</p>
+</section>
+<section id="how-it-works">
+<h2>How it works<a class="headerlink" href="#how-it-works" title="Link to this heading"><span>¶</span></a></h2>
 <p>Eight kinds of unit, <code class="docutils literal notranslate"><span class="pre">2*T*T</span> <span class="pre">+</span> <span class="pre">6</span> <span class="pre">=</span> <span class="pre">38</span></code> concurrent processes at <code class="docutils literal notranslate"><span class="pre">T=4</span></code>.</p>
 <p><strong>Control.</strong> One unit fetches and decodes, and sends each of the five
 instruction-executing units only the instructions it executes:</p>
@@ -374,7 +377,7 @@ Gemmini’s split too:
 the adds live in <code class="docutils literal notranslate"><span class="pre">AccumulatorMem</span></code>’s write path, not in the mesh. In the
 shipped program <code class="docutils literal notranslate"><span class="pre">mm</span></code> carries an overwrite/accumulate field (<code class="docutils literal notranslate"><span class="pre">f2</span></code>) and the
 GEMM inner loop no longer uses <code class="docutils literal notranslate"><span class="pre">vadd</span></code> at all, so <code class="docutils literal notranslate"><span class="pre">vadd_program</span></code> exists to
-keep <code class="docutils literal notranslate"><span class="pre">vadd</span></code>/<code class="docutils literal notranslate"><span class="pre">vrelu</span></code> exercised; see <a class="reference internal" href="#tinytpu-isa-programs"><span class="std std-ref">Programs, and the loop-nest generator</span></a>.</p>
+keep <code class="docutils literal notranslate"><span class="pre">vadd</span></code>/<code class="docutils literal notranslate"><span class="pre">vrelu</span></code> exercised; see <a class="reference internal" href="tinytpu_isa_spec.html#tinytpu-isa-programs"><span class="std std-ref">Programs, and the loop-nest generator</span></a>.</p>
 <p><strong>Pure SIMD scratchpad.</strong> A row of <code class="docutils literal notranslate"><span class="pre">spad</span></code> <em>is</em> one <code class="docutils literal notranslate"><span class="pre">UInt(T*8)</span></code> packed word of
 T int8 lanes; there is no way to address a lane. That is what lets a
 single-ported memory feed T lanes per cycle, and it satisfies <code class="docutils literal notranslate"><span class="pre">HLS</span> <span class="pre">200-779</span></code>
@@ -457,10 +460,10 @@ makes a design runnable, while the symptom is an unexplained silent hang, is the
 strongest argument for a deadlock report in the simulator: naming the blocked
 processes and the full channels would have replaced a long bisection with one
 run. (The simulator has since gained a tier-0 watchdog; the per-channel report
-is still open – see <a class="reference internal" href="../developer/limitations.html#limitation-11"><span class="std std-ref">11. The dataflow simulator deadlocks when processes outnumber OMP threads — FIXED</span></a>.)</p>
+is still open – see <a class="reference internal" href="../developer/limitations.html#limitation-11"><span class="std std-ref">11. The dataflow simulator deadlocked when processes outnumbered OMP threads – closed</span></a>.)</p>
 </section>
 <section id="one-owner-per-memory">
-<h3>One owner per memory<a class="headerlink" href="#one-owner-per-memory" title="Link to this heading"><span>¶</span></a></h3>
+<span id="tinytpu-isa-one-owner"></span><h3>One owner per memory<a class="headerlink" href="#one-owner-per-memory" title="Link to this heading"><span>¶</span></a></h3>
 <p><code class="docutils literal notranslate"><span class="pre">spad</span></code> lives in <code class="docutils literal notranslate"><span class="pre">spm</span></code> and is written by <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> and read by <code class="docutils literal notranslate"><span class="pre">vld</span></code> and
 <code class="docutils literal notranslate"><span class="pre">mm</span></code> (weights); <code class="docutils literal notranslate"><span class="pre">vr</span></code> lives in <code class="docutils literal notranslate"><span class="pre">vru</span></code> and is written by <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> and
 <code class="docutils literal notranslate"><span class="pre">vld</span></code> and read by <code class="docutils literal notranslate"><span class="pre">mm</span></code> (activations); <code class="docutils literal notranslate"><span class="pre">ar</span></code> lives in <code class="docutils literal notranslate"><span class="pre">accu</span></code> and is
@@ -470,919 +473,47 @@ writer – it rejects a region-scope <code class="docutils literal notranslate">
 (<code class="docutils literal notranslate"><span class="pre">EmitVivadoHLS.cpp:3083-3122</span></code>) – so those three units keep every arm of
 their opcode dispatch in one process. This rules out a one-process-per-opcode
 split; see <a class="reference internal" href="tinytpu_history.html#tinytpu-history-rowflat"><span class="std std-ref">Row-flattening the per-instruction loop: 1.08x</span></a>. Vitis is not what refuses: a Vitis
-2023.2 probe (<a class="reference external" href="https://github.com/sunwookim028/allo/tree/main/examples/accelerator/tinytpu_vitis/impact/probe_shared">impact/probe_shared/</a>)
+2023.2 probe (<a class="reference external" href="https://github.com/sunwookim028/allo/tree/main/examples/tinytpu/impact/probe_shared">impact/probe_shared/</a>)
 shows that <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">stream</span> <span class="pre">variable=buf</span> <span class="pre">type=unsync</span></code> makes it share an
 on-chip array between two processes, one per BRAM port (<code class="docutils literal notranslate"><span class="pre">HLS</span> <span class="pre">200-824</span></code>,
 <code class="docutils literal notranslate"><span class="pre">200-755</span></code>, <code class="docutils literal notranslate"><span class="pre">200-634</span></code>), and <code class="docutils literal notranslate"><span class="pre">HLS</span> <span class="pre">200-779</span></code> applies only to <em>synchronized</em>
 arrays; Allo never emits <code class="docutils literal notranslate"><span class="pre">stream</span> <span class="pre">type=unsync</span></code>. Vitis does separately forbid
 one <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> bundle read by two processes (<code class="docutils literal notranslate"><span class="pre">HLS</span> <span class="pre">200-1013</span></code> / <code class="docutils literal notranslate"><span class="pre">200-984</span></code>).</p>
 <p><strong>Measured impact of the rule on this design: 0 cycles</strong> – every restructure
-the gap attribution needed was Allo-legal (<a class="reference internal" href="gemmini_comparison.html#gemmini-gap-attribution"><span class="std std-ref">Where the deficit came from, and what was landed</span></a>).
+the gap attribution needed was Allo-legal (<a class="reference internal" href="gemmini_results.html#gemmini-gap-attribution"><span class="std std-ref">Where the deficit came from, and what was landed</span></a>).
 See <a class="reference internal" href="../developer/limitations.html#limitation-shared-memory"><span class="std std-ref">Shared on-chip memory: the one-owner rule is Allo’s, not Vitis’s</span></a>. This paragraph charged the rule to both
 tools until 2026-09-19, and a claim that rested on that reading was withdrawn;
-see <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
+see <a class="reference internal" href="tinytpu_isa_results.html"><span class="doc">TinyTPU-isa: Results and History</span></a>.</p>
 </section>
 <section id="data-type">
 <h3>Data type<a class="headerlink" href="#data-type" title="Link to this heading"><span>¶</span></a></h3>
 <p>Packing is what makes the SIMD scratchpad work, and packing needs integers, so
 unlike <code class="docutils literal notranslate"><span class="pre">microarch_ws.py</span></code> (at <code class="docutils literal notranslate"><span class="pre">e2451b81</span></code>) there is no fp32 switch. The
 widths, the exactness of each stage and the output conversion are the
-<a class="reference internal" href="#tinytpu-isa-spec"><span class="std std-ref">The ISA</span></a> numerics table; the configuration shipped is Gemmini’s
+<a class="reference internal" href="tinytpu_isa_spec.html#tinytpu-isa-spec"><span class="std std-ref">TinyTPU-isa: The ISA</span></a> numerics table; the configuration shipped is Gemmini’s
 default (<code class="docutils literal notranslate"><span class="pre">inputType</span> <span class="pre">=</span> <span class="pre">SInt(8.W)</span></code>, <code class="docutils literal notranslate"><span class="pre">accType</span> <span class="pre">=</span> <span class="pre">SInt(32.W)</span></code>) with its
 <code class="docutils literal notranslate"><span class="pre">mvout</span></code> behaviour under <code class="docutils literal notranslate"><span class="pre">ACC_SCALE_IDENTITY</span></code> and shift 0, which is what
 <code class="docutils literal notranslate"><span class="pre">allo_cmp.c</span></code> passes.</p>
 </section>
 </section>
-<section id="the-isa">
-<span id="tinytpu-isa-spec"></span><h2>The ISA<a class="headerlink" href="#the-isa" title="Link to this heading"><span>¶</span></a></h2>
-<p><strong>Every fact in this section is generated from</strong>
-<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/isa_spec.json</span></code>, which is the source of
-truth for the instruction encoding, the opcodes, the instruction-memory header,
-the memory map, the two program contracts, the build parameters and the
-numerics. <code class="docutils literal notranslate"><span class="pre">gen_isa.py</span> <span class="pre">--write</span></code> regenerates the tables below and
-<code class="docutils literal notranslate"><span class="pre">isa_encoding.py</span></code>; <code class="docutils literal notranslate"><span class="pre">gen_isa.py</span> <span class="pre">--check</span></code> fails if either is stale or if the
-design or the reference model has drifted from the spec. The prose outside the
-generated region is hand-written rationale.</p>
-<section id="bit-layout">
-<h3>Bit layout<a class="headerlink" href="#bit-layout" title="Link to this heading"><span>¶</span></a></h3>
-<p>Most significant on the left. <code class="docutils literal notranslate"><span class="pre">enc()</span></code> builds word 0 and <code class="docutils literal notranslate"><span class="pre">enc_agu()</span></code> word 1; both are generated from the field table below, so neither picture can go stale.</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>word 0:
-+------------+------------+------------+------------+------------+------------+------------+
-|            |     nr     |     f3     |     f2     |     f1     |     f0     |     op     |
-|   63:62    |   61:54    |   53:42    |   41:30    |   29:18    |    17:6    |    5:0     |
-+------------+------------+------------+------------+------------+------------+------------+
-
-word 1: up to AGU_TERMS = 3 address terms of 19 bits:
-+------------+------------+------------+------------+
-|            |   term 2   |   term 1   |   term 0   |
-|   63:57    |   56:38    |   37:19    |    18:0    |
-+------------+------------+------------+------------+
-
-one term:    stride [18:7]   level [6:4]   target [3:0]
-resolves to: field[target] += iv[level] * stride, for each term with target != 0, in term order
-</pre></div>
-</div>
-<p>Bits 62, 63 of word 0 and bits 63:57 of word 1 are unused.</p>
-<table class="docutils align-default" id="id1">
-<caption><span class="caption-text">Who reads this spec, and how each one is held to it</span><a class="headerlink" href="#id1" title="Link to this table"><span>¶</span></a></caption>
-<thead>
-<tr class="row-odd"><th class="head"><p>file</p></th>
-<th class="head"><p>held</p></th>
-<th class="head"><p>note</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/isa_encoding.py</span></code></p></td>
-<td><p>generated</p></td>
-<td><p>The spec as Python. Regenerated and diffed byte for byte by gen_isa.py –check.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">docs/source/designs/tinytpu_isa.rst</span></code></p></td>
-<td><p>generated</p></td>
-<td><p>The ISA tables, between the GENERATED markers. The prose around them is hand-written.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/microarch_isa.py</span></code></p></td>
-<td><p>checked</p></td>
-<td><p>The shipped instantiation: the build parameters, read from the environment, and the names the harness imports. Held to this file by parameter range and by parameter agreement under several configurations.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/ip/isa.py</span></code></p></td>
-<td><p>checked</p></td>
-<td><p>Opcodes, DMA flags, AGU targets and budgets, and the instruction layout named once (OP_LO .. NR_HI, AGU_*_BITS), which <code class="docutils literal notranslate"><span class="pre">enc</span></code>/<code class="docutils literal notranslate"><span class="pre">enc_agu</span></code> build from. Held by value, layout name by layout name, and by behaviour.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/ip/assembler.py</span></code></p></td>
-<td><p>checked</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">expand</span></code>, the program validator and the imem header, decoding through ip/isa.py. Held by behaviour on every program the check generates, and AR_RAW_DIST by value.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/ip/units</span></code></p></td>
-<td><p>checked</p></td>
-<td><p>The hardware. Its bit slices of a 64-bit word are literal because a symbolic bound widens the extract to i32 (docs/source/designs/tinytpu_library.rst), so every slice is checked against the field table here, as is the mvout saturation.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/isa_dsl.py</span></code></p></td>
-<td><p>checked</p></td>
-<td><p>The program generator, through the encoder it shares with the design.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/isa_ref.py</span></code></p></td>
-<td><p>built on the generated module</p></td>
-<td><p>The reference model. Names operands by the <code class="docutils literal notranslate"><span class="pre">name</span></code> given below and never sees a bit position, an opcode number or a numeric width the design chose.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">allo/encoding.py</span></code></p></td>
-<td><p>checked</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">TINYTPU_ISA</span></code>: the compiler-side descriptor of what one instruction word can carry. It imports nothing from examples/, so its address_terms and loop_depth budgets are checked against <code class="docutils literal notranslate"><span class="pre">agu.terms</span></code> and <code class="docutils literal notranslate"><span class="pre">loop_stack.depth</span></code> rather than generated.</p></td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="instruction-word">
-<h3>Instruction word<a class="headerlink" href="#instruction-word" title="Link to this heading"><span>¶</span></a></h3>
-<p>An instruction is <strong>2 64-bit words</strong> (<code class="docutils literal notranslate"><span class="pre">IWORDS</span></code>). Word 0 carries the opcode and five fields; word 1 carries up to 3 address-generation terms.</p>
-<table class="docutils align-default" id="id2">
-<caption><span class="caption-text">Instruction word 0</span><a class="headerlink" href="#id2" title="Link to this table"><span>¶</span></a></caption>
-<thead>
-<tr class="row-odd"><th class="head"><p>field</p></th>
-<th class="head"><p>bits</p></th>
-<th class="head"><p>width</p></th>
-<th class="head"><p>usable range</p></th>
-<th class="head"><p>role</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">op</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">[0:6]</span></code></p></td>
-<td><p>6</p></td>
-<td><p>0 .. 31</p></td>
-<td><p>opcode</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">f0</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">[6:18]</span></code></p></td>
-<td><p>12</p></td>
-<td><p>0 .. 2047</p></td>
-<td><p>operand field, AGU target 1</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">f1</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">[18:30]</span></code></p></td>
-<td><p>12</p></td>
-<td><p>0 .. 2047</p></td>
-<td><p>operand field, AGU target 2</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">f2</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">[30:42]</span></code></p></td>
-<td><p>12</p></td>
-<td><p>0 .. 2047</p></td>
-<td><p>operand field, AGU target 3</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">f3</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">[42:54]</span></code></p></td>
-<td><p>12</p></td>
-<td><p>0 .. 2047</p></td>
-<td><p>operand field, AGU target 4</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nr</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">[54:62]</span></code></p></td>
-<td><p>8</p></td>
-<td><p>0 .. 127</p></td>
-<td><p>row count, or loop trip count</p></td>
-</tr>
-</tbody>
-</table>
-<p>Every field carries one more bit than its value range needs: an N-bit field safely holds <code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">..</span> <span class="pre">2^(N-1)</span> <span class="pre">-</span> <span class="pre">1</span></code>, the spare-bit rule below.</p>
-<table class="docutils align-default" id="id3">
-<caption><span class="caption-text">Instruction word 1: one AGU term (19 bits, 3 of them)</span><a class="headerlink" href="#id3" title="Link to this table"><span>¶</span></a></caption>
-<thead>
-<tr class="row-odd"><th class="head"><p>subfield</p></th>
-<th class="head"><p>bits</p></th>
-<th class="head"><p>width</p></th>
-<th class="head"><p>usable range</p></th>
-<th class="head"><p>meaning</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">target</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">[0:4]</span></code></p></td>
-<td><p>4</p></td>
-<td><p>0 .. 7</p></td>
-<td><p>4 bits for 0..4 under the spare-bit rule.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">level</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">[4:7]</span></code></p></td>
-<td><p>3</p></td>
-<td><p>0 .. 3</p></td>
-<td><p>3 bits for 0..LOOP_DEPTH-1.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">stride</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">[7:19]</span></code></p></td>
-<td><p>12</p></td>
-<td><p>0 .. 2047</p></td>
-<td><p>12 bits for 0..2047.</p></td>
-</tr>
-</tbody>
-</table>
-<p>A term resolves to <code class="docutils literal notranslate"><span class="pre">field[target]</span> <span class="pre">+=</span> <span class="pre">iv[level]</span> <span class="pre">*</span> <span class="pre">stride,</span> <span class="pre">for</span> <span class="pre">each</span> <span class="pre">term</span> <span class="pre">with</span> <span class="pre">target</span> <span class="pre">!=</span> <span class="pre">0,</span> <span class="pre">in</span> <span class="pre">term</span> <span class="pre">order</span></code>. Targets: 0 = unused, 1 = <code class="docutils literal notranslate"><span class="pre">f0</span></code>, 2 = <code class="docutils literal notranslate"><span class="pre">f1</span></code>, 3 = <code class="docutils literal notranslate"><span class="pre">f2</span></code>, 4 = <code class="docutils literal notranslate"><span class="pre">f3</span></code>.</p>
-</section>
-<section id="opcodes">
-<h3>Opcodes<a class="headerlink" href="#opcodes" title="Link to this heading"><span>¶</span></a></h3>
-<table class="docutils align-default" id="id4">
-<caption><span class="caption-text">Opcodes</span><a class="headerlink" href="#id4" title="Link to this table"><span>¶</span></a></caption>
-<thead>
-<tr class="row-odd"><th class="head"><p>constant</p></th>
-<th class="head"><p>value</p></th>
-<th class="head"><p>name</p></th>
-<th class="head"><p>operand fields</p></th>
-<th class="head"><p><code class="docutils literal notranslate"><span class="pre">nr</span></code></p></th>
-<th class="head"><p>units</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">OP_NOP</span></code></p></td>
-<td><p>0</p></td>
-<td><p>nop</p></td>
-<td></td>
-<td><p>none</p></td>
-<td><p>–</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">OP_DMA_LD</span></code></p></td>
-<td><p>1</p></td>
-<td><p>dma_ld</p></td>
-<td><div class="line-block">
-<div class="line"><code class="docutils literal notranslate"><span class="pre">f0</span></code> = mode: source matrix | destination memory</div>
-<div class="line"><code class="docutils literal notranslate"><span class="pre">f1</span></code> = dram_row0: first DRAM row of the source matrix</div>
-<div class="line"><code class="docutils literal notranslate"><span class="pre">f2</span></code> = col_block: packed-word column block within the row, 0 .. WPR-1</div>
-<div class="line"><code class="docutils literal notranslate"><span class="pre">f3</span></code> = dst_row0: first destination row, in spad or vr by the mode bit</div>
-</div>
-</td>
-<td><p>nr DRAM rows</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">dma_ld</span></code>, spm (dst = spad) or vru (dst = vr)</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">OP_DMA_ST</span></code></p></td>
-<td><p>2</p></td>
-<td><p>dma_st</p></td>
-<td><p>Retired: results leave via mvout. <code class="docutils literal notranslate"><span class="pre">check_program</span></code> refuses it, so the number stays reserved rather than reusable.</p></td>
-<td><p>none</p></td>
-<td><p>–</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">OP_VLD</span></code></p></td>
-<td><p>3</p></td>
-<td><p>vld</p></td>
-<td><div class="line-block">
-<div class="line"><code class="docutils literal notranslate"><span class="pre">f0</span></code> = vr0: first destination vreg row</div>
-<div class="line"><code class="docutils literal notranslate"><span class="pre">f1</span></code> = spad0: first source scratchpad row</div>
-</div>
-</td>
-<td><p>nr packed words</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code>, <code class="docutils literal notranslate"><span class="pre">vru</span></code></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">OP_MM</span></code></p></td>
-<td><p>4</p></td>
-<td><p>mm</p></td>
-<td><div class="line-block">
-<div class="line"><code class="docutils literal notranslate"><span class="pre">f0</span></code> = vr_a: first activation row in vr</div>
-<div class="line"><code class="docutils literal notranslate"><span class="pre">f1</span></code> = ar0: first accumulator row</div>
-<div class="line"><code class="docutils literal notranslate"><span class="pre">f2</span></code> = acc: 0 = overwrite ar, 1 = accumulate into ar</div>
-<div class="line"><code class="docutils literal notranslate"><span class="pre">f3</span></code> = spad_w: first of T weight rows in spad</div>
-</div>
-</td>
-<td><p>nr activation rows (wavefront rows through the array)</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code>, <code class="docutils literal notranslate"><span class="pre">vru</span></code>, <code class="docutils literal notranslate"><span class="pre">accu</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">OP_VADD</span></code></p></td>
-<td><p>5</p></td>
-<td><p>vadd</p></td>
-<td><div class="line-block">
-<div class="line"><code class="docutils literal notranslate"><span class="pre">f0</span></code> = ar_d: first destination accumulator row</div>
-<div class="line"><code class="docutils literal notranslate"><span class="pre">f1</span></code> = ar_s1: first row of the left source</div>
-<div class="line"><code class="docutils literal notranslate"><span class="pre">f2</span></code> = ar_s2: first row of the right source</div>
-</div>
-</td>
-<td><p>nr accumulator rows</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">OP_VRELU</span></code></p></td>
-<td><p>6</p></td>
-<td><p>vrelu</p></td>
-<td><div class="line-block">
-<div class="line"><code class="docutils literal notranslate"><span class="pre">f0</span></code> = ar_d: first destination accumulator row</div>
-<div class="line"><code class="docutils literal notranslate"><span class="pre">f1</span></code> = ar_s: first source accumulator row</div>
-</div>
-</td>
-<td><p>nr accumulator rows</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">OP_MVOUT</span></code></p></td>
-<td><p>7</p></td>
-<td><p>mvout</p></td>
-<td><div class="line-block">
-<div class="line"><code class="docutils literal notranslate"><span class="pre">f0</span></code> = ar0: first accumulator row to retire</div>
-<div class="line"><code class="docutils literal notranslate"><span class="pre">f1</span></code> = dram_row0: first DRAM row of C</div>
-<div class="line"><code class="docutils literal notranslate"><span class="pre">f2</span></code> = col_block: packed-word column block of C, 0 .. WPR-1</div>
-</div>
-</td>
-<td><p>nr accumulator rows</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code>, <code class="docutils literal notranslate"><span class="pre">dma_st</span></code></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">OP_LOOP</span></code></p></td>
-<td><p>8</p></td>
-<td><p>loop</p></td>
-<td></td>
-<td><p>nr is the trip count, minimum 1</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">sequencer</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">OP_ENDLOOP</span></code></p></td>
-<td><p>9</p></td>
-<td><p>endloop</p></td>
-<td></td>
-<td><p>none</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">sequencer</span></code></p></td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="derived-properties">
-<h3>Derived properties<a class="headerlink" href="#derived-properties" title="Link to this heading"><span>¶</span></a></h3>
-<p>Facts that <strong>follow</strong> from the tables above rather than being written in them. <code class="docutils literal notranslate"><span class="pre">gen_isa.py</span> <span class="pre">--check</span></code> recomputes each one from the spec and then confirms the design behaves that way, so they are checked rather than asserted – every one of them was documented wrongly here until 2026-09-21, which is the argument for computing them.</p>
-<dl>
-<dt><code class="docutils literal notranslate"><span class="pre">every_operand_field_is_an_agu_target</span></code></dt><dd><p>Every operand field is a legal AGU target, including one with a restricted value set such as mm’s <code class="docutils literal notranslate"><span class="pre">acc</span></code>. Nothing in the encoding or in the sequencer distinguishes them: the sequencer adds iv[level] * stride to whichever field the term names and writes the sum back, and it does not know which fields have restricted values.</p>
-<p>Derived from: <code class="docutils literal notranslate"><span class="pre">agu.targets</span></code>, <code class="docutils literal notranslate"><span class="pre">agu.semantics</span></code>.</p>
-<p><strong>Corrects:</strong> Three documents in this project described <code class="docutils literal notranslate"><span class="pre">acc</span></code> as a static field that cannot be predicated on an induction variable. That is false. The real obstacle is the next property.</p>
-</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">agu_terms_are_additively_monotone</span></code></dt><dd><p>An AGU term contributes base + iv * stride with no predication, no saturation and no wrap, so the values a field takes over a loop of trip t are the arithmetic progression base, base + stride, …, base + (t-1) * stride, and nothing bends it back inside a bound. A field with a restricted value set is therefore drivable from a loop for exactly as long as that progression stays inside the set – <code class="docutils literal notranslate"><span class="pre">isa_encoding.agu_legal_trip</span></code> computes how long from <code class="docutils literal notranslate"><span class="pre">legal_values</span></code> alone.</p>
-<p>Derived from: <code class="docutils literal notranslate"><span class="pre">agu.semantics</span></code>, <code class="docutils literal notranslate"><span class="pre">opcodes[mm].operands[acc].legal_values</span></code>.</p>
-<p>At base 0 stride 1 the frontier is 2: an accumulate field driven by the reduce loop assembles for exactly two k-tiles and is rejected at the third.</p>
-</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">a_term_on_acc_costs_one_of_the_budget</span></code></dt><dd><p>A term on <code class="docutils literal notranslate"><span class="pre">acc</span></code> costs one of the AGU_TERMS terms an instruction carries. The accumulating mm of the shipped tiled GEMM already spends all of them – activations walk the reduce loop, weights walk both the column loop and the reduce loop – so driving <code class="docutils literal notranslate"><span class="pre">acc</span></code> from the reduce loop needs one more than the instruction word has, and the budget refuses the instruction before the monotonicity frontier above is ever reached. Widening the address generator and relieving <code class="docutils literal notranslate"><span class="pre">acc</span></code> are therefore COMPLEMENTS, not alternatives: at AGU_TERMS = 3 the second constraint is unreachable for any program with a column loop.</p>
-<p>Derived from: <code class="docutils literal notranslate"><span class="pre">agu.terms</span></code>, <code class="docutils literal notranslate"><span class="pre">opcodes[mm].operands</span></code>.</p>
-<p><code class="docutils literal notranslate"><span class="pre">terms_used_by_shipped_acc_mm</span></code> is read out of the shipped program’s own AGU word, not restated here.</p>
-</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">the_maxdim_ceilings_are_the_encoding's</span></code></dt><dd><p>What bounds MAXDIM is the ENCODING, not the datapath, and both bounds follow from numbers already in this file. They answer different questions – one asks what the operand layout can ADDRESS, the other what a CUBIC GEMM’s header count can promise – so neither is a correction of the other, and the binding one depends on the program. <code class="docutils literal notranslate"><span class="pre">isa_encoding.maxdim_ceiling</span></code> computes each over multiples of T, and the design refuses a cubic GEMM at exactly the value the cubic-header ceiling gives.</p>
-<p>Derived from: <code class="docutils literal notranslate"><span class="pre">maxdim_ceilings</span></code>, <code class="docutils literal notranslate"><span class="pre">encoding_rule.usable_max</span></code>, <code class="docutils literal notranslate"><span class="pre">imem.count_slice_width</span></code>, <code class="docutils literal notranslate"><span class="pre">imem.entries[accu_iterations]</span></code>.</p>
-<p>The numbers are computed, not typed: at T=4 the addressing ceiling is 88 and the cubic-header ceiling is 76, so the cubic one binds; at T=8 they are 128 and 120, so the cubic one binds there too. An earlier revision of this file said 90 for the first, copied from the design’s comment, which solved the inequality over the reals instead of over multiples of T.</p>
-</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">program_limits_predict_what_assembles</span></code></dt><dd><p>The limits in <code class="docutils literal notranslate"><span class="pre">program_limits</span></code> decide exactly which GEMM shapes this build can run, and <code class="docutils literal notranslate"><span class="pre">isa_encoding.gemm_limits</span></code> computes which limit refuses a shape and by how much. For the shipped layout, a shape assembles if and only if every limit but the <code class="docutils literal notranslate"><span class="pre">split_operand_load</span></code> alternative fits.</p>
-<p>Derived from: <code class="docutils literal notranslate"><span class="pre">program_limits.limits</span></code>, <code class="docutils literal notranslate"><span class="pre">derived_constants[MAXROWS]</span></code>, <code class="docutils literal notranslate"><span class="pre">imem.count_usable_max</span></code>.</p>
-<p>The <code class="docutils literal notranslate"><span class="pre">split_operand_load</span></code> row is the one that makes the answer actionable rather than final: at T=8 MAXDIM=128 the shipped layout is over by 1 on <code class="docutils literal notranslate"><span class="pre">max(M,</span> <span class="pre">K)</span></code> for 32x128x128 and 64x128x128, but splitting the B load removes K from the row count and both assemble and compute A&#64;B exactly – measured on the design, not argued. 128x128x128 is over by 1 even then, and its accu header count is over by 2049, so it needs both a wider nr and a wider header slice.</p>
-</dd>
-</dl>
-</section>
-<section id="per-unit-rewrites">
-<h3>Per-unit rewrites<a class="headerlink" href="#per-unit-rewrites" title="Link to this heading"><span>¶</span></a></h3>
-<p>The sequencer hands two units a rewritten copy of the word, so each unit’s flat row loop reads its own work count out of <code class="docutils literal notranslate"><span class="pre">nr</span></code>:</p>
-<table class="docutils align-default">
-<thead>
-<tr class="row-odd"><th class="head"><p>opcode</p></th>
-<th class="head"><p>unit</p></th>
-<th class="head"><p>rewritten to</p></th>
-<th class="head"><p>why</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mm</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">nr</span></code> = T + 1, <code class="docutils literal notranslate"><span class="pre">f1</span></code> = the instruction’s own nr</p></td>
-<td><p>One header word plus T weight rows down wcol; f1 carries the array’s row count into the header word.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">vadd</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">nr</span></code> = 2 * nr</p></td>
-<td><p>accu takes two iterations per vadd row: first source on the even one, second source and the write on the odd one. 2 * MAXROWS fits the 8-bit field.</p></td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="instruction-memory-header">
-<h3>Instruction memory header<a class="headerlink" href="#instruction-memory-header" title="Link to this heading"><span>¶</span></a></h3>
-<p><code class="docutils literal notranslate"><span class="pre">imem[0:NHDR]</span></code> (<code class="docutils literal notranslate"><span class="pre">NHDR</span> <span class="pre">=</span> <span class="pre">8</span></code>) is a header of per-unit <strong>work</strong> counts; instructions follow, two words each. Each count is read back through a 16-bit slice, so it stops at 32767.</p>
-<table class="docutils align-default" id="id5">
-<caption><span class="caption-text">Header words</span><a class="headerlink" href="#id5" title="Link to this table"><span>¶</span></a></caption>
-<thead>
-<tr class="row-odd"><th class="head"><p>word</p></th>
-<th class="head"><p>bits</p></th>
-<th class="head"><p>name</p></th>
-<th class="head"><p>count</p></th>
-<th class="head"><p>consumer</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">imem[0]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">[0:16]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">n_instr</span></code></p></td>
-<td><p>static instruction count</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">sequencer</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">imem[1]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">[0:16]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">dma_ld_rows</span></code></p></td>
-<td><p>rows of <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">dma_ld</span></code></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">imem[2]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">[0:16]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">spm_rows</span></code></p></td>
-<td><div class="line-block">
-<div class="line">the sum of:</div>
-<div class="line-block">
-<div class="line">rows of <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> with destination <code class="docutils literal notranslate"><span class="pre">spad</span></code></div>
-<div class="line">rows of <code class="docutils literal notranslate"><span class="pre">vld</span></code></div>
-<div class="line">issues of <code class="docutils literal notranslate"><span class="pre">mm</span></code>, times T + 1</div>
-</div>
-</div>
-</td>
-<td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">imem[3]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">[0:16]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">vru_words</span></code></p></td>
-<td><div class="line-block">
-<div class="line">the sum of:</div>
-<div class="line-block">
-<div class="line">rows of <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> with destination <code class="docutils literal notranslate"><span class="pre">vr</span></code></div>
-<div class="line">rows of <code class="docutils literal notranslate"><span class="pre">vld</span></code></div>
-<div class="line">rows of <code class="docutils literal notranslate"><span class="pre">mm</span></code></div>
-</div>
-</div>
-</td>
-<td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">imem[4]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">[0:16]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">mm_count</span></code></p></td>
-<td><p>issues of <code class="docutils literal notranslate"><span class="pre">mm</span></code></p></td>
-<td><p>the array, via spm’s header word</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">imem[4]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">[16:32]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">mm_rows</span></code></p></td>
-<td><p>rows of <code class="docutils literal notranslate"><span class="pre">mm</span></code></p></td>
-<td><p>the array, via spm’s header word</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">imem[5]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">[0:16]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">accu_iterations</span></code></p></td>
-<td><div class="line-block">
-<div class="line">the sum of:</div>
-<div class="line-block">
-<div class="line">rows of <code class="docutils literal notranslate"><span class="pre">mm</span></code>, <code class="docutils literal notranslate"><span class="pre">vrelu</span></code>, <code class="docutils literal notranslate"><span class="pre">mvout</span></code></div>
-<div class="line">rows of <code class="docutils literal notranslate"><span class="pre">vadd</span></code>, times 2</div>
-</div>
-</div>
-</td>
-<td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">imem[6]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">[0:16]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">dma_st_rows</span></code></p></td>
-<td><p>rows of <code class="docutils literal notranslate"><span class="pre">mvout</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">dma_st</span></code></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">imem[7]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">[0:16]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">a_span</span></code></p></td>
-<td><p>max(first row + rows) over <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> with source <code class="docutils literal notranslate"><span class="pre">A</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">dma_ld</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">imem[7]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">[16:32]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">b_span</span></code></p></td>
-<td><p>max(first row + rows) over <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> with source <code class="docutils literal notranslate"><span class="pre">B</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">dma_ld</span></code></p></td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="memory-map">
-<h3>Memory map<a class="headerlink" href="#memory-map" title="Link to this heading"><span>¶</span></a></h3>
-<table class="docutils align-default" id="id6">
-<caption><span class="caption-text">Memories</span><a class="headerlink" href="#id6" title="Link to this table"><span>¶</span></a></caption>
-<thead>
-<tr class="row-odd"><th class="head"><p>memory</p></th>
-<th class="head"><p>owner</p></th>
-<th class="head"><p>depth</p></th>
-<th class="head"><p>row width</p></th>
-<th class="head"><p>written by</p></th>
-<th class="head"><p>read by</p></th>
-<th class="head"><p>cleared at start</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">spad</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">SPAD_ROWS</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">*</span> <span class="pre">8</span></code> bits</p></td>
-<td><p>dma_ld (dst = spad)</p></td>
-<td><p>vld, mm (weights)</p></td>
-<td><p><strong>no</strong></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">vr</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">NVR</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">*</span> <span class="pre">8</span></code> bits</p></td>
-<td><p>dma_ld (dst = vr), vld</p></td>
-<td><p>mm (activations)</p></td>
-<td><p><strong>no</strong></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ar</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">NAR</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">*</span> <span class="pre">32</span></code> bits</p></td>
-<td><p>mm, vadd, vrelu</p></td>
-<td><p>mm (acc = 1), vadd, vrelu, mvout</p></td>
-<td><p><strong>no</strong></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">imem</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">sequencer</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">IMEM_SIZE</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">64</span></code> bits</p></td>
-<td><p>the host, through m_axi</p></td>
-<td><p>sequencer</p></td>
-<td><p><strong>no</strong></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">A</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">dma_ld</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">MAXDIM</span> <span class="pre">*</span> <span class="pre">MAXDIM</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">8</span></code> bits</p></td>
-<td><p>the host</p></td>
-<td><p>dma_ld</p></td>
-<td><p><strong>no</strong></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">B</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">dma_ld</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">MAXDIM</span> <span class="pre">*</span> <span class="pre">MAXDIM</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">8</span></code> bits</p></td>
-<td><p>the host</p></td>
-<td><p>dma_ld</p></td>
-<td><p><strong>no</strong></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">C</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">dma_st</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">MAXDIM</span> <span class="pre">*</span> <span class="pre">MAXDIM</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">8</span></code> bits</p></td>
-<td><p>dma_st (mvout)</p></td>
-<td><p>the host</p></td>
-<td><p><strong>no</strong></p></td>
-</tr>
-</tbody>
-</table>
-<p>No on-chip memory is cleared by the hardware, so every read of one is the program’s obligation; see the contracts below.</p>
-</section>
-<section id="contracts">
-<h3>Contracts<a class="headerlink" href="#contracts" title="Link to this heading"><span>¶</span></a></h3>
-<p><strong>Write before read.</strong></p>
-<ul class="simple">
-<li><p>Every ar row read by an accumulating mm, by either source of a vadd, by a vrelu source or by an mvout must have been written earlier in the SAME program, by an overwriting mm, a vadd or a vrelu.</p></li>
-<li><p>Every vr row an mm reads as activations, and every spad row it reads as weights, must hold data a dma_ld put there – directly, or into spad and then through a vld.</p></li>
-<li><p>vld is a pure copy and may copy an unwritten spad row; the copy is then unwritten too, and consuming it in an mm is an error.</p></li>
-<li><p>nr &gt;= 1 on every data op: a unit fetches an instruction whenever its row counter runs out, so a zero-row instruction is fetched as if it had one row. It desynchronises the unit; it is not a no-op.</p></li>
-<li><p>Every resolved field must be within 0 .. 2047, the range the encoding rule admits.</p></li>
-</ul>
-<p>Enforced by microarch_isa.check_program, which microarch_isa.assemble calls, so a violating program cannot be assembled.</p>
-<p><strong>The accumulator read-after-write distance.</strong> A read of an ar row must come at least AR_RAW_DIST accu iterations after the write it depends on. <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span> <span class="pre">=</span> <span class="pre">4</span></code> accu iterations; cost per opcode: <code class="docutils literal notranslate"><span class="pre">mm</span></code> 1 per row, <code class="docutils literal notranslate"><span class="pre">vrelu</span></code> 1 per row, <code class="docutils literal notranslate"><span class="pre">mvout</span></code> 1 per row, <code class="docutils literal notranslate"><span class="pre">vadd</span></code> 2 per row: first source on the even iteration, second source and the write on the odd one. Enforced by microarch_isa.check_program. Exercised at its edge by isa_dsl.ar_distance_program(AR_RAW_DIST), run by TPU_TB=stress cosim on every build.</p>
-</section>
-<section id="parameters">
-<h3>Parameters<a class="headerlink" href="#parameters" title="Link to this heading"><span>¶</span></a></h3>
-<table class="docutils align-default" id="id7">
-<caption><span class="caption-text">Build parameters</span><a class="headerlink" href="#id7" title="Link to this table"><span>¶</span></a></caption>
-<thead>
-<tr class="row-odd"><th class="head"><p>constant</p></th>
-<th class="head"><p>environment variable</p></th>
-<th class="head"><p>default</p></th>
-<th class="head"><p>legal range</p></th>
-<th class="head"><p>role</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">T</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">TPU_T</span></code></p></td>
-<td><p>4</p></td>
-<td><p>4 .. unbounded</p></td>
-<td><p>SIMD width, and the array dimension: the array is T*T processing elements</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM</span></code></p></td>
-<td><p>64</p></td>
-<td><p>4 .. unbounded</p></td>
-<td><p>largest M, K, N supported by one build</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">SPAD_ROWS</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">TPU_SPAD</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">max(TEST_WINDOW,</span> <span class="pre">OPERAND_ROWS)</span></code></p></td>
-<td><p>1 .. 2048</p></td>
-<td><p>scratchpad depth in packed words</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NVR</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">TPU_NVR</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">max(TEST_WINDOW,</span> <span class="pre">OPERAND_ROWS)</span></code></p></td>
-<td><p>1 .. 2048</p></td>
-<td><p>operand vector registers</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NAR</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">TPU_NAR</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">max(128,</span> <span class="pre">TEST_WINDOW,</span> <span class="pre">2</span> <span class="pre">*</span> <span class="pre">MAXDIM</span> <span class="pre">+</span> <span class="pre">8)</span></code></p></td>
-<td><p>1 .. 2048</p></td>
-<td><p>accumulator vector registers</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">IMEM_SIZE</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">TPU_IMEM</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">NHDR</span> <span class="pre">+</span> <span class="pre">IWORDS</span> <span class="pre">*</span> <span class="pre">24</span></code></p></td>
-<td><p>8 .. unbounded</p></td>
-<td><p>instruction memory depth in 64-bit words</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">QD</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">TPU_QD</span></code></p></td>
-<td><p>8</p></td>
-<td><p>2 .. unbounded</p></td>
-<td><p>stream depth on every point-to-point channel</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">TPU_DMA_WORDS</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">min(WPR,</span> <span class="pre">max(1,</span> <span class="pre">BUS_BYTES</span> <span class="pre">//</span> <span class="pre">(VW</span> <span class="pre">//</span> <span class="pre">8)))</span> <span class="pre">if</span> <span class="pre">os.environ.get(&quot;TPU_DMA_WIDEN&quot;)</span> <span class="pre">==</span> <span class="pre">&quot;1&quot;</span> <span class="pre">else</span> <span class="pre">1</span></code></p></td>
-<td><p>1 .. unbounded</p></td>
-<td><p>packed words the operand burst moves per loop iteration</p></td>
-</tr>
-</tbody>
-</table>
-<table class="docutils align-default" id="id8">
-<caption><span class="caption-text">Derived constants</span><a class="headerlink" href="#id8" title="Link to this table"><span>¶</span></a></caption>
-<thead>
-<tr class="row-odd"><th class="head"><p>constant</p></th>
-<th class="head"><p>value</p></th>
-<th class="head"><p>role</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">VW</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">*</span> <span class="pre">8</span></code></p></td>
-<td><p>packed operand word: T operand lanes</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">AW</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">*</span> <span class="pre">32</span></code></p></td>
-<td><p>packed accumulator word: T accumulator lanes</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">WPR</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">MAXDIM</span> <span class="pre">//</span> <span class="pre">T</span></code></p></td>
-<td><p>packed words per DRAM row; the legal range of col_block</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">OPERAND_ROWS</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">(MAXDIM</span> <span class="pre">//</span> <span class="pre">T)</span> <span class="pre">*</span> <span class="pre">MAXDIM</span></code></p></td>
-<td><p>the highest operand row the shipped GEMM’s layout names; what the operand memories are sized from</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TEST_WINDOW</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">64</span></code></p></td>
-<td><p>the fixed row window the stress harness’s fuzz programs address, independently of MAXDIM; a floor under the operand memories</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">BUS_BYTES</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">64</span></code></p></td>
-<td><p>the m_axi beat the build aligns to (align_value 64)</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MAXROWS</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">127</span></code></p></td>
-<td><p>the largest nr the 8-bit field admits under the encoding rule</p></td>
-</tr>
-</tbody>
-</table>
-<p>Cross-parameter constraints, asserted by <code class="docutils literal notranslate"><span class="pre">isa_encoding.check_parameters()</span></code>:</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">&gt;=</span> <span class="pre">4</span></code> – a packed operand word must hold the two 16-bit counts vru sends down wcol</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">MAXDIM</span> <span class="pre">%</span> <span class="pre">T</span> <span class="pre">==</span> <span class="pre">0</span></code> – a DRAM row must be a whole number of packed words</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">OPERAND_ROWS</span> <span class="pre">&lt;=</span> <span class="pre">2048</span></code> – an address field carries 11 usable bits, and the layout numbers its rows 0 .. OPERAND_ROWS-1, so the highest address must be &lt;= 2047</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span> <span class="pre">&lt;=</span> <span class="pre">T</span></code> – a T-row GEMM must satisfy the accumulator distance contract</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">IMEM_SIZE</span> <span class="pre">%</span> <span class="pre">8</span> <span class="pre">==</span> <span class="pre">0</span></code> – the program prefetch moves 8 words per iteration</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">IMEM_SIZE</span> <span class="pre">&gt;=</span> <span class="pre">NHDR</span> <span class="pre">+</span> <span class="pre">IWORDS</span></code> – imem must hold the header and at least one instruction</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">SPAD_ROWS</span> <span class="pre">&lt;=</span> <span class="pre">2048</span> <span class="pre">and</span> <span class="pre">NVR</span> <span class="pre">&lt;=</span> <span class="pre">2048</span> <span class="pre">and</span> <span class="pre">NAR</span> <span class="pre">&lt;=</span> <span class="pre">2048</span></code> – a 12-bit address field carries 0..2047 under the encoding rule, and a memory of depth D is addressed 0..D-1, so D &lt;= 2048 – the same count-versus-address distinction as the addressing ceiling</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">SPAD_ROWS</span> <span class="pre">&gt;=</span> <span class="pre">OPERAND_ROWS</span> <span class="pre">and</span> <span class="pre">NVR</span> <span class="pre">&gt;=</span> <span class="pre">OPERAND_ROWS</span></code> – an operand memory smaller than the layout addresses assembles and gives wrong answers</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">NAR</span> <span class="pre">&gt;=</span> <span class="pre">2</span> <span class="pre">*</span> <span class="pre">MAXDIM</span> <span class="pre">+</span> <span class="pre">2</span></code> – AR_C is MAXDIM rows and AR_P another MAXDIM from MAXDIM+1</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span> <span class="pre">&gt;=</span> <span class="pre">1</span></code> – the operand burst moves at least one packed word per iteration</p></li>
-</ul>
-</section>
-<section id="what-bounds-maxdim">
-<h3>What bounds <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code><a class="headerlink" href="#what-bounds-maxdim" title="Link to this heading"><span>¶</span></a></h3>
-<p>Two ceilings, both in the <strong>encoding</strong> rather than the datapath. They answer different questions, so neither is a correction of the other, and which one binds depends on the program and on <code class="docutils literal notranslate"><span class="pre">T</span></code>. The values below are <strong>computed</strong> by <code class="docutils literal notranslate"><span class="pre">isa_encoding.maxdim_ceiling</span></code>, over multiples of <code class="docutils literal notranslate"><span class="pre">T</span></code>: solving either inequality over the reals gives a number no build can use.</p>
-<table class="docutils align-default" id="id9">
-<caption><span class="caption-text"><code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code> ceilings</span><a class="headerlink" href="#id9" title="Link to this table"><span>¶</span></a></caption>
-<thead>
-<tr class="row-odd"><th class="head"><p>ceiling</p></th>
-<th class="head"><p>at T=4</p></th>
-<th class="head"><p>at T=8</p></th>
-<th class="head"><p>predicate</p></th>
-<th class="head"><p>the question it answers</p></th>
-<th class="head"><p>how the design refuses past it</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">addressing</span></code></p></td>
-<td><p>88</p></td>
-<td><p>128</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">(MAXDIM</span> <span class="pre">//</span> <span class="pre">T)</span> <span class="pre">*</span> <span class="pre">MAXDIM</span> <span class="pre">&lt;=</span> <span class="pre">2048</span></code></p></td>
-<td><p>How large a MAXDIM can the shipped GEMM’s operand layout ADDRESS? A property of the layout and the address field, independent of the shape being run.</p></td>
-<td><p>check_program: “AGU-resolved f3=… is outside the 0..2047 range”, or the import-time assert on OPERAND_ROWS</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">cubic_header</span></code></p></td>
-<td><p>76</p></td>
-<td><p>120</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">MAXDIM</span> <span class="pre">**</span> <span class="pre">3</span> <span class="pre">//</span> <span class="pre">T</span> <span class="pre">**</span> <span class="pre">2</span> <span class="pre">+</span> <span class="pre">MAXDIM</span> <span class="pre">**</span> <span class="pre">2</span> <span class="pre">//</span> <span class="pre">T</span> <span class="pre">&lt;=</span> <span class="pre">32767</span></code></p></td>
-<td><p>How large a MAXDIM can a CUBIC GEMM’s header count promise accu? A property of the WORKLOAD as well as the encoding – a non-cubic shape gives a different count, so this ceiling moves with the program.</p></td>
-<td><p>assemble: “header count … does not fit 15 bits”</p></td>
-</tr>
-</tbody>
-</table>
-<p>The binding ceiling for a build is the smaller of the two, and which one binds depends on the program. The design ships at MAXDIM=64, inside both.</p>
-</section>
-<section id="numerics">
-<h3>Numerics<a class="headerlink" href="#numerics" title="Link to this heading"><span>¶</span></a></h3>
-<p>Active configuration: <strong>int8</strong>. A configuration states what happens to <em>values</em>, not only how wide they are, so that a format whose arithmetic is inexact can be added without restructuring anything above.</p>
-<table class="docutils align-default" id="id10">
-<caption><span class="caption-text"><code class="docutils literal notranslate"><span class="pre">int8</span></code></span><a class="headerlink" href="#id10" title="Link to this table"><span>¶</span></a></caption>
-<thead>
-<tr class="row-odd"><th class="head"><p>stage</p></th>
-<th class="head"><p>operation</p></th>
-<th class="head"><p>range, or exactness and what replaces it</p></th>
-<th class="head"><p>where / note</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p>operand</p></td>
-<td><p>integer, signed, 8 bits</p></td>
-<td><p>-128 .. 127</p></td>
-<td><p>A, B, C at the region boundary; spad and vr lanes</p></td>
-</tr>
-<tr class="row-odd"><td><p>accumulator</p></td>
-<td><p>integer, signed, 32 bits</p></td>
-<td><p>-2147483648 .. 2147483647</p></td>
-<td><p>ar lanes, and the partial sum travelling south through the array</p></td>
-</tr>
-<tr class="row-even"><td><p>multiply</p></td>
-<td><p>operand x operand -&gt; 16 bits</p></td>
-<td><p>exact</p></td>
-<td><p>int8 x int8 is bounded by 128*128 = 16384, so a 16-bit product is exact and the multiplier stays narrow.</p></td>
-</tr>
-<tr class="row-odd"><td><p>accumulate</p></td>
-<td><p>integer addition</p></td>
-<td><p>rounding: none; overflow: wraparound, two’s complement, at 32 bits</p></td>
-<td><p>order: strictly sequential in ascending contraction index, south down the PE column, then the mm’s acc term</p></td>
-</tr>
-<tr class="row-even"><td><p>output</p></td>
-<td><p>accumulator -&gt; operand, saturate</p></td>
-<td><p>to -128 .. 127, rounding none</p></td>
-<td><p>mvout, in accu, before the word leaves for dma_st</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">vadd</span></code></p></td>
-<td><p>integer addition</p></td>
-<td><p>overflow: wraparound, two’s complement, at 32 bits</p></td>
-<td><p>in the accumulator format</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">vrelu</span></code></p></td>
-<td><p>max(x, 0)</p></td>
-<td><p>exact</p></td>
-<td><p>in the accumulator format</p></td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="rationale">
-<h3>Rationale<a class="headerlink" href="#rationale" title="Link to this heading"><span>¶</span></a></h3>
-<p><strong>Control flow.</strong> <code class="docutils literal notranslate"><span class="pre">LOOP</span></code>/<code class="docutils literal notranslate"><span class="pre">ENDLOOP</span></code> drive a <code class="docutils literal notranslate"><span class="pre">LOOP_DEPTH</span> <span class="pre">=</span> <span class="pre">4</span></code> hardware loop
-stack, as MiniTPU’s (<a class="reference internal" href="minitpu.html"><span class="doc">MiniTPU: Reference Architecture</span></a>). The sequencer’s loop is do-while, so a
-trip count of 0 would run <strong>once</strong>; the generator refuses it (below).</p>
-<p><strong>Address generation.</strong> Each AGU term is <code class="docutils literal notranslate"><span class="pre">(target,</span> <span class="pre">level,</span> <span class="pre">stride)</span></code> and resolves
-to <code class="docutils literal notranslate"><span class="pre">field[target]</span> <span class="pre">+=</span> <span class="pre">iv[level]</span> <span class="pre">*</span> <span class="pre">stride</span></code>, so an address can be relative to any
-enclosing loop’s induction variable. Terms name their target rather than being
-fixed one-per-field, because a single field often needs two: the <code class="docutils literal notranslate"><span class="pre">mm</span></code> inside
-the k loop names its weights at an offset by both the n tile and the k tile,
-<code class="docutils literal notranslate"><span class="pre">B_SP</span> <span class="pre">+</span> <span class="pre">nb*MAXDIM</span> <span class="pre">+</span> <span class="pre">kb*T</span></code>, and a one-term-per-field encoding cannot say it.
-Without this a loop body would reissue identical addresses every iteration and
-simply redo the same work.</p>
-</section>
-<section id="the-spare-bit-rule">
-<h3>The spare-bit rule<a class="headerlink" href="#the-spare-bit-rule" title="Link to this heading"><span>¶</span></a></h3>
-<p>Every field carries one more bit than its value range needs, because
-<strong>an N-bit ISA field safely carries 0 .. 2^(N-1) - 1</strong>. So <code class="docutils literal notranslate"><span class="pre">nr</span></code> is 8 bits
-for <code class="docutils literal notranslate"><span class="pre">MAXROWS</span> <span class="pre">=</span> <span class="pre">127</span></code>, the address fields are 12 bits for a 2047 maximum, AGU
-targets are 4 bits for 0..4, levels 3 bits for 0..3, strides 12 bits for
-0..2047, and <code class="docutils literal notranslate"><span class="pre">enc()</span></code> asserts <code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">&lt;=</span> <span class="pre">v</span> <span class="pre">&lt;</span> <span class="pre">2^(w-1)</span></code> for every field.</p>
-<p>The rule was earned from an emitter bug that extracted a bit-slice into a
-<strong>signed</strong> <code class="docutils literal notranslate"><span class="pre">ap_int&lt;N&gt;</span></code>, so a field whose top bit was set read back negative
-and the loop it bounded ran zero times. The general lesson it left is
-<strong>keep cosim in the loop rather than running it once at the end</strong>: the Allo
-dataflow simulator did not model the narrowing, so the fault was a genuine
-simulator/RTL divergence and was invisible to every functional check that had
-been passing. The bug itself is in
-<a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The emitter has since been fixed: the fork’s <code class="docutils literal notranslate"><span class="pre">3de74846</span></code> (“hls: emit bit
-slices as unsigned”, 2026-09-18) and upstream’s <code class="docutils literal notranslate"><span class="pre">094ab413</span></code> (PR #612,
-“Preserve unsigned bit-slice types during HLS codegen”) fix the same bug;
-<code class="docutils literal notranslate"><span class="pre">main</span></code> took upstream’s implementation in merge <code class="docutils literal notranslate"><span class="pre">dc6b8fa6</span></code> (2026-09-19).
-The design’s spare-bit encoding predates the fix and is unchanged. See
-<a class="reference internal" href="../developer/limitations.html#limitation-12"><span class="std std-ref">12. Bit-slices lower to signed ap_int&lt;N&gt;, silently, and the simulator disagrees</span></a>.</p>
-</div>
-<p>The <code class="docutils literal notranslate"><span class="pre">nr</span></code> width is also load-bearing for synthesis, not only for correctness;
-see <a class="reference internal" href="#tinytpu-isa-csynth-bound"><span class="std std-ref">A programmable design’s csynth number is not a cycle count</span></a>.</p>
-</section>
-<section id="header-and-program-memory">
-<h3>Header and program memory<a class="headerlink" href="#header-and-program-memory" title="Link to this heading"><span>¶</span></a></h3>
-<p>The header words are tabulated above. <code class="docutils literal notranslate"><span class="pre">imem[0]</span></code> bounds the sequencer’s fetch;
-every other count is dynamic, from <code class="docutils literal notranslate"><span class="pre">expand()</span></code>, which runs the program’s
-control flow at assembly time and resolves the AGU exactly as the sequencer
-does. With a hardware loop the static and dynamic counts differ, and <strong>a unit
-promised more work than it receives does not produce a wrong answer, it
-hangs</strong> – the one place where the assembler and the microarchitecture are
-coupled.</p>
-<p><code class="docutils literal notranslate"><span class="pre">IMEM_SIZE</span></code> is <code class="docutils literal notranslate"><span class="pre">NHDR</span> <span class="pre">+</span> <span class="pre">IWORDS</span> <span class="pre">*</span> <span class="pre">24</span></code> (the longest program shipped, plus
-headroom). The program is pulled on-chip by one burst of <code class="docutils literal notranslate"><span class="pre">IMEM_SIZE</span></code> words
-before anything runs, so imem size is startup time whether the program uses it
-or not. Measured when the prefetch moved one word per cycle: moving to the
-2-word instruction format cost exactly +68 cycles at all five shapes, exactly
-the 68 extra words it added – the loop logic itself cost nothing. Since
-<code class="docutils literal notranslate"><span class="pre">e24e433b</span></code> the prefetch moves <strong>8 words per cycle</strong> (gmem0 is 512 bits wide;
-<code class="docutils literal notranslate"><span class="pre">ib</span></code> is cyclically partitioned by 8), so the 56 words cost 7 cycles, not 56
-– worth 52 cycles at every shape (<code class="docutils literal notranslate"><span class="pre">v_imem8</span></code>). With control flow the program
-is O(nesting), not O(tiles): the looped GEMM is at most 14 instructions (with
-<code class="docutils literal notranslate"><span class="pre">relu</span></code>) at every shape, where the unrolled one reaches 32.</p>
-</section>
-<section id="programs-and-the-loop-nest-generator">
-<span id="tinytpu-isa-programs"></span><h3>Programs, and the loop-nest generator<a class="headerlink" href="#programs-and-the-loop-nest-generator" title="Link to this heading"><span>¶</span></a></h3>
-<p>Three program forms are kept, and <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code> checks them against each
-other before building anything:</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">isa_dsl.gemm_program</span></code> – the shipped program, from the loop-nest generator:
-A <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code>’d straight into the vregs, B into the scratchpad, and every
-<code class="docutils literal notranslate"><span class="pre">mm</span></code> naming its T weight rows there.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">microarch_isa.gemm_program_handwritten</span></code> – the hand-emitted reference. The
-first k-tile is peeled out of the k loop deliberately: it carries <code class="docutils literal notranslate"><span class="pre">f2=0</span></code>
-(overwrite the accumulator) where the looped tiles carry <code class="docutils literal notranslate"><span class="pre">f2=1</span></code>
-(accumulate), and peeling is how you say that without a predicate on the
-induction variable.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">microarch_isa.gemm_program_flat</span></code> – the fully unrolled differential
-reference, absolute addresses and no control flow.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">vadd_program</span></code> computes <code class="docutils literal notranslate"><span class="pre">relu(2</span> <span class="pre">*</span> <span class="pre">(A</span> <span class="pre">&#64;</span> <span class="pre">B))</span></code> on the first output tile, so
-<code class="docutils literal notranslate"><span class="pre">vadd</span></code>/<code class="docutils literal notranslate"><span class="pre">vrelu</span></code> stay exercised now that the GEMM inner loop no longer needs
-them.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">isa_dsl.vector_program</span></code> and <code class="docutils literal notranslate"><span class="pre">isa_dsl.ar_distance_program</span></code> are test
-programs: the first varies every field GEMM holds constant (both <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code>
-destinations, <code class="docutils literal notranslate"><span class="pre">vld</span></code>, distinct accumulator regions), the second sits exactly
-on the accumulator distance contract (<a class="reference internal" href="#tinytpu-isa-dependence"><span class="std std-ref">The accumulator’s dependence claim</span></a>).</p></li>
-</ul>
-<p><code class="docutils literal notranslate"><span class="pre">isa_dsl.py</span></code> is <strong>a code generator, not a compiler</strong>. It chooses nothing:</p>
-<table class="docutils align-default">
-<colgroup>
-<col style="width: 25.0%" />
-<col style="width: 75.0%" />
-</colgroup>
-<tbody>
-<tr class="row-odd"><td><p>the programmer writes</p></td>
-<td><p>the tiling, the loop order, the layout, which k-tile is peeled, and which
-loop an address walks</p></td>
-</tr>
-<tr class="row-even"><td><p>the generator derives</p></td>
-<td><p>every <code class="docutils literal notranslate"><span class="pre">agu_level</span></code>, every AGU term, every loop open/close pair, and the
-encoded instruction word</p></td>
-</tr>
-<tr class="row-odd"><td><p>the generator refuses</p></td>
-<td><p>a nest deeper than the hardware loop stack, an induction variable used
-outside its own loop, and more address terms than one instruction can
-carry</p></td>
-</tr>
-<tr class="row-even"><td><p>nobody decides</p></td>
-<td><p>what the best tiling is – there is no search here</p></td>
-</tr>
-</tbody>
-</table>
-<p>It ports MiniTPU’s mechanism (<code class="docutils literal notranslate"><span class="pre">board_package/dsl.py:126-141</span></code>, its <code class="docutils literal notranslate"><span class="pre">loop()</span></code>):
-<strong>nesting depth IS the AGU level</strong>, and the only handle on a level is the
-induction variable the <code class="docutils literal notranslate"><span class="pre">with</span></code> yields:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">k</span><span class="o">.</span><span class="n">loop</span><span class="p">(</span><span class="n">Nt</span><span class="p">,</span> <span class="s2">"n"</span><span class="p">)</span> <span class="k">as</span> <span class="n">nb</span><span class="p">:</span>                       <span class="c1"># level 0, derived</span>
-    <span class="n">k</span><span class="o">.</span><span class="n">mm</span><span class="p">(</span><span class="n">A_VR</span><span class="p">,</span> <span class="n">AR_C</span><span class="p">,</span> <span class="n">Ref</span><span class="p">(</span><span class="n">B_SP</span><span class="p">)</span><span class="o">.</span><span class="n">at</span><span class="p">(</span><span class="n">nb</span><span class="p">,</span> <span class="n">MAXDIM</span><span class="p">),</span> <span class="n">rows</span><span class="o">=</span><span class="n">M</span><span class="p">,</span> <span class="n">acc</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>  <span class="c1"># peeled</span>
-    <span class="k">with</span> <span class="n">k</span><span class="o">.</span><span class="n">loop</span><span class="p">(</span><span class="n">Kt</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"k"</span><span class="p">)</span> <span class="k">as</span> <span class="n">kb</span><span class="p">:</span>               <span class="c1"># level 1, derived</span>
-        <span class="n">k</span><span class="o">.</span><span class="n">mm</span><span class="p">(</span><span class="n">Ref</span><span class="p">(</span><span class="n">A_VR</span> <span class="o">+</span> <span class="n">MAXDIM</span><span class="p">)</span><span class="o">.</span><span class="n">at</span><span class="p">(</span><span class="n">kb</span><span class="p">,</span> <span class="n">MAXDIM</span><span class="p">),</span> <span class="n">AR_C</span><span class="p">,</span>
-             <span class="n">Ref</span><span class="p">(</span><span class="n">B_SP</span> <span class="o">+</span> <span class="n">T</span><span class="p">)</span><span class="o">.</span><span class="n">at</span><span class="p">(</span><span class="n">nb</span><span class="p">,</span> <span class="n">MAXDIM</span><span class="p">)</span><span class="o">.</span><span class="n">at</span><span class="p">(</span><span class="n">kb</span><span class="p">,</span> <span class="n">T</span><span class="p">),</span> <span class="n">rows</span><span class="o">=</span><span class="n">M</span><span class="p">,</span> <span class="n">acc</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</pre></div>
-</div>
-<p>Swap two <code class="docutils literal notranslate"><span class="pre">with</span></code> statements and every address term follows, because the
-induction variables carry their levels with them. It is generalised to this
-AGU rather than copied: MiniTPU’s AGU is one term on one field as a
-power-of-two shift, this one is three <code class="docutils literal notranslate"><span class="pre">(target,</span> <span class="pre">level,</span> <span class="pre">stride)</span></code> terms with
-arbitrary 11-bit strides, any number of which may land on the same field –
-<code class="docutils literal notranslate"><span class="pre">B_SP</span> <span class="pre">+</span> <span class="pre">nb*MAXDIM</span> <span class="pre">+</span> <span class="pre">kb*T</span></code> is two terms on <code class="docutils literal notranslate"><span class="pre">f3</span></code> and their encoding cannot say
-it. So <code class="docutils literal notranslate"><span class="pre">Ref</span></code> is a base plus an ordered list of <code class="docutils literal notranslate"><span class="pre">(iv,</span> <span class="pre">stride)</span></code> terms and any
-field may be one.</p>
-<p><strong>It emits the identical instruction stream, and that is the whole test.</strong>
-<code class="docutils literal notranslate"><span class="pre">isa_dsl.assert_matches_handwritten</span></code> compares both 64-bit words of every
-instruction against <code class="docutils literal notranslate"><span class="pre">gemm_program_handwritten</span></code> at all five shapes and both
-relu settings; <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code> runs it before it builds anything. Bit-identical
-means cosim cannot move, so it was not re-run.</p>
-<p><strong>What it bought.</strong> Three errors that were previously expressible are not: a
-level that disagrees with the nest, an induction variable used after its loop
-closed (the sequencer would resolve it against a stale <code class="docutils literal notranslate"><span class="pre">iv_now[level]</span></code>), and a
-<code class="docutils literal notranslate"><span class="pre">loop</span></code> whose <code class="docutils literal notranslate"><span class="pre">endloop</span></code> was forgotten. Two more are now caught at the point
-of writing rather than at <code class="docutils literal notranslate"><span class="pre">enc_agu</span></code>: a nest deeper than <code class="docutils literal notranslate"><span class="pre">LOOP_DEPTH</span></code>, named
-(“the nest is n &gt; k &gt; m &gt; j &gt; i”), and a trip count of 0, which the do-while
-sequencer would run <strong>once</strong>.</p>
-<p><strong>What it cost.</strong> It is ~120 lines of machinery to remove four typed integers
-from a 40-line program, and at this size the hand-written form was not actually
-hard to keep right – the trade only pays once there is more than one program.
-It also trades one hand-maintained correspondence for another: the instruction
-methods (<code class="docutils literal notranslate"><span class="pre">vld(vr,</span> <span class="pre">spad,</span> <span class="pre">rows)</span></code>) restate the field layout that the opcode table
-comments give. The new correspondence is stated once per opcode instead of once
-per instruction and the bit-identity assertion checks it, which is why it is the
-better of the two, but it is not free. And the genuinely subtle part of the
-program – the peeled first k-tile, and the <code class="docutils literal notranslate"><span class="pre">B_SP</span> <span class="pre">+</span> <span class="pre">T</span></code> base that encodes “kb
-starts at 1” – is exactly as subtle as it was.</p>
-<p>Programs are written against this encoder (by hand, or through <code class="docutils literal notranslate"><span class="pre">isa_dsl.py</span></code>)
-because the compiler backend that lowers a TOSA matmul into these instructions
-lives only on the <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> branch; see <a class="reference internal" href="../extensions/act.html"><span class="doc">ACT, and Why We Cite It</span></a>.</p>
-</section>
-</section>
+<section id="reference">
+<h2>Reference<a class="headerlink" href="#reference" title="Link to this heading"><span>¶</span></a></h2>
+<p>The instruction encoding – bit layout, opcodes, the header, the memory map,
+the parameter set and the numerics – is generated from <code class="docutils literal notranslate"><span class="pre">isa_spec.json</span></code> and
+is on its own page: <a class="reference internal" href="tinytpu_isa_spec.html"><span class="doc">TinyTPU-isa: The ISA</span></a>.</p>
 <section id="hardware-parameters">
-<h2>Hardware parameters<a class="headerlink" href="#hardware-parameters" title="Link to this heading"><span>¶</span></a></h2>
+<h3>Hardware parameters<a class="headerlink" href="#hardware-parameters" title="Link to this heading"><span>¶</span></a></h3>
 <p>Every constant is fixed at build time and <strong>independent of the workload</strong>: one
 RTL build runs every shape, with M, K and N arriving as instruction fields. This
 is the property the Gemmini comparison needs – Gemmini’s numbers come from one
 elaboration, and <code class="docutils literal notranslate"><span class="pre">allo_cmp.c</span></code> passes <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code> as the stride for every shape.
 The parameters, their defaults, their legal ranges, their cross-constraints and
-what bounds <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code> are tabulated in <a class="reference internal" href="#tinytpu-isa-spec"><span class="std std-ref">The ISA</span></a>, generated from
-<code class="docutils literal notranslate"><span class="pre">isa_spec.json</span></code>.
-The parameters, their defaults, their legal ranges and their cross-constraints
-are tabulated in <a class="reference internal" href="#tinytpu-isa-spec"><span class="std std-ref">The ISA</span></a>.</p>
+what bounds <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code> are tabulated in <a class="reference internal" href="tinytpu_isa_spec.html#tinytpu-isa-spec"><span class="std std-ref">TinyTPU-isa: The ISA</span></a>, generated from
+<code class="docutils literal notranslate"><span class="pre">isa_spec.json</span></code>.</p>
 <p><code class="docutils literal notranslate"><span class="pre">T</span></code> is the one parameter that changes the <em>shape</em> of the generated region: the
 array is <code class="docutils literal notranslate"><span class="pre">T*T</span></code> kernel instances, so <code class="docutils literal notranslate"><span class="pre">T=16</span></code> is 262 instances and ~800 streams.
 That was unrunnable until the simulator’s OpenMP team was sized to the section
-count (<a class="reference internal" href="../developer/limitations.html#limitation-11"><span class="std std-ref">11. The dataflow simulator deadlocks when processes outnumber OMP threads — FIXED</span></a>); before that fix it hung with no output.</p>
+count (<a class="reference internal" href="../developer/limitations.html#limitation-11"><span class="std std-ref">11. The dataflow simulator deadlocked when processes outnumbered OMP threads – closed</span></a>); before that fix it hung with no output.</p>
 <p><code class="docutils literal notranslate"><span class="pre">A</span></code>, <code class="docutils literal notranslate"><span class="pre">B</span></code> and <code class="docutils literal notranslate"><span class="pre">C</span></code> are <strong>flat</strong> at the region boundary, addressed
 <code class="docutils literal notranslate"><span class="pre">row</span> <span class="pre">*</span> <span class="pre">MAXDIM</span> <span class="pre">+</span> <span class="pre">col</span></code>. That is what DRAM is, and it is what makes
 <code class="docutils literal notranslate"><span class="pre">wrap_io=False</span></code> legal – it refuses multi-dimensional arguments to nested
@@ -1394,9 +525,9 @@ cyclically by <code class="docutils literal notranslate"><span class="pre">T</sp
 build is on <a class="reference internal" href="tinytpu_history.html"><span class="doc">TinyTPU-isa: Design History</span></a>, and the Vitis-side mechanics are in
 <a class="reference internal" href="../backends/vitis.html"><span class="doc">AMD Vitis HLS (FPGA)</span></a>.</p>
 </section>
-<section id="building-and-running">
-<h2>Building and running<a class="headerlink" href="#building-and-running" title="Link to this heading"><span>¶</span></a></h2>
-<p>Files in <code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/</span></code>:</p>
+<section id="files-commands-and-knobs">
+<span id="tinytpu-isa-build"></span><h3>Files, commands and knobs<a class="headerlink" href="#files-commands-and-knobs" title="Link to this heading"><span>¶</span></a></h3>
+<p>Files in <code class="docutils literal notranslate"><span class="pre">examples/tinytpu/</span></code>:</p>
 <table class="docutils align-default">
 <colgroup>
 <col style="width: 25.0%" />
@@ -1444,55 +575,29 @@ already run in (<a class="reference internal" href="#tinytpu-isa-saif"><span cla
 <td><p>a KPN model of the channel graph with bounded FIFOs and deadlock
 reporting</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">logs/</span></code></p></td>
-<td><p>the csynth/cosim reports and sweep logs behind the numbers on these
-pages</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemmini/</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemmini/</span></code></p></td>
 <td><p>the patches and benchmarks for the matched Gemmini baseline
 (<a class="reference internal" href="gemmini_comparison.html#gemmini-reproduce"><span class="std std-ref">Reproducing the Gemmini baseline</span></a>)</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">impact/</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">impact/</span></code></p></td>
 <td><p>the gap attribution’s variants (generated from the pre-landing
-baseline), their raw results and timelines, the Vitis shared-array
-probe, and the RTL probe of the accumulator’s dependence claim
-(<a class="reference internal" href="gemmini_comparison.html#gemmini-attribution-reproduce"><span class="std std-ref">Reproducing the attribution</span></a>)</p></td>
+baseline), the Vitis shared-array probe, and the RTL probe of the
+accumulator’s dependence claim (<a class="reference internal" href="gemmini_results.html#gemmini-attribution-reproduce"><span class="std std-ref">Reproducing the attribution</span></a>)</p></td>
 </tr>
 </tbody>
 </table>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># One command, from a clean checkout: builds this checkout's MLIR bindings,</span>
-<span class="c1"># runs bench_isa + stress_isa, then the default cosim, and checks the five</span>
-<span class="c1"># cycle counts against 175 / 265 / 421 / 482 / 674 at the TPU_MAXDIM=16 it</span>
-<span class="c1"># pins. Exits nonzero otherwise.</span>
-examples/accelerator/tinytpu_vitis/reproduce.sh<span class="w">            </span><span class="c1"># ~6 min, incl. a fresh mlir build</span>
-examples/accelerator/tinytpu_vitis/reproduce.sh<span class="w"> </span>--no-cosim<span class="w"> </span><span class="c1"># functional, ~1 min</span>
-
-<span class="c1"># Or by hand, from examples/accelerator/tinytpu_vitis (the env sets neither variable):</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">LLVM_BUILD_DIR</span><span class="o">=</span>/home/sk3463/llvm-allo-6b09f739/build<span class="w"> </span><span class="nv">OMP_NUM_THREADS</span><span class="o">=</span><span class="m">8</span>
-python<span class="w"> </span>bench_isa.py<span class="w">                   </span><span class="c1"># published functional setup: ALL EXACT</span>
-python<span class="w"> </span>bench_isa.py<span class="w"> </span><span class="m">8</span><span class="w"> </span><span class="m">8</span><span class="w"> </span><span class="m">8</span><span class="w">             </span><span class="c1"># one shape</span>
-python<span class="w"> </span>stress_isa.py<span class="w">                  </span><span class="c1"># correctness gate:          STRESS OK</span>
-python<span class="w"> </span>kpn_model.py<span class="w">                   </span><span class="c1"># channel protocol / deadlock model</span>
-python<span class="w"> </span>cosim.py<span class="w">                       </span><span class="c1"># default TB: the published cycle counts</span>
-<span class="nv">TPU_TB</span><span class="o">=</span>stress<span class="w"> </span><span class="nv">TPU_SHAPES</span><span class="o">=</span>4x4x4,16x16x16<span class="w"> </span>python<span class="w"> </span>cosim.py<span class="w">   </span><span class="c1"># correctness in RTL</span>
-python<span class="w"> </span>mutate.py<span class="w">                      </span><span class="c1"># does the harness catch a broken design? (~15 min)</span>
-python<span class="w"> </span>mutate.py<span class="w"> </span>--no-rtl<span class="w">             </span><span class="c1"># the same without the one cosim (~5 min)</span>
-<span class="nv">TPU_WRAP</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>python<span class="w"> </span>cosim.py<span class="w">            </span><span class="c1"># the old hoisted-argument variant, for comparison</span>
-</pre></div>
-</div>
-<p><code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code> and <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code>’s default testbench use Gemmini’s <code class="docutils literal notranslate"><span class="pre">[-4,</span> <span class="pre">4]</span></code>
-operands so the comparison is like for like; they are <strong>performance</strong> checks
-and are blind to an int16 accumulator, a wrong clip boundary, or a unit ignoring
-a field GEMM never varies. <code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code> and <code class="docutils literal notranslate"><span class="pre">TPU_TB=stress</span></code> are the
-<strong>correctness</strong> checks; <code class="docutils literal notranslate"><span class="pre">mutate.py</span></code> prints which level catches which bug. Any
-<code class="docutils literal notranslate"><span class="pre">TPU_*</span></code> variable left set changes what <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code> measures.</p>
-<p>Since the fix recorded in <a class="reference internal" href="../developer/limitations.html#limitation-11"><span class="std std-ref">11. The dataflow simulator deadlocks when processes outnumber OMP threads — FIXED</span></a> the simulator sizes its OpenMP
+<p>The csynth/cosim reports and sweep logs behind the numbers on these pages,
+and the gap attribution’s raw results and timelines, are evidence rather than
+part of the design: they live under <code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/logs/</span></code> and
+<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/impact-results/</span></code> at the repository root, not in
+<code class="docutils literal notranslate"><span class="pre">examples/</span></code>.</p>
+<p>Since the fix recorded in <a class="reference internal" href="../developer/limitations.html#limitation-11"><span class="std std-ref">11. The dataflow simulator deadlocked when processes outnumbered OMP threads – closed</span></a> the simulator sizes its OpenMP
 team to the section count itself, so <code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS=8</span></code> runs the 38-process
 design. <code class="docutils literal notranslate"><span class="pre">kpn_model.py</span></code> is driven by the assembled header (<code class="docutils literal notranslate"><span class="pre">ef112868</span></code>);
 every shipped program completes in it at FIFO depth <strong>1</strong>. See
 <code class="docutils literal notranslate"><span class="pre">dev/toolchains.rst</span></code> for <code class="docutils literal notranslate"><span class="pre">LLVM_BUILD_DIR</span></code> and the Vitis install.
 Older reproduce instructions, and the thread count the recorded numbers were
-produced at, are in <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
+produced at, are in <a class="reference internal" href="tinytpu_isa_results.html"><span class="doc">TinyTPU-isa: Results and History</span></a>.</p>
 <p><code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code> first asserts that the generated program is bit-identical to
 the hand-written one, then that the looped and unrolled programs expand to the
 identical dynamic stream (every resolved address field, not just the opcode and
@@ -1532,7 +637,7 @@ come from</p></td>
 explicit <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> depths, <code class="docutils literal notranslate"><span class="pre">alignas(64)</span></code> arrays) are general to any Allo
 dataflow design and are documented in <a class="reference internal" href="../backends/vitis.html"><span class="doc">AMD Vitis HLS (FPGA)</span></a>.</p>
 <section id="switching-activity-from-the-cosim-run">
-<span id="tinytpu-isa-saif"></span><h3>Switching activity from the cosim run<a class="headerlink" href="#switching-activity-from-the-cosim-run" title="Link to this heading"><span>¶</span></a></h3>
+<span id="tinytpu-isa-saif"></span><h4>Switching activity from the cosim run<a class="headerlink" href="#switching-activity-from-the-cosim-run" title="Link to this heading"><span>¶</span></a></h4>
 <p><code class="docutils literal notranslate"><span class="pre">saif_capture.py</span></code> writes a <strong>SAIF</strong> – toggle counts and time-in-state per
 net – from the same xsim run whose cycle count is published, so an annotated
 power analysis and the cycle figure would describe one workload rather than
@@ -1646,7 +751,7 @@ just the wrapper around it. The files are 41 MB and 87 MB: SAIF is a per-net
 summary, so size follows the net count, not the run length.</p>
 </section>
 <section id="the-spec-and-holding-both-consumers-to-it">
-<span id="tinytpu-isa-conformance"></span><span id="tinytpu-isa-verify"></span><h3>The spec, and holding both consumers to it<a class="headerlink" href="#the-spec-and-holding-both-consumers-to-it" title="Link to this heading"><span>¶</span></a></h3>
+<span id="tinytpu-isa-conformance"></span><span id="tinytpu-isa-verify"></span><h4>The spec, and holding both consumers to it<a class="headerlink" href="#the-spec-and-holding-both-consumers-to-it" title="Link to this heading"><span>¶</span></a></h4>
 <p><code class="docutils literal notranslate"><span class="pre">isa_ref.py</span></code> was derived from <code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code>’s own comments and
 imported its opcode numbers, its field layout and its address resolution. It
 therefore agreed with the design about everything, <em>because it shared the
@@ -1663,7 +768,7 @@ rather than discovered):</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">isa_encoding.py</span></code> – the constants, the encoder, a decoder that returns
 operands under the spec’s <em>names</em>, the control-flow and AGU resolver, the
 header builder and the numerics.</p></li>
-<li><p>the tables in <a class="reference internal" href="#tinytpu-isa-spec"><span class="std std-ref">The ISA</span></a>, between the <code class="docutils literal notranslate"><span class="pre">GENERATED</span></code> markers.</p></li>
+<li><p>the tables in <a class="reference internal" href="tinytpu_isa_spec.html#tinytpu-isa-spec"><span class="std std-ref">TinyTPU-isa: The ISA</span></a>, between the <code class="docutils literal notranslate"><span class="pre">GENERATED</span></code> markers.</p></li>
 </ul>
 <p><strong>Checked against the spec, not generated.</strong> <code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code> keeps its
 constants and bit slices written out: it is the file Vitis synthesises and the
@@ -1694,7 +799,7 @@ there, in the one configuration no test varies: the defaults.</p>
 being written in it, and three of them were stated wrongly in this project’s
 own documents until 2026-09-21. They are recomputed from the spec and
 confirmed against the design on every run – see the generated list in
-<a class="reference internal" href="#tinytpu-isa-spec"><span class="std std-ref">The ISA</span></a>.</p>
+<a class="reference internal" href="tinytpu_isa_spec.html#tinytpu-isa-spec"><span class="std std-ref">TinyTPU-isa: The ISA</span></a>.</p>
 <p>The load-bearing one: <code class="docutils literal notranslate"><span class="pre">isa_encoding.agu_legal_trip</span></code> derives, from
 <code class="docutils literal notranslate"><span class="pre">legal_values</span></code> alone, how long a field with a restricted value set stays
 legal when a loop drives it, and the design is then asked where it actually
@@ -1776,19 +881,19 @@ longer move the reference model with it. Before, an opcode renumbered in the
 design was renumbered in its own oracle.</p>
 </section>
 <section id="verifying-a-change">
-<h3>Verifying a change<a class="headerlink" href="#verifying-a-change" title="Link to this heading"><span>¶</span></a></h3>
+<h4>Verifying a change<a class="headerlink" href="#verifying-a-change" title="Link to this heading"><span>¶</span></a></h4>
 <p>From a clean checkout, one command builds the checkout’s own bindings, runs the
 functional gates, runs cosim, and checks the published cycle counts
 (175 / 265 / 421 / 482 / 674, at the <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=16</span></code> it pins), exiting
 nonzero if any step fails or any number differs:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>examples/accelerator/tinytpu_vitis/reproduce.sh<span class="w">              </span><span class="c1"># everything, with cosim</span>
-examples/accelerator/tinytpu_vitis/reproduce.sh<span class="w"> </span>--no-cosim<span class="w">   </span><span class="c1"># functional only, ~1 min</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>examples/tinytpu/reproduce.sh<span class="w">              </span><span class="c1"># everything, with cosim</span>
+examples/tinytpu/reproduce.sh<span class="w"> </span>--no-cosim<span class="w">   </span><span class="c1"># functional only, ~1 min</span>
 </pre></div>
 </div>
 <p>It unsets every <code class="docutils literal notranslate"><span class="pre">TPU_*</span></code> knob, pins <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=16</span></code>, and checks that
 <code class="docutils literal notranslate"><span class="pre">allo</span></code> resolves to the checkout it is run from (<code class="docutils literal notranslate"><span class="pre">92fb2f1b</span></code>). Added on
 <code class="docutils literal notranslate"><span class="pre">main</span></code> on 2026-09-19; the pristine-worktree runs it has printed, including
-the pre-landing design’s, are in <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
+the pre-landing design’s, are in <a class="reference internal" href="tinytpu_isa_results.html"><span class="doc">TinyTPU-isa: Results and History</span></a>.</p>
 <p><strong>The gate is what catches a moved number.</strong> It carries the published row as
 an expectation and refuses to pass on a change of one cycle, which is how the
 2026-09-22 shift was found minutes after the merge that caused it, on a
@@ -1857,7 +962,7 @@ cycles (measured on the pre-landing design)</p></td>
 <code class="docutils literal notranslate"><span class="pre">none</span></code> control through the same loader), each run through <code class="docutils literal notranslate"><span class="pre">bench_isa</span></code>
 and <code class="docutils literal notranslate"><span class="pre">stress_isa</span></code>, and through the <code class="docutils literal notranslate"><span class="pre">TPU_TB=stress</span></code> cosim for the one
 RTL-only mutant (and for any mutant on request). <strong>All 34 are caught</strong>
-(<code class="docutils literal notranslate"><span class="pre">logs/mutate_landed.log</span></code>). 20 fail <code class="docutils literal notranslate"><span class="pre">bench_isa</span></code>. 13 get past it and are
+(<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/logs/mutate_landed.log</span></code>). 20 fail <code class="docutils literal notranslate"><span class="pre">bench_isa</span></code>. 13 get past it and are
 caught <strong>only</strong> by <code class="docutils literal notranslate"><span class="pre">stress_isa</span></code>: <code class="docutils literal notranslate"><span class="pre">pe_psum_int16</span></code> (int16 partial sum),
 <code class="docutils literal notranslate"><span class="pre">clip_hi_off_by_one</span></code> and <code class="docutils literal notranslate"><span class="pre">clip_lo_off_by_one</span></code> (both clip bounds),
 <code class="docutils literal notranslate"><span class="pre">vadd_dst_is_src1</span></code> and <code class="docutils literal notranslate"><span class="pre">vrelu_dst_is_src</span></code> (vadd/vrelu destination),
@@ -1894,15 +999,38 @@ as unwritten. The same walk enforces the accumulator distance contract
 (<a class="reference internal" href="#tinytpu-isa-dependence"><span class="std std-ref">The accumulator’s dependence claim</span></a>). It also rejects out-of-range rows, bad loop nesting
 (unbalanced or over-deep loops, trip 0, AGU terms naming a closed loop),
 zero-row instructions, and the retired <code class="docutils literal notranslate"><span class="pre">dma_st</span></code> opcode.</p>
+<p>Two of <code class="docutils literal notranslate"><span class="pre">check_program()</span></code>’s checks exist only because the walk is exact
+rather than conservative: it rejects a resolved field that has climbed past
+<code class="docutils literal notranslate"><span class="pre">2**11</span></code> (the range <code class="docutils literal notranslate"><span class="pre">enc()</span></code> admits) – the sequencer writes the resolved
+sum back into the 12-bit field, so an AGU term can push it out of range, and
+this walk is the only place that can see it – and it enforces the structural
+shape an instruction must have (<code class="docutils literal notranslate"><span class="pre">mm</span></code>’s <code class="docutils literal notranslate"><span class="pre">f2</span></code> in <code class="docutils literal notranslate"><span class="pre">{0,</span> <span class="pre">1}</span></code>, <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code>’s
+<code class="docutils literal notranslate"><span class="pre">f0</span></code> in <code class="docutils literal notranslate"><span class="pre">{0,</span> <span class="pre">1,</span> <span class="pre">2,</span> <span class="pre">3}</span></code>) rather than trusting the encoder. Every rejection
+names the static instruction, the loop iteration, and the rows.</p>
 <p>Two design facts the hardening found:</p>
 <ul class="simple">
 <li><p><strong>Zero-row instructions hang the machine</strong> instead of being no-ops: an
 <code class="docutils literal notranslate"><span class="pre">nr=0</span></code> data op desynchronises the flat row loops (confirmed on the
 simulator). The validator now rejects them.</p></li>
 <li><p><strong>The hung simulator ignores SIGTERM</strong>; only SIGKILL stops it (it is inside
-a blocking C call; compare the watchdog note in <a class="reference internal" href="../developer/limitations.html#limitation-11"><span class="std std-ref">11. The dataflow simulator deadlocks when processes outnumber OMP threads — FIXED</span></a>).</p></li>
+a blocking C call; compare the watchdog note in <a class="reference internal" href="../developer/limitations.html#limitation-11"><span class="std std-ref">11. The dataflow simulator deadlocked when processes outnumbered OMP threads – closed</span></a>).</p></li>
 </ul>
 </section>
+</section>
+</section>
+<section id="limits-and-known-failures">
+<h2>Limits and known failures<a class="headerlink" href="#limits-and-known-failures" title="Link to this heading"><span>¶</span></a></h2>
+<p>The register of Allo limitations this design runs into, with repros, is
+<a class="reference internal" href="../developer/limitations.html"><span class="doc">Allo Limitations Register</span></a>; the pitfalls of <code class="docutils literal notranslate"><span class="pre">&#64;df.region()</span></code> are in
+<a class="reference internal" href="../developer/pitfalls.html"><span class="doc">Dataflow Region Pitfalls</span></a>. Two limits belong to the design itself rather than
+to the toolchain:</p>
+<ul class="simple">
+<li><p><strong>The accumulator RAW-distance contract</strong>, below – the one claim on this
+page that no simulator can check.</p></li>
+<li><p><strong>The csynth latency number is not a cycle count</strong> for a programmable
+design; only cosim measures this machine. See
+<a class="reference internal" href="tinytpu_isa_results.html#tinytpu-isa-csynth-bound"><span class="std std-ref">A programmable design’s csynth number is not a cycle count</span></a> on <a class="reference internal" href="tinytpu_isa_results.html"><span class="doc">TinyTPU-isa: Results and History</span></a>.</p></li>
+</ul>
 <section id="the-accumulator-s-dependence-claim">
 <span id="tinytpu-isa-dependence"></span><h3>The accumulator’s dependence claim<a class="headerlink" href="#the-accumulator-s-dependence-claim" title="Link to this heading"><span>¶</span></a></h3>
 <p><code class="docutils literal notranslate"><span class="pre">accu</span></code> is one flat row loop at II=1 because <code class="docutils literal notranslate"><span class="pre">schedule()</span></code> tells Vitis that
@@ -1939,7 +1067,7 @@ there. In the synthesized loop (II=1, depth 6) the <code class="docutils literal
 pipeline state 5 and the store lands in state 7, so a row read one or two
 iterations after it was written returns its <strong>old</strong> value. Measured in RTL
 with <code class="docutils literal notranslate"><span class="pre">isa_dsl.ar_distance_program(d)</span></code>, every read exactly <code class="docutils literal notranslate"><span class="pre">d</span></code> iterations
-after its write (<code class="docutils literal notranslate"><span class="pre">logs/cosim_isa_ar_distance.log</span></code>,
+after its write (<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/logs/cosim_isa_ar_distance.log</span></code>,
 <code class="docutils literal notranslate"><span class="pre">impact/ar_distance_probe.py</span></code>):</p>
 <table class="docutils align-default">
 <thead>
@@ -1987,526 +1115,11 @@ validator controls.</p>
 distance of 4 itself rather than rely on the schedule; it was not measured.</p>
 </section>
 </section>
-<section id="results">
-<h2>Results<a class="headerlink" href="#results" title="Link to this heading"><span>¶</span></a></h2>
-<section id="cycle-counts">
-<h3>Cycle counts<a class="headerlink" href="#cycle-counts" title="Link to this heading"><span>¶</span></a></h3>
-<p><strong>Current row, 2026-09-24 (``63ee6ec7``), ``T=4``, ``TPU_MAXDIM=16``,
-``-m_axi_latency 0``, channel depth ``QD=16``:</strong></p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>4x4x4  175    8x8x8  265    12x12x12  421    16x16x8  482    16x16x16  674
-</pre></div>
-</div>
-<p>That is what <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code> checks. The <code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code> sweep, which is the
-shipped default and the one that reaches steady state, is on
-<a class="reference internal" href="benchmarks.html"><span class="doc">The Benchmark Set</span></a> – at <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> it opens 222 / 361 / 567 / 676 / 868 at
-these five shapes, the same +4 / +4 / +4 / -1 / -11 deltas.</p>
-<p>The row reached this from 171 / 261 / 417 / 483 / 685, which is what it was
-between 2026-09-22 and 2026-09-24, and 172 / 262 / 418 / 484 / 686 before
-that; both moves are in <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
-<p>The table below is the <strong>``e24e433b`` measurement</strong>, taken before either move:
-the derived memory sizing that landed afterwards took one cycle out of the
-fixed term at every shape, and the channel depth then moved it again by
-+4 / +4 / +4 / -1 / -11 (<a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>). Every
-other column – instruction counts, mismatches, the pre-landing comparison –
-is unaffected. Measured by Vitis <code class="docutils literal notranslate"><span class="pre">cosim</span></code> (xsim), one build,
-<code class="docutils literal notranslate"><span class="pre">-m_axi_latency</span> <span class="pre">0</span></code> (<code class="docutils literal notranslate"><span class="pre">logs/cosim_isa_landed_sweep.log</span></code>), against the
-pre-landing build that was shipped until then
-(<code class="docutils literal notranslate"><span class="pre">logs/cosim_isa_widened_sweep.log</span></code>):</p>
-<table class="docutils align-default">
-<thead>
-<tr class="row-odd"><th class="head"><p>shape</p></th>
-<th class="head"><p>dynamic instructions</p></th>
-<th class="head"><p>cycles</p></th>
-<th class="head"><p>mismatches</p></th>
-<th class="head"><p>pre-landing (instructions, cycles)</p></th>
-<th class="head"><p>saved</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p>4x4x4</p></td>
-<td><p>4</p></td>
-<td><p><strong>172</strong></p></td>
-<td><p>0/16</p></td>
-<td><p>6, 252</p></td>
-<td><p>80 (32%)</p></td>
-</tr>
-<tr class="row-odd"><td><p>8x8x8</p></td>
-<td><p>10</p></td>
-<td><p><strong>262</strong></p></td>
-<td><p>0/64</p></td>
-<td><p>15, 383</p></td>
-<td><p>121 (32%)</p></td>
-</tr>
-<tr class="row-even"><td><p>12x12x12</p></td>
-<td><p>18</p></td>
-<td><p><strong>418</strong></p></td>
-<td><p>0/144</p></td>
-<td><p>28, 591</p></td>
-<td><p>173 (29%)</p></td>
-</tr>
-<tr class="row-odd"><td><p>16x16x8</p></td>
-<td><p>16</p></td>
-<td><p><strong>484</strong></p></td>
-<td><p>0/128</p></td>
-<td><p>25, 667</p></td>
-<td><p>183 (27%)</p></td>
-</tr>
-<tr class="row-even"><td><p>16x16x16</p></td>
-<td><p>28</p></td>
-<td><p><strong>686</strong></p></td>
-<td><p>0/256</p></td>
-<td><p>45, 919</p></td>
-<td><p>233 (25%)</p></td>
-</tr>
-</tbody>
-</table>
-<p>The two shapes the gap attribution measured (172 and 686, <a class="reference internal" href="gemmini_comparison.html#gemmini-gap-attribution"><span class="std std-ref">Where the deficit came from, and what was landed</span></a>)
-reproduce exactly; the other three were first measured on this build.
-<code class="docutils literal notranslate"><span class="pre">TPU_TB=stress</span></code> cosim at 4x4x4 and 16x16x16: 0 wrong over 6 calls each
-(<code class="docutils literal notranslate"><span class="pre">logs/cosim_isa_landed_stress.log</span></code>).</p>
-<p>Utilization against the 4x4 array’s peak is 2.3% / 12.2% / 25.8% / 26.4% /
-37.3% (was 1.6% / 8.4% / 18.3% / 19.2% / 27.9%). Least squares against dynamic
-instruction count gives fixed <strong>74.5</strong>, marginal <strong>21.70</strong> cycles per dynamic
-instruction (was 151 and 17.28); the two fits are not comparable term by term,
-because the landing removed instructions (the <code class="docutils literal notranslate"><span class="pre">vld</span></code>s) as well as cycles,
-so each remaining instruction carries more work. Against MACs instead: fixed
-<strong>192</strong>, <strong>7.95</strong> MAC/cycle marginal, 49.7% of peak (was 289 and 6.17, 38.6%).</p>
-<p>Where a run’s cycles go, in the shape the units impose:</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>one GEMM, time to the right (not to scale)
-
-sequencer  [prefetch][ dispatch, one instruction at a time ]
-dma_ld             [ burst A ][ burst B ][ one operand row/cycle ]
-spm                                     [ hdr + T weight rows / mm ]
-vru                                     [ nr activation rows / mm  ]
-wld + pe                                  [ one wavefront row/cycle ]
-accu                                        [ 1 iteration per row ]
-dma_st                                            [ mvout rows ] --&gt; C
-
-|&lt;------ prologue ------&gt;|&lt;----- steady state -----&gt;|&lt;-- drain --&gt;|
-</pre></div>
-</div>
-<ul class="simple">
-<li><p><strong>Prefetch</strong> is <code class="docutils literal notranslate"><span class="pre">IMEM_SIZE</span> <span class="pre">/</span> <span class="pre">8</span></code> iterations – 7 at the shipped 56 words,
-since gmem0 is 512 bits wide and <code class="docutils literal notranslate"><span class="pre">ib</span></code> is cyclically partitioned by 8 –
-and nothing else can start, because every unit blocks on its first control
-word.</p></li>
-<li><p><strong>The operand bursts</strong> are <code class="docutils literal notranslate"><span class="pre">na*WPR</span></code> and <code class="docutils literal notranslate"><span class="pre">nb*WPR</span></code> packed words, one per
-cycle at <code class="docutils literal notranslate"><span class="pre">DMA_WORDS=1</span></code>, where <code class="docutils literal notranslate"><span class="pre">na</span></code> and <code class="docutils literal notranslate"><span class="pre">nb</span></code> are the DRAM row spans
-<code class="docutils literal notranslate"><span class="pre">assemble()</span></code> computes. They are serial before the first weight reaches the
-array, and they scale with <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code> rather than with the shape being run:
-a 4x4x4 GEMM on a <code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code> build bursts 4 x 16 = 64 words to use 4.
-That is the largest remaining term in the deficit to Gemmini, and the one
-the opt-in <code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code> widening attacks (<a class="reference internal" href="benchmarks.html"><span class="doc">The Benchmark Set</span></a>).</p></li>
-<li><p><strong>Steady state</strong> is one word per cycle per link, every unit concurrent.</p></li>
-<li><p><strong>Drain</strong> is the last partial sums walking up to <code class="docutils literal notranslate"><span class="pre">T-1</span></code> links south and up
-to <code class="docutils literal notranslate"><span class="pre">T-1</span></code> east before <code class="docutils literal notranslate"><span class="pre">accu</span></code> sees them, then <code class="docutils literal notranslate"><span class="pre">mvout</span></code>’s rows leaving
-through <code class="docutils literal notranslate"><span class="pre">dma_st</span></code>.</p></li>
-</ul>
-<p>These numbers were measured with a memory that answers immediately; the
-latency sweep (<code class="docutils literal notranslate"><span class="pre">-m_axi_latency</span></code> 16 and 64: 214 / 702 and 358 / 894 at
-4x4x4 / 16x16x16) and what a real memory system does to them is on
-<a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>. <strong>They are not faster than Gemmini</strong>: 1.07-1.24x
-slower like for like.</p>
-<p>How the design got from 1017 cycles at 4x4x4 to the current row is on
-<a class="reference internal" href="tinytpu_history.html"><span class="doc">TinyTPU-isa: Design History</span></a>. What the last step was, where it came from, and what
-deficit to Gemmini remains is on <a class="reference internal" href="gemmini_comparison.html#gemmini-gap-attribution"><span class="std std-ref">Where the deficit came from, and what was landed</span></a>; the five
-changes that step consisted of are listed in
-<a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
-</section>
-<section id="a-programmable-design-s-csynth-number-is-not-a-cycle-count">
-<span id="tinytpu-isa-csynth-bound"></span><h3>A programmable design’s csynth number is not a cycle count<a class="headerlink" href="#a-programmable-design-s-csynth-number-is-not-a-cycle-count" title="Link to this heading"><span>¶</span></a></h3>
-<p><code class="docutils literal notranslate"><span class="pre">vitis_hls</span></code> at 8x8x8: <strong>0 errors</strong>, <code class="docutils literal notranslate"><span class="pre">dataflow</span></code> at the top, all 16 PEs
-instantiated as separate modules. But the first run reported a top-level latency
-of <strong>91407 cycles</strong>, against 74 for the fixed-function <code class="docutils literal notranslate"><span class="pre">microarch_ws.py</span></code>, and
-the report says why:</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>o VITIS_LOOP_300_1   Trip = 1023   Pipelined = yes
-o VITIS_LOOP_474_4   Trip = 2049
-</pre></div>
-</div>
-<p>Nothing is slow. <strong>Vitis bounds a runtime-bounded loop by the range of its
-index</strong>, and the row count was arriving in a 12-bit instruction field, so it
-assumed up to 4095 rows per instruction. The number is a worst-case bound
-derived from the <em>encoding</em>, not a property of the machine.</p>
-<p>For a fixed-function design, csynth’s interval <em>is</em> the answer
-(<code class="docutils literal notranslate"><span class="pre">microarch_ws.py</span></code>, at <code class="docutils literal notranslate"><span class="pre">e2451b81</span></code>, hit its roofline exactly and could be
-checked statically). For an instruction-programmable design, <strong>trip counts are
-data</strong>, so static estimates become bounds and only <code class="docutils literal notranslate"><span class="pre">cosim</span></code> gives a cycle
-count. Any comparison against Gemmini’s measured <code class="docutils literal notranslate"><span class="pre">rdcycle</span></code> has to be a cosim
-comparison.</p>
-<p>The bound is still worth tightening, because it is the ISA’s fault rather than
-the tool’s: <code class="docutils literal notranslate"><span class="pre">nr</span></code> became a dedicated row-count field (<code class="docutils literal notranslate"><span class="pre">MAXROWS</span> <span class="pre">=</span> <span class="pre">127</span></code>) used by
-every instruction, instead of a 12-bit general field, and the header that
-carries the row count into the array was narrowed to match. Gemmini does the
-same – its mvin/mvout carry an explicit bounded row count. <strong>Narrowing one
-field, with no change to any datapath, moved the bound 22x:</strong></p>
-<table class="docutils align-default">
-<thead>
-<tr class="row-odd"><th class="head"></th>
-<th class="head"><p>before (12-bit count)</p></th>
-<th class="head"><p>after (7-bit <code class="docutils literal notranslate"><span class="pre">nr</span></code>)</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p>top-level latency</p></td>
-<td><p>91407</p></td>
-<td><p><strong>4133</strong></p></td>
-</tr>
-<tr class="row-odd"><td><p>top-level interval</p></td>
-<td><p>90333</p></td>
-<td><p><strong>3059</strong></p></td>
-</tr>
-<tr class="row-even"><td><p>reported trip counts</p></td>
-<td><p>1023, 2049</p></td>
-<td><p><strong>63</strong></p></td>
-</tr>
-</tbody>
-</table>
-<p>The extreme case is the <code class="docutils literal notranslate"><span class="pre">T=16</span></code> build: csynth reports a top-level latency of
-<strong>2.259e+08</strong>, cosim measures <strong>1,176</strong> – a ratio of about 192,000x. A bound is
-not a measurement. The same lesson, stated as a general rule, is
-<a class="reference internal" href="../developer/limitations.html#limitation-16"><span class="std std-ref">16. cosim is not wired into df.build</span></a>.</p>
-</section>
-<section id="resources">
-<h3>Resources<a class="headerlink" href="#resources" title="Link to this heading"><span>¶</span></a></h3>
-<p>What the landing cost, csynth on the xcu280 at the 3.33 ns target, the
-pre-landing design re-synthesized with the same toolchain
-(<code class="docutils literal notranslate"><span class="pre">logs/csynth_isa_prelanding.rpt</span></code>, <code class="docutils literal notranslate"><span class="pre">logs/csynth_isa_landed.rpt</span></code>).
-Both columns are the <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code> netlist; the derived memory sizing that
-landed on 2026-09-22 took BRAM 42 -&gt; 40, FF 17,481 -&gt; 17,075 and
-LUT 26,583 -&gt; 26,558 at an unchanged 2.431 ns
-(<a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>). The
-estimated clock is <strong>2.431 ns</strong> for both, so the design still meets 3.33 ns
-with the same margin. The last row is the remainder, and <code class="docutils literal notranslate"><span class="pre">entry_proc</span></code> is in
-it (6,363 FF = 6,360 + 3; 7,809 LUT = 7,780 + 29), so a re-derivation from the
-report’s per-module rows matches.</p>
-<table class="docutils align-default">
-<thead>
-<tr class="row-odd"><th class="head"><p>unit</p></th>
-<th class="head"><p>BRAM</p></th>
-<th class="head"><p>DSP</p></th>
-<th class="head"><p>FF</p></th>
-<th class="head"><p>LUT</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">sequencer</span></code></p></td>
-<td><p>0 -&gt; 0</p></td>
-<td><p>3 -&gt; 2</p></td>
-<td><p>2,058 -&gt; 2,275</p></td>
-<td><p>2,312 -&gt; 3,313</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dma_ld</span></code></p></td>
-<td><p>0 -&gt; 0</p></td>
-<td><p>0 -&gt; 0</p></td>
-<td><p>574 -&gt; 575</p></td>
-<td><p>1,075 -&gt; 1,094</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code></p></td>
-<td><p>1 -&gt; 1</p></td>
-<td><p>0 -&gt; 0</p></td>
-<td><p>147 -&gt; 452</p></td>
-<td><p>417 -&gt; 812</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code></p></td>
-<td><p>1 -&gt; 1</p></td>
-<td><p>0 -&gt; 0</p></td>
-<td><p>221 -&gt; 484</p></td>
-<td><p>725 -&gt; 544</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">wld</span></code> x16 (new)</p></td>
-<td><p>0</p></td>
-<td><p>0</p></td>
-<td><p>1,250</p></td>
-<td><p>4,472</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">pe</span></code> x16</p></td>
-<td><p>0 -&gt; 0</p></td>
-<td><p>12 -&gt; 12</p></td>
-<td><p>4,019 -&gt; 3,996</p></td>
-<td><p>5,175 -&gt; 6,264</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code></p></td>
-<td><p>4 -&gt; 4</p></td>
-<td><p>0 -&gt; 0</p></td>
-<td><p>1,250 -&gt; 1,744</p></td>
-<td><p>2,393 -&gt; 1,764</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dma_st</span></code></p></td>
-<td><p>0 -&gt; 0</p></td>
-<td><p>0 -&gt; 0</p></td>
-<td><p>342 -&gt; 342</p></td>
-<td><p>511 -&gt; 511</p></td>
-</tr>
-<tr class="row-even"><td><p>FIFOs, <code class="docutils literal notranslate"><span class="pre">entry_proc</span></code> and top level</p></td>
-<td><p>36 -&gt; 36</p></td>
-<td><p>0 -&gt; 0</p></td>
-<td><p>6,277 -&gt; 6,363</p></td>
-<td><p>7,358 -&gt; 7,809</p></td>
-</tr>
-<tr class="row-odd"><td><p><strong>total</strong></p></td>
-<td><p><strong>42 -&gt; 42</strong></p></td>
-<td><p><strong>15 -&gt; 14</strong></p></td>
-<td><p><strong>14,888 -&gt; 17,481</strong> (+17%)</p></td>
-<td><p><strong>19,966 -&gt; 26,583</strong> (+33%)</p></td>
-</tr>
-</tbody>
-</table>
-<p>The speedup costs <strong>+2,593 FF and +6,617 LUT</strong>, about 0.1% and 0.5% of the
-xcu280, and no BRAM or DSP. The largest item is the 16 weight loaders (1,250
-FF, 4,472 LUT); <code class="docutils literal notranslate"><span class="pre">accu</span></code>’s dependence claim costs 494 FF over the nested loop
-it replaced – against <strong>16,188</strong> for the write-behind rotation that reached
-the same II (<a class="reference internal" href="../developer/limitations.html#limitation-21"><span class="std std-ref">21. No #pragma HLS dependence primitive, so a false dependence cannot be asserted away</span></a>).</p>
-<p>The resource figures the sources record for earlier builds are listed with the
-build they belong to on <a class="reference internal" href="tinytpu_history.html"><span class="doc">TinyTPU-isa: Design History</span></a>: 8x8x8 csynth after the <code class="docutils literal notranslate"><span class="pre">nr</span></code>
-narrowing (BRAM 42, DSP 12, FF 16247, LUT 21918), the one-build row-flattened
-design (BRAM 16, DSP 15, FF 12835, LUT 18968), and the <code class="docutils literal notranslate"><span class="pre">T=16</span></code> build (240 DSP,
-111,776 FF, 144,329 LUT – 11% of the xcu280 – 34 BRAM, all 256 PEs
-instantiated). DSP is low at <code class="docutils literal notranslate"><span class="pre">T=4</span></code> because int8 multiplies mapped into LUTs;
-that is a mapping difference, not a missing array.</p>
-</section>
-<section id="cosim-as-a-deadlock-oracle">
-<h3>Cosim as a deadlock oracle<a class="headerlink" href="#cosim-as-a-deadlock-oracle" title="Link to this heading"><span>¶</span></a></h3>
-<p>Cosim compiles an <code class="docutils literal notranslate"><span class="pre">AESL_deadlock_detect_unit</span></code> into the RTL testbench, so
-<strong>Vitis cosim already has deadlock reporting</strong> of the kind the Allo simulator
-lacked, which makes it a useful oracle for the class of bug in
-<a class="reference internal" href="../developer/limitations.html#limitation-11"><span class="std std-ref">11. The dataflow simulator deadlocks when processes outnumber OMP threads — FIXED</span></a>. <code class="docutils literal notranslate"><span class="pre">csim</span></code> passing is the first functional check of the
-<em>emitted HLS code</em> rather than of the Allo simulator’s interpretation of the
-design.</p>
-</section>
-</section>
-<section id="standard-cell-synthesis-one-number-and-what-it-is-not">
-<h2>Standard-cell synthesis: one number, and what it is not<a class="headerlink" href="#standard-cell-synthesis-one-number-and-what-it-is-not" title="Link to this heading"><span>¶</span></a></h2>
-<p>The shipped configuration has been synthesised to standard cells for the first
-time, on 2026-09-22, on a different host from the one every other figure here
-comes from.</p>
-<p><strong>FreePDK45 / NanGate, ``view-standard``, 3.33 ns on ``ap_clk``, topographical,
-flatten effort 3, memories as flip-flops</strong> (<code class="docutils literal notranslate"><span class="pre">sram_mode='none'</span></code>), Synopsys DC
-<code class="docutils literal notranslate"><span class="pre">W-2024.09</span></code>, via mflowgen 0.8.0 at commit <code class="docutils literal notranslate"><span class="pre">aee0e5d6</span></code>. 37 minutes of wall
-time, synthesising the current shipped design (<code class="docutils literal notranslate"><span class="pre">rtl_handoff/</span></code>,
-<code class="docutils literal notranslate"><span class="pre">T4_MAXDIM16_shipped_baseline</span></code>).</p>
-<table class="docutils align-default">
-<tbody>
-<tr class="row-odd"><td><p>Total cell area</p></td>
-<td><p><strong>1,136,598</strong> FreePDK45 area units</p></td>
-</tr>
-<tr class="row-even"><td><p>non-combinational</p></td>
-<td><p>906,098 — <strong>79.7 %</strong></p></td>
-</tr>
-<tr class="row-odd"><td><p>combinational</p></td>
-<td><p>230,501</p></td>
-</tr>
-<tr class="row-even"><td><p>macro / black box</p></td>
-<td><p>0</p></td>
-</tr>
-<tr class="row-odd"><td><p>Cells</p></td>
-<td><p>389,399 (200,561 sequential, 1,662
-hierarchical)</p></td>
-</tr>
-<tr class="row-even"><td><p>Timing</p></td>
-<td><p><strong>MET</strong>, worst slack <strong>+0.21 ns</strong>, critical path
-3.08 ns of 3.33, 62 logic levels, zero violating
-and zero hold violations</p></td>
-</tr>
-<tr class="row-odd"><td><p>Power</p></td>
-<td><p>not re-reported for this run; power from DC
-here is <strong>indicative only</strong> in any case, at
-default toggle rates with no activity data</p></td>
-</tr>
-</tbody>
-</table>
-<p>This replaces a first run of <strong>1,271,692</strong> that synthesised an export of the
-design <em>before</em> its memories were made derived from <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code>; that netlist no
-longer exists. The current design is <strong>10.6 % smaller</strong> and one cycle faster,
-from the same change that took FPGA block RAM from 42 to 40 — so area and cycles
-now describe the same design.</p>
-<p><strong>Across configurations</strong>, synthesised identically and all closing at 3.33 ns
-(full table and reports: <code class="docutils literal notranslate"><span class="pre">asic_synthesis/</span></code>):</p>
-<table class="docutils align-default">
-<thead>
-<tr class="row-odd"><th class="head"><p>comparison</p></th>
-<th class="head"><p>cell area</p></th>
-<th class="head"><p>FPGA says</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code> 16 → 64, T=4 fixed</p></td>
-<td><p><strong>+64.1 %</strong></p></td>
-<td><p>+2.4 % FF</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">T</span></code> 4 → 8, <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code>=64 fixed</p></td>
-<td><p><strong>1.33x</strong></p></td>
-<td><p>–</p></td>
-</tr>
-</tbody>
-</table>
-<p>The first row is the finding: the two substrates disagree about operand space
-by roughly <strong>27x</strong>. On the FPGA it disappears into block RAM and looks nearly
-free; with memories as flip-flops it is most of the design. So off the FPGA,
-<strong>``MAXDIM`` is the expensive knob, not ``T``</strong>. Never quote T=8 against the
-shipped baseline (2.18x) – that changes both at once.</p>
-<p><strong>Four fifths of the cell area is flip-flops</strong>, which is the predicted result
-rather than a surprising one: the scratchpad, the vector registers and the
-accumulator are block RAM on the FPGA and become registers when the flow is told
-to use no memory macros.</p>
-<p>That is the whole interpretive caveat, and it runs in a direction worth naming.
-<strong>This number says more about the memory treatment than about the datapath</strong>, so
-it cannot be compared against any flow that used provided SRAM macros without
-giving that flow the same treatment. It also means a <em>variant</em> comparison —
-which is the useful thing this run enables — will <strong>overstate</strong> the area cost of
-any change that buys cycles with more on-chip memory, because memory is being
-priced as registers rather than as macros. The burst-widening candidate, which
-costs +123 % block RAM, is exactly such a change.</p>
-<p>What the run gives up, stated plainly: relative cell area only, no place and
-route and therefore no routed timing and no real area, no DRC or LVS, and power
-without activity data. The one thing it does establish beyond relative area is
-that the design <strong>closes timing at 3.33 ns in 45 nm standard cells</strong>, which no
-FPGA figure could have told us.</p>
-<p>Two flow defects were found and worked around rather than papered over, and both
-would bite the next person:</p>
-<ul class="simple">
-<li><p>The RTL-collection step rejects a top module whose declaration carries an
-attribute, because it matches <code class="docutils literal notranslate"><span class="pre">^\s*module\s+&lt;name&gt;</span></code> and Vitis emits the
-<code class="docutils literal notranslate"><span class="pre">CORE_GENERATION_INFO</span></code> attribute and the <code class="docutils literal notranslate"><span class="pre">module</span></code> keyword on one line.
-<code class="docutils literal notranslate"><span class="pre">sv2v</span></code> itself converted all 146 files without complaint; the failure is
-downstream of it. Bypassing <code class="docutils literal notranslate"><span class="pre">sv2v</span></code> is correct on the merits here anyway —
-Vitis emits Verilog-2001 — and it keeps the RTL byte-identical.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">view-tiny</span></code> is not usable for this: it has no technology file, no scan
-cells, and no driving cell, so DC runs and emits unmapped GTECH. Use
-<code class="docutils literal notranslate"><span class="pre">view-standard</span></code>.</p></li>
-</ul>
-</section>
-<section id="earlier-measurements-and-corrections">
-<h2>Earlier measurements and corrections<a class="headerlink" href="#earlier-measurements-and-corrections" title="Link to this heading"><span>¶</span></a></h2>
-<p>Superseded figures, withdrawn claims, and the accounts of how particular
-numbers moved. Nothing here is the current state; the design’s own history,
-at greater length, is on <a class="reference internal" href="tinytpu_history.html"><span class="doc">TinyTPU-isa: Design History</span></a>.</p>
-<section id="the-channel-depth-moved-the-row-again-2026-09-24">
-<span id="tinytpu-isa-qd16"></span><h3>The channel depth moved the row again, 2026-09-24<a class="headerlink" href="#the-channel-depth-moved-the-row-again-2026-09-24" title="Link to this heading"><span>¶</span></a></h3>
-<p><code class="docutils literal notranslate"><span class="pre">63ee6ec7</span></code> made <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> the default channel depth, because three legal
-tiled programs never complete at depth 8 and all ten of that family complete
-bit-exact at 16 (<a class="reference internal" href="../developer/limitations.html#limitation-24-qd"><span class="std std-ref">The diagnosis: it is a channel-depth threshold, and TPU_QD=16 clears it</span></a>). The published row moved from
-171 / 261 / 417 / 483 / 685 to <strong>175 / 265 / 421 / 482 / 674</strong>.</p>
-<p><strong>The delta is lumpy, and that is the finding</strong>: +4 / +4 / +4 / <strong>-1</strong> /
-<strong>-11</strong>. A uniform delta would have been a fixed-cost change, as the
-2026-09-22 move below was. This one is not. The three smallest shapes pay the
-pipeline skew of deeper FIFOs; the two largest <strong>get faster</strong>, because a
-deeper queue lets the sequencer run further ahead of the units it dispatches
-to. So the depth buys completion <em>and</em> throughput where the queues are the
-constraint, and charges four cycles where they are not.</p>
-<p>The same deltas reproduce independently at <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=64</span></code>:
-218 / 357 / 563 / 677 / 879 becomes 222 / 361 / 567 / 676 / 868. Correctness
-is unchanged – <code class="docutils literal notranslate"><span class="pre">stress_isa</span></code> is 640/640 exact at the new default – and
-cosim reports <code class="docutils literal notranslate"><span class="pre">COSIM</span> <span class="pre">OK</span></code>.</p>
-<p><strong>What it costs, and what is not yet known.</strong> The FPGA price is <strong>+9.3 %
-flip-flops</strong> at the shipped <code class="docutils literal notranslate"><span class="pre">T=4</span></code>/<code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code> (+9.5 % at <code class="docutils literal notranslate"><span class="pre">MAXDIM=16</span></code>),
-with BRAM, DSP and the 2.431 ns estimated period unchanged. <strong>The ASIC price
-is unmeasured</strong>: the figure on record is a count from the RTL priced at this
-design’s own area per sequential cell, not a DC run. And <strong>the Gemmini parity
-sweep was measured at ``QD=8``</strong>, so the deficit has to be re-measured before
-any comparison is restated. The full accounting is <a class="reference internal" href="../developer/limitations.html#limitation-24-price"><span class="std std-ref">What QD=16 costs the shipped design</span></a>.</p>
-</section>
-<section id="the-published-row-moved-by-one-cycle-2026-09-22">
-<h3>The published row moved by one cycle, 2026-09-22<a class="headerlink" href="#the-published-row-moved-by-one-cycle-2026-09-22" title="Link to this heading"><span>¶</span></a></h3>
-<p><strong>The row moved by one cycle at every shape on 2026-09-22</strong>, from
-172 / 262 / 418 / 484 / 686 to <strong>171 / 261 / 417 / 483 / 685</strong>, every
-testbench still bit-exact. It was caught by the design’s own reproduction
-gate reporting <code class="docutils literal notranslate"><span class="pre">DIFFERS</span></code> rather than passing, and confirmed by two
-independent co-simulation runs in separate processes with separate syntheses,
-which reproduced it exactly.</p>
-<p>A delta that is <strong>uniform across shapes</strong> is a fixed-cost change rather than a
-per-work one. It arrived with the design edits that came in with the benchmark
-work – sizing literals replaced by a derived <code class="docutils literal notranslate"><span class="pre">OPERAND_ROWS</span></code>, two
-encoding-ceiling assertions, and a test-window fix – and this page recorded
-for several hours that <em>which of those saves the cycle is not yet identified</em>,
-on the grounds that a number whose mechanism nobody can state is a number on
-probation however well it reproduces.</p>
-<p><strong>It was then identified, by measurement rather than inference</strong> (<code class="docutils literal notranslate"><span class="pre">05169938</span></code>,
-recorded in <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code>): rebuilding the same configuration with the
-memory sizes the design used to carry, <code class="docutils literal notranslate"><span class="pre">TPU_SPAD=512</span> <span class="pre">TPU_NVR=256</span>
-<span class="pre">TPU_NAR=128</span></code> and nothing else reverted, returns all five of the old numbers
-exactly. The scratchpad and vreg files are now derived as <code class="docutils literal notranslate"><span class="pre">MAXDIM^2/T</span></code>,
-64 rows each at <code class="docutils literal notranslate"><span class="pre">MAXDIM=16</span></code> against the literals 512 and 256 they replaced;
-a 64-row file is not implemented the way a 512-row one is (BRAM 42 -&gt; 40 says
-two memories left block RAM), and the shorter operand read path takes one
-cycle out of the fixed term. That is why the delta is uniform. It is a small
-improvement, not a regression, and it changes no conclusion on this page.</p>
-<p>The same rebuild moved the csynth figures to BRAM 40, FF 17,075 and
-LUT 26,558 at an unchanged 2.431 ns. The full account, including the
-cycle-neutrality of the parametric burst loop, is at
-<a class="reference internal" href="benchmarks.html#benchmarks-one-cycle"><span class="std std-ref">The published row moved by one cycle, and why</span></a>.</p>
-</section>
-<section id="the-signed-bit-slice-bug-that-the-spare-bit-rule-came-from">
-<h3>The signed bit-slice bug that the spare-bit rule came from<a class="headerlink" href="#the-signed-bit-slice-bug-that-the-spare-bit-rule-came-from" title="Link to this heading"><span>¶</span></a></h3>
-<p>When the design was built, a bit-slice was extracted into a <strong>signed</strong>
-<code class="docutils literal notranslate"><span class="pre">ap_int&lt;N&gt;</span></code> in the emitted HLS:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">ap_int</span><span class="o">&lt;</span><span class="mi">7</span><span class="o">&gt;</span><span class="w"> </span><span class="n">v268</span><span class="p">;</span><span class="w">  </span><span class="n">v268</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">w02</span><span class="p">(</span><span class="mi">60</span><span class="p">,</span><span class="w"> </span><span class="mi">54</span><span class="p">);</span><span class="w">   </span><span class="c1">// the nr field</span>
-<span class="kt">int32_t</span><span class="w"> </span><span class="n">nr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v268</span><span class="p">;</span><span class="w">                     </span><span class="c1">// 64 -&gt; 0b1000000 -&gt; -64</span>
-</pre></div>
-</div>
-<p>So a field whose top bit is set read back negative, and a loop bounded by it
-ran zero times. Consolidating the <code class="docutils literal notranslate"><span class="pre">vld</span></code> broke 16x16x16 in cosim – <strong>251 of
-256 outputs wrong</strong> – while the Allo dataflow simulator passed it: <code class="docutils literal notranslate"><span class="pre">nr</span> <span class="pre">=</span> <span class="pre">64</span></code>
-for a 64-row <code class="docutils literal notranslate"><span class="pre">vld</span></code> read back as -64, the loop ran zero times, and the design
-silently produced zeros. It appeared exactly at the field’s sign-bit boundary:
-<code class="docutils literal notranslate"><span class="pre">nr</span> <span class="pre">&lt;=</span> <span class="pre">63</span></code> worked, 64 did not. The emitter has since been fixed and the
-spare-bit encoding kept; see <a class="reference internal" href="../developer/limitations.html#limitation-12"><span class="std std-ref">12. Bit-slices lower to signed ap_int&lt;N&gt;, silently, and the simulator disagrees</span></a> and the rule in
-<a class="reference internal" href="#the-spare-bit-rule">The spare-bit rule</a>.</p>
-</section>
-<section id="the-one-owner-rule-was-charged-to-vitis-as-well-as-to-allo">
-<h3>The one-owner rule was charged to Vitis as well as to Allo<a class="headerlink" href="#the-one-owner-rule-was-charged-to-vitis-as-well-as-to-allo" title="Link to this heading"><span>¶</span></a></h3>
-<p><strong>Correction, 2026-09-19: the one-owner rule is Allo’s, not Vitis’s.</strong>
-<a class="reference internal" href="#one-owner-per-memory">One owner per memory</a> charged it to both until this date, citing
-<code class="docutils literal notranslate"><span class="pre">HLS</span> <span class="pre">200-779</span> <span class="pre">/</span> <span class="pre">200-979</span></code> as a Vitis refusal; only the Allo half holds. A Vitis 2023.2 probe (<a class="reference external" href="https://github.com/sunwookim028/allo/tree/main/examples/accelerator/tinytpu_vitis/impact/probe_shared">impact/probe_shared/</a>)
-shows that <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">stream</span> <span class="pre">variable=buf</span> <span class="pre">type=unsync</span></code> makes Vitis share
-an on-chip array between two processes, one per BRAM port (<code class="docutils literal notranslate"><span class="pre">HLS</span> <span class="pre">200-824</span></code>,
-<code class="docutils literal notranslate"><span class="pre">200-755</span></code>, <code class="docutils literal notranslate"><span class="pre">200-634</span></code>); <code class="docutils literal notranslate"><span class="pre">HLS</span> <span class="pre">200-779</span></code> applies only to <em>synchronized</em>
-arrays. Allo is what refuses: it rejects a region-scope <code class="docutils literal notranslate"><span class="pre">Stateful</span></code> shared by
-two kernels (<code class="docutils literal notranslate"><span class="pre">EmitVivadoHLS.cpp:3083-3122</span></code>) and never emits
-<code class="docutils literal notranslate"><span class="pre">stream</span> <span class="pre">type=unsync</span></code>. Vitis does separately forbid one <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> bundle read
-by two processes (<code class="docutils literal notranslate"><span class="pre">HLS</span> <span class="pre">200-1013</span></code> / <code class="docutils literal notranslate"><span class="pre">200-984</span></code>).</p>
-<p>An earlier claim in this project, that removing <code class="docutils literal notranslate"><span class="pre">vru</span></code>’s double handling of B
-would need a second producer on a shared memory, <strong>was wrong</strong>: the
-<code class="docutils literal notranslate"><span class="pre">v_wdirect</span></code> / <code class="docutils literal notranslate"><span class="pre">v_wdb</span></code> variants remove it with <code class="docutils literal notranslate"><span class="pre">spm</span></code> still the one owner
-of <code class="docutils literal notranslate"><span class="pre">spad</span></code> and one writer of <code class="docutils literal notranslate"><span class="pre">wcol[0]</span></code>, and that is how the shipped design
-has done it since <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code>. See <a class="reference internal" href="../developer/limitations.html#limitation-shared-memory"><span class="std std-ref">Shared on-chip memory: the one-owner rule is Allo’s, not Vitis’s</span></a>.</p>
-</section>
-<section id="what-landed-in-e24e433b">
-<span id="tinytpu-isa-landing"></span><h3>What landed in <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code><a class="headerlink" href="#what-landed-in-e24e433b" title="Link to this heading"><span>¶</span></a></h3>
-<p>The gap attribution priced the deficit to Gemmini on variants of the design
-(<a class="reference internal" href="gemmini_comparison.html#gemmini-gap-attribution"><span class="std std-ref">Where the deficit came from, and what was landed</span></a>); its best bit-exact stack,
-<code class="docutils literal notranslate"><span class="pre">v_design_dep_imem8</span></code>, is now the design, rebuilt from the sources rather than
-patched:</p>
-<ul class="simple">
-<li><p><strong>Program prefetch, 8 words a cycle</strong> into a cyclically partitioned <code class="docutils literal notranslate"><span class="pre">ib</span></code>
-(gmem0 is 512 bits wide): 56 words in 7 cycles instead of 56 (<code class="docutils literal notranslate"><span class="pre">v_imem8</span></code>).</p></li>
-<li><p><strong>Weights by scratchpad address.</strong> <code class="docutils literal notranslate"><span class="pre">mm</span></code>’s <code class="docutils literal notranslate"><span class="pre">f3</span></code> names T scratchpad rows
-and <code class="docutils literal notranslate"><span class="pre">spm</span></code> streams the header and weights down the weight chain; the weight
-<code class="docutils literal notranslate"><span class="pre">vld</span></code> through the vregs is gone. A <strong>per-PE weight loader</strong> (<code class="docutils literal notranslate"><span class="pre">wld</span></code>)
-double-buffers each PE’s weight, and the PE is one flat loop (<code class="docutils literal notranslate"><span class="pre">v_wdb</span></code>).</p></li>
-<li><p><strong>A straight into the vregs.</strong> <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code>’s <code class="docutils literal notranslate"><span class="pre">f0</span></code> gained a destination bit;
-the shipped GEMM sends A to the vregs, so the A <code class="docutils literal notranslate"><span class="pre">spad</span> <span class="pre">-&gt;</span> <span class="pre">vld</span> <span class="pre">-&gt;</span> <span class="pre">vr</span></code> trip is
-gone (<code class="docutils literal notranslate"><span class="pre">v_design</span></code>). <code class="docutils literal notranslate"><span class="pre">vld</span></code> stays in the ISA.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">accu</span></code> <strong>flat at II=1</strong>, held there by the <code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> claim and the
-distance contract that makes it true (<a class="reference internal" href="#tinytpu-isa-dependence"><span class="std std-ref">The accumulator’s dependence claim</span></a>), not by
-patching <code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code> (<code class="docutils literal notranslate"><span class="pre">v_accudep</span></code>).</p></li>
-<li><p><strong>Per-unit work counts precomputed in the sequencer</strong>: a flat loop whose row
-count depends on the decoded opcode closes at <code class="docutils literal notranslate"><span class="pre">Final</span> <span class="pre">II</span> <span class="pre">=</span> <span class="pre">2</span></code> on its
-counter – the trap the branch found in <code class="docutils literal notranslate"><span class="pre">spm</span></code> and <code class="docutils literal notranslate"><span class="pre">accu</span></code>.</p></li>
-</ul>
-</section>
-<section id="earlier-reproduce-instructions-and-the-runs-of-them">
-<h3>Earlier reproduce instructions, and the runs of them<a class="headerlink" href="#earlier-reproduce-instructions-and-the-runs-of-them" title="Link to this heading"><span>¶</span></a></h3>
-<p>The commands in <a class="reference internal" href="#building-and-running">Building and running</a> replaced older reproduce instructions
-(<code class="docutils literal notranslate"><span class="pre">d18de251</span></code>) that named <code class="docutils literal notranslate"><span class="pre">TPU_M</span></code> / <code class="docutils literal notranslate"><span class="pre">TPU_K</span></code> / <code class="docutils literal notranslate"><span class="pre">TPU_N</span></code> knobs, a
-<code class="docutils literal notranslate"><span class="pre">simulator</span></code> argument and <code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS=32</span></code>, none of which the current
-scripts use; the numbers recorded then were produced at 32 threads.
-<code class="docutils literal notranslate"><span class="pre">kpn_model.py</span></code> has since been rewritten for the row-flattened units.</p>
-<p><code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code> was run from a pristine worktree, including a fresh MLIR
-build, and printed <code class="docutils literal notranslate"><span class="pre">REPRODUCED</span></code> with 172 / 262 / 418 / 484 / 686 and 0
-mismatches in <strong>5m49s</strong> (<code class="docutils literal notranslate"><span class="pre">96c3aef6</span></code>, re-run at the docs commit); against the
-pre-landing design it printed 252 / 383 / 591 / 667 / 919 in 5m48s
-(<code class="docutils literal notranslate"><span class="pre">d18de251</span></code>). Both predate the one-cycle move above.</p>
-</section>
+<section id="results-and-history">
+<h2>Results and history<a class="headerlink" href="#results-and-history" title="Link to this heading"><span>¶</span></a></h2>
+<p>Cycle counts, resources, the standard-cell synthesis figure, and every
+superseded figure and withdrawn claim are on <a class="reference internal" href="tinytpu_isa_results.html"><span class="doc">TinyTPU-isa: Results and History</span></a>. The
+design’s longer optimisation history is on <a class="reference internal" href="tinytpu_history.html"><span class="doc">TinyTPU-isa: Design History</span></a>.</p>
 </section>
 </section>
 
@@ -2525,7 +1138,8 @@ pre-landing design it printed 252 / 383 / 591 / 667 / 919 in 5m48s
             <div class="page_toc">
                 <ul>
 <li><a class="reference internal" href="#">TinyTPU-isa: A Programmable GEMM Accelerator</a><ul>
-<li><a class="reference internal" href="#architecture">Architecture</a><ul>
+<li><a class="reference internal" href="#quick-start">Quick start</a></li>
+<li><a class="reference internal" href="#how-it-works">How it works</a><ul>
 <li><a class="reference internal" href="#chains-rather-than-fan-out">Chains rather than fan-out</a></li>
 <li><a class="reference internal" href="#hazards-come-from-being-in-order">Hazards come from being in-order</a></li>
 <li><a class="reference internal" href="#two-structural-rules-that-fixed-real-deadlocks">Two structural rules that fixed real deadlocks</a></li>
@@ -2533,49 +1147,21 @@ pre-landing design it printed 252 / 383 / 591 / 667 / 919 in 5m48s
 <li><a class="reference internal" href="#data-type">Data type</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#the-isa">The ISA</a><ul>
-<li><a class="reference internal" href="#bit-layout">Bit layout</a></li>
-<li><a class="reference internal" href="#instruction-word">Instruction word</a></li>
-<li><a class="reference internal" href="#opcodes">Opcodes</a></li>
-<li><a class="reference internal" href="#derived-properties">Derived properties</a></li>
-<li><a class="reference internal" href="#per-unit-rewrites">Per-unit rewrites</a></li>
-<li><a class="reference internal" href="#instruction-memory-header">Instruction memory header</a></li>
-<li><a class="reference internal" href="#memory-map">Memory map</a></li>
-<li><a class="reference internal" href="#contracts">Contracts</a></li>
-<li><a class="reference internal" href="#parameters">Parameters</a></li>
-<li><a class="reference internal" href="#what-bounds-maxdim">What bounds <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code></a></li>
-<li><a class="reference internal" href="#numerics">Numerics</a></li>
-<li><a class="reference internal" href="#rationale">Rationale</a></li>
-<li><a class="reference internal" href="#the-spare-bit-rule">The spare-bit rule</a></li>
-<li><a class="reference internal" href="#header-and-program-memory">Header and program memory</a></li>
-<li><a class="reference internal" href="#programs-and-the-loop-nest-generator">Programs, and the loop-nest generator</a></li>
-</ul>
-</li>
+<li><a class="reference internal" href="#reference">Reference</a><ul>
 <li><a class="reference internal" href="#hardware-parameters">Hardware parameters</a></li>
-<li><a class="reference internal" href="#building-and-running">Building and running</a><ul>
+<li><a class="reference internal" href="#files-commands-and-knobs">Files, commands and knobs</a><ul>
 <li><a class="reference internal" href="#switching-activity-from-the-cosim-run">Switching activity from the cosim run</a></li>
 <li><a class="reference internal" href="#the-spec-and-holding-both-consumers-to-it">The spec, and holding both consumers to it</a></li>
 <li><a class="reference internal" href="#verifying-a-change">Verifying a change</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#limits-and-known-failures">Limits and known failures</a><ul>
 <li><a class="reference internal" href="#the-accumulator-s-dependence-claim">The accumulator’s dependence claim</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#results">Results</a><ul>
-<li><a class="reference internal" href="#cycle-counts">Cycle counts</a></li>
-<li><a class="reference internal" href="#a-programmable-design-s-csynth-number-is-not-a-cycle-count">A programmable design’s csynth number is not a cycle count</a></li>
-<li><a class="reference internal" href="#resources">Resources</a></li>
-<li><a class="reference internal" href="#cosim-as-a-deadlock-oracle">Cosim as a deadlock oracle</a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#standard-cell-synthesis-one-number-and-what-it-is-not">Standard-cell synthesis: one number, and what it is not</a></li>
-<li><a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a><ul>
-<li><a class="reference internal" href="#the-channel-depth-moved-the-row-again-2026-09-24">The channel depth moved the row again, 2026-09-24</a></li>
-<li><a class="reference internal" href="#the-published-row-moved-by-one-cycle-2026-09-22">The published row moved by one cycle, 2026-09-22</a></li>
-<li><a class="reference internal" href="#the-signed-bit-slice-bug-that-the-spare-bit-rule-came-from">The signed bit-slice bug that the spare-bit rule came from</a></li>
-<li><a class="reference internal" href="#the-one-owner-rule-was-charged-to-vitis-as-well-as-to-allo">The one-owner rule was charged to Vitis as well as to Allo</a></li>
-<li><a class="reference internal" href="#what-landed-in-e24e433b">What landed in <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code></a></li>
-<li><a class="reference internal" href="#earlier-reproduce-instructions-and-the-runs-of-them">Earlier reproduce instructions, and the runs of them</a></li>
-</ul>
-</li>
+<li><a class="reference internal" href="#results-and-history">Results and history</a></li>
 </ul>
 </li>
 </ul>
@@ -2597,7 +1183,7 @@ pre-landing design it printed 252 / 383 / 591 / 667 / 919 in 5m48s
 
             <div class="right">
                 
-                    <a href="tinytpu_library.html"><span>The Unit Library: Composing a Region from Units</span><span class="icon">&gt;</span></a>
+                    <a href="tinytpu_isa_spec.html"><span>TinyTPU-isa: The ISA</span><span class="icon">&gt;</span></a>
                 
             </div>
         </div>

@@ -165,6 +165,7 @@
 <li class="toctree-l1"><a class="reference internal" href="backends/llvm.html">LLVM (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
@@ -174,8 +175,12 @@
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="designs/ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
 <li class="toctree-l1"><a class="reference internal" href="designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="designs/gemmini_results.html">TinyTPU-isa vs Gemmini: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="designs/benchmarks.html">The Benchmark Set</a></li>
 <li class="toctree-l1"><a class="reference internal" href="designs/workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
 <li class="toctree-l1"><a class="reference internal" href="designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
@@ -186,9 +191,13 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
 <li class="toctree-l1"><a class="reference internal" href="extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="extensions/chia_results.html">CHIA Agentic Co-Design: Results</a></li>
+<li class="toctree-l1"><a class="reference internal" href="extensions/chia_codesign.html">The Original Co-Design Effort (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
-<li class="toctree-l1"><a class="reference internal" href="extensions/act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="extensions/act.html">ACT and the TinyTPU-isa Mapper</a></li>
 <li class="toctree-l1"><a class="reference internal" href="extensions/act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="extensions/act_results.html">ACT: Results, Findings and Corrections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="extensions/codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
 <ul>
@@ -394,6 +403,75 @@ invisible to every static check</strong> — an action naming the wrong operand,
 subtraction where addition was meant. The model verifies <em>composition</em>, not
 arithmetic. A control mutant that changes nothing is correctly not caught,
 which is what shows the harness ran the file it was given.</p>
+<p><strong>5.1 Can the behavioural model be derived from the structural one?</strong> The two
+descriptions were written independently: a <cite>compose</cite> unit declares what names a
+body needs from outside, an <cite>actions</cite> unit declares what effect lands where and
+when. If the second can be <em>derived</em> from the first, an Action becomes an
+annotation on an existing model rather than a second declaration of every unit.
+We built the derivation and made the diff a gate.</p>
+<p><strong>Of 28 ports the Action model declares, 24 stop being independent</strong>: 20 are
+the architecture’s own channels and memories, read off the same AST the
+structural checker already parses, and 4 more stand for them. Two units derive
+completely. The residue is exactly the interesting part:</p>
+<ul class="simple">
+<li><p><strong>3 are arithmetic</strong> — a multiplexer, a multiply-accumulate, an ALU. No
+composition can carry these: they are what a unit <em>does</em>, not what it is
+connected to.</p></li>
+<li><p><strong>1 counts instructions</strong> and corresponds to nothing physical.</p></li>
+<li><p><strong>The control path cannot be an action at all.</strong> A unit reads its dispatch
+queue inside a step it is already spending; an action is per-row or
+per-instruction, and the per-instruction form adds a head step to the work
+count the instruction header carries. Measured rather than asserted: one
+instruction’s cost goes from 6 to 7.</p></li>
+<li><p><strong>The derivation found three on-chip memories the Action model never had</strong> —
+real state, invisible to the ISA because no instruction field names a row of
+them.</p></li>
+</ul>
+<p><strong>And the load-bearing finding: the two models do not agree on what a unit
+is.</strong> A <cite>compose</cite> unit is a <em>kernel</em>, replicated by an instance count. An
+<cite>actions</cite> unit is a <em>dispatch domain</em>, one work counter. They are the same
+object for seven of eight units and a different object for the array, where
+T×T kernels are one dispatch domain the ISA calls <cite>array</cite>. No naming convention
+closes that: a header field counts rows per instance across T×T kernels, and
+the behavioural model has no word for the distinction.</p>
+<p><strong>5.2 The two defects the second machine exposed, and what fixing them cost.</strong>
+Lane width was previously read off a shadow one-row <em>state</em>, because a lane map
+seemed to need addressed storage. It does not: giving the structural
+<code class="docutils literal notranslate"><span class="pre">Channel</span></code> a lane count and deriving its element type from it removes the
+shadow state entirely, and a fold takes its operand width from the channel the
+value arrived on. <strong>The missing thing was a lane count, not addressed state</strong> —
+a channel has no rows, no bank map and no collision rule, and a fold needs none
+of them.</p>
+<p>The work model charged latency as occupancy, reporting 80 steps where the
+hardware does 16. Separating an action’s <strong>span</strong> (which a declared latency
+lengthens) from its <strong>initiation</strong> (the busiest resource a row books, read off
+ports already declared) gives 16, leaves the calendar unchanged, and declares
+nothing new. Every count on the first machine is unchanged, because a unit with
+no declared latency has span equal to initiation — which is why one machine
+could never have shown the defect.</p>
+<p><strong>It cost a static catch, and we kept the loss visible.</strong> One deliberately
+wrong declaration — an ALU declared one lane operation per step instead of two
+— was previously caught by the cost check <em>because of the defect</em>: the broken
+model pushed the work into a third cycle. Correctly pipelined, the accumulator’s
+single read port binds at two per row either way, so no work count can see the
+ALU’s width. The fifteen-mutant split moves from 5 / 4 / 6 to <strong>5 refused
+structurally, 3 caught by cost, 6 invisible, 1 caught by nothing</strong>.</p>
+<p><strong>5.3 Consolidation: not one file, and the reason is a result.</strong> The intended
+end state was a single file. It should not be, on two independent grounds.
+First, the behavioural model imports nothing from the compiler, and that
+independence is what lets an ISA be composed and checked without the front end;
+merging would make it depend on the dataflow layer and on MLIR bindings for no
+new capability. Second, the specification’s discipline is that the spec is the
+source of truth and the design is held to it — <strong>a spec that reads its ports
+out of the design cannot check the design’s ports.</strong></p>
+<p>What is available, and what we built, is a <strong>checked projection</strong>: where the
+two models overlap they can no longer drift, and where they cannot overlap the
+reason is written down and checked in both directions. Two architectures now
+compose, and the second one’s behavioural model is <em>derived</em> rather than
+written.</p>
+<p>So the end state is reachable in a modified form, and the modification is the
+finding: <strong>`Unit` means two different things</strong>, and one file would mean one of
+the two meanings silently winning.</p>
 <p><strong>Recommendation.</strong> Worth using where several consumers would otherwise restate
 one per-unit fact; <strong>not</strong> a default, because one machine has exercised it.
 This is directed work, not a search result, and is reported as such.</p>
@@ -456,6 +534,48 @@ TileLink reader, writer and transaction-tracker path is 6.3% of theirs. This is
 a structural difference rather than an efficiency gap — TileLink at this width
 does not produce this structure — and it is §6.2’s finding arriving from the
 comparison rather than from our own hierarchy.</p>
+<p><strong>6.2d The shape difference, at two sizes.</strong> Gemmini DIM=8 logic-only is
+<strong>524,402 µm²</strong>, timing met, same flow and same stub rule. Two readings follow,
+and the second is the one that does not depend on any argument we could be
+accused of choosing.</p>
+<p><em>Doubling the mesh costs +37.3% of logic</em> (382,026 → 524,402) for <strong>4× the
+PEs</strong> — sub-linear, which is what one expects when control and the memory path
+dominate rather than the array. That is the adapter finding of §6.2 arriving
+from the opposite direction, on someone else’s design.</p>
+<p><em>And the non-combinational share is stable and opposite on the two designs:</em></p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"></th>
+<th class="head"><p>Gemmini DIM=4</p></th>
+<th class="head"><p>Gemmini DIM=8</p></th>
+<th class="head"><p>ours, every run</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>non-combinational share of logic</p></td>
+<td><p>38.3%</p></td>
+<td><p>37.2%</p></td>
+<td><p><strong>≈80%</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Their logic is gate-heavy; ours is flop-heavy — at both sizes, and
+regardless of the memory treatment.</strong> No node scaling, no capacity matching and
+no exclusion rule enters that comparison; it is a share of each design’s own
+logic. It is therefore a structural statement about <strong>what HLS emits versus
+what a Chisel generator emits</strong>, not about either accelerator, and it is the
+most transferable result the area track produced.</p>
+<p><strong>A caution that belongs beside the frequency numbers.</strong> Gemmini DIM=8’s worst
+path group closes at <strong>exactly 0.00 ns</strong> — zero violating paths, zero hold, a
+genuine pass, but with nothing spare, against +0.20 to +0.21 ns on every one of
+ours. It must be written as <em>“closes at 3.33 ns”</em> and never as headroom: a
+<cite>0.00</cite> that reads as “met” in a table becomes “both close at 3.33 ns, equally”
+in prose. If a frequency comparison is ever attempted, Gemmini’s is the number
+that moves first.</p>
+<p><strong>The clean pair is still two runs away.</strong> Our 1,396,966 against their 524,402
+is 2.66×, but that is our T=4/MAXDIM=64 against their DIM=8 — not a
+single-variable comparison. The pair that answers the question is our
+T=8/MAXDIM=64 at QD=16 against this run, and both remain queued.</p>
 <p><strong>Two methodological points are now settled on evidence rather than argument.</strong>
 First, the exclusion of our instruction-fetch adapter: <strong>no cells inside the
 Gemmini boundary match instruction fetch at all.</strong> What exists is command queue

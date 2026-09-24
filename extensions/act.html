@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>ACT, and Why We Cite It &#8212; Allo Documentation</title>
+    <title>ACT and the TinyTPU-isa Mapper &#8212; Allo Documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/basic_mod.css?v=9b2032db" />
     <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
@@ -165,6 +165,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
@@ -174,8 +175,12 @@
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_results.html">TinyTPU-isa vs Gemmini: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
@@ -186,9 +191,13 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
 <li class="toctree-l1"><a class="reference internal" href="chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="chia_results.html">CHIA Agentic Co-Design: Results</a></li>
+<li class="toctree-l1"><a class="reference internal" href="chia_codesign.html">The Original Co-Design Effort (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">ACT and the TinyTPU-isa Mapper</a></li>
 <li class="toctree-l1"><a class="reference internal" href="act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="act_results.html">ACT: Results, Findings and Corrections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
 <ul>
@@ -216,65 +225,56 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <section id="act-and-why-we-cite-it">
-<h1>ACT, and Why We Cite It<a class="headerlink" href="#act-and-why-we-cite-it" title="Link to this heading"><span>¶</span></a></h1>
+  <section id="act-and-the-tinytpu-isa-mapper">
+<h1>ACT and the TinyTPU-isa Mapper<a class="headerlink" href="#act-and-the-tinytpu-isa-mapper" title="Link to this heading"><span>¶</span></a></h1>
+<p><code class="docutils literal notranslate"><span class="pre">act/</span></code> is a loop-nest mapper for <a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>. Given a workload
+spec and a shape it enumerates the mapspace, lowers each nest to the machine’s
+instruction words, prices what it lowered, and prints the ranked mappings with a
+census of why the rest were refused. It is target-independent pure python that
+needs no build of the MLIR bindings, and it is a rebuild of the core of <strong>ACT</strong>
+– Kai Shao’s accelerator-compilation work – against this fork’s abstractions,
+using ACT’s algorithms as the reference and copying none of its code. The corpus
+it compiles and the judge that grades the result are on <a class="reference internal" href="act_specs.html"><span class="doc">ACT Workload Specs and the Judge</span></a>; the
+audit that produced the rebuild decision, the measurements and every withdrawn
+claim are on <a class="reference internal" href="act_results.html"><span class="doc">ACT: Results, Findings and Corrections</span></a>.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p><strong>ACT is Kai Shao’s work</strong>, developed at <a class="reference external" href="https://github.com/kkkaishao/allo">https://github.com/kkkaishao/allo</a>
 (the <code class="docutils literal notranslate"><span class="pre">kai</span></code> remote), branch <code class="docutils literal notranslate"><span class="pre">act</span></code>. This fork’s <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> lineage
 imports it at commit <code class="docutils literal notranslate"><span class="pre">3c1ad38d</span></code> as merge <code class="docutils literal notranslate"><span class="pre">29cb1d99</span></code>; <code class="docutils literal notranslate"><span class="pre">ATTRIBUTION.md</span></code>
-at tag <code class="docutils literal notranslate"><span class="pre">chia-codesign-final</span></code> (<code class="docutils literal notranslate"><span class="pre">629c2767</span></code>) records the terms. This page
-audits that work <strong>from the outside</strong> to decide whether to connect it to
+at tag <code class="docutils literal notranslate"><span class="pre">chia-codesign-final</span></code> (<code class="docutils literal notranslate"><span class="pre">629c2767</span></code>) records the terms. These pages
+audit that work <strong>from the outside</strong> to decide whether to connect it to
 <a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>. It cites ACT; it does not republish it. <code class="docutils literal notranslate"><span class="pre">main</span></code>
 has no ACT sources.</p>
 </div>
 <p>Audited 2026-09-22 against <code class="docutils literal notranslate"><span class="pre">chia-codesign-final</span></code>: <code class="docutils literal notranslate"><span class="pre">allo/exp/dsa/</span></code> is 12
 files, 8,347 lines.</p>
-<p>The other side of that connection – the workload specs a compiler would be
-given and the judge that decides whether what comes out is right, legal and
-fast – is on <a class="reference internal" href="act_specs.html"><span class="doc">ACT Workload Specs and the Judge</span></a>, and contains no part of ACT.</p>
-<section id="verdict">
-<h2>Verdict<a class="headerlink" href="#verdict" title="Link to this heading"><span>¶</span></a></h2>
-<p><strong>Rebuild the core against this fork’s abstractions, using ACT’s algorithms as
-the reference; cite ACT, copy nothing.</strong> That is what <code class="docutils literal notranslate"><span class="pre">act/</span></code> is. The decision
-was forced rather than preferred, and the reasoning is worth keeping because it
-is the argument any future port has to answer:</p>
-<ol class="arabic simple">
-<li><p><strong>A port could not have been validated.</strong> ACT’s suite does not run on this
-host – see <a class="reference internal" href="#it-cannot-be-run-here">It Cannot Be Run Here</a> – so porting would have meant carrying
-code we could neither execute before the move nor compare against after it.
-Every bug would have been indistinguishable from a porting mistake.</p></li>
-<li><p><strong>The parts we want are not separable.</strong> <code class="docutils literal notranslate"><span class="pre">mapspace</span></code> imports <code class="docutils literal notranslate"><span class="pre">mapping</span></code>
-imports <code class="docutils literal notranslate"><span class="pre">search</span></code> imports <code class="docutils literal notranslate"><span class="pre">allo._mlir.ir</span></code>; with <code class="docutils literal notranslate"><span class="pre">allo/__init__.py</span></code>
-bypassed, the only module in <code class="docutils literal notranslate"><span class="pre">allo/exp/dsa/</span></code> that imports cleanly is
-<code class="docutils literal notranslate"><span class="pre">errors.py</span></code>. Extracting the mapper means rewriting its imports anyway,
-which is most of the work of rewriting it.</p></li>
-<li><p><strong>Its upper half has never run.</strong> <code class="docutils literal notranslate"><span class="pre">tests/dsa/</span></code> covers the frontend,
-matcher, solvers, planner and oracle, and covers <strong>none</strong> of <code class="docutils literal notranslate"><span class="pre">mapping.py</span></code>,
-<code class="docutils literal notranslate"><span class="pre">mapspace.py</span></code>, <code class="docutils literal notranslate"><span class="pre">epoch.py</span></code> or <code class="docutils literal notranslate"><span class="pre">check.py</span></code>. No <code class="docutils literal notranslate"><span class="pre">Binding</span></code> is constructed
-anywhere in the tree. A port would import untested code into a tested
-design.</p></li>
-<li><p><strong>The target is a library of composable IPs, not this one design.</strong> A port
-inherits ACT’s flat step list, in which “time” is a position in one Python
-list (<code class="docutils literal notranslate"><span class="pre">search.py:2357</span></code>), an operand’s address is a single scalar offset
-(<code class="docutils literal notranslate"><span class="pre">mapping.py:966</span></code>) and the nest is fully unrolled (<code class="docutils literal notranslate"><span class="pre">mapping.py:904</span></code>).
-None of that shape survives a second architecture.</p></li>
-</ol>
-<p>What is given up by not porting, stated plainly: ACT’s pattern matcher (TOSA DAG
-to instruction, a memoized tree DP that is globally optimal because multi-use
-values are forced cut points), its residence and layout solvers, its Belady
-spiller, and its MLIR emission. Those are the parts of ACT that are genuinely
-hard and genuinely good, and <code class="docutils literal notranslate"><span class="pre">act/</span></code> has none of them. <code class="docutils literal notranslate"><span class="pre">act/</span></code> is a mapper, a
-cost model and a lowering, and it stops where ACT’s interesting work begins.
-When the bindings for the chia lineage can be built, the matcher is the piece to
-revisit first – not the mapper.</p>
-<p>What is kept from ACT, deliberately: the interface. <code class="docutils literal notranslate"><span class="pre">act.nest.Loop</span></code> carries
-ACT’s four field names in ACT’s order, so a real <code class="docutils literal notranslate"><span class="pre">mapping.Mapping.loops</span></code> can
-be handed to <code class="docutils literal notranslate"><span class="pre">act.search</span></code> unchanged, and <code class="docutils literal notranslate"><span class="pre">Priced.cost</span></code> is ACT’s
-<code class="docutils literal notranslate"><span class="pre">(makespan,</span> <span class="pre">emits)</span></code> lexicographic pair.</p>
+<section id="quick-start">
+<h2>Quick start<a class="headerlink" href="#quick-start" title="Link to this heading"><span>¶</span></a></h2>
+<p>The fork’s usual environment: the <code class="docutils literal notranslate"><span class="pre">allo</span></code> env with <code class="docutils literal notranslate"><span class="pre">LLVM_BUILD_DIR</span></code>
+exported (<code class="docutils literal notranslate"><span class="pre">CLAUDE.md</span></code>).</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>examples/tinytpu
+python<span class="w"> </span>act_compile.py<span class="w"> </span>gemm.relu<span class="w"> </span>16x16x16<span class="w">   </span><span class="c1"># map one workload at one shape</span>
+python<span class="w"> </span>act_compile.py<span class="w"> </span>--gate<span class="w">               </span><span class="c1"># verify every encodable mapping</span>
+python<span class="w"> </span>act_compile.py<span class="w"> </span>--list<span class="w">               </span><span class="c1"># the registered workloads</span>
+</pre></div>
+</div>
+<p>The first prints the chosen nest with its <code class="docutils literal notranslate"><span class="pre">(makespan,</span> <span class="pre">emits)</span></code> cost, the margin
+over the runner-up together with the error bar that margin has to carry, and the
+refusal census below – 1,226 nests in 1.3 s for <code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> at 16x16x16.
+<code class="docutils literal notranslate"><span class="pre">--gate</span></code> compiles 12 problems and verifies <strong>every</strong> encodable mapping of each
+against numpy in 1.3 s, printing one grep-able verdict line.</p>
+<p>Mappings this flow reports are <em>encodable</em>, not <em>confirmed</em>: the RTL measurement
+is a separate command, and the difference is not cosmetic – see
+<a class="reference internal" href="#act-encodable-tiers"><span class="std std-ref">“Encodable” has three tiers of evidence</span></a>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">TPU_PRJ</span><span class="o">=</span>/tmp/act-cosim.prj<span class="w"> </span>python<span class="w"> </span>act_cosim.py<span class="w"> </span>gemm<span class="w"> </span>4x4x4<span class="w"> </span>--top<span class="w"> </span><span class="m">1</span><span class="w"> </span>--baseline
+</pre></div>
+</div>
 </section>
+<section id="how-it-works">
+<h2>How it works<a class="headerlink" href="#how-it-works" title="Link to this heading"><span>¶</span></a></h2>
 <section id="what-act-is">
-<h2>What ACT Is<a class="headerlink" href="#what-act-is" title="Link to this heading"><span>¶</span></a></h2>
+<h3>What ACT Is<a class="headerlink" href="#what-act-is" title="Link to this heading"><span>¶</span></a></h3>
 <p>An accelerator ISA is declared with decorators, and a TOSA program is compiled
 onto it.</p>
 <ul class="simple">
@@ -307,203 +307,8 @@ branches’ merge base <code class="docutils literal notranslate"><span class="p
 files share only their SPDX header. So ACT emitting flat streams is not an
 oversight; ours would be the first loop machine it met.</p>
 </section>
-<section id="the-mapper">
-<h2>The Mapper<a class="headerlink" href="#the-mapper" title="Link to this heading"><span>¶</span></a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">mapping.Loop(rank,</span> <span class="pre">factor,</span> <span class="pre">level,</span> <span class="pre">spatial)</span></code> is a frozen 4-field dataclass
-(<code class="docutils literal notranslate"><span class="pre">mapping.py:122-131</span></code>) and <code class="docutils literal notranslate"><span class="pre">Mapping(ranks,</span> <span class="pre">loops,</span> <span class="pre">bypass)</span></code> is frozen with the
-nest as a persistent field (<code class="docutils literal notranslate"><span class="pre">mapping.py:147-149</span></code>). So the chosen nest <strong>is</strong>
-readable back out: <code class="docutils literal notranslate"><span class="pre">search(binding,</span> <span class="pre">op).best.mapping.loops</span></code>. That much of our
-standing plan is real.</p>
-<p>Everything else about it is worse than we thought.</p>
-<table class="docutils align-default">
-<colgroup>
-<col style="width: 30.0%" />
-<col style="width: 70.0%" />
-</colgroup>
-<thead>
-<tr class="row-odd"><th class="head"><p>claim</p></th>
-<th class="head"><p>what the code says</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p>“the mapper is a loop-nest mapper”</p></td>
-<td><p>True, but the <strong>enumeration is entirely in</strong> <code class="docutils literal notranslate"><span class="pre">mapspace.py:102-174</span></code>.
-<code class="docutils literal notranslate"><span class="pre">mapping.py</span></code> contains no enumeration: it parses one given nest
-(<code class="docutils literal notranslate"><span class="pre">from_timeloop</span></code>, 39 lines) and lowers it.</p></td>
-</tr>
-<tr class="row-odd"><td><p>“<code class="docutils literal notranslate"><span class="pre">mapping._lower</span></code> discards the loops”</p></td>
-<td><p>Understated. <code class="docutils literal notranslate"><span class="pre">mapping.py:904</span></code> is
-<code class="docutils literal notranslate"><span class="pre">for</span> <span class="pre">point</span> <span class="pre">in</span> <span class="pre">itertools.product(*(range(loop.factor)</span> <span class="pre">for</span> <span class="pre">loop</span> <span class="pre">in</span> <span class="pre">nest))</span></code>
-– the nest is <strong>fully unrolled</strong>, temporal and spatial alike, so program
-size is the product of the factors. Below it an operand’s address is
-already a single scalar element offset (<code class="docutils literal notranslate"><span class="pre">mapping.py:966-970</span></code>), so the
-multi-dimensional index structure an AGU needs does not exist there at
-all.</p></td>
-</tr>
-<tr class="row-even"><td><p>“<code class="docutils literal notranslate"><span class="pre">mapspace.py</span></code> is dead code”</p></td>
-<td><p>True, and it is not alone. <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">grep</span> <span class="pre">mapspace</span></code> outside the file itself:
-zero hits, here and on <code class="docutils literal notranslate"><span class="pre">kai/act</span></code>. One commit ever (“checkpoint”,
-2026-08-19). Of <code class="docutils literal notranslate"><span class="pre">mapping.py</span></code>’s 1,292 lines the only live import is
-<code class="docutils literal notranslate"><span class="pre">lower_site</span></code> at <code class="docutils literal notranslate"><span class="pre">search.py:2690</span></code>, reachable only when <code class="docutils literal notranslate"><span class="pre">mapping_for</span></code>
-is passed to <code class="docutils literal notranslate"><span class="pre">compile_program</span></code> – which nothing does. <strong>And no code
-anywhere constructs a</strong> <code class="docutils literal notranslate"><span class="pre">Binding</span></code>, which every entry point requires.
-<code class="docutils literal notranslate"><span class="pre">from_timeloop</span></code>/<code class="docutils literal notranslate"><span class="pre">to_timeloop</span></code> have no callers.</p></td>
-</tr>
-<tr class="row-odd"><td><p>“factorisations x permutations x spatial splits”</p></td>
-<td><p>Only with <code class="docutils literal notranslate"><span class="pre">instances</span> <span class="pre">&gt;</span> <span class="pre">1</span></code>. At the default <code class="docutils literal notranslate"><span class="pre">instances=1</span></code> there are
-<strong>no spatial slots at all</strong> (<code class="docutils literal notranslate"><span class="pre">mapspace.py:139-141</span></code>), and <code class="docutils literal notranslate"><span class="pre">instances</span></code>
-is the one number the ISA cannot declare.</p></td>
-</tr>
-<tr class="row-even"><td><p>“<code class="docutils literal notranslate"><span class="pre">Priced.cost</span></code> is <code class="docutils literal notranslate"><span class="pre">(makespan,</span> <span class="pre">emits)</span></code>”</p></td>
-<td><p>Confirmed, <code class="docutils literal notranslate"><span class="pre">mapspace.py:189-196</span></code>. <code class="docutils literal notranslate"><span class="pre">emits</span></code> is <code class="docutils literal notranslate"><span class="pre">len(program.emits)</span></code>
-and is only a lexicographic tie-break. Nothing in <code class="docutils literal notranslate"><span class="pre">allo/exp/dsa/</span></code>
-models instruction-memory capacity. Pricing a candidate calls
-<code class="docutils literal notranslate"><span class="pre">assemble</span></code> – ACT’s <strong>whole</strong> codegen and allocator – so its ranking
-is unavailable without the machinery we wanted to bypass.</p></td>
-</tr>
-</tbody>
-</table>
-<p>Also: <code class="docutils literal notranslate"><span class="pre">_derive</span></code> supports exactly two operations, <code class="docutils literal notranslate"><span class="pre">tosa.matmul</span></code> and
-<code class="docutils literal notranslate"><span class="pre">tosa.conv2d</span></code> (<code class="docutils literal notranslate"><span class="pre">mapping.py:526</span></code>), and refuses conv2d with padding or a
-non-zero bias.</p>
-<p><strong>Dependencies.</strong> MLIR python bindings are unavoidable for in-place use, three
-independent ways: <code class="docutils literal notranslate"><span class="pre">core.py:28</span></code>, <code class="docutils literal notranslate"><span class="pre">search.py:48-49</span></code>, and <code class="docutils literal notranslate"><span class="pre">search.py:83</span></code>
-pulling in <code class="docutils literal notranslate"><span class="pre">oracle.py</span></code>, which imports <code class="docutils literal notranslate"><span class="pre">ExecutionEngine</span></code> and <code class="docutils literal notranslate"><span class="pre">PassManager</span></code>.
-<code class="docutils literal notranslate"><span class="pre">sympy</span></code> and <code class="docutils literal notranslate"><span class="pre">ml_dtypes</span></code> come along transitively although the mapper never
-uses them. A <strong>port</strong> of the mapper alone – <code class="docutils literal notranslate"><span class="pre">Loop</span></code>, <code class="docutils literal notranslate"><span class="pre">Mapping</span></code>,
-<code class="docutils literal notranslate"><span class="pre">Dataspace</span></code>, a re-modelled <code class="docutils literal notranslate"><span class="pre">Binding</span></code>, <code class="docutils literal notranslate"><span class="pre">mapspace</span></code>’s enumerator, the
-coverage/intrinsic half of <code class="docutils literal notranslate"><span class="pre">Mapping.check</span></code>, and the pure geometry helpers
-<code class="docutils literal notranslate"><span class="pre">_split_body</span></code>/<code class="docutils literal notranslate"><span class="pre">_weights</span></code>/<code class="docutils literal notranslate"><span class="pre">_span</span></code>/<code class="docutils literal notranslate"><span class="pre">_tile</span></code>/<code class="docutils literal notranslate"><span class="pre">_project</span></code>/<code class="docutils literal notranslate"><span class="pre">_packing</span></code>/
-<code class="docutils literal notranslate"><span class="pre">_run_offsets</span></code>/<code class="docutils literal notranslate"><span class="pre">_reduction_ranks</span></code> (~105 lines of the last group) – is on
-the order of <strong>250-350 lines</strong> and would be free of MLIR, sympy, ml_dtypes and
-the JIT. That is the honest size of “use ACT as a mapper only”.</p>
-</section>
-<section id="it-cannot-be-run-here">
-<h2>It Cannot Be Run Here<a class="headerlink" href="#it-cannot-be-run-here" title="Link to this heading"><span>¶</span></a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">scripts/act-test-recipe.sh</span></code> probes every precondition and prints a verdict.
-As of 2026-09-22 four are missing:</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">allo/_mlir</span></code> must be built from <em>this</em> tree: ACT reaches
-<code class="docutils literal notranslate"><span class="pre">allo._mlir.schedule</span></code> (<code class="docutils literal notranslate"><span class="pre">mlir/python/allo/schedule.py</span></code>) and the <code class="docutils literal notranslate"><span class="pre">allo</span></code>
-dialect’s <code class="docutils literal notranslate"><span class="pre">AlloISAOps</span></code>/<code class="docutils literal notranslate"><span class="pre">AlloISATypes</span></code>, none of which exist in <code class="docutils literal notranslate"><span class="pre">main</span></code>’s
-<code class="docutils literal notranslate"><span class="pre">mlir/</span></code>. Pointing the symlink at <code class="docutils literal notranslate"><span class="pre">main</span></code>’s build fails at
-<code class="docutils literal notranslate"><span class="pre">ModuleNotFoundError:</span> <span class="pre">No</span> <span class="pre">module</span> <span class="pre">named</span> <span class="pre">'allo._mlir.schedule'</span></code>.</p></li>
-<li><p>That build reads <code class="docutils literal notranslate"><span class="pre">$LLVM_BASE_DIR</span></code> (not the <code class="docutils literal notranslate"><span class="pre">LLVM_BUILD_DIR</span></code> the dataflow
-simulator wants) and needs <code class="docutils literal notranslate"><span class="pre">llvm-project</span></code> at <code class="docutils literal notranslate"><span class="pre">040a6419</span></code>. The 11 GB build
-on this host is <code class="docutils literal notranslate"><span class="pre">6b09f739</span></code>, which is <code class="docutils literal notranslate"><span class="pre">main</span></code>’s pin.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">mlir/CMakeLists.txt:17-23,35</span></code> FATAL_ERRORs without CIRCT, and
-<code class="docutils literal notranslate"><span class="pre">MLIRAlloRegisterEverything</span></code> – which the bindings link – lists
-<code class="docutils literal notranslate"><span class="pre">CIRCTHW</span></code>/<code class="docutils literal notranslate"><span class="pre">CIRCTComb</span></code>/<code class="docutils literal notranslate"><span class="pre">CIRCTSeq</span></code> plus <code class="docutils literal notranslate"><span class="pre">MLIRAlloMicroarch</span></code> and
-<code class="docutils literal notranslate"><span class="pre">MLIRAlloScheduling</span></code>, so it is not separable. <code class="docutils literal notranslate"><span class="pre">externals/circt</span></code> is an
-empty submodule directory and no <code class="docutils literal notranslate"><span class="pre">CIRCTConfig.cmake</span></code> exists anywhere on the
-filesystem.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">mlir/CMakeLists.txt:27-33</span></code> FATAL_ERRORs without an OR-Tools <strong>cmake
-package</strong>. <code class="docutils literal notranslate"><span class="pre">$HOME/chia-ortools</span></code> is not one: it ships runtime <code class="docutils literal notranslate"><span class="pre">.so</span></code> files
-to keep an already-built tree importable.</p></li>
-</ul>
-<p>Two corrections to the environment as it was described to us: the conda env is
-<strong>not</strong> <code class="docutils literal notranslate"><span class="pre">chia_env</span></code> (python 3.10.19, ray + google-genai + mcp, and no numpy or
-pytest – it is the CHIA agent’s env); and no <code class="docutils literal notranslate"><span class="pre">cpython-314</span></code> extension module
-survives on this host, the tree that had them having been deleted. The
-<code class="docutils literal notranslate"><span class="pre">allo</span></code> env (python 3.12.13) does have all four pure-python deps –
-numpy, sympy, ml_dtypes, pytest – so the deps are not the problem, the bindings
-are.</p>
-<section id="measured-2026-09-22">
-<h3>Measured, 2026-09-22<a class="headerlink" href="#measured-2026-09-22" title="Link to this heading"><span>¶</span></a></h3>
-<p>Run in a detached worktree at <code class="docutils literal notranslate"><span class="pre">chia-codesign-final</span></code>, with the <code class="docutils literal notranslate"><span class="pre">allo</span></code> env
-(python 3.12.13, pytest 9.1.1):</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ PYTHONPATH=$WT python -m pytest tests/dsa/ -q -p no:cacheprovider
-collected 9 items / 27 errors
-!!!!!!!!!!!!!!! Interrupted: 27 errors during collection !!!!!!!!!!!!!!!!
-$ ...  --continue-on-collection-errors
-9 passed, 27 errors in 0.99s
-</pre></div>
-</div>
-<p><strong>One file of 28 runs.</strong> <code class="docutils literal notranslate"><span class="pre">tests/dsa/test_tinytpu_agent_policy.py</span></code> (4 test
-functions, 9 parametrised items) passes; it imports no <code class="docutils literal notranslate"><span class="pre">allo</span></code> and tests an
-agent sandbox policy, not an ACT algorithm. The other 27 files hold 226 of the
-230 test functions.</p>
-<p><strong>The failures are one cause wearing twenty-seven hats, and it is not a bug in
-ACT.</strong> Every collection error is the same meta-cause – no build of that
-lineage’s <code class="docutils literal notranslate"><span class="pre">mlir/</span></code> – which presents as four faces in sequence:</p>
-<table class="docutils align-default">
-<colgroup>
-<col style="width: 8.0%" />
-<col style="width: 92.0%" />
-</colgroup>
-<thead>
-<tr class="row-odd"><th class="head"><p>files</p></th>
-<th class="head"><p>exception, at its originating line</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p>27</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">ModuleNotFoundError:</span> <span class="pre">No</span> <span class="pre">module</span> <span class="pre">named</span> <span class="pre">'allo._mlir.schedule'</span></code> at
-<code class="docutils literal notranslate"><span class="pre">allo/schedule/keys.py:10</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p>27</p></td>
-<td><p>after shimming that: <code class="docutils literal notranslate"><span class="pre">ImportError:</span> <span class="pre">cannot</span> <span class="pre">import</span> <span class="pre">name</span> <span class="pre">'allo'</span> <span class="pre">from</span>
-<span class="pre">'allo._mlir.dialects.transform'</span></code> at <code class="docutils literal notranslate"><span class="pre">allo/schedule/script.py:20</span></code></p></td>
-</tr>
-<tr class="row-even"><td><p>27</p></td>
-<td><p>after shimming that: <code class="docutils literal notranslate"><span class="pre">ImportError:</span> <span class="pre">cannot</span> <span class="pre">import</span> <span class="pre">name</span> <span class="pre">'ir_ext'</span> <span class="pre">from</span>
-<span class="pre">'allo._mlir._mlir_libs._allo'</span></code> at <code class="docutils literal notranslate"><span class="pre">allo/schedule/core.py:49</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p>1</p></td>
-<td><p>bypassing the package root: <code class="docutils literal notranslate"><span class="pre">ImportError:</span> <span class="pre">cannot</span> <span class="pre">import</span> <span class="pre">name</span>
-<span class="pre">'register_passes'</span> <span class="pre">from</span> <span class="pre">'allo._mlir.dialects.allo'</span></code> at
-<code class="docutils literal notranslate"><span class="pre">allo/exp/dsa/oracle.py:34</span></code></p></td>
-</tr>
-</tbody>
-</table>
-<p>There is <strong>no assertion failure anywhere in the run</strong>. Shimming stops at the
-third face, which is a C++ submodule of that lineage’s own <code class="docutils literal notranslate"><span class="pre">.so</span></code>. One subtlety
-is worth recording: <code class="docutils literal notranslate"><span class="pre">allo._mlir</span></code> <em>does</em> resolve, but to a foreign lineage –
-the editable install maps <code class="docutils literal notranslate"><span class="pre">allo</span></code> to another worktree, so <code class="docutils literal notranslate"><span class="pre">allo</span></code> came from
-the checkout under test and <code class="docutils literal notranslate"><span class="pre">allo._mlir</span></code> from elsewhere. None of the eight
-build trees on this host has <code class="docutils literal notranslate"><span class="pre">allo/_mlir/schedule*</span></code>, and no <code class="docutils literal notranslate"><span class="pre">_allo*.so</span></code> on
-the host contains the string <code class="docutils literal notranslate"><span class="pre">ir_ext</span></code>.</p>
-<p><strong>On 238 / 40 / 0.</strong> That figure exists <strong>only in the message of commit</strong>
-<code class="docutils literal notranslate"><span class="pre">cee57bc0</span></code> (“Skip the torch-backed dsa tests instead of failing them”; 2 files,
-+3 -6, replacing bare <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">torch</span></code> with <code class="docutils literal notranslate"><span class="pre">pytest.importorskip</span></code>). Nothing
-committed records it – no log, JSON, <code class="docutils literal notranslate"><span class="pre">.rst</span></code> or <code class="docutils literal notranslate"><span class="pre">.md</span></code>. The suite and the code
-under test are byte-identical between that commit and the tag, so the claim is
-about exactly this code; it is neither confirmed nor refuted here, only
-unreproducible on this host. <strong>243 / 0 / 35</strong> appears nowhere in git at all and
-remains uncitable.</p>
-<p>Census, which needs no build: <strong>28 files, 230 test functions, 32
-``pytest.importorskip`` sites</strong> (23 on <code class="docutils literal notranslate"><span class="pre">torch</span></code>, 7 on <code class="docutils literal notranslate"><span class="pre">torch_mlir.fx</span></code>, 2 on
-<code class="docutils literal notranslate"><span class="pre">ml_dtypes</span></code>), and no <code class="docutils literal notranslate"><span class="pre">pytest.mark.skip</span></code> anywhere. <code class="docutils literal notranslate"><span class="pre">grep</span> <span class="pre">-rn</span> <span class="pre">makespan</span>
-<span class="pre">tests/</span></code> is still zero hits.</p>
-</section>
-<section id="the-scheduler-s-guarantee-and-the-claim-that-was-not-it">
-<h3>The scheduler’s guarantee, and the claim that was not it<a class="headerlink" href="#the-scheduler-s-guarantee-and-the-claim-that-was-not-it" title="Link to this heading"><span>¶</span></a></h3>
-<p><code class="docutils literal notranslate"><span class="pre">Priced.cost</span> <span class="pre">=</span> <span class="pre">(makespan,</span> <span class="pre">emits)</span></code> is confirmed, but it lives in
-<code class="docutils literal notranslate"><span class="pre">mapspace.py:189-196</span></code> – the dead file – not in the scheduler. The scheduler
-is <code class="docutils literal notranslate"><span class="pre">epoch.schedule</span></code> (<code class="docutils literal notranslate"><span class="pre">epoch.py:432</span></code>), and it is <strong>one forward
-order-preserving greedy ASAP pass</strong>: no search, no backtracking, no priority
-heuristic. Its own docstring says it derives the sigma the emitted program
-<em>has</em>, and does not search for a better one.</p>
-<p>A claim this project once made for <code class="docutils literal notranslate"><span class="pre">epoch.schedule()</span></code> – that it reproduces
-its makespan exactly, 100 == 100, over 200,000 random topological orders –
-<strong>is withdrawn</strong>: it describes a property ACT never claims and could not have.
-The argument is in <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
-<p>What is true and testable is pointwise minimality. Fix the epochs, the unit
-assignment and each epoch’s issue and depth; then the derived start times are
-the <strong>pointwise minimum</strong> over every assignment satisfying (a) non-negativity,
-(b) <code class="docutils literal notranslate"><span class="pre">start_dst</span> <span class="pre">&gt;=</span> <span class="pre">finish_src</span></code> for each derived dependence, and (c)
-<code class="docutils literal notranslate"><span class="pre">start_later</span> <span class="pre">&gt;=</span> <span class="pre">start_earlier</span> <span class="pre">+</span> <span class="pre">issue_earlier</span></code> for consecutive epochs on one
-unit. That is the proposition <code class="docutils literal notranslate"><span class="pre">tests/act/test_schedule.py</span></code> holds
-<code class="docutils literal notranslate"><span class="pre">act.schedule.run</span></code> to, against two solvers that do not share its algorithm: a
-least-fixpoint iteration over the constraint system, and brute force over every
-start vector for the smallest cases.</p>
-<p>Also worth recording for a future port: <code class="docutils literal notranslate"><span class="pre">epoch.py</span></code> is 480 lines with <strong>zero</strong>
-<code class="docutils literal notranslate"><span class="pre">ir.</span></code> uses, so it is the most portable piece in the package, and <code class="docutils literal notranslate"><span class="pre">check.py</span></code>
-sits directly on it.</p>
-</section>
-</section>
 <section id="the-rebuilt-core">
-<h2>The Rebuilt Core<a class="headerlink" href="#the-rebuilt-core" title="Link to this heading"><span>¶</span></a></h2>
+<h3>The rebuilt core<a class="headerlink" href="#the-rebuilt-core" title="Link to this heading"><span>¶</span></a></h3>
 <p>Target-independent, pure python, and deliberately <strong>not</strong> under <code class="docutils literal notranslate"><span class="pre">allo/</span></code>,
 because <code class="docutils literal notranslate"><span class="pre">allo/__init__.py</span></code> imports <code class="docutils literal notranslate"><span class="pre">allo._mlir</span></code> unconditionally and the core
 has to stay testable without a build of the bindings:</p>
@@ -563,8 +368,8 @@ lines of data in <code class="docutils literal notranslate"><span class="pre">ac
 promised – plus the sequencer’s <code class="docutils literal notranslate"><span class="pre">II=5</span></code>. A second architecture is a second
 declaration, not a second generator.</p>
 <section id="the-tinytpu-isa-target">
-<h3>The TinyTPU-isa target<a class="headerlink" href="#the-tinytpu-isa-target" title="Link to this heading"><span>¶</span></a></h3>
-<p><code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/act_target.py</span></code> derives what the earlier
+<h4>The TinyTPU-isa target<a class="headerlink" href="#the-tinytpu-isa-target" title="Link to this heading"><span>¶</span></a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">examples/tinytpu/act_target.py</span></code> derives what the earlier
 <code class="docutils literal notranslate"><span class="pre">act_nest.py</span></code> prototype hardcoded:</p>
 <ul class="simple">
 <li><p>the <strong>row / reduce / column roles</strong> from the spec’s rank structure, not from
@@ -580,52 +385,6 @@ either encodable or refused by a named hardware constraint.</p></li>
 machine is the usability defect this work exists to fix. Everything it proved is
 now a committed test.</p>
 </section>
-<section id="one-command">
-<h3>One command<a class="headerlink" href="#one-command" title="Link to this heading"><span>¶</span></a></h3>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>examples/accelerator/tinytpu_vitis/act_compile.py<span class="w"> </span>gemm.relu<span class="w"> </span>16x16x16
-python<span class="w"> </span>examples/accelerator/tinytpu_vitis/act_compile.py<span class="w"> </span>--gate
-python<span class="w"> </span>examples/accelerator/tinytpu_vitis/act_compile.py<span class="w"> </span>--list
-</pre></div>
-</div>
-<p>Measured in this worktree, <code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> at 16x16x16, 1,226 nests in 1.3 s:</p>
-<table class="docutils align-default">
-<colgroup>
-<col style="width: 10.0%" />
-<col style="width: 10.0%" />
-<col style="width: 80.0%" />
-</colgroup>
-<thead>
-<tr class="row-odd"><th class="head"><p>first</p></th>
-<th class="head"><p>also</p></th>
-<th class="head"><p>cause</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p>897</p></td>
-<td><p>897</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">acc-split</span></code> – the reduce rank is split across two emitted loops, so
-the first partial sum is not a contiguous prefix at all</p></td>
-</tr>
-<tr class="row-odd"><td><p>253</p></td>
-<td><p>253</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">acc-position</span></code> – the reduce rank is not innermost among the emitted
-loops, so peeling its first iteration would duplicate the whole body</p></td>
-</tr>
-<tr class="row-even"><td><p>55</p></td>
-<td><p>930</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">ar-distance</span></code> – rows below <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST=4</span></code> make the accumulating
-<code class="docutils literal notranslate"><span class="pre">mm</span></code> re-read its own row inside the pipeline window</p></td>
-</tr>
-<tr class="row-odd"><td><p>13</p></td>
-<td><p>13</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">AGU_TERMS=3</span></code>, one instruction word’s address-term budget</p></td>
-</tr>
-<tr class="row-even"><td><p>3</p></td>
-<td><p>3</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">LOOP_DEPTH=4</span></code></p></td>
-</tr>
-</tbody>
-</table>
 </section>
 <section id="what-acc-actually-is">
 <h3>What <code class="docutils literal notranslate"><span class="pre">acc</span></code> actually is<a class="headerlink" href="#what-acc-actually-is" title="Link to this heading"><span>¶</span></a></h3>
@@ -675,6 +434,73 @@ one needs a per-iteration predicate, the other needs a whole body duplicated –
 and lumping them as one <code class="docutils literal notranslate"><span class="pre">acc-peel</span></code> bucket of 1,150 is what made this census
 incomparable with an independently built one. Together they are still 1,150.</p>
 </section>
+<section id="what-this-flow-should-emit-next">
+<h3>What this flow should emit next<a class="headerlink" href="#what-this-flow-should-emit-next" title="Link to this heading"><span>¶</span></a></h3>
+<p>Today <code class="docutils literal notranslate"><span class="pre">act/</span></code> chooses a mapping for a <strong>fixed</strong> design and emits instructions
+for it. The stated end state is the other direction: a library of parametrized,
+modular IPs that compose into different architectures. The useful fact, from the
+same branch, is that <strong>the composable IR already exists</strong> – <code class="docutils literal notranslate"><span class="pre">df.customize</span></code>
+emits each unit as a <code class="docutils literal notranslate"><span class="pre">func.func</span></code> with explicit <code class="docutils literal notranslate"><span class="pre">!allo.stream&lt;i32,4&gt;</span></code>
+arguments and an <code class="docutils literal notranslate"><span class="pre">stypes</span></code> attribute for port direction, with the region
+constructing the streams and wiring by <code class="docutils literal notranslate"><span class="pre">call</span></code>, and parametrized units
+instantiated at two sizes in one program already work and are covered by the
+dataflow test suite. What is missing is only the <em>source syntax</em>: <code class="docutils literal notranslate"><span class="pre">Stream</span></code> has
+no <code class="docutils literal notranslate"><span class="pre">__class_getitem__</span></code>, and stream ops are keyed to construct sites rather
+than values.</p>
+<p>So the emission target for a generated design is that IR form, not the
+closure-nested source form this design uses – where all seven units are
+<code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code> closures inside one <code class="docutils literal notranslate"><span class="pre">&#64;df.region</span></code> sharing about fifteen
+region-scope streams by capture, so no unit is separable, importable or testable
+on its own. <code class="docutils literal notranslate"><span class="pre">act/machine.py</span></code> is deliberately the same information a generator
+for that form would need: units, the work each does per issue, and the spaces
+they read and write. Turning that declaration into <code class="docutils literal notranslate"><span class="pre">func.func</span></code> units is the
+next piece of work, and nothing here forecloses it.</p>
+</section>
+</section>
+<section id="reference">
+<h2>Reference<a class="headerlink" href="#reference" title="Link to this heading"><span>¶</span></a></h2>
+<section id="the-refusal-census">
+<h3>The refusal census<a class="headerlink" href="#the-refusal-census" title="Link to this heading"><span>¶</span></a></h3>
+<p>Measured in this worktree, <code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> at 16x16x16, 1,226 nests in 1.3 s:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 10.0%" />
+<col style="width: 10.0%" />
+<col style="width: 80.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>first</p></th>
+<th class="head"><p>also</p></th>
+<th class="head"><p>cause</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>897</p></td>
+<td><p>897</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">acc-split</span></code> – the reduce rank is split across two emitted loops, so
+the first partial sum is not a contiguous prefix at all</p></td>
+</tr>
+<tr class="row-odd"><td><p>253</p></td>
+<td><p>253</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">acc-position</span></code> – the reduce rank is not innermost among the emitted
+loops, so peeling its first iteration would duplicate the whole body</p></td>
+</tr>
+<tr class="row-even"><td><p>55</p></td>
+<td><p>930</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ar-distance</span></code> – rows below <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST=4</span></code> make the accumulating
+<code class="docutils literal notranslate"><span class="pre">mm</span></code> re-read its own row inside the pipeline window</p></td>
+</tr>
+<tr class="row-odd"><td><p>13</p></td>
+<td><p>13</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">AGU_TERMS=3</span></code>, one instruction word’s address-term budget</p></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>3</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">LOOP_DEPTH=4</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</section>
 <section id="two-census-definitions-and-which-number-is-which">
 <h3>Two census definitions, and which number is which<a class="headerlink" href="#two-census-definitions-and-which-number-is-which" title="Link to this heading"><span>¶</span></a></h3>
 <p>The two columns above are different quantities, and the difference has already
@@ -709,26 +535,69 @@ histogram is a property of the check order and of the emitter’s limits, not of
 the hardware, and only the independent census and the relieve-and-re-census
 numbers are comparable across implementations.</p>
 </section>
-<section id="reconciling-the-encodable-count-5-against-3">
-<h3>Reconciling the encodable count: 5 against 3<a class="headerlink" href="#reconciling-the-encodable-count-5-against-3" title="Link to this heading"><span>¶</span></a></h3>
-<p>This flow reports <strong>5</strong> encodable nests at 16x16x16 where the earlier
-<code class="docutils literal notranslate"><span class="pre">act_nest.py</span></code> prototype and an independently built enumerator report <strong>3</strong>.
-The five are <code class="docutils literal notranslate"><span class="pre">N4&gt;K4</span></code>, <code class="docutils literal notranslate"><span class="pre">M2&gt;N4&gt;K4</span></code>, <code class="docutils literal notranslate"><span class="pre">M4&gt;N4&gt;K4</span></code>, <code class="docutils literal notranslate"><span class="pre">N4&gt;M2&gt;K4</span></code> and
-<code class="docutils literal notranslate"><span class="pre">N4&gt;M4&gt;K4</span></code>; the three are the first three. So the difference is exactly the two
-nests whose <strong>column loop is outside the row loop</strong>, and it is not a
-disagreement about the machine: <code class="docutils literal notranslate"><span class="pre">act_nest.py</span></code> refused them explicitly, in a
-message that called itself <em>“A limit of this file, not of the machine”</em>, because
-it staged the activations only outside the whole nest. This flow stages them
-immediately inside the innermost row loop wherever that loop sits, which costs
-redundant re-staging when a column loop encloses it – correct, and ranked worse
-by the cost model, which is the right outcome for a mapper rather than a
-refusal.</p>
-<p>Both extra nests pass <code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code>, and <code class="docutils literal notranslate"><span class="pre">--gate</span></code> verifies every encodable
-mapping of every registered workload at every shape. <strong>But that is not enough
-to claim them, and the check that says so is below.</strong> Read with the next
-section, the reconciliation is: 5 encodable by the encoder and the reference
-model, <strong>3 confirmed on the RTL</strong>, and the other tree’s 3 is the better-grounded
-number for any claim about the hardware.</p>
+<section id="two-kinds-of-gap-cannot-express-cannot-refuse">
+<h3>Two kinds of gap: cannot express, cannot refuse<a class="headerlink" href="#two-kinds-of-gap-cannot-express-cannot-refuse" title="Link to this heading"><span>¶</span></a></h3>
+<p>A failing build hides two opposite problems, and the census now sorts every
+refusal into one of them (<code class="docutils literal notranslate"><span class="pre">act_target.CAUSE_KIND</span></code>). This vocabulary is from
+the abstractions work on branch <code class="docutils literal notranslate"><span class="pre">act-abstractions</span></code> (<code class="docutils literal notranslate"><span class="pre">65ae98c6</span></code>), which found
+that four of the five gaps it examined were of the second kind.</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">express</span></code></dt><dd><p>The instruction word has no field, or no room, for what the nest asks. The
+design is fine and the encoding is not, and the repair is a wider word or a
+new field. <code class="docutils literal notranslate"><span class="pre">acc-peel</span></code>, <code class="docutils literal notranslate"><span class="pre">AGU_TERMS</span></code>, <code class="docutils literal notranslate"><span class="pre">LOOP_DEPTH</span></code>, <code class="docutils literal notranslate"><span class="pre">capacity</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">refuse</span></code></dt><dd><p>The machine would accept the program and produce a wrong answer or hang.
+Only a hand-written check says no, and the repair is a checker. This is
+<code class="docutils literal notranslate"><span class="pre">ar-distance</span></code> – and it is why <code class="docutils literal notranslate"><span class="pre">check_program</span></code> has to exist outside
+<code class="docutils literal notranslate"><span class="pre">allo/</span></code> at all, since <code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> makes a claim that no Allo pass
+verifies.</p>
+</dd>
+</dl>
+<p>At <code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> 16x16x16 that is <strong>1,166 express against 55 refuse</strong> by first
+cause, and 1,166 against 930 counting every cause a nest violates.</p>
+<p>The distinction cuts the other way too, and it is worth stating because it is
+easy to misread <code class="docutils literal notranslate"><span class="pre">acc-peel</span></code> as a limit of Allo. It is not: expressed at the
+Allo level, the predicate a reduction needs is <code class="docutils literal notranslate"><span class="pre">scf.if</span></code> on
+<code class="docutils literal notranslate"><span class="pre">cmpi</span> <span class="pre">eq,</span> <span class="pre">index_cast(k),</span> <span class="pre">0</span></code>, and <strong>Allo builds that happily</strong>. Nothing in
+Allo refuses it and no primitive removes it. The refusal is our ISA’s encoding
+meeting a compiler that cannot check encodings – which is exactly the hole
+<code class="docutils literal notranslate"><span class="pre">allo/encoding.py</span></code> on that branch fills. <code class="docutils literal notranslate"><span class="pre">act_machine.ENCODING</span></code> states
+TinyTPU-isa’s budgets in that record’s field names, so the two sides state one
+budget rather than two once the branches meet.</p>
+</section>
+</section>
+<section id="limits-and-known-failures">
+<h2>Limits and known failures<a class="headerlink" href="#limits-and-known-failures" title="Link to this heading"><span>¶</span></a></h2>
+<section id="it-cannot-be-run-here">
+<span id="act-cannot-run"></span><h3>It cannot be run here<a class="headerlink" href="#it-cannot-be-run-here" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">scripts/act-test-recipe.sh</span></code> probes every precondition and prints a verdict.
+As of 2026-09-22 four are missing:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">allo/_mlir</span></code> must be built from <em>this</em> tree: ACT reaches
+<code class="docutils literal notranslate"><span class="pre">allo._mlir.schedule</span></code> (<code class="docutils literal notranslate"><span class="pre">mlir/python/allo/schedule.py</span></code>) and the <code class="docutils literal notranslate"><span class="pre">allo</span></code>
+dialect’s <code class="docutils literal notranslate"><span class="pre">AlloISAOps</span></code>/<code class="docutils literal notranslate"><span class="pre">AlloISATypes</span></code>, none of which exist in <code class="docutils literal notranslate"><span class="pre">main</span></code>’s
+<code class="docutils literal notranslate"><span class="pre">mlir/</span></code>. Pointing the symlink at <code class="docutils literal notranslate"><span class="pre">main</span></code>’s build fails at
+<code class="docutils literal notranslate"><span class="pre">ModuleNotFoundError:</span> <span class="pre">No</span> <span class="pre">module</span> <span class="pre">named</span> <span class="pre">'allo._mlir.schedule'</span></code>.</p></li>
+<li><p>That build reads <code class="docutils literal notranslate"><span class="pre">$LLVM_BASE_DIR</span></code> (not the <code class="docutils literal notranslate"><span class="pre">LLVM_BUILD_DIR</span></code> the dataflow
+simulator wants) and needs <code class="docutils literal notranslate"><span class="pre">llvm-project</span></code> at <code class="docutils literal notranslate"><span class="pre">040a6419</span></code>. The 11 GB build
+on this host is <code class="docutils literal notranslate"><span class="pre">6b09f739</span></code>, which is <code class="docutils literal notranslate"><span class="pre">main</span></code>’s pin.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mlir/CMakeLists.txt:17-23,35</span></code> FATAL_ERRORs without CIRCT, and
+<code class="docutils literal notranslate"><span class="pre">MLIRAlloRegisterEverything</span></code> – which the bindings link – lists
+<code class="docutils literal notranslate"><span class="pre">CIRCTHW</span></code>/<code class="docutils literal notranslate"><span class="pre">CIRCTComb</span></code>/<code class="docutils literal notranslate"><span class="pre">CIRCTSeq</span></code> plus <code class="docutils literal notranslate"><span class="pre">MLIRAlloMicroarch</span></code> and
+<code class="docutils literal notranslate"><span class="pre">MLIRAlloScheduling</span></code>, so it is not separable. <code class="docutils literal notranslate"><span class="pre">externals/circt</span></code> is an
+empty submodule directory and no <code class="docutils literal notranslate"><span class="pre">CIRCTConfig.cmake</span></code> exists anywhere on the
+filesystem.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mlir/CMakeLists.txt:27-33</span></code> FATAL_ERRORs without an OR-Tools <strong>cmake
+package</strong>. <code class="docutils literal notranslate"><span class="pre">$HOME/chia-ortools</span></code> is not one: it ships runtime <code class="docutils literal notranslate"><span class="pre">.so</span></code> files
+to keep an already-built tree importable.</p></li>
+</ul>
+<p>Two corrections to the environment as it was described to us: the conda env is
+<strong>not</strong> <code class="docutils literal notranslate"><span class="pre">chia_env</span></code> (python 3.10.19, ray + google-genai + mcp, and no numpy or
+pytest – it is the CHIA agent’s env); and no <code class="docutils literal notranslate"><span class="pre">cpython-314</span></code> extension module
+survives on this host, the tree that had them having been deleted. The
+<code class="docutils literal notranslate"><span class="pre">allo</span></code> env (python 3.12.13) does have all four pure-python deps –
+numpy, sympy, ml_dtypes, pytest – so the deps are not the problem, the bindings
+are.</p>
 </section>
 <section id="encodable-has-three-tiers-of-evidence">
 <span id="act-encodable-tiers"></span><h3>“Encodable” has three tiers of evidence<a class="headerlink" href="#encodable-has-three-tiers-of-evidence" title="Link to this heading"><span>¶</span></a></h3>
@@ -831,60 +700,8 @@ committed as <code class="docutils literal notranslate"><span class="pre">tests/
 <p><code class="docutils literal notranslate"><span class="pre">--gate</span></code> compiles 12 problems and verifies <strong>every</strong> encodable mapping of each
 against numpy in 1.3 s, printing one grep-able verdict line.</p>
 </section>
-<section id="two-kinds-of-gap-cannot-express-cannot-refuse">
-<h3>Two kinds of gap: cannot express, cannot refuse<a class="headerlink" href="#two-kinds-of-gap-cannot-express-cannot-refuse" title="Link to this heading"><span>¶</span></a></h3>
-<p>A failing build hides two opposite problems, and the census now sorts every
-refusal into one of them (<code class="docutils literal notranslate"><span class="pre">act_target.CAUSE_KIND</span></code>). This vocabulary is from
-the abstractions work on branch <code class="docutils literal notranslate"><span class="pre">act-abstractions</span></code> (<code class="docutils literal notranslate"><span class="pre">65ae98c6</span></code>), which found
-that four of the five gaps it examined were of the second kind.</p>
-<dl class="simple">
-<dt><code class="docutils literal notranslate"><span class="pre">express</span></code></dt><dd><p>The instruction word has no field, or no room, for what the nest asks. The
-design is fine and the encoding is not, and the repair is a wider word or a
-new field. <code class="docutils literal notranslate"><span class="pre">acc-peel</span></code>, <code class="docutils literal notranslate"><span class="pre">AGU_TERMS</span></code>, <code class="docutils literal notranslate"><span class="pre">LOOP_DEPTH</span></code>, <code class="docutils literal notranslate"><span class="pre">capacity</span></code>.</p>
-</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">refuse</span></code></dt><dd><p>The machine would accept the program and produce a wrong answer or hang.
-Only a hand-written check says no, and the repair is a checker. This is
-<code class="docutils literal notranslate"><span class="pre">ar-distance</span></code> – and it is why <code class="docutils literal notranslate"><span class="pre">check_program</span></code> has to exist outside
-<code class="docutils literal notranslate"><span class="pre">allo/</span></code> at all, since <code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> makes a claim that no Allo pass
-verifies.</p>
-</dd>
-</dl>
-<p>At <code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> 16x16x16 that is <strong>1,166 express against 55 refuse</strong> by first
-cause, and 1,166 against 930 counting every cause a nest violates.</p>
-<p>The distinction cuts the other way too, and it is worth stating because it is
-easy to misread <code class="docutils literal notranslate"><span class="pre">acc-peel</span></code> as a limit of Allo. It is not: expressed at the
-Allo level, the predicate a reduction needs is <code class="docutils literal notranslate"><span class="pre">scf.if</span></code> on
-<code class="docutils literal notranslate"><span class="pre">cmpi</span> <span class="pre">eq,</span> <span class="pre">index_cast(k),</span> <span class="pre">0</span></code>, and <strong>Allo builds that happily</strong>. Nothing in
-Allo refuses it and no primitive removes it. The refusal is our ISA’s encoding
-meeting a compiler that cannot check encodings – which is exactly the hole
-<code class="docutils literal notranslate"><span class="pre">allo/encoding.py</span></code> on that branch fills. <code class="docutils literal notranslate"><span class="pre">act_machine.ENCODING</span></code> states
-TinyTPU-isa’s budgets in that record’s field names, so the two sides state one
-budget rather than two once the branches meet.</p>
-</section>
-<section id="what-this-flow-should-emit-next">
-<h3>What this flow should emit next<a class="headerlink" href="#what-this-flow-should-emit-next" title="Link to this heading"><span>¶</span></a></h3>
-<p>Today <code class="docutils literal notranslate"><span class="pre">act/</span></code> chooses a mapping for a <strong>fixed</strong> design and emits instructions
-for it. The stated end state is the other direction: a library of parametrized,
-modular IPs that compose into different architectures. The useful fact, from the
-same branch, is that <strong>the composable IR already exists</strong> – <code class="docutils literal notranslate"><span class="pre">df.customize</span></code>
-emits each unit as a <code class="docutils literal notranslate"><span class="pre">func.func</span></code> with explicit <code class="docutils literal notranslate"><span class="pre">!allo.stream&lt;i32,4&gt;</span></code>
-arguments and an <code class="docutils literal notranslate"><span class="pre">stypes</span></code> attribute for port direction, with the region
-constructing the streams and wiring by <code class="docutils literal notranslate"><span class="pre">call</span></code>, and parametrized units
-instantiated at two sizes in one program already work and are covered by the
-dataflow test suite. What is missing is only the <em>source syntax</em>: <code class="docutils literal notranslate"><span class="pre">Stream</span></code> has
-no <code class="docutils literal notranslate"><span class="pre">__class_getitem__</span></code>, and stream ops are keyed to construct sites rather
-than values.</p>
-<p>So the emission target for a generated design is that IR form, not the
-closure-nested source form this design uses – where all seven units are
-<code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code> closures inside one <code class="docutils literal notranslate"><span class="pre">&#64;df.region</span></code> sharing about fifteen
-region-scope streams by capture, so no unit is separable, importable or testable
-on its own. <code class="docutils literal notranslate"><span class="pre">act/machine.py</span></code> is deliberately the same information a generator
-for that form would need: units, the work each does per issue, and the spaces
-they read and write. Turning that declaration into <code class="docutils literal notranslate"><span class="pre">func.func</span></code> units is the
-next piece of work, and nothing here forecloses it.</p>
-</section>
 <section id="where-the-cost-model-is-honest-and-where-it-is-not">
-<h3>Where the cost model is honest and where it is not<a class="headerlink" href="#where-the-cost-model-is-honest-and-where-it-is-not" title="Link to this heading"><span>¶</span></a></h3>
+<span id="act-cost-model-honesty"></span><h3>Where the cost model is honest and where it is not<a class="headerlink" href="#where-the-cost-model-is-honest-and-where-it-is-not" title="Link to this heading"><span>¶</span></a></h3>
 <p><code class="docutils literal notranslate"><span class="pre">makespan</span></code> is a model, not a measurement. Every work count in it is read off
 <code class="docutils literal notranslate"><span class="pre">assemble</span></code>’s header – the counts the units are actually promised – plus the
 sequencer’s <code class="docutils literal notranslate"><span class="pre">II=5</span></code>, and the sequencer is charged for its <code class="docutils literal notranslate"><span class="pre">LOOP</span></code>/<code class="docutils literal notranslate"><span class="pre">ENDLOOP</span></code>
@@ -904,164 +721,6 @@ instruction granularity, so no row-level overlap is charged. At <code class="doc
 16x16x16 the model says 517 where cosim measures 750, about 31% low. It ranks;
 it does not measure.</p>
 </section>
-<section id="the-ranking-checked-against-cosim">
-<h3>The ranking, checked against cosim<a class="headerlink" href="#the-ranking-checked-against-cosim" title="Link to this heading"><span>¶</span></a></h3>
-<p><code class="docutils literal notranslate"><span class="pre">act_cosim.py</span></code> measures the mappings the search ranks, and
-<code class="docutils literal notranslate"><span class="pre">--baseline</span></code> measures <code class="docutils literal notranslate"><span class="pre">isa_dsl.gemm_program</span></code> for the same shape beside them:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">TPU_PRJ</span><span class="o">=</span>/tmp/act-cosim.prj<span class="w"> </span>python<span class="w"> </span>act_cosim.py<span class="w"> </span>gemm<span class="w"> </span>4x4x4<span class="w"> </span>--top<span class="w"> </span><span class="m">1</span><span class="w"> </span>--baseline
-</pre></div>
-</div>
-<p>Measured 2026-09-22 on this host, one synthesis per project, default testbench:</p>
-<table class="docutils align-default">
-<colgroup>
-<col style="width: 34.9%" />
-<col style="width: 16.3%" />
-<col style="width: 16.3%" />
-<col style="width: 16.3%" />
-<col style="width: 16.3%" />
-</colgroup>
-<thead>
-<tr class="row-odd"><th class="head"><p>program</p></th>
-<th class="head"><p>static</p></th>
-<th class="head"><p>dynamic</p></th>
-<th class="head"><p>model</p></th>
-<th class="head"><p><strong>cosim</strong></p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm</span></code> 4x4x4, <code class="docutils literal notranslate"><span class="pre">isa_dsl.gemm_program</span></code></p></td>
-<td><p>10</p></td>
-<td><p>4</p></td>
-<td><p>50</p></td>
-<td><p><strong>172</strong></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm</span></code> 4x4x4, the search’s choice</p></td>
-<td><p>8</p></td>
-<td><p>4</p></td>
-<td><p>40</p></td>
-<td><p><strong>169</strong></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm</span></code> 8x8x8</p></td>
-<td><p>13</p></td>
-<td><p>10</p></td>
-<td><p>115</p></td>
-<td><p><strong>262</strong></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm</span></code> 12x12x12</p></td>
-<td><p>13</p></td>
-<td><p>18</p></td>
-<td><p>227</p></td>
-<td><p><strong>418</strong></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm</span></code> 16x16x8</p></td>
-<td><p>13</p></td>
-<td><p>16</p></td>
-<td><p>261</p></td>
-<td><p><strong>484</strong></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm</span></code> 16x16x16</p></td>
-<td><p>13</p></td>
-<td><p>28</p></td>
-<td><p>453</p></td>
-<td><p><strong>686</strong></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> 16x16x16</p></td>
-<td><p>14</p></td>
-<td><p>32</p></td>
-<td><p>517</p></td>
-<td><p><strong>750</strong></p></td>
-</tr>
-</tbody>
-</table>
-<p>The <code class="docutils literal notranslate"><span class="pre">gemm</span></code> rows reproduce <strong>172 / 262 / 418 / 484 / 686</strong> exactly, all five,
-so the harness is the one those figures came from. (That was the published row
-when this was measured. It moved to <strong>171 / 261 / 417 / 483 / 685</strong> on
-2026-09-22 when the memory sizing became derived, and to
-<strong>175 / 265 / 421 / 482 / 674</strong> on 2026-09-24 when <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> became the
-default channel depth; the reproduction above is of the design as it then
-stood, and is not a disagreement.) The
-<code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> row settles what they are: <strong>plain</strong> <code class="docutils literal notranslate"><span class="pre">gemm</span></code>, because
-<code class="docutils literal notranslate"><span class="pre">cosim.py</span></code>’s <code class="docutils literal notranslate"><span class="pre">testbench(M,</span> <span class="pre">K,</span> <span class="pre">N)</span></code> leaves <code class="docutils literal notranslate"><span class="pre">relu</span></code> at its default.
-<code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> at 16x16x16 is 750, and 750 - 686 = <strong>64</strong>, exactly the four
-<code class="docutils literal notranslate"><span class="pre">vrelu</span></code> instructions’ 64 <code class="docutils literal notranslate"><span class="pre">accu</span></code> rows. The delta is accounted for to the
-cycle, which is the best evidence available that the units’ work counts are the
-right model of this machine.</p>
-</section>
-<section id="the-error-bar-a-pick-has-to-carry">
-<h3>The error bar a pick has to carry<a class="headerlink" href="#the-error-bar-a-pick-has-to-carry" title="Link to this heading"><span>¶</span></a></h3>
-<p>Over those six points the model fits <code class="docutils literal notranslate"><span class="pre">cosim</span> <span class="pre">=</span> <span class="pre">128</span> <span class="pre">+</span> <span class="pre">1.24</span> <span class="pre">x</span> <span class="pre">makespan</span></code> with a
-worst residual of <strong>34 cycles</strong> – computed from the table by
-<code class="docutils literal notranslate"><span class="pre">act_machine.fit</span></code>, not typed in, and re-checked by a test that fails if the
-model drifts from the stored points. So the model’s <em>absolute</em> level is
-predictable across shapes to a few percent once the intercept is allowed.</p>
-<p>That is the wrong statistic for ranking, and saying so matters. Ranking compares
-two mappings of <strong>one</strong> shape, where the intercept is common and only the
-difference matters, and there is exactly <strong>one</strong> such pair measured: at 4x4x4 the
-model put the two programs <strong>1.25x</strong> apart and the machine put them <strong>1.02x</strong>
-apart, same order. The model therefore overstated the gap by roughly an order of
-magnitude while getting the direction right.</p>
-<p><code class="docutils literal notranslate"><span class="pre">act_compile.py</span></code> prints this wherever it reports a pick, rather than leaving
-it on this page:</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>chosen: N4&gt;K4  cost (517, 32)
-margin over the runner-up 1.24x. That margin sizes nothing: cosim ~ 128 +
-1.24 x makespan over 6 measured points, worst residual 34 cycles, but the
-model's ORDER is validated on 1 same-shape pair -- gemm 4x4x4: model 1.25x
--&gt; cosim 1.02x, same order -- so it overstated the gap by an order of
-magnitude while getting the order right. Treat the pick as a ranking
-hypothesis and measure it with act_cosim.py.
-</pre></div>
-</div>
-<p>Until more same-shape pairs are measured, <strong>“the best mapping for this hardware”
-is not a claim this flow can make</strong> – “the mapping this cost model ranks first,
-whose order has been checked once” is. That distinction is the reason the
-sequencer correction mattered: charging <code class="docutils literal notranslate"><span class="pre">LOOP</span></code>/<code class="docutils literal notranslate"><span class="pre">ENDLOOP</span></code> moved a pair from
-509-vs-512 to 517-vs-642 and reversed it, so a term the model omits can flip an
-order, and only a measurement closes it.</p>
-</section>
-<section id="where-the-search-beats-the-hand-written-generator">
-<h3>Where the search beats the hand-written generator<a class="headerlink" href="#where-the-search-beats-the-hand-written-generator" title="Link to this heading"><span>¶</span></a></h3>
-<p>At four of the five shapes the search’s choice <strong>is</strong> <code class="docutils literal notranslate"><span class="pre">isa_dsl.gemm_program</span></code>,
-word for word. At 4x4x4 it is not: every tile count is 1 there, so the mapspace
-offers a single nest with no emitted loops, and the program it lowers drops a
-trip-1 hardware loop the hand-written generator keeps – 8 static instructions
-against 10, the same 4 dynamic issues, and a model cost of 40 against 50.</p>
-<p>Cosim, in the table above: <strong>169 cycles against 172</strong>, both exact. The
-hand-written program reproduces the published 172 for that shape to the cycle,
-and the search’s program is 3 cycles faster. The model predicted a 10-cycle
-saving and the machine gave 3, which is the expected direction of error for a
-model that charges a fixed <code class="docutils literal notranslate"><span class="pre">II</span></code> per fetch and no overlap.</p>
-<p>That is the whole shape of what a mapper buys on this machine today: it
-reproduces a carefully hand-tuned choice where that choice is right, and it
-removes overhead the generator could not see, because the generator has no cost
-model at all. Three cycles in 172 is a small win, and it is the honest size of
-the win – what matters is that it is a <em>measured</em> win, chosen by a cost model
-and confirmed by RTL, with the functional check passing in both cases.</p>
-</section>
-</section>
-<section id="the-co-design-loop-this-argues-for">
-<h2>The Co-design Loop This Argues For<a class="headerlink" href="#the-co-design-loop-this-argues-for" title="Link to this heading"><span>¶</span></a></h2>
-<p>The finding above is the shape of a publishable loop, because the thing that
-collapsed the mapspace was a <strong>hardware/ISA parameter</strong>, not a compiler bug.</p>
-<ul class="simple">
-<li><p><strong>The agent edits the ISA and the microarchitecture</strong>: the <code class="docutils literal notranslate"><span class="pre">acc</span></code> field’s
-predicability, <code class="docutils literal notranslate"><span class="pre">AGU_TERMS</span></code>, <code class="docutils literal notranslate"><span class="pre">LOOP_DEPTH</span></code>, <code class="docutils literal notranslate"><span class="pre">T</span></code>, <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code>,
-<code class="docutils literal notranslate"><span class="pre">IMEM_SIZE</span></code>, the accumulator RAW distance.</p></li>
-<li><p><strong>Frozen</strong>: the mapper’s objective and the program generator. The agent may
-not edit the thing that scores it. (This is the guard CHIA already needs and
-the reason its runs are auditable.)</p></li>
-<li><p><strong>The inner loop is exhaustive, not agentic</strong>: for each hardware candidate,
-enumerate the mapspace and take the best encodable nest. The agent proposes
-hardware; enumeration answers what that hardware can run.</p></li>
-<li><p><strong>Feedback is a measurement</strong>: cycles from RTL cosim (<code class="docutils literal notranslate"><span class="pre">cosim.py</span></code>) and
-resource estimates from HLS <code class="docutils literal notranslate"><span class="pre">csynth</span></code>. PD is deferred. The pure-python proxy
-is for ranking inside one candidate only, and must never be the reported
-number.</p></li>
-<li><p><strong>Publishable rather than anecdotal</strong> needs: the frozen-vs-edited split stated
-up front; every reported cycle count from cosim, with the exhaustive inner
-search making “the best mapping for this hardware” a claim rather than a
-sample; and a cost/benefit axis, since <code class="docutils literal notranslate"><span class="pre">AGU_TERMS=4</span></code> and a predicable
-<code class="docutils literal notranslate"><span class="pre">acc</span></code> both cost area that <code class="docutils literal notranslate"><span class="pre">csynth</span></code> can price.</p></li>
-</ul>
 <section id="failure-modes-named">
 <h3>Failure modes, named<a class="headerlink" href="#failure-modes-named" title="Link to this heading"><span>¶</span></a></h3>
 <ul class="simple">
@@ -1081,52 +740,13 @@ a requirement, not a convenience.</p></li>
 </ul>
 </section>
 </section>
-<section id="earlier-measurements-and-corrections">
-<span id="act-earlier-corrections"></span><h2>Earlier measurements and corrections<a class="headerlink" href="#earlier-measurements-and-corrections" title="Link to this heading"><span>¶</span></a></h2>
-<p>Superseded numbers and claims this page has withdrawn. None of it is the
-current state; each entry is kept so the correction is checkable.</p>
-<p><strong>The makespan claim that was withdrawn.</strong> “<code class="docutils literal notranslate"><span class="pre">epoch.schedule()</span></code> reproduces
-its makespan exactly, 100 == 100, over 200,000 random topological orders” is
-not merely absent from git – <strong>it describes a property ACT never claims and
-could not have.</strong> <code class="docutils literal notranslate"><span class="pre">depends</span></code> takes an edge’s source to be the earlier stream
-index (<code class="docutils literal notranslate"><span class="pre">epoch.py:372-386</span></code>), so permuting the stream changes which
-dependences exist, which changes the program’s meaning rather than its
-schedule. What replaced it is pointwise minimality; see
-<a class="reference internal" href="#the-scheduler-s-guarantee-and-the-claim-that-was-not-it">The scheduler’s guarantee, and the claim that was not it</a>.</p>
-<p><strong>Earlier numbers on this page:</strong></p>
-<ul class="simple">
-<li><p>“A minimal ACT pilot was run, using a toy ISA.” <strong>No artifact exists.</strong> There
-are no <code class="docutils literal notranslate"><span class="pre">pilot</span></code> hits in either repo’s notes or git log. If it ran, it ran in
-a scratch checkout deleted 2026-09-07 (the CHIA checkpoint on
-<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>). Nothing in <code class="docutils literal notranslate"><span class="pre">chia_runs/</span></code> is it:
-<code class="docutils literal notranslate"><span class="pre">20260905-060830/variants.jsonl</span></code> is a single baseline line, and
-<code class="docutils literal notranslate"><span class="pre">swarm-20260905-063857/</span></code> is a 6-worker <strong>CHIA LLM-agent</strong> search (best
-126,432 -&gt; 31,056 cycles on the <code class="docutils literal notranslate"><span class="pre">dram</span></code> hypothesis), which is not a mapspace
-search.</p></li>
-<li><p>“ACT has a mapspace search” – it has a mapspace <em>file</em>, <code class="docutils literal notranslate"><span class="pre">mapspace.py</span></code>, and
-nothing reaches it. The enumerator this page describes is the rebuilt one, not
-ACT’s.</p></li>
-<li><p>“Our 9 opcodes” listed <code class="docutils literal notranslate"><span class="pre">DMA_ST</span></code> as expressible. The machine <strong>refuses</strong> it
-(<code class="docutils literal notranslate"><span class="pre">check_program</span></code> rejects <code class="docutils literal notranslate"><span class="pre">OP_DMA_ST</span></code>) and <code class="docutils literal notranslate"><span class="pre">isa_dsl</span></code> has no emitter for
-it. There are 10 encodings, 9 executable: 7 data opcodes plus
-<code class="docutils literal notranslate"><span class="pre">LOOP</span></code>/<code class="docutils literal notranslate"><span class="pre">ENDLOOP</span></code>.</p></li>
-<li><p>“<code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> at 16x16x16 is 49 instructions = 106 words flat, 17
-instructions = 42 words looped, headroom 14 words.” Measured today: <strong>32
-instructions / 72 words flat, 14 instructions / 36 words looped</strong>, headroom
-<strong>20</strong> of <code class="docutils literal notranslate"><span class="pre">IMEM_SIZE=56</span></code>.</p></li>
-<li><p>“The re-roll is the missing inverse of an identity we already test.” It is
-not an inverse of anything: <code class="docutils literal notranslate"><span class="pre">gemm_program</span></code> exposes no tiling parameter, so
-the adapter is a new emitter, which is what <code class="docutils literal notranslate"><span class="pre">act_target.py</span></code> is.</p></li>
-<li><p>“Of 1,226 nests, 54 are refused by a limit of the prototype emitter.” Fixed
-rather than corrected: <code class="docutils literal notranslate"><span class="pre">act_target</span></code> stages the activations at the innermost
-row loop wherever it sits, so those nests are now encodable or refused by a
-named hardware constraint, and five nests survive instead of three.</p></li>
-<li><p>“Three survivors, and the shipped <code class="docutils literal notranslate"><span class="pre">N4&gt;K4</span></code> is the cheapest by the proxy.”
-The proxy still says so. The <code class="docutils literal notranslate"><span class="pre">(makespan,</span> <span class="pre">emits)</span></code> model does <strong>not</strong>: it puts
-<code class="docutils literal notranslate"><span class="pre">M2&gt;N4&gt;K4</span></code> first by 0.6%, which is inside any honest error bar for a model
-that charges no row-level overlap. That disagreement is what <code class="docutils literal notranslate"><span class="pre">act_cosim.py</span></code>
-is for; see <a class="reference internal" href="#where-the-cost-model-is-honest-and-where-it-is-not">Where the cost model is honest and where it is not</a>.</p></li>
-</ul>
+<section id="results-and-history">
+<h2>Results and history<a class="headerlink" href="#results-and-history" title="Link to this heading"><span>¶</span></a></h2>
+<p><a class="reference internal" href="act_results.html"><span class="doc">ACT: Results, Findings and Corrections</span></a> carries the measurements, the findings and the corrections:
+why the core was rebuilt rather than ported, what ACT’s own mapper does when it
+is read, the 2026-09-22 run of ACT’s test suite, the ranking checked against
+cosim, the error bar a pick has to carry, the co-design loop this work argued
+for, and every claim these pages have withdrawn.</p>
 </section>
 </section>
 
@@ -1144,35 +764,32 @@ is for; see <a class="reference internal" href="#where-the-cost-model-is-honest-
             <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
             <div class="page_toc">
                 <ul>
-<li><a class="reference internal" href="#">ACT, and Why We Cite It</a><ul>
-<li><a class="reference internal" href="#verdict">Verdict</a></li>
+<li><a class="reference internal" href="#">ACT and the TinyTPU-isa Mapper</a><ul>
+<li><a class="reference internal" href="#quick-start">Quick start</a></li>
+<li><a class="reference internal" href="#how-it-works">How it works</a><ul>
 <li><a class="reference internal" href="#what-act-is">What ACT Is</a></li>
-<li><a class="reference internal" href="#the-mapper">The Mapper</a></li>
-<li><a class="reference internal" href="#it-cannot-be-run-here">It Cannot Be Run Here</a><ul>
-<li><a class="reference internal" href="#measured-2026-09-22">Measured, 2026-09-22</a></li>
-<li><a class="reference internal" href="#the-scheduler-s-guarantee-and-the-claim-that-was-not-it">The scheduler’s guarantee, and the claim that was not it</a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#the-rebuilt-core">The Rebuilt Core</a><ul>
+<li><a class="reference internal" href="#the-rebuilt-core">The rebuilt core</a><ul>
 <li><a class="reference internal" href="#the-tinytpu-isa-target">The TinyTPU-isa target</a></li>
-<li><a class="reference internal" href="#one-command">One command</a></li>
-<li><a class="reference internal" href="#what-acc-actually-is">What <code class="docutils literal notranslate"><span class="pre">acc</span></code> actually is</a></li>
-<li><a class="reference internal" href="#two-census-definitions-and-which-number-is-which">Two census definitions, and which number is which</a></li>
-<li><a class="reference internal" href="#reconciling-the-encodable-count-5-against-3">Reconciling the encodable count: 5 against 3</a></li>
-<li><a class="reference internal" href="#encodable-has-three-tiers-of-evidence">“Encodable” has three tiers of evidence</a></li>
-<li><a class="reference internal" href="#two-kinds-of-gap-cannot-express-cannot-refuse">Two kinds of gap: cannot express, cannot refuse</a></li>
-<li><a class="reference internal" href="#what-this-flow-should-emit-next">What this flow should emit next</a></li>
-<li><a class="reference internal" href="#where-the-cost-model-is-honest-and-where-it-is-not">Where the cost model is honest and where it is not</a></li>
-<li><a class="reference internal" href="#the-ranking-checked-against-cosim">The ranking, checked against cosim</a></li>
-<li><a class="reference internal" href="#the-error-bar-a-pick-has-to-carry">The error bar a pick has to carry</a></li>
-<li><a class="reference internal" href="#where-the-search-beats-the-hand-written-generator">Where the search beats the hand-written generator</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#the-co-design-loop-this-argues-for">The Co-design Loop This Argues For</a><ul>
+<li><a class="reference internal" href="#what-acc-actually-is">What <code class="docutils literal notranslate"><span class="pre">acc</span></code> actually is</a></li>
+<li><a class="reference internal" href="#what-this-flow-should-emit-next">What this flow should emit next</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#reference">Reference</a><ul>
+<li><a class="reference internal" href="#the-refusal-census">The refusal census</a></li>
+<li><a class="reference internal" href="#two-census-definitions-and-which-number-is-which">Two census definitions, and which number is which</a></li>
+<li><a class="reference internal" href="#two-kinds-of-gap-cannot-express-cannot-refuse">Two kinds of gap: cannot express, cannot refuse</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#limits-and-known-failures">Limits and known failures</a><ul>
+<li><a class="reference internal" href="#it-cannot-be-run-here">It cannot be run here</a></li>
+<li><a class="reference internal" href="#encodable-has-three-tiers-of-evidence">“Encodable” has three tiers of evidence</a></li>
+<li><a class="reference internal" href="#where-the-cost-model-is-honest-and-where-it-is-not">Where the cost model is honest and where it is not</a></li>
 <li><a class="reference internal" href="#failure-modes-named">Failure modes, named</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a></li>
+<li><a class="reference internal" href="#results-and-history">Results and history</a></li>
 </ul>
 </li>
 </ul>

@@ -162,6 +162,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../backends/llvm.html">LLVM (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
@@ -171,8 +172,12 @@
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../designs/ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../designs/gemmini_results.html">TinyTPU-isa vs Gemmini: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../designs/benchmarks.html">The Benchmark Set</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../designs/workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
@@ -183,9 +188,13 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extensions/chia_results.html">CHIA Agentic Co-Design: Results</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extensions/chia_codesign.html">The Original Co-Design Effort (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../extensions/act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extensions/act.html">ACT and the TinyTPU-isa Mapper</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../extensions/act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extensions/act_results.html">ACT: Results, Findings and Corrections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extensions/codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
 <ul>
@@ -264,12 +273,6 @@
 <span class="p">)</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">primitives</span> <span class="k">as</span> <span class="n">prim</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">.dependence</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">Claim</span><span class="p">,</span>
-    <span class="n">accept</span> <span class="k">as</span> <span class="n">accept_dependence_claim</span><span class="p">,</span>
-    <span class="n">recheck</span> <span class="k">as</span> <span class="n">recheck_dependence_claims</span><span class="p">,</span>
-<span class="p">)</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">.encoding</span><span class="w"> </span><span class="kn">import</span> <span class="n">EncodingError</span><span class="p">,</span> <span class="n">violations</span> <span class="k">as</span> <span class="n">encoding_violations</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">.ir.visitor</span><span class="w"> </span><span class="kn">import</span> <span class="n">ASTContext</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">.ir.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">MockArg</span><span class="p">,</span> <span class="n">MockBuffer</span><span class="p">,</span> <span class="n">parse_ast</span><span class="p">,</span> <span class="n">get_global_vars</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">.ir.builder</span><span class="w"> </span><span class="kn">import</span> <span class="n">ASTTransformer</span>
@@ -321,8 +324,6 @@
         <span class="c1"># Record primitive sequences</span>
         <span class="k">if</span> <span class="n">fn</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">!=</span> <span class="s2">"compose"</span><span class="p">:</span>
             <span class="n">sch</span><span class="o">.</span><span class="n">primitive_sequences</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">fn</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">:]),</span> <span class="n">kwargs</span><span class="p">))</span>
-        <span class="n">sch</span><span class="o">.</span><span class="n">recheck_encoding</span><span class="p">(</span><span class="n">fn</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
-        <span class="n">sch</span><span class="o">.</span><span class="n">recheck_dependence</span><span class="p">(</span><span class="n">fn</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">res</span>
 
     <span class="k">return</span> <span class="n">wrapper</span>
@@ -366,8 +367,6 @@
                     <span class="bp">self</span><span class="o">.</span><span class="n">func_args</span><span class="p">[</span><span class="n">func_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">func_instances</span> <span class="o">=</span> <span class="n">func_instances</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">systolic</span> <span class="o">=</span> <span class="n">check_systolic</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">encoding</span> <span class="o">=</span> <span class="kc">None</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">dependence_obligations</span> <span class="o">=</span> <span class="p">[]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_loops</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
@@ -1060,7 +1059,7 @@
 <div class="viewcode-block" id="Schedule.pipeline">
 <a class="viewcode-back" href="../../api/index.html#allo.customize.Schedule.pipeline">[docs]</a>
     <span class="nd">@wrapped_apply</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">pipeline</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axis</span><span class="p">,</span> <span class="n">initiation_interval</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">rewind</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">pipeline</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axis</span><span class="p">,</span> <span class="n">initiation_interval</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">rewind</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Pipelines a loop with index `axis` into `initiation_interval` stages.</span>
 
@@ -1075,26 +1074,8 @@
 <span class="sd">        rewind: bool</span>
 <span class="sd">            If true, rewinding is allowed, allowing continuous loop pipelining.</span>
 <span class="sd">            This is only effective for perfect loop nests inside a top level function.</span>
-
-<span class="sd">        style: str | None</span>
-<span class="sd">            Vitis's pipeline control style: ``"stp"`` (stall, the tool's</span>
-<span class="sd">            default), ``"flp"`` (flushable) or ``"frp"`` (free-running),</span>
-<span class="sd">            emitted as ``#pragma HLS pipeline ... style=&lt;style&gt;``.</span>
-
-<span class="sd">            It exists for a failure no simulation shows. A process that puts a</span>
-<span class="sd">            request on one stream and gets the response on another inside one</span>
-<span class="sd">            pipelined loop can deadlock in RTL under ``stp``, because the</span>
-<span class="sd">            blocked read of a later iteration freezes the earlier iteration's</span>
-<span class="sd">            put; a flushable or free-running pipeline keeps the earlier</span>
-<span class="sd">            iterations draining. **Which styles survive depends on the loop</span>
-<span class="sd">            shape, and the choice is a measurement, not a rule**: see</span>
-<span class="sd">            ``docs/source/backends/vitis.rst``. Only the Vivado/Vitis emitter</span>
-<span class="sd">            writes ``style=``; building a styled loop for another HLS backend</span>
-<span class="sd">            is refused rather than silently dropped.</span>
 <span class="sd">        """</span>
 
-        <span class="k">if</span> <span class="n">style</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">style</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"stp"</span><span class="p">,</span> <span class="s2">"flp"</span><span class="p">,</span> <span class="s2">"frp"</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="n">AlloValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"pipeline: style </span><span class="si">{</span><span class="n">style</span><span class="si">!r}</span><span class="s2"> is not stp/flp/frp"</span><span class="p">)</span>
         <span class="n">i32</span> <span class="o">=</span> <span class="n">IntegerType</span><span class="o">.</span><span class="n">get_unsigned</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span>
         <span class="n">ii</span> <span class="o">=</span> <span class="n">IntegerAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">i32</span><span class="p">,</span> <span class="n">initiation_interval</span><span class="p">)</span>
         <span class="n">func</span><span class="p">,</span> <span class="n">axis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_func_and_axis</span><span class="p">(</span><span class="n">axis</span><span class="p">)</span>
@@ -1103,10 +1084,6 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">get_loops</span><span class="p">(</span><span class="n">func</span><span class="p">)[</span><span class="n">band_name</span><span class="p">][</span><span class="n">axis</span><span class="p">]</span><span class="o">.</span><span class="n">loop</span><span class="o">.</span><span class="n">attributes</span><span class="p">[</span>
                 <span class="s2">"rewind"</span>
             <span class="p">]</span> <span class="o">=</span> <span class="n">UnitAttr</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
-        <span class="k">if</span> <span class="n">style</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">get_loops</span><span class="p">(</span><span class="n">func</span><span class="p">)[</span><span class="n">band_name</span><span class="p">][</span><span class="n">axis</span><span class="p">]</span><span class="o">.</span><span class="n">loop</span><span class="o">.</span><span class="n">attributes</span><span class="p">[</span>
-                <span class="s2">"pipeline_style"</span>
-            <span class="p">]</span> <span class="o">=</span> <span class="n">StringAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">style</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">get_loops</span><span class="p">(</span><span class="n">func</span><span class="p">)[</span><span class="n">band_name</span><span class="p">][</span><span class="n">axis</span><span class="p">]</span><span class="o">.</span><span class="n">loop</span><span class="o">.</span><span class="n">attributes</span><span class="p">[</span><span class="s2">"pipeline_ii"</span><span class="p">]</span> <span class="o">=</span> <span class="n">ii</span></div>
 
 
@@ -1122,7 +1099,6 @@
         <span class="n">distance</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
         <span class="n">dependent</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
         <span class="n">dep_class</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-        <span class="n">because</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Tells HLS about the loop-carried (or intra-iteration) dependences of</span>
@@ -1138,20 +1114,6 @@
 <span class="sd">        say) pipeline at II=1; if the claim is false the RTL computes a wrong</span>
 <span class="sd">        answer while every software simulation, which ignores the pragma,</span>
 <span class="sd">        still passes.</span>
-
-<span class="sd">        **The rule.** A claim that the IR *disproves* -- a dependence provable</span>
-<span class="sd">        at a distance the claim denies -- raises</span>
-<span class="sd">        ``allo.dependence.DependenceError``, here and again after every later</span>
-<span class="sd">        primitive. The check is one-sided: it refuses a demonstrably false</span>
-<span class="sd">        claim, it never confirms a true one, and it never refuses a claim just</span>
-<span class="sd">        because no proof was found. Asserting away what the compiler cannot</span>
-<span class="sd">        prove is the whole point of the primitive.</span>
-
-<span class="sd">        **The obligation.** Everything the rule accepts is therefore still the</span>
-<span class="sd">        author's to discharge, outside the compiler; ``because`` records what</span>
-<span class="sd">        the claim rests on, and every claim is listed in</span>
-<span class="sd">        ``s.dependence_obligations``. Omitting ``because`` warns</span>
-<span class="sd">        (``allo.dependence.UndeclaredPremise``).</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -1171,9 +1133,6 @@
 <span class="sd">            Whether the dependence exists (True) or is claimed absent (False).</span>
 <span class="sd">        dep_class: str | None</span>
 <span class="sd">            ``"array"`` or ``"pointer"``; None leaves Vitis's default.</span>
-<span class="sd">        because: str | None</span>
-<span class="sd">            What makes the claim true, in the author's words. Nothing checks</span>
-<span class="sd">            it; it is emitted beside the pragma and recorded as an obligation.</span>
 <span class="sd">        """</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">._mlir.ir</span><span class="w"> </span><span class="kn">import</span> <span class="n">ArrayAttr</span><span class="p">,</span> <span class="n">BoolAttr</span><span class="p">,</span> <span class="n">DictAttr</span>
 
@@ -1217,7 +1176,6 @@
         <span class="n">entry</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s2">"type"</span><span class="p">:</span> <span class="n">StringAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">dep_type</span><span class="p">),</span>
             <span class="s2">"dependent"</span><span class="p">:</span> <span class="n">BoolAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">bool</span><span class="p">(</span><span class="n">dependent</span><span class="p">)),</span>
-            <span class="s2">"variable"</span><span class="p">:</span> <span class="n">StringAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">target</span><span class="o">.</span><span class="n">name</span><span class="p">),</span>
         <span class="p">}</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mlir_target</span><span class="p">,</span> <span class="n">MockArg</span><span class="p">):</span>
             <span class="n">entry</span><span class="p">[</span><span class="s2">"arg_index"</span><span class="p">]</span> <span class="o">=</span> <span class="n">IntegerAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">IntegerType</span><span class="o">.</span><span class="n">get_signless</span><span class="p">(</span><span class="mi">64</span><span class="p">),</span> <span class="n">idx</span><span class="p">)</span>
@@ -1229,31 +1187,13 @@
                         <span class="sa">f</span><span class="s2">"dependence: </span><span class="si">{</span><span class="n">target</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> is declared inside the loop"</span>
                     <span class="p">)</span>
                 <span class="n">parent</span> <span class="o">=</span> <span class="n">parent</span><span class="o">.</span><span class="n">parent</span>
+            <span class="n">entry</span><span class="p">[</span><span class="s2">"variable"</span><span class="p">]</span> <span class="o">=</span> <span class="n">StringAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">target</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">direction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">entry</span><span class="p">[</span><span class="s2">"direction"</span><span class="p">]</span> <span class="o">=</span> <span class="n">StringAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">direction</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">distance</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">entry</span><span class="p">[</span><span class="s2">"distance"</span><span class="p">]</span> <span class="o">=</span> <span class="n">IntegerAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">IntegerType</span><span class="o">.</span><span class="n">get_signless</span><span class="p">(</span><span class="mi">64</span><span class="p">),</span> <span class="n">distance</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">dep_class</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">entry</span><span class="p">[</span><span class="s2">"class"</span><span class="p">]</span> <span class="o">=</span> <span class="n">StringAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">dep_class</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">because</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">entry</span><span class="p">[</span><span class="s2">"because"</span><span class="p">]</span> <span class="o">=</span> <span class="n">StringAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">because</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">dependence_obligations</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
-            <span class="n">accept_dependence_claim</span><span class="p">(</span>
-                <span class="n">loop</span><span class="p">,</span>
-                <span class="n">mlir_target</span><span class="o">.</span><span class="n">result</span><span class="p">,</span>
-                <span class="n">Claim</span><span class="p">(</span>
-                    <span class="n">target</span><span class="o">=</span><span class="n">target</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
-                    <span class="n">dep_type</span><span class="o">=</span><span class="n">dep_type</span><span class="p">,</span>
-                    <span class="n">direction</span><span class="o">=</span><span class="n">direction</span><span class="p">,</span>
-                    <span class="n">distance</span><span class="o">=</span><span class="n">distance</span><span class="p">,</span>
-                    <span class="n">dependent</span><span class="o">=</span><span class="nb">bool</span><span class="p">(</span><span class="n">dependent</span><span class="p">),</span>
-                    <span class="n">dep_class</span><span class="o">=</span><span class="n">dep_class</span><span class="p">,</span>
-                    <span class="n">because</span><span class="o">=</span><span class="n">because</span><span class="p">,</span>
-                <span class="p">),</span>
-                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">func_name</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">axis</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
-                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
-            <span class="p">)</span>
-        <span class="p">)</span>
         <span class="n">old</span> <span class="o">=</span> <span class="p">(</span>
             <span class="nb">list</span><span class="p">(</span><span class="n">loop</span><span class="o">.</span><span class="n">attributes</span><span class="p">[</span><span class="s2">"dependence"</span><span class="p">])</span>
             <span class="k">if</span> <span class="s2">"dependence"</span> <span class="ow">in</span> <span class="n">loop</span><span class="o">.</span><span class="n">attributes</span>
@@ -1261,42 +1201,6 @@
         <span class="p">)</span>
         <span class="n">loop</span><span class="o">.</span><span class="n">attributes</span><span class="p">[</span><span class="s2">"dependence"</span><span class="p">]</span> <span class="o">=</span> <span class="n">ArrayAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">old</span> <span class="o">+</span> <span class="p">[</span><span class="n">DictAttr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">entry</span><span class="p">)])</span></div>
 
-
-<div class="viewcode-block" id="Schedule.encodable_on">
-<a class="viewcode-back" href="../../api/index.html#allo.customize.Schedule.encodable_on">[docs]</a>
-    <span class="nd">@wrapped_apply</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">encodable_on</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">encoding</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">"""</span>
-<span class="sd">        Declares that this schedule must stay expressible in one instruction</span>
-<span class="sd">        word of ``encoding``, and checks it now and after every later</span>
-<span class="sd">        primitive. Raises ``allo.encoding.EncodingError``, which names every</span>
-<span class="sd">        offending site, the budget it exceeds and the repair.</span>
-
-<span class="sd">        A declaration constrains nothing that the encoding leaves unset, so</span>
-<span class="sd">        ``Encoding()`` is a no-op. See</span>
-<span class="sd">        ``docs/source/developer/extending_allo.rst``.</span>
-
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        encoding: allo.encoding.Encoding</span>
-<span class="sd">            The target's encoding budgets.</span>
-<span class="sd">        """</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">encoding</span> <span class="o">=</span> <span class="n">encoding</span></div>
-
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">recheck_encoding</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">after</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">return</span>
-        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="o">.</span><span class="n">context</span><span class="p">:</span>
-            <span class="n">found</span> <span class="o">=</span> <span class="n">encoding_violations</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">found</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">EncodingError</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">,</span> <span class="n">found</span><span class="p">,</span> <span class="n">after</span><span class="o">=</span><span class="n">after</span><span class="p">)</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">recheck_dependence</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">after</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">dependence_obligations</span><span class="p">:</span>
-            <span class="k">return</span>
-        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="o">.</span><span class="n">context</span><span class="p">:</span>
-            <span class="n">recheck_dependence_claims</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="p">,</span> <span class="n">after</span><span class="o">=</span><span class="n">after</span><span class="p">)</span>
 
 <div class="viewcode-block" id="Schedule.parallel">
 <a class="viewcode-back" href="../../api/index.html#allo.customize.Schedule.parallel">[docs]</a>

@@ -165,6 +165,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
@@ -174,8 +175,12 @@
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gemmini_results.html">TinyTPU-isa vs Gemmini: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="benchmarks.html">The Benchmark Set</a></li>
 <li class="toctree-l1"><a class="reference internal" href="workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">TinyTPU-isa: Design History</a></li>
@@ -186,9 +191,13 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia_results.html">CHIA Agentic Co-Design: Results</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia_codesign.html">The Original Co-Design Effort (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT and the TinyTPU-isa Mapper</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act_results.html">ACT: Results, Findings and Corrections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
 <ul>
@@ -316,8 +325,8 @@ structure every later design keeps</p></td>
 <code class="docutils literal notranslate"><span class="pre">acc</span> <span class="pre">+=</span> <span class="pre">a*b</span></code> is a loop-carried dependence so <code class="docutils literal notranslate"><span class="pre">Final</span> <span class="pre">II</span> <span class="pre">=</span> <span class="pre">7</span></code></p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tinytpu_vitis/microarch_ws.py</span></code>, <code class="docutils literal notranslate"><span class="pre">bench_ws.py</span></code>, <code class="docutils literal notranslate"><span class="pre">RESULTS_WS.md</span></code>,
-<code class="docutils literal notranslate"><span class="pre">logs/csyn_int8_8x8x8.log</span></code>,
-<code class="docutils literal notranslate"><span class="pre">logs/csynth_{int8_8x8x8,int8_16x16x16,fp32_8x8x8}.rpt</span></code></p></td>
+<code class="docutils literal notranslate"><span class="pre">csyn_int8_8x8x8.log</span></code>,
+<code class="docutils literal notranslate"><span class="pre">csynth_{int8_8x8x8,int8_16x16x16,fp32_8x8x8}.rpt</span></code></p></td>
 <td><p>weight-stationary, one opcode, II=1 per MAC at 100% of roofline
 (interval 74 at 8x8x8, down from 168 once the feeders and accumulator
 were partitioned) – but <em>one</em> opcode, no scratchpad, no vector unit;
@@ -389,8 +398,8 @@ so <code class="docutils literal notranslate"><span class="pre">vadd</span></cod
 <section id="first-synthesis-and-co-simulation">
 <h3>First synthesis and co-simulation<a class="headerlink" href="#first-synthesis-and-co-simulation" title="Link to this heading"><span>¶</span></a></h3>
 <p>The csynth bound and the <code class="docutils literal notranslate"><span class="pre">nr</span></code> narrowing (91407 -&gt; 4133) are on
-<a class="reference internal" href="tinytpu_isa.html#tinytpu-isa-csynth-bound"><span class="std std-ref">A programmable design’s csynth number is not a cycle count</span></a>. Per unit at 8x8x8 after the narrowing
-(<code class="docutils literal notranslate"><span class="pre">logs/csynth_isa_8x8x8.rpt</span></code>), 0 errors, <code class="docutils literal notranslate"><span class="pre">dataflow</span></code>, 22 processes:</p>
+<a class="reference internal" href="tinytpu_isa_results.html#tinytpu-isa-csynth-bound"><span class="std std-ref">A programmable design’s csynth number is not a cycle count</span></a>. Per unit at 8x8x8 after the narrowing
+(<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/logs/csynth_isa_8x8x8.rpt</span></code>), 0 errors, <code class="docutils literal notranslate"><span class="pre">dataflow</span></code>, 22 processes:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>| + tinytpu_isa*  | latency 4133 | interval 3059 | dataflow | BRAM 42 | DSP 12 | FF 16247 | LUT 21918 |
 |  + sequencer_0  |         24   |               |          |
 |  + dma_ld_0     |       1519   |               |          |
@@ -470,7 +479,7 @@ the “required depth grows with the program” law was an artifact throughout. 
 FIFOs were masking a thread-starvation deadlock by letting each producer run to
 completion before anyone had to block. <code class="docutils literal notranslate"><span class="pre">QD</span></code> is now a constant <strong>8</strong>.</p>
 <p>The simulator was fixed on 2026-09-17 (OpenMP team sized to the section count)
-and gained a watchdog on 2026-09-18; see <a class="reference internal" href="../developer/limitations.html#limitation-11"><span class="std std-ref">11. The dataflow simulator deadlocks when processes outnumber OMP threads — FIXED</span></a>.</p>
+and gained a watchdog on 2026-09-18; see <a class="reference internal" href="../developer/limitations.html#limitation-11"><span class="std std-ref">11. The dataflow simulator deadlocked when processes outnumbered OMP threads – closed</span></a>.</p>
 <p><strong>Four theories tested and disproved</strong>, kept so they are not re-tried: the PE’s
 <code class="docutils literal notranslate"><span class="pre">put</span></code> order (swapping changed nothing), a cycle in the process graph (two
 repros, one with real traffic on every edge, both ran), the <code class="docutils literal notranslate"><span class="pre">vld</span></code> burst length
@@ -538,7 +547,7 @@ for. The 2026-09-18 window audit showed the included driver is about 413 of
 <section id="t-16-scaling-the-array-16x-bought-1-47x">
 <h2>T=16: scaling the array 16x bought 1.47x<a class="headerlink" href="#t-16-scaling-the-array-16x-bought-1-47x" title="Link to this heading"><span>¶</span></a></h2>
 <p>The 16x16 build became possible only after the simulator’s OpenMP team was sized
-to the section count (<a class="reference internal" href="../developer/limitations.html#limitation-11"><span class="std std-ref">11. The dataflow simulator deadlocks when processes outnumber OMP threads — FIXED</span></a>); before that fix a 262-instance
+to the section count (<a class="reference internal" href="../developer/limitations.html#limitation-11"><span class="std std-ref">11. The dataflow simulator deadlocked when processes outnumbered OMP threads – closed</span></a>); before that fix a 262-instance
 region hung silently. It builds and runs in <strong>50 s</strong>, 821 streams, all three
 programs bit-exact, and cosim measures:</p>
 <table class="docutils align-default">
@@ -741,7 +750,7 @@ array between two processes, one per BRAM port (<code class="docutils literal no
 arrays. Allo rejects a region-scope <code class="docutils literal notranslate"><span class="pre">Stateful</span></code> shared by two kernels and
 never emits <code class="docutils literal notranslate"><span class="pre">stream</span> <span class="pre">type=unsync</span></code>. The measured cost to this design is 0
 cycles. See <a class="reference internal" href="../developer/limitations.html#limitation-shared-memory"><span class="std std-ref">Shared on-chip memory: the one-owner rule is Allo’s, not Vitis’s</span></a> and
-<a class="reference internal" href="gemmini_comparison.html#gemmini-gap-attribution"><span class="std std-ref">Where the deficit came from, and what was landed</span></a>.</p>
+<a class="reference internal" href="gemmini_results.html#gemmini-gap-attribution"><span class="std std-ref">Where the deficit came from, and what was landed</span></a>.</p>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">accu</span></code> <strong>resisted the flattening.</strong> It was built twice and was bit-exact both
 times, and both times it was slower than the nested loop it replaced:</p>
@@ -1368,13 +1377,13 @@ at all.</p>
 </section>
 <section id="landing-the-gap-attribution-919-686">
 <span id="tinytpu-history-landing"></span><h2>Landing the gap attribution: 919 -&gt; 686<a class="headerlink" href="#landing-the-gap-attribution-919-686" title="Link to this heading"><span>¶</span></a></h2>
-<p>The gap attribution (<a class="reference internal" href="gemmini_comparison.html#gemmini-gap-attribution"><span class="std std-ref">Where the deficit came from, and what was landed</span></a>) priced the deficit to
+<p>The gap attribution (<a class="reference internal" href="gemmini_results.html#gemmini-gap-attribution"><span class="std std-ref">Where the deficit came from, and what was landed</span></a>) priced the deficit to
 Gemmini on variants of the 919 build and found about 80% of it in our own
 design and 35-95 cycles forced by Allo’s missing dependence pragma
 (<a class="reference internal" href="../developer/limitations.html#limitation-21"><span class="std std-ref">21. No #pragma HLS dependence primitive, so a false dependence cannot be asserted away</span></a>). <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code> (2026-09-19) made its best bit-exact
 stack, <code class="docutils literal notranslate"><span class="pre">v_design_dep_imem8</span></code>, the design, after <code class="docutils literal notranslate"><span class="pre">bbea2af0</span></code> added the
 <code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> primitive so the pragma no longer needed a <code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code>
-patch. The changes are listed on <a class="reference internal" href="tinytpu_isa.html#tinytpu-isa-landing"><span class="std std-ref">What landed in e24e433b</span></a>.</p>
+patch. The changes are listed on <a class="reference internal" href="tinytpu_isa_results.html#tinytpu-isa-landing"><span class="std std-ref">What landed in e24e433b</span></a>.</p>
 <table class="docutils align-default">
 <thead>
 <tr class="row-odd"><th class="head"><p>shape</p></th>
@@ -1412,8 +1421,8 @@ patch. The changes are listed on <a class="reference internal" href="tinytpu_isa
 </tbody>
 </table>
 <p>Bit-exact at every shape in the default testbench and at 4x4x4 and 16x16x16
-in <code class="docutils literal notranslate"><span class="pre">TPU_TB=stress</span></code> (<code class="docutils literal notranslate"><span class="pre">logs/cosim_isa_landed_sweep.log</span></code>,
-<code class="docutils literal notranslate"><span class="pre">logs/cosim_isa_landed_stress.log</span></code>); est. clock unchanged at 2.431 ns; +2,593
+in <code class="docutils literal notranslate"><span class="pre">TPU_TB=stress</span></code> (<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/logs/cosim_isa_landed_sweep.log</span></code>,
+<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/logs/cosim_isa_landed_stress.log</span></code>); est. clock unchanged at 2.431 ns; +2,593
 FF and +6,617 LUT, no BRAM or DSP (<a class="reference internal" href="tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>, “Resources”). The
 variants interacted (the bottleneck moved from <code class="docutils literal notranslate"><span class="pre">vru</span></code> to the PE prologue to
 <code class="docutils literal notranslate"><span class="pre">accu</span></code>), so the stack was measured at all five shapes rather than assumed:

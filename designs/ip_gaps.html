@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>The IP Library’s Gaps, and the Adder Tree &#8212; Allo Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic_mod.css?v=9b2032db" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=db78e746"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/petite-vue.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="TinyTPU-isa vs Gemmini: A Matched Comparison" href="gemmini_comparison.html" />
+    <link rel="prev" title="The Unit Library: Composing a Region from Units" href="tinytpu_library.html" /> 
+  </head><body data-dark_mode_code_blocks="true">
+
+<div id="top_nav">
+    
+
+    <nav>
+        
+            
+        
+
+        <p id="toggle_sidebar">
+            <a href="#" title="Toggle sidebar">|||</a>
+        </p>
+        <h1><a href="../index.html" title="Go to homepage">Allo Documentation</a></h1>
+            <a id="source_link" href="https://github.com/sunwookim028/allo">
+    
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512">
+            <path fill="white" d="M 244.8,8 C 106.1,8 0,113.3 0,252 c 0,110.9 69.8,205.8 169.5,239.2 12.8,2.3 17.3,-5.6 17.3,-12.1 0,-6.2 -0.3,-40.4 -0.3,-61.4 0,0 -70,15 -84.7,-29.8 0,0 -11.4,-29.1 -27.8,-36.6 0,0 -22.9,-15.7 1.6,-15.4 0,0 24.9,2 38.6,25.8 21.9,38.6 58.6,27.5 72.9,20.9 2.3,-16 8.8,-27.1 16,-33.7 -55.9,-6.2 -112.3,-14.3 -112.3,-110.5 0,-27.5 7.6,-41.3 23.6,-58.9 -2.6,-6.5 -11.1,-33.3 2.6,-67.9 20.9,-6.5 69,27 69,27 20,-5.6 41.5,-8.5 62.8,-8.5 21.3,0 42.8,2.9 62.8,8.5 0,0 48.1,-33.6 69,-27 13.7,34.7 5.2,61.4 2.6,67.9 16,17.7 25.8,31.5 25.8,58.9 0,96.5 -58.9,104.2 -114.8,110.5 9.2,7.9 17,22.9 17,46.4 0,33.7 -0.3,75.4 -0.3,83.6 0,6.5 4.6,14.4 17.3,12.1 C 428.2,457.8 496,362.9 496,252 496,113.3 383.5,8 244.8,8 Z"/>
+        </svg>
+    
+</a>
+        
+
+        <a id="mode_toggle" href="#" @click.prevent="handleClick" :title="mode">
+    <template v-if="mode == 'light'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_light"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M67.48,18.073c1.913,-1.912 1.913,-5.018 0,-6.931c-1.912,-1.912 -5.018,-1.912 -6.931,0l-6.798,6.799c-1.912,1.912 -1.912,5.018 0,6.931c1.913,1.912 5.018,1.912 6.931,-0l6.798,-6.799Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.728,61.108c1.912,-1.913 1.912,-5.018 -0,-6.931c-1.913,-1.913 -5.019,-1.913 -6.931,-0l-6.799,6.798c-1.912,1.913 -1.912,5.019 0,6.931c1.913,1.913 5.019,1.913 6.931,0l6.799,-6.798Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.682,54.177c-1.913,-1.913 -5.018,-1.913 -6.931,-0c-1.912,1.913 -1.912,5.018 0,6.931l6.798,6.798c1.913,1.913 5.019,1.913 6.931,0c1.913,-1.912 1.913,-5.018 0,-6.931l-6.798,-6.798Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M4.901,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,-0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M18.929,11.142c-1.912,-1.912 -5.018,-1.912 -6.931,0c-1.912,1.913 -1.912,5.019 0,6.931l6.799,6.799c1.912,1.912 5.018,1.912 6.931,-0c1.912,-1.913 1.912,-5.019 -0,-6.931l-6.799,-6.799Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.108,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c-0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c-0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'dark'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_dark"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.901,2.196 -4.901,4.901c0,2.705 2.197,4.901 4.901,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.662,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.989,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.732,61.103c1.91,-1.91 1.91,-5.011 0,-6.921l-0.009,-0.01c-1.91,-1.91 -5.012,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.909,1.91 5.011,1.91 6.92,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.672,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.52,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l-0,-0.01c-0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.901,2.196 -4.901,4.901c0,2.704 2.197,4.9 4.901,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.73,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 -0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.098,34.623c-2.699,0 -4.891,2.192 -4.891,4.892l-0,0.019c-0,2.699 2.192,4.891 4.891,4.891c2.7,0 4.892,-2.192 4.892,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.892,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'darkest'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_darkest"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><path d="M39.315,23.791c8.684,-0 15.734,7.05 15.734,15.733c0,8.684 -7.05,15.734 -15.734,15.734c-8.683,0 -15.733,-7.05 -15.733,-15.734c-0,-8.683 7.05,-15.733 15.733,-15.733Zm0,4.737c6.069,0 10.997,4.927 10.997,10.996c-0,6.069 -4.928,10.996 -10.997,10.996c-6.068,0 -10.996,-4.927 -10.996,-10.996c0,-6.069 4.928,-10.996 10.996,-10.996Z" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.216,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.9,2.196 -4.9,4.901c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.666,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.99,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.737,61.103c1.909,-1.91 1.909,-5.011 -0,-6.921l-0.01,-0.01c-1.91,-1.91 -5.011,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.91,1.91 5.011,1.91 6.921,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.676,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.524,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l0,-0.01c0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.216,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901c-0,2.704 2.196,4.9 4.9,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.734,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.103,34.623c-2.7,0 -4.892,2.192 -4.892,4.892l-0,0.019c-0,2.699 2.192,4.891 4.892,4.891c2.699,0 4.891,-2.192 4.891,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.891,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+</a>
+
+<script>
+(function() {
+    const LOCAL_STORAGE_KEY = 'piccoloThemeMode'
+
+    var initialMode = localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (initialMode) {
+        // Make sure the value in local storage is valid
+        if (['light', 'dark', 'darkest'].indexOf(initialMode) == -1) {
+            initialMode = 'light'
+            localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+        }
+    } else {
+        // Check if the client prefers dark mode
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialMode = 'dark'
+        } else {
+            initialMode = 'light'
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+    }
+
+    document.documentElement.dataset.mode = initialMode
+
+    PetiteVue.createApp({
+        'mode': initialMode,
+        handleClick() {
+            let currentMode = this.mode
+
+            if (currentMode == 'light') {
+                this.mode = 'dark'
+            } else if (currentMode == 'dark') {
+                this.mode = 'darkest'
+            } else if (currentMode == 'darkest') {
+                this.mode = 'light'
+            }
+
+            document.documentElement.dataset.mode = this.mode
+            localStorage.setItem(LOCAL_STORAGE_KEY, this.mode)
+
+            console.log(this.mode)
+        }
+    }).mount('#mode_toggle')
+})()
+</script>
+            <p class="mobile_search_link">
+                <a href="../search.html" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65 64" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                        <path d="M14.873 40.009c-2.315-3.943-3.642-8.532-3.642-13.429C11.231 11.91 23.141 0 37.811 0s26.58 11.91 26.58 26.58-11.91 26.58-26.58 26.58a26.44 26.44 0 0 1-14.277-4.161L9.739 62.794a3.12 3.12 0 0 1-4.413 0L.913 58.382c-1.217-1.218-1.217-3.196 0-4.413l13.96-13.96zM37.811 8.054c10.225 0 18.526 8.301 18.526 18.526s-8.301 18.526-18.526 18.526-18.526-8.301-18.526-18.526S27.586 8.054 37.811 8.054z" fill="#fff" />
+                    </svg>
+                </a>
+            </p>
+        
+
+        <div class="searchbox_wrapper">
+            
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+    </nav>
+</div>
+
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Paper</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../paper.html">A Co-Design Compilation Flow as a Harness for Language Models to Improve It</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup/index.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_01_get_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_02_vhls.html">Vivado/Vitis HLS Backend</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Deep Dive</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dive/frontend_syntax.html">Frontend Syntax Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/dataflow.html">Dataflow Programming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_01_data_types.html">Data Types and Type Casting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_02_template.html">Template Kernels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_03_composition.html">Kernel Composition</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/ip.html">IP Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/pytorch.html">PyTorch Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_05_verifier.html">Equivalence Checking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_04_features.html">Other Features</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Backends</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">The IP Library’s Gaps, and the Adder Tree</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gemmini_results.html">TinyTPU-isa vs Gemmini: Results and History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="benchmarks.html">The Benchmark Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_history.html">TinyTPU-isa: Design History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="minitpu.html">MiniTPU: Reference Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Extensions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia_results.html">CHIA Agentic Co-Design: Results</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia_codesign.html">The Original Co-Design Effort (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT and the TinyTPU-isa Mapper</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act_results.html">ACT: Results, Findings and Corrections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/extending_allo.html">Extending Allo’s Abstractions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/stream_ports.html">Stream Ports: a Unit with an Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">Schedule Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html#data-types">Data Types</a></li>
+</ul>
+
+        </div>
+      </div>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="the-ip-library-s-gaps-and-the-adder-tree">
+<h1>The IP Library’s Gaps, and the Adder Tree<a class="headerlink" href="#the-ip-library-s-gaps-and-the-adder-tree" title="Link to this heading"><span>¶</span></a></h1>
+<p>What a real accelerator needs that <code class="docutils literal notranslate"><span class="pre">examples/tinytpu/ip/</span></code>
+does not have. The reference is <a class="reference internal" href="minitpu.html"><span class="doc">MiniTPU: Reference Architecture</span></a>, another engineer’s machine;
+the destinations are Groq’s <strong>LPU</strong> and OpenAI’s <strong>Jalapeño</strong>
+(<a class="reference external" href="https://zartbot.github.io/blog/arch/jalapeno/en.html">zartbot’s analysis</a>).</p>
+<p>The library is in <a class="reference internal" href="tinytpu_library.html"><span class="doc">The Unit Library: Composing a Region from Units</span></a>; this page is the register of what it
+cannot do, with the repro for each, and the one gap that has since been
+filled.</p>
+<nav class="contents local" id="contents">
+<ul class="simple">
+<li><p><a class="reference internal" href="#where-the-two-projects-actually-stand" id="id2">Where the two projects actually stand</a></p></li>
+<li><p><a class="reference internal" href="#cannot-express-cannot-refuse" id="id3">Cannot express, cannot refuse</a></p></li>
+<li><p><a class="reference internal" href="#the-gap-table" id="id4">The gap table</a></p></li>
+<li><p><a class="reference internal" href="#row-2-which-is-the-one-worth-reading-twice" id="id5">Row 2, which is the one worth reading twice</a></p></li>
+<li><p><a class="reference internal" href="#the-adder-tree" id="id6">The adder tree</a></p></li>
+<li><p><a class="reference internal" href="#what-compose-py-did-not-need" id="id7">What <code class="docutils literal notranslate"><span class="pre">compose.py</span></code> did not need</a></p></li>
+<li><p><a class="reference internal" href="#what-is-not-filled-and-why" id="id8">What is not filled, and why</a></p></li>
+<li><p><a class="reference internal" href="#what-running-the-gaps-looks-like" id="id9">What running the gaps looks like</a></p></li>
+<li><p><a class="reference internal" href="#still-open-from-their-side" id="id10">Still open from their side</a></p></li>
+</ul>
+</nav>
+<section id="where-the-two-projects-actually-stand">
+<h2><a class="toc-backref" href="#id2" role="doc-backlink">Where the two projects actually stand</a><a class="headerlink" href="#where-the-two-projects-actually-stand" title="Link to this heading"><span>¶</span></a></h2>
+<p>The first thing the comparison produced was not a gap. It was a correction to
+the framing.</p>
+<p>MiniTPU’s units are <strong>not composable in our sense, and they fail by
+construction rather than by oversight</strong>: geometry is <code class="docutils literal notranslate"><span class="pre">localparam</span></code> in a
+package plus <code class="docutils literal notranslate"><span class="pre">define</span></code> macros, so you change the machine’s shape by
+recompiling the package; <code class="docutils literal notranslate"><span class="pre">vpu.sv</span></code>’s entire control interface is one ~29-field
+<code class="docutils literal notranslate"><span class="pre">vpu_ctrl_t</span></code> struct, so the VPU and the sequencer are one unit wearing two
+file names; six files in the whole tree have no package reference at all. The
+one block with an interface we would recognise as declared is the MXU – which
+is also the only major block their released course lab does <em>not</em> ship, which
+its author thinks is not a coincidence: <em>“the discipline came from having to
+hand it to students.”</em></p>
+<p>Their own summary, which is the honest shape of this page:</p>
+<blockquote>
+<div><p><em>“Your library is ahead of our structure; what we have that you want is a
+longer list of units that survived contact with real workloads.”</em></p>
+</div></blockquote>
+<p>So: <strong>we are ahead on structure, they are ahead on list length and on contact
+with real workloads.</strong> Nothing below proposes restructuring anything of ours
+toward their shape. On our three tests they pass <em>synthesisable</em> (on an FPGA,
+with two storage units that know it), fail <em>composable</em> outright, and meet
+<em>instruction-definable</em> only for the contract, not for the hardware.</p>
+</section>
+<section id="cannot-express-cannot-refuse">
+<h2><a class="toc-backref" href="#id3" role="doc-backlink">Cannot express, cannot refuse</a><a class="headerlink" href="#cannot-express-cannot-refuse" title="Link to this heading"><span>¶</span></a></h2>
+<p><a class="reference internal" href="../developer/extending_allo.html#extending-allo-gaps"><span class="std std-ref">The open gaps, ranked</span></a> makes this distinction for the Allo front end and
+it is the same one here, because this project keeps finding the second
+disguised as the first:</p>
+<ul class="simple">
+<li><p><strong>Cannot express</strong> – there is no way to write the thing down. The repair is
+a new unit, a new parameter or a new field.</p></li>
+<li><p><strong>Cannot refuse</strong> – the thing can be written down, and something wrong can
+be written down beside it and is accepted. The repair is a checker. This is
+the cheaper and the more dangerous kind, because the failure arrives as a
+wrong number rather than as an error.</p></li>
+</ul>
+<p>Four of the eight rows below are <em>cannot refuse</em>, and one row (row 2) is a
+false refusal hiding a real contract, which is the third and worst case.</p>
+</section>
+<section id="the-gap-table">
+<span id="ip-gaps-table"></span><h2><a class="toc-backref" href="#id4" role="doc-backlink">The gap table</a><a class="headerlink" href="#the-gap-table" title="Link to this heading"><span>¶</span></a></h2>
+<p>Every “evidence” cell names a test in <code class="docutils literal notranslate"><span class="pre">tests/ip/test_ip_gaps.py</span></code> or a place
+in the source. Every unfilled row has a declaration in
+<code class="docutils literal notranslate"><span class="pre">examples/tinytpu/ip/placeholders.py</span></code> carrying its
+interface, what would make it real, and a <code class="docutils literal notranslate"><span class="pre">NotBuilt</span></code> exception that says so
+if anything imports it expecting an implementation.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 4.0%" />
+<col style="width: 20.0%" />
+<col style="width: 14.0%" />
+<col style="width: 20.0%" />
+<col style="width: 28.0%" />
+<col style="width: 14.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>What is missing</p></th>
+<th class="head"><p>Which target needs it</p></th>
+<th class="head"><p>What would have to change</p></th>
+<th class="head"><p>Evidence</p></th>
+<th class="head"><p>Kind</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p><strong>A reduction topology that can be chosen.</strong> The PEs forward partial
+sums south through <code class="docutils literal notranslate"><span class="pre">p_fwd</span></code>, so the reduction is <code class="docutils literal notranslate"><span class="pre">T</span></code> units deep and
+its shape <em>is</em> the unit graph.</p></td>
+<td><p>Jalapeño: adder-tree reduction, output-stationary, 6-9 cycles, <em>not</em>
+a systolic chain</p></td>
+<td><p>a unit. Not <code class="docutils literal notranslate"><span class="pre">compose.py</span></code> – see <a class="reference internal" href="#what-compose-py-did-not-need">What compose.py did not need</a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ip/units/pe.py</span></code> reduces by <code class="docutils literal notranslate"><span class="pre">p_fwd[i-1,</span> <span class="pre">j].get()</span></code> /
+<code class="docutils literal notranslate"><span class="pre">p_fwd[i,</span> <span class="pre">j].put(psum)</span></code>; changing it means editing the PE body, and
+<code class="docutils literal notranslate"><span class="pre">compose.py</span></code> contains no word for topology</p></td>
+<td><p>cannot express – <strong>FILLED</strong>, <a class="reference internal" href="#the-adder-tree">The adder tree</a></p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p><strong>M down to 1.</strong> Two separate things wearing one costume.</p></td>
+<td><p>Jalapeño: <em>“can go as fine as 1 in the row direction”</em>, against
+Nvidia’s M&lt;64 cliff</p></td>
+<td><p>the accumulator’s dependence contract, or an output-stationary unit
+that does not have one</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">GemmPrograms._tiles</span></code> asserts <code class="docutils literal notranslate"><span class="pre">M</span> <span class="pre">%</span> <span class="pre">T</span> <span class="pre">==</span> <span class="pre">0</span></code> with no message –
+<strong>a false refusal</strong>: bypass it and M=3 at T=4 is bit-exact. The real
+bound is <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span></code>: at M=1, K=8, N=8 every dependent <code class="docutils literal notranslate"><span class="pre">ar</span></code> pair
+has to be padded apart and the program runs <strong>22 dynamic instructions
+against 10 at M=4</strong> – 2.2x the instructions for a quarter of the work</p></td>
+<td><p>both – <strong>FILLED</strong>, see below</p></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p><strong>One unit instantiated N times, at N parameter sets, against
+different channels</strong> – N slices with their own local memories</p></td>
+<td><p>Jalapeño: per-slice local memory, no unified L2; LPU</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">compose.py</span></code> emits <code class="docutils literal notranslate"><span class="pre">&#64;df.unit</span></code> instances instead of nesting kernel
+source, <strong>and</strong> <code class="docutils literal notranslate"><span class="pre">&#64;df.unit</span></code> accepts parameters at the instantiation
+site</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">test_second_instance_of_a_unit</span></code> – the same <code class="docutils literal notranslate"><span class="pre">Unit</span></code> twice fails
+<code class="docutils literal notranslate"><span class="pre">Architecture._check</span></code> with <em>“channel ‘b’ writes in both copy_unit and
+copy_unit”</em>. The front end no longer has this limit
+(<a class="reference internal" href="../developer/stream_ports.html"><span class="doc">Stream Ports: a Unit with an Interface</span></a>); this library has not adopted it, and
+instantiation-site parameters are named there as not attempted</p></td>
+<td><p>cannot express</p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p><strong>Explicit compile-time placement.</strong> Nothing says where an instance or
+the memory it addresses lives.</p></td>
+<td><p>Jalapeño: <code class="docutils literal notranslate"><span class="pre">TensorInfo</span></code> carries logical layout <em>and</em> physical
+placement; the compiler decides which HBM slice every weight shard, KV
+and expert belongs to</p></td>
+<td><p>a placement expression on <code class="docutils literal notranslate"><span class="pre">Unit</span></code>, an owning slice on <code class="docutils literal notranslate"><span class="pre">Memory</span></code>, and
+a reachability rule in <code class="docutils literal notranslate"><span class="pre">Architecture._check</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">test_no_placement_concept</span></code>: <code class="docutils literal notranslate"><span class="pre">Unit</span></code>’s fields are <code class="docutils literal notranslate"><span class="pre">body</span></code>,
+<code class="docutils literal notranslate"><span class="pre">instances</span></code>, <code class="docutils literal notranslate"><span class="pre">memories</span></code>, <code class="docutils literal notranslate"><span class="pre">reads</span></code>, <code class="docutils literal notranslate"><span class="pre">writes</span></code>, <code class="docutils literal notranslate"><span class="pre">parameters</span></code>,
+<code class="docutils literal notranslate"><span class="pre">isa</span></code>, <code class="docutils literal notranslate"><span class="pre">directives</span></code>, <code class="docutils literal notranslate"><span class="pre">legality</span></code>. <code class="docutils literal notranslate"><span class="pre">compose.py</span></code> contains none of
+the words place, slice, location, affinity, topology or bank</p></td>
+<td><p>cannot express</p></td>
+</tr>
+<tr class="row-even"><td><p>5</p></td>
+<td><p><strong>A channel whose topology is declared</strong> – broadcast, all-reduce,
+all-gather – rather than hand-built as a chain</p></td>
+<td><p>Jalapeño: an independent 8x8 two-stage collective network <em>beside</em> a
+general mesh; LPU</p></td>
+<td><p>a kind on <code class="docutils literal notranslate"><span class="pre">Channel</span></code>, and <code class="docutils literal notranslate"><span class="pre">compose.py</span></code> emitting the arrangement it
+names</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">test_no_collective_topology</span></code>; and <code class="docutils literal notranslate"><span class="pre">ip/tinytpu.py</span></code>’s own docstring:
+<em>“every distribution is a CHAIN carrying packed words, never a T-way
+fan-out”</em> – the topology is the sixteen <code class="docutils literal notranslate"><span class="pre">Channel</span></code> declarations</p></td>
+<td><p>cannot express</p></td>
+</tr>
+<tr class="row-odd"><td><p>6</p></td>
+<td><p><strong>A unit cannot declare its latency, and nothing checks one from both
+ends.</strong></p></td>
+<td><p>both targets, and MiniTPU’s own strongest recommendation to us</p></td>
+<td><p>a latency contract beside <code class="docutils literal notranslate"><span class="pre">ip/isa.py</span></code>, generated-from and
+checked-against like the encoding is, plus a <strong>two-sided</strong> probe</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">test_unit_cannot_declare_latency</span></code>. <code class="docutils literal notranslate"><span class="pre">reduce_tree</span></code>’s two outputs sit
+<code class="docutils literal notranslate"><span class="pre">RED_DEPTH</span> <span class="pre">-</span> <span class="pre">RED_TAP_LEVEL</span></code> adder levels apart and nothing says what
+that is in cycles</p></td>
+<td><p>cannot refuse – <strong>flagged to ``unit-actions``, deliberately not built
+here</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>7</p></td>
+<td><p><strong>A unit does not declare its arithmetic.</strong></p></td>
+<td><p>all three: MXFP4/FP8 on Jalapeño, BF16 on MiniTPU, int8 here</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int8</span></code>/<code class="docutils literal notranslate"><span class="pre">int16</span></code>/<code class="docutils literal notranslate"><span class="pre">int32</span></code> leave <code class="docutils literal notranslate"><span class="pre">FRONTEND_NAMES</span></code> and become
+declarable like any other parameter</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">test_units_do_not_declare_arithmetic</span></code>: <code class="docutils literal notranslate"><span class="pre">pe</span></code> computes an
+<code class="docutils literal notranslate"><span class="pre">int8</span> <span class="pre">x</span> <span class="pre">int8</span></code> product into <code class="docutils literal notranslate"><span class="pre">int32</span></code> and declares
+<code class="docutils literal notranslate"><span class="pre">parameters=(&quot;T&quot;,</span> <span class="pre">&quot;VW&quot;,</span> <span class="pre">&quot;AW&quot;)</span></code>. <code class="docutils literal notranslate"><span class="pre">reduce_tree</span></code> declares <code class="docutils literal notranslate"><span class="pre">RED_IN</span></code>
+and <code class="docutils literal notranslate"><span class="pre">RED_ACC</span></code> and is the shape the other eight would take</p></td>
+<td><p>cannot refuse</p></td>
+</tr>
+<tr class="row-odd"><td><p>8</p></td>
+<td><p><strong>A memory with two writers is not refused</strong> – the structure an FPGA
+gives away and standard cells reject</p></td>
+<td><p>the ASIC flow itself, which is a standing constraint on every unit here</p></td>
+<td><p>a write-site count in <code class="docutils literal notranslate"><span class="pre">Unit.check</span></code>, plus the RTL audit</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">test_two_write_sites_not_refused</span></code>: a unit whose local buffer is
+written in two loops composes <em>and builds</em> with nothing remarked.
+<a class="reference internal" href="benchmarks.html"><span class="doc">The Benchmark Set</span></a> and <code class="docutils literal notranslate"><span class="pre">asic_synthesis/README.md</span></code> record DC
+refusing exactly that shape with <code class="docutils literal notranslate"><span class="pre">ELAB-366</span></code> after Vitis emitted a
+true dual-write-port RAM still named <code class="docutils literal notranslate"><span class="pre">_1R1W</span></code></p></td>
+<td><p>cannot refuse – <strong>partly filled</strong>: <code class="docutils literal notranslate"><span class="pre">reduce_csynth.py</span> <span class="pre">--audit</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>9</p></td>
+<td><p><strong>A stream array is not held to one writer per element, nor to its
+declared shape</strong></p></td>
+<td><p>none – our own soundness, not a target’s requirement</p></td>
+<td><p>an abstract interpretation of the index expressions, or a declared
+per-element ownership rule to check bodies against</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">test_two_writers_on_a_chain_not_refused</span></code> (the same pair on a
+<em>scalar</em> channel is refused) and
+<code class="docutils literal notranslate"><span class="pre">test_chain_index_outside_shape_not_refused</span></code> – an index 1000 past
+the shape composes, and <code class="docutils literal notranslate"><span class="pre">df.build</span></code> then reports <em>“Variable
+narrow_1000 not defined in current scope”</em></p></td>
+<td><p>cannot refuse</p></td>
+</tr>
+</tbody>
+</table>
+<p>Two front-end limits found on the way, which belong to
+<a class="reference internal" href="../developer/limitations.html"><span class="doc">Allo Limitations Register</span></a> rather than to this library:</p>
+<ul class="simple">
+<li><p><strong>A datatype-parametric unit costs every bit extract 32 bits.</strong> A unit <em>can</em>
+take its element type from the architecture – <code class="docutils literal notranslate"><span class="pre">reduce_tree</span></code> does, and an
+architecture binding <code class="docutils literal notranslate"><span class="pre">float32</span></code> builds and runs – but a slice whose bounds
+are expressions over a <em>named</em> width (<code class="docutils literal notranslate"><span class="pre">packed[W*k</span> <span class="pre">:</span> <span class="pre">W*(k+1)]</span></code>) cannot be
+width-inferred: <code class="docutils literal notranslate"><span class="pre">allo/ir/infer.py:583</span></code> warns and widens the extract to
+<code class="docutils literal notranslate"><span class="pre">UInt(32)</span></code>. This is the same limit as
+<a class="reference internal" href="tinytpu_library.html#tinytpu-library-symbolic-slice"><span class="std std-ref">The third site cannot, and that is a front-end limitation</span></a>, reached from the other side: it is
+why the eight shipped units spell their lane widths as literals, and it is
+the thing standing between this library and a genuinely datatype-parametric
+unit set. <code class="docutils literal notranslate"><span class="pre">test_datatype_parametric_slices_widen_to_32_bits</span></code>.</p></li>
+<li><p><strong>A full-width bit slice does not build.</strong> <code class="docutils literal notranslate"><span class="pre">w[0:32]</span></code> on a <code class="docutils literal notranslate"><span class="pre">UInt(32)</span></code>
+lowers to an <code class="docutils literal notranslate"><span class="pre">arith.trunci</span></code> from <code class="docutils literal notranslate"><span class="pre">i32</span></code> to <code class="docutils literal notranslate"><span class="pre">i32</span></code> and the pass pipeline
+rejects it. <code class="docutils literal notranslate"><span class="pre">test_full_width_bit_slice_does_not_build</span></code>; it is why
+<code class="docutils literal notranslate"><span class="pre">reduce_tree</span></code> refuses <code class="docutils literal notranslate"><span class="pre">RED_GROUPS=1</span></code> explicitly rather than emitting a
+tap that happens to be the root.</p></li>
+</ul>
+</section>
+<section id="row-2-which-is-the-one-worth-reading-twice">
+<h2><a class="toc-backref" href="#id5" role="doc-backlink">Row 2, which is the one worth reading twice</a><a class="headerlink" href="#row-2-which-is-the-one-worth-reading-twice" title="Link to this heading"><span>¶</span></a></h2>
+<p>“M must be a multiple of T” is asserted in <code class="docutils literal notranslate"><span class="pre">GemmPrograms._tiles</span></code> as a bare
+<code class="docutils literal notranslate"><span class="pre">assert</span></code> with no message, and it is <strong>not true of the hardware</strong>. Bypassing
+it and running the shipped <code class="docutils literal notranslate"><span class="pre">flat</span></code> program shape at T=4, MAXDIM=16 on the
+simulator:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>M=4 K=4 N=4          4 dynamic instructions   wrong=0/16
+M=3 K=4 N=4          REFUSED by assemble(): mvout reads ar row 0 three
+                     accu steps after writing it
+M=3 K=4 N=4 padded   5 dynamic               wrong=0/12
+M=1 K=4 N=4 padded   7 dynamic               wrong=0/4
+M=4 K=8 N=8         10 dynamic               wrong=0/32
+M=2 K=8 N=8 padded  14 dynamic               wrong=0/16
+M=1 K=8 N=8 padded  22 dynamic               wrong=0/8
+</pre></div>
+</div>
+<p>So there are three distinct claims wearing one assertion:</p>
+<ol class="arabic simple">
+<li><p><strong>M need not be a multiple of T.</strong> The array streams M wavefront rows; only
+K and N are tiled by the packed word. The generator’s assertion refuses
+shapes the machine computes exactly. That is a <em>false refusal</em>.</p></li>
+<li><p><strong>M &lt; AR_RAW_DIST is a real contract violation</strong>, and <code class="docutils literal notranslate"><span class="pre">assemble()</span></code> is
+right to reject it. <code class="docutils literal notranslate"><span class="pre">accu</span></code>’s II=1 rests on
+<code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span> <span class="pre">...</span> <span class="pre">inter</span> <span class="pre">false</span></code>, true only when an <code class="docutils literal notranslate"><span class="pre">ar</span></code> row is
+read at least <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST=4</span></code> accu steps after it is written, and at
+small M every dependent pair is closer than that.</p></li>
+<li><p><strong>Padding makes it legal and costs almost everything.</strong> 22 dynamic
+instructions for 8 output elements against 10 for 32: 8.8x the work per
+useful row.</p></li>
+</ol>
+<p>Jalapeño’s M-down-to-1 requirement is therefore not a tiling question at all
+on this machine. It is a consequence of reducing through a <em>chain with an
+architectural accumulator</em>, and the fix is the row above it: an
+output-stationary tree finishes one output element in one pass, so M is a trip
+count and M=1 costs 1/M of M’s work. <code class="docutils literal notranslate"><span class="pre">test_m_of_one_costs_one_row</span></code>.</p>
+</section>
+<section id="the-adder-tree">
+<span id="ip-gaps-tree"></span><h2><a class="toc-backref" href="#id6" role="doc-backlink">The adder tree</a><a class="headerlink" href="#the-adder-tree" title="Link to this heading"><span>¶</span></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">ip/units/reduction_tree.py</span></code>, composed by <code class="docutils literal notranslate"><span class="pre">ip/reduce.py</span></code> into <code class="docutils literal notranslate"><span class="pre">DotTree</span></code>:
+a three-unit region computing an <code class="docutils literal notranslate"><span class="pre">M</span> <span class="pre">x</span> <span class="pre">RED_LANES</span> <span class="pre">x</span> <span class="pre">N</span></code> GEMM with the
+contraction done by the tree. It is not bolted beside the systolic chain; it
+is a different unit an architecture instantiates instead, and <code class="docutils literal notranslate"><span class="pre">DotTree</span></code> is
+the second architecture this library composes.</p>
+<section id="what-is-declared">
+<h3>What is declared<a class="headerlink" href="#what-is-declared" title="Link to this heading"><span>¶</span></a></h3>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 22.0%" />
+<col style="width: 78.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>What it fixes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">RED_LANES</span></code></p></td>
+<td><p>the width. A power of two. <code class="docutils literal notranslate"><span class="pre">RED_DEPTH</span> <span class="pre">=</span> <span class="pre">log2(RED_LANES)</span></code> is
+<strong>derived</strong>, never declared, so the two cannot disagree</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">RED_IN</span></code> / <code class="docutils literal notranslate"><span class="pre">RED_IN_BITS</span></code></p></td>
+<td><p>the lane type and its width. The body needs both – a type to annotate
+with, an integer to slice with – so <code class="docutils literal notranslate"><span class="pre">legality</span></code> holds the pair to
+each other</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">RED_ACC</span></code> / <code class="docutils literal notranslate"><span class="pre">RED_ACC_BITS</span></code></p></td>
+<td><p>the type <strong>every node</strong> of the tree carries. The same width at every
+level: there is no widening down the tree</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">RED_GROUPS</span></code></p></td>
+<td><p>the <strong>leaf mapping</strong>. Input lane <code class="docutils literal notranslate"><span class="pre">g</span> <span class="pre">+</span> <span class="pre">s*RED_GROUPS</span></code> lands at leaf
+<code class="docutils literal notranslate"><span class="pre">g*RED_GROUP_SIZE</span> <span class="pre">+</span> <span class="pre">s</span></code>, so each group owns one contiguous subtree</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">RED_TAP_LEVEL</span></code> / <code class="docutils literal notranslate"><span class="pre">RED_TAP_BASE</span></code></p></td>
+<td><p>where those subtrees’ roots sit. Derived from the two above</p></td>
+</tr>
+</tbody>
+</table>
+<p><code class="docutils literal notranslate"><span class="pre">reduction_tree_legality</span></code> refuses a parameter set at <strong>composition</strong> time –
+not at build, not in cosim, not in a testbench. The condition that matters is</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>RED_ACC_BITS &gt;= RED_IN_BITS + RED_DEPTH
+</pre></div>
+</div>
+<p>with the message <em>“Narrower is not a smaller tree, it is a DIFFERENT function:
+every level rounds, so the leaf mapping becomes observable and two correct
+trees disagree.”</em> At <code class="docutils literal notranslate"><span class="pre">RED_LANES=8,</span> <span class="pre">RED_IN_BITS=16</span></code>, an <code class="docutils literal notranslate"><span class="pre">Int(19)</span></code>
+accumulator is accepted and an <code class="docutils literal notranslate"><span class="pre">Int(18)</span></code> is refused, and the test pins that
+boundary.</p>
+</section>
+<section id="three-things-minitpu-s-owner-told-us-to-declare-and-why">
+<h3>Three things MiniTPU’s owner told us to declare, and why<a class="headerlink" href="#three-things-minitpu-s-owner-told-us-to-declare-and-why" title="Link to this heading"><span>¶</span></a></h3>
+<p><strong>Leaf mapping is interface, not implementation.</strong> Their leaves are
+sublane-major, <code class="docutils literal notranslate"><span class="pre">sublane*NUM_LANES</span> <span class="pre">+</span> <span class="pre">lane</span></code>, which reassociates <code class="docutils literal notranslate"><span class="pre">vredsum</span></code>
+relative to the lane order a reader assumes:</p>
+<blockquote>
+<div><p><em>“a tree’s topology is not just width and depth, it is which operand lands
+at which leaf – and if your unit interface cannot say that, two correct
+trees will disagree in the last bits and nobody will know why.”</em></p>
+</div></blockquote>
+<p>They <strong>priced</strong> the order rather than assuming it: a separate 4x16 lane-reduce
+network synthesised at 19,198 LUT against the tree’s own 20,216, so the
+sublane-major order plus a four-wire tap beat a second network on cost. That
+is why the tap exists here too.</p>
+<p><strong>The relation between the tap and the tree’s depth lives with the
+parameters.</strong> On MiniTPU exactly one assertion ties the tap to the booked
+writeback and it is in a testbench; change the lane count, the sublane count
+or the adder’s stage count and the tap silently moves, and a sequencer
+broadcasts a stale mid-tree value with nothing faulting. In a <em>parametrized</em>
+unit that is the single most likely way to ship a wrong design, so
+<code class="docutils literal notranslate"><span class="pre">RED_TAP_LEVEL</span> <span class="pre">==</span> <span class="pre">log2(RED_GROUP_SIZE)</span></code> and
+<code class="docutils literal notranslate"><span class="pre">RED_TAP_BASE</span> <span class="pre">==</span> <span class="pre">2*RED_LANES</span> <span class="pre">-</span> <span class="pre">2*RED_GROUPS</span></code> are legality conditions on the
+unit, not assertions in a test.</p>
+<p><strong>A tap needs something that uses it.</strong> For a whole commit MiniTPU’s measured
+lane-tap latency was a number nothing used – the probe was right about the
+hardware, the scheduler booked every reduce at the root latency, and the two
+halves had never been checked against each other. Wiring them together took a
+span-64 softmax from 150 bundles to 142. Here <code class="docutils literal notranslate"><span class="pre">red_group</span></code> is written by the
+tree, read by <code class="docutils literal notranslate"><span class="pre">dot_sink</span></code>, landed in a region argument and compared against an
+independently built numpy reference from the first commit, and
+<code class="docutils literal notranslate"><span class="pre">test_the_tap_is_not_the_root</span></code> fails a unit that emits the root twice.</p>
+</section>
+<section id="the-tree-we-did-not-build">
+<span id="ip-gaps-cheap-tree"></span><h3>The tree we did not build<a class="headerlink" href="#the-tree-we-did-not-build" title="Link to this heading"><span>¶</span></a></h3>
+<p>MiniTPU’s tree instantiates the same pipelined BF16 adder 63 times, so a
+64-element sum <strong>rounds six times, not once</strong>. Their commit <code class="docutils literal notranslate"><span class="pre">875f3bd</span></code> costed
+the alternative – align once to a shared exponent, sum as integers, normalise
+once – at roughly <strong>-6,400 LUT and L ~ 8 instead of 16</strong>, and rejected it only
+because it changes <code class="docutils literal notranslate"><span class="pre">vredsum</span></code>’s numbers against host references they had
+already matched. Their words: <em>“If your reference is not frozen yet, that is
+probably the design to take. We are worse than you here by inheritance, not by
+argument.”</em></p>
+<p>Ours is not frozen, so that is the form <code class="docutils literal notranslate"><span class="pre">reduce_tree</span></code> takes, and the
+architectural point is what it does to the unit’s <em>shape</em>: <strong>rounding stops
+being a per-level property of the unit and becomes a property of its two
+ends.</strong> <code class="docutils literal notranslate"><span class="pre">RED_ACC_BITS</span></code> is then a single legality condition rather than a
+per-level error model, and the leaf mapping stops being numerically
+observable. The per-level-rounding tree is the variant to keep for comparison,
+not the default.</p>
+<p>Two habits of theirs this unit deliberately does not inherit: their datapath is
+unreset (a 1024-sink reset net avoided, safe only because the valid and op
+pipelines <em>are</em> reset – an invariant written down nowhere), and it therefore
+toggles every cycle regardless of <code class="docutils literal notranslate"><span class="pre">valid</span></code>. On the ASIC flow that is power,
+and the ASIC flow is our substrate.</p>
+</section>
+<section id="synthesis">
+<h3>Synthesis<a class="headerlink" href="#synthesis" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">examples/tinytpu/reduce_csynth.py</span> <span class="pre">8:2</span> <span class="pre">16:4</span> <span class="pre">32:8</span>
+<span class="pre">64:8</span></code> – one <code class="docutils literal notranslate"><span class="pre">csynth_design</span></code> each, <code class="docutils literal notranslate"><span class="pre">xcu280</span></code>, 3.33 ns target, project
+deleted as soon as it is parsed. The per-instance row for <code class="docutils literal notranslate"><span class="pre">reduce_tree_0_U0</span></code>
+is the unit; the rig’s feeder, sink and Vitis’s five <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> shims are not.</p>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text"><code class="docutils literal notranslate"><span class="pre">reduce_tree</span></code> alone, post-csynth estimate</span><a class="headerlink" href="#id1" title="Link to this table"><span>¶</span></a></caption>
+<colgroup>
+<col style="width: 14.0%" />
+<col style="width: 12.0%" />
+<col style="width: 12.0%" />
+<col style="width: 10.0%" />
+<col style="width: 10.0%" />
+<col style="width: 22.0%" />
+<col style="width: 20.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>lanes : groups</p></th>
+<th class="head"><p>LUT</p></th>
+<th class="head"><p>FF</p></th>
+<th class="head"><p>DSP</p></th>
+<th class="head"><p>BRAM</p></th>
+<th class="head"><p>tree loop</p></th>
+<th class="head"><p>est. clock</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>8 : 2 (depth 3)</p></td>
+<td><p>354</p></td>
+<td><p>148</p></td>
+<td><p>0</p></td>
+<td><p>0</p></td>
+<td><p>4 cycles, II=1</p></td>
+<td><p>2.431 ns</p></td>
+</tr>
+<tr class="row-odd"><td><p>16 : 4 (depth 4)</p></td>
+<td><p>553</p></td>
+<td><p>272</p></td>
+<td><p>0</p></td>
+<td><p>0</p></td>
+<td><p>4 cycles, II=1</p></td>
+<td><p>2.431 ns</p></td>
+</tr>
+<tr class="row-even"><td><p>32 : 8 (depth 5)</p></td>
+<td><p>940</p></td>
+<td><p>500</p></td>
+<td><p>0</p></td>
+<td><p>0</p></td>
+<td><p>4 cycles, II=1</p></td>
+<td><p>2.431 ns</p></td>
+</tr>
+<tr class="row-odd"><td><p>64 : 8 (depth 6)</p></td>
+<td><p><strong>1,643</strong></p></td>
+<td><p>1,036</p></td>
+<td><p>0</p></td>
+<td><p>0</p></td>
+<td><p><strong>5 cycles, II=1</strong></p></td>
+<td><p><strong>2.431 ns</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p>Read as: about 26 LUT per lane, linear in the width; <strong>zero DSP and zero
+BRAM</strong> at every width; one reduction accepted per cycle at every width; and
+the estimated clock unmoved at 2.431 ns against a 3.33 ns target, so the tree
+is not the critical path of the rig it is in. <code class="docutils literal notranslate"><span class="pre">Memory:</span> <span class="pre">N/A</span></code> in every report
+– <code class="docutils literal notranslate"><span class="pre">node</span></code> is wires, which is what the <code class="docutils literal notranslate"><span class="pre">Partition.Complete</span></code> directive on it
+is for.</p>
+<p><strong>Jalapeño asks for 6-9 cycles of reduction depth.</strong> A 64-lane tree here is 5
+cycles at II=1, inside that band, so this is the first unit in the library that
+can express the requirement rather than approximate it.</p>
+<p><strong>ASIC legality is checked, not assumed.</strong> <code class="docutils literal notranslate"><span class="pre">reduce_csynth.py</span></code> scans every
+generated Verilog module for a declared memory written from more than one
+clocked <code class="docutils literal notranslate"><span class="pre">always</span></code> block – the <code class="docutils literal notranslate"><span class="pre">ELAB-366</span></code> shape – and reports it as a
+failure. Across all four widths: <em>no memory written from more than one clocked
+block</em>, with the five findings in Vitis’s own <code class="docutils literal notranslate"><span class="pre">m_axi</span></code>/<code class="docutils literal notranslate"><span class="pre">s_axi</span></code> interface
+shims listed separately and not scored, because those modules are emitted
+identically into every design this flow generates, including the shipped
+TinyTPU that Design Compiler has already accepted.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>Do not compare 1,643 LUT with MiniTPU’s 16,259.</strong> Different datatype
+(int32 nodes against BF16), different tool, different device, and theirs is
+a hierarchical post-synthesis figure from a commit that is not an ancestor
+of their master, while ours is a Vitis HLS <em>estimate</em> before any Vivado
+run. Their three figures – 16,259 LUT / 8.2 % in-design, 20,216 LUT out of
+context, -1,062 LUT for +126 DSP at -1.08 ns – are not interchangeable
+either. What <em>does</em> transfer is the shape: the reduction is adder-shaped,
+not multiplier-shaped, and wants fabric. Both designs land at <strong>zero DSP</strong>,
+independently.</p>
+</div>
+</section>
+<section id="the-tree-as-actions-and-the-two-things-the-action-layer-could-not-say">
+<h3>The tree as Actions, and the two things the Action layer could not say<a class="headerlink" href="#the-tree-as-actions-and-the-two-things-the-action-layer-could-not-say" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">tests/ip/test_reduce_actions.py</span></code> describes this unit as a <code class="docutils literal notranslate"><span class="pre">Machine</span></code> in
+the Action layer (<code class="docutils literal notranslate"><span class="pre">allo/actions.py</span></code>, branch <code class="docutils literal notranslate"><span class="pre">unit-actions</span></code>), built from
+<code class="docutils literal notranslate"><span class="pre">ReduceParams</span></code> rather than from an example’s invented widths, with the two
+output depths set to what <code class="docutils literal notranslate"><span class="pre">reduce_latency_probe.py</span></code> measured. It is the
+second machine that layer asked for, and it was asked for precisely because
+only one – TinyTPU – had ever exercised it.</p>
+<p>The answer is a <strong>qualified yes</strong>. Everything structural survives the trip:
+which units the opcode reaches, the leaf order and the refusal of a mapping
+that is not a permutation, both output depths as measured, and the
+reassociation obligation together with its dependence on the arithmetic
+(discharged under exact integer addition, left open under rounding). Three
+things do not survive, and none of them is a property of this unit:</p>
+<ol class="arabic simple">
+<li><p><strong>Latency is charged as occupancy.</strong> <code class="docutils literal notranslate"><span class="pre">Machine.work</span></code> is documented as the
+per-unit work count an instruction-memory header carries. For
+<code class="docutils literal notranslate"><span class="pre">reduce_tree</span></code> it returns 80 where the hardware does 16: the model places
+each Action at <code class="docutils literal notranslate"><span class="pre">max(ready</span> <span class="pre">of</span> <span class="pre">its</span> <span class="pre">args)</span> <span class="pre">+</span> <span class="pre">at</span></code> and takes the unit’s per-row
+cost to be the <em>span</em> of that placement, so the measured <code class="docutils literal notranslate"><span class="pre">at=2</span></code> is paid
+once per row instead of once per stream. There is no way to state what the
+probe measured – latency 2, one word retired per cycle – because the
+model draws no distinction between a <strong>latency</strong> and an <strong>initiation
+interval</strong> on an Action. <code class="docutils literal notranslate"><span class="pre">Unit.ii</span></code> cannot stand in for it: <code class="docutils literal notranslate"><span class="pre">ii</span></code> is the
+interval between the unit’s own steps, so buying the right work count with
+<code class="docutils literal notranslate"><span class="pre">ii=5</span></code> would mean declaring something false. <code class="docutils literal notranslate"><span class="pre">dot_feed</span></code> and
+<code class="docutils literal notranslate"><span class="pre">dot_sink</span></code>, whose Actions carry no <code class="docutils literal notranslate"><span class="pre">at=</span></code>, model correctly – which is
+why TinyTPU, described throughout without <code class="docutils literal notranslate"><span class="pre">at=</span></code>, never surfaced this.</p></li>
+<li><p><strong>One fold read at two taps cannot be said.</strong> The root and the group tap
+are one fold with two taps off it; the model has only <code class="docutils literal notranslate"><span class="pre">compute</span></code> Actions,
+so the pair is written twice and the single reassociation is reported as
+two obligations. The direction is right and the multiplicity is the
+model’s.</p></li>
+<li><p><strong>A lane width has to hang on addressed state.</strong> A lane map is checked
+against a lane <em>count</em>, which the model reads off the action’s <code class="docutils literal notranslate"><span class="pre">state</span></code>.
+MiniTPU’s fold reads a vector register file, so its width is a property of
+addressed state; this operand arrives on a <strong>channel</strong>, and a channel is
+not a state. The composition is refused – <em>“lane map without a width …
+None declares no lane count”</em> – until the packed word is declared as a
+one-row, <code class="docutils literal notranslate"><span class="pre">RED_LANES</span></code>-wide state. That is a fair reading of a FIFO word
+and it is still the model meeting a dataflow unit half way; the repair the
+error message suggests names a thing this unit does not have.</p></li>
+</ol>
+<p>The first of the three is the consequential one, and it is the reason the
+Action hypothesis should not yet be promoted to the default: a work count
+that is wrong by 5x on the first unit whose latencies were actually measured
+is not a number a header can carry.</p>
+</section>
+</section>
+<section id="what-compose-py-did-not-need">
+<span id="ip-gaps-compose"></span><h2><a class="toc-backref" href="#id7" role="doc-backlink">What <code class="docutils literal notranslate"><span class="pre">compose.py</span></code> did not need</a><a class="headerlink" href="#what-compose-py-did-not-need" title="Link to this heading"><span>¶</span></a></h2>
+<p>The brief’s sharpest question was whether admitting a choice of reduction
+topology would force a change to <code class="docutils literal notranslate"><span class="pre">compose.py</span></code> – the test of whether it is
+architecture-independent or only claims to be.</p>
+<p><strong>It did not, and that is the finding.</strong> Topology is not a property
+<code class="docutils literal notranslate"><span class="pre">compose.py</span></code> should hold; it is the pair (which units, which channels), which
+is exactly what an <code class="docutils literal notranslate"><span class="pre">Architecture</span></code> <em>is</em>. <code class="docutils literal notranslate"><span class="pre">DotTree</span></code> composes a tree reduction
+out of the same <code class="docutils literal notranslate"><span class="pre">Unit</span></code>, <code class="docutils literal notranslate"><span class="pre">Channel</span></code>, <code class="docutils literal notranslate"><span class="pre">Memory</span></code> and <code class="docutils literal notranslate"><span class="pre">Architecture</span></code> classes
+TinyTPU uses, with no new mechanism and no TinyTPU-shaped assumption anywhere
+in the way. The claim in <a class="reference internal" href="tinytpu_library.html"><span class="doc">The Unit Library: Composing a Region from Units</span></a> that <code class="docutils literal notranslate"><span class="pre">compose.py</span></code> “knows
+nothing about TinyTPU” now has a second architecture behind it instead of only
+an assertion.</p>
+<p>One thing it did need, and it is a <em>cannot refuse</em> repair rather than a new
+capability: <code class="docutils literal notranslate"><span class="pre">Unit</span></code> gained a <code class="docutils literal notranslate"><span class="pre">legality</span></code> callable, run by
+<code class="docutils literal notranslate"><span class="pre">Architecture._check</span></code> against the parameter set. <code class="docutils literal notranslate"><span class="pre">Unit.check</span></code> answered
+<em>which names a unit may use</em>; nothing answered <em>which values it works at</em>, and
+a tree instantiated past what its accumulator is exact for composed, built and
+returned plausible wrong numbers. Six lines, and it is where every derived
+relation in the tree is pinned.</p>
+</section>
+<section id="what-is-not-filled-and-why">
+<h2><a class="toc-backref" href="#id8" role="doc-backlink">What is not filled, and why</a><a class="headerlink" href="#what-is-not-filled-and-why" title="Link to this heading"><span>¶</span></a></h2>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 6.0%" />
+<col style="width: 30.0%" />
+<col style="width: 64.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Row</p></th>
+<th class="head"><p>Why not</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>3, 4, 5</p></td>
+<td><p>second instance, placement, collectives</p></td>
+<td><p>All three need the same thing first: <code class="docutils literal notranslate"><span class="pre">compose.py</span></code> emitting
+<code class="docutils literal notranslate"><span class="pre">&#64;df.unit</span></code> instances, and <code class="docutils literal notranslate"><span class="pre">&#64;df.unit</span></code> taking parameters at the
+instantiation site. Building placement or a collective kind on top of
+source-level name binding would be building them twice. Row 3 is
+therefore the highest-value structural change available to this
+library, and it is a front-end-adjacent change, not an IP one</p></td>
+</tr>
+<tr class="row-odd"><td><p>6</p></td>
+<td><p>declared latency, checked from both ends</p></td>
+<td><p>Belongs to <code class="docutils literal notranslate"><span class="pre">unit-actions</span></code>. A latency is a property of an <em>action</em>,
+not of a unit – MiniTPU’s own <code class="docutils literal notranslate"><span class="pre">vmatpush</span></code> occupies its controller 5
+cycles and produces its first result at 82 – and building it here
+would duplicate that branch. Flagged, with the two-sided probe
+described in <code class="docutils literal notranslate"><span class="pre">placeholders.UNIT_LATENCY</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>7</p></td>
+<td><p>declared arithmetic</p></td>
+<td><p>Retrofitting the eight shipped units changes every declaration in the
+library and buys no capability today, against a design whose measured
+behaviour must not move. <code class="docutils literal notranslate"><span class="pre">reduce_tree</span></code> demonstrates the shape; the
+retrofit waits for a second architecture that needs it</p></td>
+</tr>
+<tr class="row-odd"><td><p>9</p></td>
+<td><p>chain ownership</p></td>
+<td><p>The exemption is <em>honest</em>: a chain’s owner is per element and the
+element is a runtime index, so nothing static decides it today. A
+guess here would refuse the shipped design. It needs a declared chain
+rule to check against, which is a design question and not a missing
+check</p></td>
+</tr>
+<tr class="row-even"><td><p>8</p></td>
+<td><p>two-writer memories</p></td>
+<td><p>Half filled. The audit exists and runs; what is missing is
+<code class="docutils literal notranslate"><span class="pre">Unit.check</span></code> counting a body’s array write sites, which is the
+<strong>cheapest unfilled row on this page</strong> – the AST is already parsed for
+<code class="docutils literal notranslate"><span class="pre">free_names</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="what-running-the-gaps-looks-like">
+<h2><a class="toc-backref" href="#id9" role="doc-backlink">What running the gaps looks like</a><a class="headerlink" href="#what-running-the-gaps-looks-like" title="Link to this heading"><span>¶</span></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pytest<span class="w"> </span>tests/ip/<span class="w">                    </span><span class="c1"># 23 pass, 1 xfail -- the xfail IS row 3</span>
+python<span class="w"> </span>examples/tinytpu/reduce_csynth.py<span class="w"> </span><span class="m">64</span>:8
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">tests/ip/test_ip_gaps.py</span></code> is one test per unfilled row. A row that gets
+filled makes its test fail – the second-instance test is
+<code class="docutils literal notranslate"><span class="pre">xfail(strict=True)</span></code> precisely so that closing the gap forces the row to be
+closed too. <code class="docutils literal notranslate"><span class="pre">tests/ip/test_reduction_tree.py</span></code> builds and runs the tree at
+five configurations and every leaf mapping, against full-range <code class="docutils literal notranslate"><span class="pre">int8</span></code>
+operands, comparing both outputs with numpy.</p>
+<p>TinyTPU’s own gates are unaffected and were re-run: <code class="docutils literal notranslate"><span class="pre">bench_isa</span></code> <code class="docutils literal notranslate"><span class="pre">ALL</span>
+<span class="pre">EXACT</span></code>, <code class="docutils literal notranslate"><span class="pre">stress_isa</span></code> <code class="docutils literal notranslate"><span class="pre">STRESS</span> <span class="pre">OK:</span> <span class="pre">640/640</span></code>. Nothing on this page
+instantiates a unit into <code class="docutils literal notranslate"><span class="pre">tinytpu_isa</span></code>.</p>
+</section>
+<section id="still-open-from-their-side">
+<h2><a class="toc-backref" href="#id10" role="doc-backlink">Still open from their side</a><a class="headerlink" href="#still-open-from-their-side" title="Link to this heading"><span>¶</span></a></h2>
+<p>Carried because it is reduction-adjacent and was volunteered rather than
+hidden: MiniTPU has an <strong>unclosed defect</strong> where a context past 64 tokens
+fails <em>in simulation</em> with infinite relative error – a row’s exponentials
+summing to zero – while their board runs 448-key attention correctly. Whether
+it is the tree, the softmax scaling or the schedule is unknown. Relevant to
+anyone reusing that softmax structure.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+    
+        <div id="show_right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&lt;</span><span>Page contents</span></a></p>
+        </div>
+
+        <div id="right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
+            <div class="page_toc">
+                <ul>
+<li><a class="reference internal" href="#">The IP Library’s Gaps, and the Adder Tree</a><ul>
+<li><a class="reference internal" href="#where-the-two-projects-actually-stand">Where the two projects actually stand</a></li>
+<li><a class="reference internal" href="#cannot-express-cannot-refuse">Cannot express, cannot refuse</a></li>
+<li><a class="reference internal" href="#the-gap-table">The gap table</a></li>
+<li><a class="reference internal" href="#row-2-which-is-the-one-worth-reading-twice">Row 2, which is the one worth reading twice</a></li>
+<li><a class="reference internal" href="#the-adder-tree">The adder tree</a><ul>
+<li><a class="reference internal" href="#what-is-declared">What is declared</a></li>
+<li><a class="reference internal" href="#three-things-minitpu-s-owner-told-us-to-declare-and-why">Three things MiniTPU’s owner told us to declare, and why</a></li>
+<li><a class="reference internal" href="#the-tree-we-did-not-build">The tree we did not build</a></li>
+<li><a class="reference internal" href="#synthesis">Synthesis</a></li>
+<li><a class="reference internal" href="#the-tree-as-actions-and-the-two-things-the-action-layer-could-not-say">The tree as Actions, and the two things the Action layer could not say</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#what-compose-py-did-not-need">What <code class="docutils literal notranslate"><span class="pre">compose.py</span></code> did not need</a></li>
+<li><a class="reference internal" href="#what-is-not-filled-and-why">What is not filled, and why</a></li>
+<li><a class="reference internal" href="#what-running-the-gaps-looks-like">What running the gaps looks like</a></li>
+<li><a class="reference internal" href="#still-open-from-their-side">Still open from their side</a></li>
+</ul>
+</li>
+</ul>
+
+            </div>
+        </div>
+    
+
+      <div class="clearer"></div>
+    </div>
+    <div class="button_nav_wrapper">
+        <div class="button_nav">
+            <div class="left">
+                
+                <a href="tinytpu_library.html">
+                    <span class="icon">&lt;</span><span>The Unit Library: Composing a Region from Units</span></a>
+                
+            </div>
+
+            <div class="right">
+                
+                    <a href="gemmini_comparison.html"><span>TinyTPU-isa vs Gemmini: A Matched Comparison</span><span class="icon">&gt;</span></a>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Allo Authors.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+
+<p id="theme_credit">Styled using the <a href="https://github.com/piccolo-orm/piccolo_theme">Piccolo Theme</a></p>
+  </body>
+</html>

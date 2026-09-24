@@ -165,6 +165,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
@@ -174,8 +175,12 @@
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_results.html">TinyTPU-isa vs Gemmini: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
@@ -186,9 +191,13 @@
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Catapult SystemC Flow and the Wire</a></li>
 <li class="toctree-l1"><a class="reference internal" href="chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="chia_results.html">CHIA Agentic Co-Design: Results</a></li>
+<li class="toctree-l1"><a class="reference internal" href="chia_codesign.html">The Original Co-Design Effort (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
-<li class="toctree-l1"><a class="reference internal" href="act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="act.html">ACT and the TinyTPU-isa Mapper</a></li>
 <li class="toctree-l1"><a class="reference internal" href="act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="act_results.html">ACT: Results, Findings and Corrections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
 <ul>
@@ -253,7 +262,7 @@ needs a non-handshaked fixed-latency edge, and Allo’s <code class="docutils li
 <p>The fork is to be integrated rather than only read. <code class="docutils literal notranslate"><span class="pre">SystemC-emitter</span></code> is its most complete
 branch. <code class="docutils literal notranslate"><span class="pre">systemc-ip-integration</span></code> lacks the RAM-pin memory interface (<code class="docutils literal notranslate"><span class="pre">b92077f5</span></code>) and the
 free-running-loop fix (<code class="docutils literal notranslate"><span class="pre">72c70dcb</span></code>), so an integration must start from <code class="docutils literal notranslate"><span class="pre">SystemC-emitter</span></code>. The
-<code class="docutils literal notranslate"><span class="pre">pe_wire</span></code> / <code class="docutils literal notranslate"><span class="pre">pe_stream</span></code> / <code class="docutils literal notranslate"><span class="pre">pe_channel</span></code> netlists used by <code class="docutils literal notranslate"><span class="pre">examples/systemc_rtlsim/</span></code> survive
+<code class="docutils literal notranslate"><span class="pre">pe_wire</span></code> / <code class="docutils literal notranslate"><span class="pre">pe_stream</span></code> / <code class="docutils literal notranslate"><span class="pre">pe_channel</span></code> netlists used by <code class="docutils literal notranslate"><span class="pre">tests/systemc/rtlsim/</span></code> survive
 only in its history, at <code class="docutils literal notranslate"><span class="pre">0eff4888:agents/noc/rtl/&lt;design&gt;/rtl.v</span></code> (<code class="docutils literal notranslate"><span class="pre">REPRO.sh</span></code> names the same
 files as <code class="docutils literal notranslate"><span class="pre">779e4350^:agents/noc/rtl/{pe_wire,pe_stream,pe_channel}/rtl.v</span></code>). Branch layout for all
 remotes is in <code class="docutils literal notranslate"><span class="pre">dev/fork_maintenance.rst</span></code>.</p>
@@ -351,7 +360,7 @@ precisely why the SystemC path exists, and why the spike is aimed there</p></td>
 </section>
 <section id="the-wire-investigation-simulating-catapult-s-netlists">
 <h2>The Wire Investigation: Simulating Catapult’s Netlists<a class="headerlink" href="#the-wire-investigation-simulating-catapult-s-netlists" title="Link to this heading"><span>¶</span></a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">examples/systemc_rtlsim/</span></code> is the apparatus behind <a class="reference internal" href="../developer/limitations.html#limitation-22"><span class="std std-ref">22. The SystemC fork’s Wire is semantically incomplete – and wrong in RTL, not just in simulation</span></a>. It took
+<p><code class="docutils literal notranslate"><span class="pre">tests/systemc/rtlsim/</span></code> is the apparatus behind <a class="reference internal" href="../developer/limitations.html#limitation-22"><span class="std std-ref">22. The SystemC fork’s Wire is semantically incomplete – and wrong in RTL, not just in simulation</span></a>. It took
 reverse-engineering the netlists’ internal signal names (e.g. <code class="docutils literal notranslate"><span class="pre">tb.u_mul.mul_0_run_inst.v8_and_cse</span></code>)
 to build, so it is kept rather than rebuilt.</p>
 <div class="admonition note">
@@ -445,18 +454,19 @@ that only ever passes proves nothing; these are why the passes above count.</p>
 <p>Needs Vivado’s xsim on <code class="docutils literal notranslate"><span class="pre">PATH</span></code> (<code class="docutils literal notranslate"><span class="pre">/opt/xilinx/Vivado/2023.2/settings64.sh</span></code>) and the netlists,
 which are <strong>not</strong> in this repository – they are Catapult output from the
 <code class="docutils literal notranslate"><span class="pre">choonsik1/SystemC-emitter</span></code> fork, and <code class="docutils literal notranslate"><span class="pre">REPRO.sh</span></code> documents where they came from. The scripts
-look for them under <code class="docutils literal notranslate"><span class="pre">../noc/rtl/&lt;design&gt;/rtl.v</span></code> relative to <code class="docutils literal notranslate"><span class="pre">examples/systemc_rtlsim/</span></code> (the
+look for them under <code class="docutils literal notranslate"><span class="pre">../noc/rtl/&lt;design&gt;/rtl.v</span></code> relative to <code class="docutils literal notranslate"><span class="pre">tests/systemc/rtlsim/</span></code> (the
 Xcelium runner takes <code class="docutils literal notranslate"><span class="pre">RTLDIR</span></code> to override). <code class="docutils literal notranslate"><span class="pre">mgc_shim.v</span></code> supplies the Mentor primitives the
 netlists instantiate. No SystemC is needed; each case takes about 6 s.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>examples/systemc_rtlsim
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>tests/systemc/rtlsim
 ./run.sh<span class="w"> </span>&lt;design&gt;<span class="w">     </span><span class="c1"># one design, tb_top.v testbench</span>
 ./run_mulacc.sh<span class="w"> </span>&lt;pe_wire<span class="p">|</span>pe_stream<span class="p">|</span>pe_channel&gt;<span class="w"> </span><span class="o">[</span>-d<span class="w"> </span>MACRO<span class="o">[=</span>VAL<span class="o">]</span><span class="w"> </span>...<span class="o">]</span>
 ./REPRO.sh<span class="w">            </span><span class="c1"># the whole matrix: boundaries, pacing sweep, lockstep control, faults</span>
 </pre></div>
 </div>
-<p>Both runners print one <code class="docutils literal notranslate"><span class="pre">RESULT:</span> <span class="pre">PASS|FAIL</span> <span class="pre">&lt;tag&gt;</span></code> line per run; <code class="docutils literal notranslate"><span class="pre">results.txt</span></code> is that output,
-sorted. The 76 xsim work directories are not kept – they are ~29 MB and regenerable, and the
-<code class="docutils literal notranslate"><span class="pre">RESULT:</span></code> lines are the evidence.</p>
+<p>Both runners print one <code class="docutils literal notranslate"><span class="pre">RESULT:</span> <span class="pre">PASS|FAIL</span> <span class="pre">&lt;tag&gt;</span></code> line per run;
+<code class="docutils literal notranslate"><span class="pre">dev/records/systemc/rtlsim/results.txt</span></code> is that output, sorted. The 76 xsim work
+directories are not kept – they are ~29 MB and regenerable, and the <code class="docutils literal notranslate"><span class="pre">RESULT:</span></code> lines
+are the evidence.</p>
 </section>
 <section id="a-second-simulator-xcelium">
 <h3>A second simulator: Xcelium<a class="headerlink" href="#a-second-simulator-xcelium" title="Link to this heading"><span>¶</span></a></h3>
@@ -466,14 +476,15 @@ sorted. The 76 xsim work directories are not kept – they are ~29 MB and regene
 <code class="docutils literal notranslate"><span class="pre">/opt/cadence/XCELIUM2403/tools.lnx86/bin/xrun</span></code> (override with <code class="docutils literal notranslate"><span class="pre">XRUN</span></code>), and resolves Catapult
 library cells from <code class="docutils literal notranslate"><span class="pre">$MGC_HOME/pkgs/siflibs</span></code>. Xcelium is installed on zhang-21, <strong>not</strong> on
 <code class="docutils literal notranslate"><span class="pre">ace-01</span></code> (see <code class="docutils literal notranslate"><span class="pre">dev/toolchains.rst</span></code>).</p>
-<p>On zhang-21 with Xcelium 24.03 (<code class="docutils literal notranslate"><span class="pre">710ab138</span></code>, 2026-09-18), <strong>all 75 cases in</strong> <code class="docutils literal notranslate"><span class="pre">results.txt</span></code>
-<strong>reproduce</strong>: <code class="docutils literal notranslate"><span class="pre">pe_stream</span></code> and <code class="docutils literal notranslate"><span class="pre">pe_channel</span></code> pass all 18 pacings each, <code class="docutils literal notranslate"><span class="pre">pe_wire</span></code> fails 8/8 at
+<p>On zhang-21 with Xcelium 24.03 (<code class="docutils literal notranslate"><span class="pre">710ab138</span></code>, 2026-09-18), <strong>all 75 cases in</strong>
+<code class="docutils literal notranslate"><span class="pre">dev/records/systemc/rtlsim/results.txt</span></code> <strong>reproduce</strong>: <code class="docutils literal notranslate"><span class="pre">pe_stream</span></code> and <code class="docutils literal notranslate"><span class="pre">pe_channel</span></code>
+pass all 18 pacings each, <code class="docutils literal notranslate"><span class="pre">pe_wire</span></code> fails 8/8 at
 all 18 in 12 cycles (<code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">0</span> <span class="pre">0</span> <span class="pre">2</span> <span class="pre">2</span> <span class="pre">10</span> <span class="pre">10</span> <span class="pre">28</span></code>), the lockstep control over <code class="docutils literal notranslate"><span class="pre">ACC_RST_DELAY</span></code> 0..6
 gives <code class="docutils literal notranslate"><span class="pre">F</span> <span class="pre">F</span> <span class="pre">F</span> <span class="pre">P</span> <span class="pre">P</span> <span class="pre">F</span> <span class="pre">F</span></code>, and all four fault injections go red. The full <code class="docutils literal notranslate"><span class="pre">REPRO.sh</span></code> takes 23 s.</p>
 </section>
 <section id="reference-xsim-runs">
 <h3>Reference xsim runs<a class="headerlink" href="#reference-xsim-runs" title="Link to this heading"><span>¶</span></a></h3>
-<p><code class="docutils literal notranslate"><span class="pre">examples/systemc_rtlsim/ref_xsim/</span></code> keeps two runs of the <strong>same</strong> <code class="docutils literal notranslate"><span class="pre">pe_wire</span></code> <strong>netlist</strong> so
+<p><code class="docutils literal notranslate"><span class="pre">dev/records/systemc/rtlsim/ref_xsim/</span></code> keeps two runs of the <strong>same</strong> <code class="docutils literal notranslate"><span class="pre">pe_wire</span></code> <strong>netlist</strong> so
 that a run on a different simulator can be compared against a known-good and a known-bad result
 rather than against a claim. Trimmed to the logs (<code class="docutils literal notranslate"><span class="pre">xsim.dir</span></code>, ~350 KB per run, is dropped) with
 absolute scratch paths rewritten to <code class="docutils literal notranslate"><span class="pre">&lt;RUNDIR&gt;</span></code>. Produced by <code class="docutils literal notranslate"><span class="pre">run_mulacc.sh</span></code> under xsim v2023.2
@@ -526,7 +537,7 @@ hang or a truncated run; the failing one is a complete run with wrong data.</p>
 rewrote its outermost loop to <code class="docutils literal notranslate"><span class="pre">while</span> <span class="pre">(1)</span></code> <strong>under</strong> <code class="docutils literal notranslate"><span class="pre">__SYNTHESIS__</span></code> – precisely a bug that
 leaves a design correct in csim and wrong in RTL. The netlists above are from <code class="docutils literal notranslate"><span class="pre">0eff4888</span></code>
 (2026-08-01), 19 days older. But <code class="docutils literal notranslate"><span class="pre">72c70dcb</span></code>’s guard requires <em>a load from a memory port inside
-the loop body</em>, and <code class="docutils literal notranslate"><span class="pre">acc</span></code> is declared <code class="docutils literal notranslate"><span class="pre">args=[]</span></code> (<code class="docutils literal notranslate"><span class="pre">pe_split.py</span></code>, kept in the directory), so
+the loop body</em>, and <code class="docutils literal notranslate"><span class="pre">acc</span></code> is declared <code class="docutils literal notranslate"><span class="pre">args=[]</span></code> (<code class="docutils literal notranslate"><span class="pre">examples/systemc/pe_split.py</span></code>), so
 the guard structurally cannot fire for it, while its unused <code class="docutils literal notranslate"><span class="pre">i</span></code> does trigger the rewrite. <code class="docutils literal notranslate"><span class="pre">mul</span></code>
 is rewritten too, but it reads Streams, whose handshake makes a free-running loop harmless. The
 proposed fix was to extend the guard so that a <code class="docutils literal notranslate"><span class="pre">get()</span></code> from a <code class="docutils literal notranslate"><span class="pre">Wire</span></code> or <code class="docutils literal notranslate"><span class="pre">Channel</span></code> in the loop
@@ -571,7 +582,7 @@ sound needs the emitter to give cycle-locked kernels a shared advance – one en
 stage’s counter, which is what a VLIW delay line is – and the SystemC path does not currently
 supply a usable non-handshaked edge.</p>
 <p>Replaying from the committed netlists (no Allo build needed):</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>examples/systemc_rtlsim
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>tests/systemc/rtlsim
 <span class="nv">RTLDIR</span><span class="o">=</span><span class="nv">$PWD</span>/guard_experiment/rtl_guard<span class="w"> </span>./run_mulacc_xrun.sh<span class="w"> </span>pe_wire
 <span class="nv">RTLDIR</span><span class="o">=</span><span class="nv">$PWD</span>/guard_experiment/rtl_base<span class="w">  </span>./run_mulacc_xrun.sh<span class="w"> </span>pe_wire
 <span class="nv">RTLDIR</span><span class="o">=</span><span class="nv">$PWD</span>/guard_experiment/rtl_guard<span class="w"> </span>./run_mulacc_xrun.sh<span class="w"> </span>pe_stream<span class="w"> </span>-d<span class="w"> </span>CONNECTIONS_FIFO
@@ -591,7 +602,7 @@ import that worktree’s <code class="docutils literal notranslate"><span class=
 netlist lands in <code class="docutils literal notranslate"><span class="pre">Catapult/&lt;design&gt;.v1/rtl.v</span></code>.</p></li>
 </ol>
 <p>The exploration branch that asked this question, <code class="docutils literal notranslate"><span class="pre">sc-wire-guard</span></code>, is deleted; its answer is
-recorded here and in <code class="docutils literal notranslate"><span class="pre">examples/systemc_rtlsim/guard_experiment/</span></code>.</p>
+recorded here and in <code class="docutils literal notranslate"><span class="pre">tests/systemc/rtlsim/guard_experiment/</span></code>.</p>
 </section>
 </section>
 <section id="earlier-measurements-and-corrections">

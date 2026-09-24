@@ -362,15 +362,17 @@ identified mechanism. If a Connections design will not schedule, open
 ``run_hls_global_setup.tcl`` first.
 
 Provenance: measured on the ``choonsik1/SystemC-emitter`` fork, on the **SystemC/Connections**
-flow. ``allo/backend/catapult.py`` there emits both lines under ``platform == "systemc"``, and
-``docs/noc/FINDINGS_wire_channel.md`` §7 on that branch carries the numbers. The directives are
+flow; ``dev/systemc/noc/FINDINGS_wire_channel.md`` §7 carries the numbers. The directives are
 solution-level and apply to any Catapult run; the 2/32 -> 22/32 figure is specific to that
 Connections corpus and has not been re-measured for ``ac_channel`` designs.
 
 .. note::
 
-   **This repository's** ``allo/backend/catapult.py`` **emits neither directive** (verified
-   2026-09-18), so a run driven from the in-tree Allo backend gets the default ``fixed``.
+   That emitter is now **in this repository**: ``allo/backend/catapult.py`` emits both lines,
+   but only under ``platform == "systemc"``. A ``target="catapult"`` run still gets the default
+   ``fixed`` -- the directives are attached to the SystemC/Connections flow, not to Catapult in
+   general. (Before the ``SystemC-emitter`` merge this repository emitted neither, which is what
+   the note here said when it was verified 2026-09-18.)
 
 Block Synthesis for Hierarchical Designs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -23,7 +23,7 @@ The Unit Library: Composing a Region from Units
 ###############################################
 
 TinyTPU-isa is not written as a design any more. It is written as eight units
-in ``examples/accelerator/tinytpu_vitis/ip/units/``, one per module, and one
+in ``examples/tinytpu/ip/units/``, one per module, and one
 *architecture* -- ``ip/tinytpu.py`` -- that names the channels wiring them, the
 parameters sizing them and the order they are declared in.
 ``microarch_isa.py`` is what is left of the design file: the parameter set read
@@ -53,7 +53,7 @@ it was pasted into happens to have declared, under whatever names. This is the
 mechanism behind "the design is a monolith": it is not that the units were
 tangled, it is that a unit had nothing to declare.
 
-``ip/compose.py`` works with that rather than against it: it composes the
+``allo/compose.py`` works with that rather than against it: it composes the
 region's **source**. A unit is an ordinary module-level function; an
 ``Architecture`` emits a ``@df.region()`` that nests all of them, declares the
 channels above them, and binds every free name in their bodies from its own
@@ -252,7 +252,7 @@ is where the parametrization lands:
    * - ``ip/isa.py``
      - The instruction encoding: opcodes, field layout, ``enc``, ``enc_agu``.
        ``ISA_NAMESPACE`` is what a unit's ``isa=`` declaration draws from.
-   * - ``ip/compose.py``
+   * - ``allo/compose.py``
      - ``Channel``, ``Memory``, ``Unit``, ``Architecture``: the composition
        itself, with no knowledge of TinyTPU.
    * - ``ip/units/*.py``
@@ -267,13 +267,24 @@ is where the parametrization lands:
      - The TinyTPU architecture: channels, memories, unit order, and
        ``TinyTPU``, which ties a parameter set to its region, its directives,
        its assembler and its reference programs.
+   * - ``ip/reduce.py``
+     - The **second** architecture, ``DotTree``: an adder-tree reduction
+       instead of the systolic chain, out of the same ``Unit``, ``Channel``,
+       ``Memory`` and ``Architecture``. :ref:`ip-gaps-compose` is what it
+       tests -- ``compose.py`` needed no change to admit a different reduction
+       topology, because the topology is the pair (which units, which
+       channels).
+   * - ``ip/placeholders.py``
+     - **Nothing here is implemented.** One declaration per unfilled row of
+       :ref:`ip-gaps-table`, each raising ``NotBuilt`` with what would make it
+       real.
 
 Instantiating it
 ================
 
 .. code-block:: python
 
-   from examples.accelerator.tinytpu_vitis.ip import TinyTPU, TpuParams
+   from examples.tinytpu.ip import TinyTPU, TpuParams
 
    wide = TinyTPU(TpuParams(T=8, MAXDIM=32, IMEM_SIZE=56), name="tinytpu_t8")
    module = df.build(wide.region, target="simulator")
@@ -464,8 +475,9 @@ text that has moved. What has to change:
 ``chia_agent/param_check.py`` and ``gate_runner.py`` need no change: they work
 through ``microarch_isa``'s module attributes, which are unchanged.
 
-``impact/make_variants.py`` is textually coupled the same way -- it builds the
-historical ablation variants by patching ``microarch_isa.py`` -- and is equally
-stale. Its measurements are recorded on :doc:`tinytpu_history`; regenerating
-them would want the variants expressed as alternative *architectures* over the
-same units, which is the first thing the library makes possible.
+``impact/make_variants.py`` was textually coupled the same way -- it built the
+historical ablation variants by patching ``microarch_isa.py`` -- and went stale
+the same way, so it has been deleted. Its measurements are recorded on
+:doc:`tinytpu_history`; regenerating them would want the variants expressed as
+alternative *architectures* over the same units, which is the first thing the
+library makes possible.

@@ -231,7 +231,7 @@ Toy first, real design second.
 
    python -m pytest tests/dataflow/test_stream_ports.py -q           # 18 tests, ~3 s
    python -m pytest tests/dataflow/test_stream_ports_tinytpu.py -q   # 4 tests, ~10 s
-   python examples/accelerator/tinytpu_vitis/lift_units.py           # regenerate units_isa.py
+   python examples/tinytpu/lift_units.py                             # regenerate units_isa.py
 
 ``tests/dataflow/test_stream_ports.py`` holds one unit instantiated twice
 against different streams, the *same* units composed into a second topology
@@ -240,7 +240,7 @@ an array-port chain replicated with ``mapping=``, a mixed region where a unit
 instance and a nested ``@df.kernel`` share one stream, and one refused and one
 accepted example of every rule above.
 
-``examples/accelerator/tinytpu_vitis/units_isa.py`` is the real test bed, and
+``examples/tinytpu/units_isa.py`` is the real test bed, and
 it is **generated** by ``lift_units.py`` from ``microarch_isa.py`` rather than
 hand-copied, so "the bodies are unchanged" is a property of the process and not
 a claim:

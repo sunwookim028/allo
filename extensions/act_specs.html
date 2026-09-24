@@ -24,8 +24,8 @@
     <script src="../_static/js/petite-vue.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Developer Setup" href="../developer/index.html" />
-    <link rel="prev" title="ACT, and Why We Cite It" href="act.html" /> 
+    <link rel="next" title="ACT: Results, Findings and Corrections" href="act_results.html" />
+    <link rel="prev" title="ACT and the TinyTPU-isa Mapper" href="act.html" /> 
   </head><body data-dark_mode_code_blocks="true">
 
 <div id="top_nav">
@@ -165,6 +165,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
@@ -174,8 +175,12 @@
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_results.html">TinyTPU-isa vs Gemmini: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
@@ -186,9 +191,13 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
 <li class="toctree-l1"><a class="reference internal" href="chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="chia_results.html">CHIA Agentic Co-Design: Results</a></li>
+<li class="toctree-l1"><a class="reference internal" href="chia_codesign.html">The Original Co-Design Effort (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
-<li class="toctree-l1"><a class="reference internal" href="act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="act.html">ACT and the TinyTPU-isa Mapper</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="act_results.html">ACT: Results, Findings and Corrections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
 <ul>
@@ -218,19 +227,55 @@
             
   <section id="act-workload-specs-and-the-judge">
 <h1>ACT Workload Specs and the Judge<a class="headerlink" href="#act-workload-specs-and-the-judge" title="Link to this heading"><span>¶</span></a></h1>
-<p>The two things a compiler needs that <a class="reference internal" href="act.html"><span class="doc">ACT, and Why We Cite It</span></a> does not supply: a corpus of
-workload-level specs to compile, and a way to decide whether what came out is
-right, legal and fast. Both live in
-<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/act/</span></code> and both are about the
-<a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a> accelerator; neither contains any part of ACT.</p>
+<p>The corpus a compiler for <a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a> is given, and the judge
+that decides whether what came out is right, legal and fast. A spec is a JSON
+file in <code class="docutils literal notranslate"><span class="pre">examples/tinytpu/act/corpus/</span></code> stating the
+computation and the calling convention and nothing about how to perform it; a
+submission is a program, either <code class="docutils literal notranslate"><span class="pre">module:function</span></code> or a <code class="docutils literal notranslate"><span class="pre">.json</span></code> file of
+instruction words; the judge returns one of three verdicts – <code class="docutils literal notranslate"><span class="pre">legal</span></code>,
+<code class="docutils literal notranslate"><span class="pre">correct</span></code>, <code class="docutils literal notranslate"><span class="pre">fast</span></code> – and says which tier it reached. <code class="docutils literal notranslate"><span class="pre">legal</span></code> and the
+corpus tools are pure python over the corpus; <code class="docutils literal notranslate"><span class="pre">correct</span></code> and <code class="docutils literal notranslate"><span class="pre">fast</span> <span class="pre">--cosim</span></code>
+need a build. The mapper that produces submissions is on <a class="reference internal" href="act.html"><span class="doc">ACT and the TinyTPU-isa Mapper</span></a>, and the
+measurements behind the gate are on <a class="reference internal" href="act_results.html"><span class="doc">ACT: Results, Findings and Corrections</span></a>.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>This page is the <strong>input and the judge</strong> side of the interface. ACT’s own
 core, mapper and scheduler are Kai Shao’s work and are audited from the
-outside on <a class="reference internal" href="act.html"><span class="doc">ACT, and Why We Cite It</span></a>; nothing here modifies or republishes them.</p>
+outside on <a class="reference internal" href="act.html"><span class="doc">ACT and the TinyTPU-isa Mapper</span></a>; nothing here modifies or republishes them.</p>
 </div>
+<section id="quick-start">
+<h2>Quick start<a class="headerlink" href="#quick-start" title="Link to this heading"><span>¶</span></a></h2>
+<p>The fork’s usual environment (<code class="docutils literal notranslate"><span class="pre">CLAUDE.md</span></code>): the <code class="docutils literal notranslate"><span class="pre">allo</span></code> env,
+<code class="docutils literal notranslate"><span class="pre">LLVM_BUILD_DIR</span></code> exported by hand, <code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS=8</span></code>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>examples/tinytpu
+python<span class="w"> </span>act/judge.py<span class="w"> </span>legal<span class="w">      </span><span class="c1"># the four legality layers</span>
+python<span class="w"> </span>act/judge.py<span class="w"> </span>correct<span class="w">    </span><span class="c1"># bit-exact against the spec and against isa_ref</span>
+python<span class="w"> </span>act/judge.py<span class="w"> </span>fast<span class="w">       </span><span class="c1"># the cheap cycle gate; --cosim measures</span>
+</pre></div>
+</div>
+<p>The three verdicts run cheap to expensive, and each takes <code class="docutils literal notranslate"><span class="pre">--spec</span> <span class="pre">&lt;name&gt;</span></code> and
+<code class="docutils literal notranslate"><span class="pre">--program</span> <span class="pre">&lt;module:function&gt;</span></code> to judge one submission. Only <code class="docutils literal notranslate"><span class="pre">correct</span></code> and
+<code class="docutils literal notranslate"><span class="pre">fast</span> <span class="pre">--cosim</span></code> need a build.</p>
+<p>The rest of the corpus tooling:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/spec.py</span></code> – validate the whole corpus and print it.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/judge.py</span> <span class="pre">specs</span></code> – the corpus with each <code class="docutils literal notranslate"><span class="pre">stresses</span></code> line.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/baseline.py</span></code> – the reference submission’s static and dynamic
+instruction counts per spec.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/judge.py</span> <span class="pre">rules</span></code> – the rule table and its self-test. Run it
+after any change to <code class="docutils literal notranslate"><span class="pre">check_program</span></code>’s messages; it is what keeps a
+rejection from degrading into a bare exception.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/cycles.py</span></code> – the per-unit work table, the estimate and the
+KPN round count for every spec, side by side.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/variants.py</span> <span class="pre">gemm_16x16x16</span></code> – several legal mappings of one
+spec with their estimates, which is the fixture the rank test uses.</p></li>
+</ul>
+<p>Adding a spec is adding a JSON file.</p>
+</section>
+<section id="how-it-works">
+<h2>How it works<a class="headerlink" href="#how-it-works" title="Link to this heading"><span>¶</span></a></h2>
 <section id="what-a-spec-says-and-what-it-deliberately-does-not">
-<h2>What a spec says, and what it deliberately does not<a class="headerlink" href="#what-a-spec-says-and-what-it-deliberately-does-not" title="Link to this heading"><span>¶</span></a></h2>
+<h3>What a spec says, and what it deliberately does not<a class="headerlink" href="#what-a-spec-says-and-what-it-deliberately-does-not" title="Link to this heading"><span>¶</span></a></h3>
 <p>A spec is a JSON file in <code class="docutils literal notranslate"><span class="pre">act/corpus/</span></code>. It states the computation and the
 calling convention, and nothing about how to perform it: no tiling, no loop
 order, no residency, no schedule, no instruction.</p>
@@ -262,7 +307,7 @@ which is the same discipline <code class="docutils literal notranslate"><span cl
 the generated GEMM: state it twice, check that the two agree, and the
 statement stops being able to drift.</p>
 <section id="three-fields-exist-because-this-isa-forces-the-question-into-the-open">
-<h3>Three fields exist because this ISA forces the question into the open<a class="headerlink" href="#three-fields-exist-because-this-isa-forces-the-question-into-the-open" title="Link to this heading"><span>¶</span></a></h3>
+<h4>Three fields exist because this ISA forces the question into the open<a class="headerlink" href="#three-fields-exist-because-this-isa-forces-the-question-into-the-open" title="Link to this heading"><span>¶</span></a></h4>
 <p><strong>``operand_pad``</strong> – what the bytes <em>around</em> a declared operand hold.
 <code class="docutils literal notranslate"><span class="pre">arbitrary</span></code> means the judge fills them with nonzero garbage; <code class="docutils literal notranslate"><span class="pre">zero</span></code> means
 the host promises zeros. It matters because <code class="docutils literal notranslate"><span class="pre">mm</span></code> consumes a whole <code class="docutils literal notranslate"><span class="pre">T</span></code>-lane
@@ -292,7 +337,7 @@ satisfy the spec, and the judge reports such a spec’s failure as <code class="
 rather than <code class="docutils literal notranslate"><span class="pre">WRONG</span></code>, so the suite stays green while the gap stays visible.</p>
 </section>
 <section id="two-layers-one-convention">
-<h3>Two layers, one convention<a class="headerlink" href="#two-layers-one-convention" title="Link to this heading"><span>¶</span></a></h3>
+<h4>Two layers, one convention<a class="headerlink" href="#two-layers-one-convention" title="Link to this heading"><span>¶</span></a></h4>
 <p>There are now two machine-readable specs in this tree and they are at
 different layers, deliberately sharing a foundation rather than inventing two:</p>
 <table class="docutils align-default">
@@ -332,7 +377,7 @@ A spec here never restates an ISA fact: opcode numbers, field widths and
 <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span></code> reach the judge by import, never by transcription.</p>
 </section>
 <section id="layout">
-<h3>Layout<a class="headerlink" href="#layout" title="Link to this heading"><span>¶</span></a></h3>
+<h4>Layout<a class="headerlink" href="#layout" title="Link to this heading"><span>¶</span></a></h4>
 <p>Every tensor lies row-major in a <code class="docutils literal notranslate"><span class="pre">MAXDIM</span> <span class="pre">x</span> <span class="pre">MAXDIM</span></code> int8 DRAM image
 (<code class="docutils literal notranslate"><span class="pre">A</span></code>, <code class="docutils literal notranslate"><span class="pre">B</span></code> or <code class="docutils literal notranslate"><span class="pre">C</span></code>): all but the last subscript index rows, the last
 indexes columns, and a vector is a column. Origins must start on a column-block
@@ -340,8 +385,166 @@ boundary, since every DRAM access the ISA has is a <code class="docutils literal
 That rule is what lets <code class="docutils literal notranslate"><span class="pre">bmk,bkn-&gt;bmn</span></code> be placed without a new field.</p>
 </section>
 </section>
+<section id="the-judge">
+<h3>The judge<a class="headerlink" href="#the-judge" title="Link to this heading"><span>¶</span></a></h3>
+<p>A submission is a program: either <code class="docutils literal notranslate"><span class="pre">module:function</span></code> taking a spec and
+returning the <code class="docutils literal notranslate"><span class="pre">(instruction</span> <span class="pre">word,</span> <span class="pre">AGU</span> <span class="pre">word)</span></code> list <code class="docutils literal notranslate"><span class="pre">assemble</span></code> takes, or a
+<code class="docutils literal notranslate"><span class="pre">.json</span></code> file of those word pairs, which is what an agent that emits text
+rather than Python should produce (<code class="docutils literal notranslate"><span class="pre">act/submission.py</span></code>). The default
+submission is <code class="docutils literal notranslate"><span class="pre">act/baseline.py</span></code>, one hand-chosen mapping per spec, which
+maps all seventeen.</p>
+<section id="is-it-legal">
+<h4>Is it legal?<a class="headerlink" href="#is-it-legal" title="Link to this heading"><span>¶</span></a></h4>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>examples/tinytpu/act/judge.py<span class="w"> </span>legal
+python<span class="w"> </span>examples/tinytpu/act/judge.py<span class="w"> </span>legal<span class="w"> </span>--spec<span class="w"> </span>gemm_narrow_2x8x4<span class="w"> </span>--program<span class="w"> </span>mymod:make
+</pre></div>
+</div>
+<p>Four layers, reported in the order a program fails them:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 14.0%" />
+<col style="width: 86.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>layer</p></th>
+<th class="head"><p>what it is</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">isa</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">microarch_isa.check_program</span></code>: write-before-read on <code class="docutils literal notranslate"><span class="pre">spad</span></code> / <code class="docutils literal notranslate"><span class="pre">vr</span></code>
+/ <code class="docutils literal notranslate"><span class="pre">ar</span></code>, the <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span> <span class="pre">=</span> <span class="pre">4</span></code> accumulator distance contract,
+bounds, <code class="docutils literal notranslate"><span class="pre">nr</span> <span class="pre">&gt;=</span> <span class="pre">1</span></code>, resolved field range, loop structure and AGU
+levels</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">encoding</span></code></p></td>
+<td><p>the assertions <code class="docutils literal notranslate"><span class="pre">assemble</span></code> makes: imem capacity, the 15-bit header
+counts, the array counts, the DRAM burst span</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">protocol</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">kpn_model.run</span></code>: the units’ promised work counts against what the
+sequencer dispatches. A valid program cannot reach this layer, which is
+the point – it is a regression detector for the assembler and the
+microarchitecture, not a program-error check</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">spec</span></code></p></td>
+<td><p>every <code class="docutils literal notranslate"><span class="pre">mvout</span></code>’s footprint in the dynamic stream against the spec’s
+write window, and the spec’s output region against that footprint.
+Static, so “you padded M into C” is caught before anything runs</p></td>
+</tr>
+</tbody>
+</table>
+<section id="the-rejection-message-is-part-of-the-deliverable">
+<h5>The rejection message is part of the deliverable<a class="headerlink" href="#the-rejection-message-is-part-of-the-deliverable" title="Link to this heading"><span>¶</span></a></h5>
+<p>A generating agent acts on the message and on nothing else, so every
+rejection carries a rule name, what happened, the rule that was broken, what
+to change instead, and a disassembly of the offending instruction with its two
+neighbours:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>REJECTED [isa / mem.write_before_read]
+  what happened: instruction 7 (mm, loop ivs [1]): reads spad row(s) [4, 5, 6, 7]
+    as weights before any instruction wrote them. spad is not cleared by the
+    hardware; see the write-before-read contract.
+  the rule:      spad, vr and ar are not cleared between programs, so a row that
+    this program never wrote holds whatever the last one left
+  what to change: load the rows with `dma_ld` (or `vld`) before the instruction
+    that consumes them. If these rows are a pad you wanted to be zero, note that
+    no opcode zeroes a row: `dma_ld` is the only writer of spad and vr and it can
+    only copy DRAM the host filled, so a zero pad has to be part of the spec's
+    calling convention.
+  in context:
+      5  endloop  nr=  0 f=[0, 0, 0, 0]
+      6  loop     nr=  2 f=[0, 0, 0, 0]
+      7  mm       nr=  4 f=[0, 0, 0, 0]  f0+=iv0*4 f1+=iv0*4 f3+=iv0*4   &lt;-- here
+      8  mvout    nr=  4 f=[0, 0, 0, 0]  f0+=iv0*4 f1+=iv0*4
+      9  endloop  nr=  0 f=[0, 0, 0, 0]
+</pre></div>
+</div>
+<p>That message is the one this fork’s own reference submission earned while it
+was being written, and it names the fix.</p>
+<p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/judge.py</span> <span class="pre">rules</span></code> prints the 23-rule table and runs its self-test.
+The ISA fixtures are <code class="docutils literal notranslate"><span class="pre">stress_isa._bad_programs</span></code> – one crafted violation per
+contract, reused rather than rewritten – plus ten built in
+<code class="docutils literal notranslate"><span class="pre">act/rules_test.py</span></code> for rules no shipped program breaks. <strong>Measured in this
+session: 29 crafted violations reach 21 of the 23 rules, every one of them
+with a remedy, and none falls through to the remedy-less fallback.</strong> The two
+unreached rules are <code class="docutils literal notranslate"><span class="pre">dma.span</span></code> (<code class="docutils literal notranslate"><span class="pre">check_program</span></code>’s operand-range check
+always fires first) and <code class="docutils literal notranslate"><span class="pre">kpn.protocol</span></code>. The same command also asserts that
+no baseline submission is rejected.</p>
+</section>
+</section>
+<section id="is-it-correct">
+<h4>Is it correct?<a class="headerlink" href="#is-it-correct" title="Link to this heading"><span>¶</span></a></h4>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>examples/tinytpu/act/judge.py<span class="w"> </span>correct
+python<span class="w"> </span>examples/tinytpu/act/judge.py<span class="w"> </span>correct<span class="w"> </span>--spec<span class="w"> </span>relu_16x16<span class="w"> </span>--no-simulator
+</pre></div>
+</div>
+<p>Bit-exact, against two named anchors, and the verdict says which one moved:</p>
+<ol class="arabic simple">
+<li><p><strong>the program against the spec</strong> – <code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code> (the ISA as numpy,
+already verified and not rewritten here) against <code class="docutils literal notranslate"><span class="pre">spec.gold</span></code> (the einsum
+in int64, then the epilogue, then the narrowing). Every byte of the output
+region must match and nothing outside the write window may move. A failure
+here is the mapping.</p></li>
+<li><p><strong>the design against the ISA</strong> – the module <code class="docutils literal notranslate"><span class="pre">df.build</span></code> produces against
+<code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code>, on all <code class="docutils literal notranslate"><span class="pre">MAXDIM</span> <span class="pre">*</span> <span class="pre">MAXDIM</span></code> bytes of <code class="docutils literal notranslate"><span class="pre">C</span></code> with no window
+and no tolerance. A failure here is the hardware or the simulator, and the
+message says so.</p></li>
+</ol>
+<p>Four operand distributions per spec (<code class="docutils literal notranslate"><span class="pre">small</span></code>, <code class="docutils literal notranslate"><span class="pre">mid</span></code>, <code class="docutils literal notranslate"><span class="pre">full</span></code>, <code class="docutils literal notranslate"><span class="pre">corner</span></code>,
+taken from <code class="docutils literal notranslate"><span class="pre">stress_isa.operands</span></code>), <code class="docutils literal notranslate"><span class="pre">C</span></code> always prefilled with random bytes
+so a clobber cannot hide behind a zero, and each case run twice on one build
+so state a previous call left in <code class="docutils literal notranslate"><span class="pre">spad</span></code> / <code class="docutils literal notranslate"><span class="pre">vr</span></code> / <code class="docutils literal notranslate"><span class="pre">ar</span></code> shows up. This is
+<code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code>’s discipline applied per spec rather than per shape.</p>
+<p>Measured in this session on the reference submission: <strong>16 of the 17 specs
+bit-exact against both anchors; the seventeenth is
+``gemm_reduce_8x6x8``, reported as its declared known gap</strong> (64 of 64 result
+bytes wrong, 0 clobbered – the arbitrary reduction pad, exactly as the spec
+predicts).</p>
+</section>
+<section id="is-it-fast">
+<h4>Is it fast?<a class="headerlink" href="#is-it-fast" title="Link to this heading"><span>¶</span></a></h4>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>examples/tinytpu/act/judge.py<span class="w"> </span>fast
+python<span class="w"> </span>examples/tinytpu/act/judge.py<span class="w"> </span>fast<span class="w"> </span>--spec<span class="w"> </span>gemm_16x16x16<span class="w"> </span>--cosim
+</pre></div>
+</div>
+<p>The cheap gate costs microseconds and involves no tool. Every unit in this
+design is one flat loop over the work count the header promises it
+(<a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>, the row-flattening note), and the units run
+concurrently, so the steady state is the busiest unit’s count and everything
+else is fixed cost:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>cycles = 173.2 + 1.621 * max(dma_ld, spm, vru, accu, dma_st)
+</pre></div>
+</div>
+<p>Both counts come straight off the header <code class="docutils literal notranslate"><span class="pre">assemble</span></code> writes, so the gate
+needs no new model of the machine – it reads the number the assembler already
+had to compute. The two constants are least squares over the five published
+cosim points, which are Vitis measurements this fork attributes to
+<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/logs/cosim_isa_landed_sweep.log</span></code> at <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code>. The gate passes a
+submission whose estimate is within 10% of the reference submission’s, and
+<code class="docutils literal notranslate"><span class="pre">--cosim</span></code> measures only what passes.</p>
+<p>The real measurement is <code class="docutils literal notranslate"><span class="pre">act/measure.py</span></code>: one <code class="docutils literal notranslate"><span class="pre">csynth_design</span></code>, then one
+<code class="docutils literal notranslate"><span class="pre">cosim_design</span></code> per submission on that same RTL, with a testbench that
+prefills <code class="docutils literal notranslate"><span class="pre">C</span></code> and compares every byte against <code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code>, so a cosim
+mismatch is an RTL fault and not a program fault. The Vitis path, the
+<code class="docutils literal notranslate"><span class="pre">-B/usr/bin</span></code> link flag that Vitis 2023.2’s binutils needs against this
+system’s glibc, the <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> depths cosim requires and Allo does not emit,
+and the <code class="docutils literal notranslate"><span class="pre">alignas(64)</span></code> that the <code class="docutils literal notranslate"><span class="pre">align_value(64)</span></code> promise obliges the
+testbench to keep are all imported from <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code> rather than restated.
+Point <code class="docutils literal notranslate"><span class="pre">TPU_PRJ</span></code> somewhere with room and delete the project afterwards; disk
+on this host is tight.</p>
+<p><code class="docutils literal notranslate"><span class="pre">cosim_design</span></code> runs under a deadline (<code class="docutils literal notranslate"><span class="pre">ACT_COSIM_TIMEOUT</span></code>, default 600 s),
+and on expiry the whole process group – <code class="docutils literal notranslate"><span class="pre">vitis_hls</span></code> and the <code class="docutils literal notranslate"><span class="pre">xsim</span></code> it
+spawned – is killed and the verdict reads <code class="docutils literal notranslate"><span class="pre">RTL</span> <span class="pre">DID</span> <span class="pre">NOT</span> <span class="pre">COMPLETE</span></code>, with what
+csim said and the last inter-transaction progress line. A submission whose RTL
+never finishes is a verdict about the submission; it must not be a hung judge.
+That case is not hypothetical: see <a class="reference internal" href="act_results.html#act-specs-rtl-hang"><span class="std std-ref">What the expensive judge found that nothing cheaper did</span></a>.</p>
+</section>
+</section>
+</section>
+<section id="reference">
+<h2>Reference<a class="headerlink" href="#reference" title="Link to this heading"><span>¶</span></a></h2>
 <section id="the-corpus">
-<h2>The corpus<a class="headerlink" href="#the-corpus" title="Link to this heading"><span>¶</span></a></h2>
+<h3>The corpus<a class="headerlink" href="#the-corpus" title="Link to this heading"><span>¶</span></a></h3>
 <p>Twenty-two specs, in three groups.</p>
 <p>The first six are the shapes this fork measures – <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code>’s
 <code class="docutils literal notranslate"><span class="pre">LATENCY</span></code> set and the 175 / 265 / 421 / 482 / 674 cosim points on
@@ -480,422 +683,11 @@ wavefront-row term from the tile-count term</p></td>
 whole corpus; <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/baseline.py</span></code> says whether the reference submission
 can map it.</p>
 </section>
-<section id="the-judge">
-<h2>The judge<a class="headerlink" href="#the-judge" title="Link to this heading"><span>¶</span></a></h2>
-<p>A submission is a program: either <code class="docutils literal notranslate"><span class="pre">module:function</span></code> taking a spec and
-returning the <code class="docutils literal notranslate"><span class="pre">(instruction</span> <span class="pre">word,</span> <span class="pre">AGU</span> <span class="pre">word)</span></code> list <code class="docutils literal notranslate"><span class="pre">assemble</span></code> takes, or a
-<code class="docutils literal notranslate"><span class="pre">.json</span></code> file of those word pairs, which is what an agent that emits text
-rather than Python should produce (<code class="docutils literal notranslate"><span class="pre">act/submission.py</span></code>). The default
-submission is <code class="docutils literal notranslate"><span class="pre">act/baseline.py</span></code>, one hand-chosen mapping per spec, which
-maps all seventeen.</p>
-<section id="is-it-legal">
-<h3>Is it legal?<a class="headerlink" href="#is-it-legal" title="Link to this heading"><span>¶</span></a></h3>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>examples/accelerator/tinytpu_vitis/act/judge.py<span class="w"> </span>legal
-python<span class="w"> </span>examples/accelerator/tinytpu_vitis/act/judge.py<span class="w"> </span>legal<span class="w"> </span>--spec<span class="w"> </span>gemm_narrow_2x8x4<span class="w"> </span>--program<span class="w"> </span>mymod:make
-</pre></div>
-</div>
-<p>Four layers, reported in the order a program fails them:</p>
-<table class="docutils align-default">
-<colgroup>
-<col style="width: 14.0%" />
-<col style="width: 86.0%" />
-</colgroup>
-<thead>
-<tr class="row-odd"><th class="head"><p>layer</p></th>
-<th class="head"><p>what it is</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">isa</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">microarch_isa.check_program</span></code>: write-before-read on <code class="docutils literal notranslate"><span class="pre">spad</span></code> / <code class="docutils literal notranslate"><span class="pre">vr</span></code>
-/ <code class="docutils literal notranslate"><span class="pre">ar</span></code>, the <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span> <span class="pre">=</span> <span class="pre">4</span></code> accumulator distance contract,
-bounds, <code class="docutils literal notranslate"><span class="pre">nr</span> <span class="pre">&gt;=</span> <span class="pre">1</span></code>, resolved field range, loop structure and AGU
-levels</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">encoding</span></code></p></td>
-<td><p>the assertions <code class="docutils literal notranslate"><span class="pre">assemble</span></code> makes: imem capacity, the 15-bit header
-counts, the array counts, the DRAM burst span</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">protocol</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">kpn_model.run</span></code>: the units’ promised work counts against what the
-sequencer dispatches. A valid program cannot reach this layer, which is
-the point – it is a regression detector for the assembler and the
-microarchitecture, not a program-error check</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">spec</span></code></p></td>
-<td><p>every <code class="docutils literal notranslate"><span class="pre">mvout</span></code>’s footprint in the dynamic stream against the spec’s
-write window, and the spec’s output region against that footprint.
-Static, so “you padded M into C” is caught before anything runs</p></td>
-</tr>
-</tbody>
-</table>
-<section id="the-rejection-message-is-part-of-the-deliverable">
-<h4>The rejection message is part of the deliverable<a class="headerlink" href="#the-rejection-message-is-part-of-the-deliverable" title="Link to this heading"><span>¶</span></a></h4>
-<p>A generating agent acts on the message and on nothing else, so every
-rejection carries a rule name, what happened, the rule that was broken, what
-to change instead, and a disassembly of the offending instruction with its two
-neighbours:</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>REJECTED [isa / mem.write_before_read]
-  what happened: instruction 7 (mm, loop ivs [1]): reads spad row(s) [4, 5, 6, 7]
-    as weights before any instruction wrote them. spad is not cleared by the
-    hardware; see the write-before-read contract.
-  the rule:      spad, vr and ar are not cleared between programs, so a row that
-    this program never wrote holds whatever the last one left
-  what to change: load the rows with `dma_ld` (or `vld`) before the instruction
-    that consumes them. If these rows are a pad you wanted to be zero, note that
-    no opcode zeroes a row: `dma_ld` is the only writer of spad and vr and it can
-    only copy DRAM the host filled, so a zero pad has to be part of the spec's
-    calling convention.
-  in context:
-      5  endloop  nr=  0 f=[0, 0, 0, 0]
-      6  loop     nr=  2 f=[0, 0, 0, 0]
-      7  mm       nr=  4 f=[0, 0, 0, 0]  f0+=iv0*4 f1+=iv0*4 f3+=iv0*4   &lt;-- here
-      8  mvout    nr=  4 f=[0, 0, 0, 0]  f0+=iv0*4 f1+=iv0*4
-      9  endloop  nr=  0 f=[0, 0, 0, 0]
-</pre></div>
-</div>
-<p>That message is the one this fork’s own reference submission earned while it
-was being written, and it names the fix.</p>
-<p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/judge.py</span> <span class="pre">rules</span></code> prints the 23-rule table and runs its self-test.
-The ISA fixtures are <code class="docutils literal notranslate"><span class="pre">stress_isa._bad_programs</span></code> – one crafted violation per
-contract, reused rather than rewritten – plus ten built in
-<code class="docutils literal notranslate"><span class="pre">act/rules_test.py</span></code> for rules no shipped program breaks. <strong>Measured in this
-session: 29 crafted violations reach 21 of the 23 rules, every one of them
-with a remedy, and none falls through to the remedy-less fallback.</strong> The two
-unreached rules are <code class="docutils literal notranslate"><span class="pre">dma.span</span></code> (<code class="docutils literal notranslate"><span class="pre">check_program</span></code>’s operand-range check
-always fires first) and <code class="docutils literal notranslate"><span class="pre">kpn.protocol</span></code>. The same command also asserts that
-no baseline submission is rejected.</p>
-</section>
-</section>
-<section id="is-it-correct">
-<h3>Is it correct?<a class="headerlink" href="#is-it-correct" title="Link to this heading"><span>¶</span></a></h3>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>examples/accelerator/tinytpu_vitis/act/judge.py<span class="w"> </span>correct
-python<span class="w"> </span>examples/accelerator/tinytpu_vitis/act/judge.py<span class="w"> </span>correct<span class="w"> </span>--spec<span class="w"> </span>relu_16x16<span class="w"> </span>--no-simulator
-</pre></div>
-</div>
-<p>Bit-exact, against two named anchors, and the verdict says which one moved:</p>
-<ol class="arabic simple">
-<li><p><strong>the program against the spec</strong> – <code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code> (the ISA as numpy,
-already verified and not rewritten here) against <code class="docutils literal notranslate"><span class="pre">spec.gold</span></code> (the einsum
-in int64, then the epilogue, then the narrowing). Every byte of the output
-region must match and nothing outside the write window may move. A failure
-here is the mapping.</p></li>
-<li><p><strong>the design against the ISA</strong> – the module <code class="docutils literal notranslate"><span class="pre">df.build</span></code> produces against
-<code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code>, on all <code class="docutils literal notranslate"><span class="pre">MAXDIM</span> <span class="pre">*</span> <span class="pre">MAXDIM</span></code> bytes of <code class="docutils literal notranslate"><span class="pre">C</span></code> with no window
-and no tolerance. A failure here is the hardware or the simulator, and the
-message says so.</p></li>
-</ol>
-<p>Four operand distributions per spec (<code class="docutils literal notranslate"><span class="pre">small</span></code>, <code class="docutils literal notranslate"><span class="pre">mid</span></code>, <code class="docutils literal notranslate"><span class="pre">full</span></code>, <code class="docutils literal notranslate"><span class="pre">corner</span></code>,
-taken from <code class="docutils literal notranslate"><span class="pre">stress_isa.operands</span></code>), <code class="docutils literal notranslate"><span class="pre">C</span></code> always prefilled with random bytes
-so a clobber cannot hide behind a zero, and each case run twice on one build
-so state a previous call left in <code class="docutils literal notranslate"><span class="pre">spad</span></code> / <code class="docutils literal notranslate"><span class="pre">vr</span></code> / <code class="docutils literal notranslate"><span class="pre">ar</span></code> shows up. This is
-<code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code>’s discipline applied per spec rather than per shape.</p>
-<p>Measured in this session on the reference submission: <strong>16 of the 17 specs
-bit-exact against both anchors; the seventeenth is
-``gemm_reduce_8x6x8``, reported as its declared known gap</strong> (64 of 64 result
-bytes wrong, 0 clobbered – the arbitrary reduction pad, exactly as the spec
-predicts).</p>
-</section>
-<section id="is-it-fast">
-<h3>Is it fast?<a class="headerlink" href="#is-it-fast" title="Link to this heading"><span>¶</span></a></h3>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>examples/accelerator/tinytpu_vitis/act/judge.py<span class="w"> </span>fast
-python<span class="w"> </span>examples/accelerator/tinytpu_vitis/act/judge.py<span class="w"> </span>fast<span class="w"> </span>--spec<span class="w"> </span>gemm_16x16x16<span class="w"> </span>--cosim
-</pre></div>
-</div>
-<p>The cheap gate costs microseconds and involves no tool. Every unit in this
-design is one flat loop over the work count the header promises it
-(<a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>, the row-flattening note), and the units run
-concurrently, so the steady state is the busiest unit’s count and everything
-else is fixed cost:</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>cycles = 173.2 + 1.621 * max(dma_ld, spm, vru, accu, dma_st)
-</pre></div>
-</div>
-<p>Both counts come straight off the header <code class="docutils literal notranslate"><span class="pre">assemble</span></code> writes, so the gate
-needs no new model of the machine – it reads the number the assembler already
-had to compute. The two constants are least squares over the five published
-cosim points, which are Vitis measurements this fork attributes to
-<code class="docutils literal notranslate"><span class="pre">logs/cosim_isa_landed_sweep.log</span></code> at <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code>. The gate passes a
-submission whose estimate is within 10% of the reference submission’s, and
-<code class="docutils literal notranslate"><span class="pre">--cosim</span></code> measures only what passes.</p>
-<p>The real measurement is <code class="docutils literal notranslate"><span class="pre">act/measure.py</span></code>: one <code class="docutils literal notranslate"><span class="pre">csynth_design</span></code>, then one
-<code class="docutils literal notranslate"><span class="pre">cosim_design</span></code> per submission on that same RTL, with a testbench that
-prefills <code class="docutils literal notranslate"><span class="pre">C</span></code> and compares every byte against <code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code>, so a cosim
-mismatch is an RTL fault and not a program fault. The Vitis path, the
-<code class="docutils literal notranslate"><span class="pre">-B/usr/bin</span></code> link flag that Vitis 2023.2’s binutils needs against this
-system’s glibc, the <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> depths cosim requires and Allo does not emit,
-and the <code class="docutils literal notranslate"><span class="pre">alignas(64)</span></code> that the <code class="docutils literal notranslate"><span class="pre">align_value(64)</span></code> promise obliges the
-testbench to keep are all imported from <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code> rather than restated.
-Point <code class="docutils literal notranslate"><span class="pre">TPU_PRJ</span></code> somewhere with room and delete the project afterwards; disk
-on this host is tight.</p>
-<p><code class="docutils literal notranslate"><span class="pre">cosim_design</span></code> runs under a deadline (<code class="docutils literal notranslate"><span class="pre">ACT_COSIM_TIMEOUT</span></code>, default 600 s),
-and on expiry the whole process group – <code class="docutils literal notranslate"><span class="pre">vitis_hls</span></code> and the <code class="docutils literal notranslate"><span class="pre">xsim</span></code> it
-spawned – is killed and the verdict reads <code class="docutils literal notranslate"><span class="pre">RTL</span> <span class="pre">DID</span> <span class="pre">NOT</span> <span class="pre">COMPLETE</span></code>, with what
-csim said and the last inter-transaction progress line. A submission whose RTL
-never finishes is a verdict about the submission; it must not be a hung judge.
-That case is not hypothetical: see <a class="reference internal" href="#act-specs-rtl-hang"><span class="std std-ref">What the expensive judge found that nothing cheaper did</span></a>.</p>
-</section>
-</section>
-<section id="is-kpn-model-py-good-enough-to-be-the-cheap-gate">
-<span id="act-specs-kpn-verdict"></span><h2>Is <code class="docutils literal notranslate"><span class="pre">kpn_model.py</span></code> good enough to be the cheap gate?<a class="headerlink" href="#is-kpn-model-py-good-enough-to-be-the-cheap-gate" title="Link to this heading"><span>¶</span></a></h2>
-<p><strong>No, and it does not claim to be.</strong> As shipped it reports no cycle number at
-all: it is a deadlock and protocol model with bounded FIFOs, it answers
-“minimum channel depth” and “which process is blocked on which channel”, and
-its own docstring says data values are not modelled. Run over every shipped
-program it prints <code class="docutils literal notranslate"><span class="pre">minimum</span> <span class="pre">depth</span> <span class="pre">1</span></code> and <code class="docutils literal notranslate"><span class="pre">KPN</span> <span class="pre">OK</span></code> and no cycles
-(reproduced in this session).</p>
-<p>It can be <em>made</em> to produce a cycle number, and <code class="docutils literal notranslate"><span class="pre">cycles.kpn_rounds</span></code> does it
-without touching the model: <code class="docutils literal notranslate"><span class="pre">kpn_model.build</span></code> hands back the process
-network, and stepping it barrier-synchronously – one channel action per
-process per round – counts the cycles a KPN with II=1 links and no memory
-latency would take. That number is worse than free and worse than the header
-counts. Single-feature least squares over the five published points, all
-measured in this session:</p>
-<table class="docutils align-default">
-<colgroup>
-<col style="width: 30.0%" />
-<col style="width: 20.0%" />
-<col style="width: 50.0%" />
-</colgroup>
-<thead>
-<tr class="row-odd"><th class="head"><p>predictor</p></th>
-<th class="head"><p>cost to compute</p></th>
-<th class="head"><p>max |error| in sample, 5 points</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">kpn_rounds</span></code> (barrier-synchronous KPN)</p></td>
-<td><p>0.6-16 ms</p></td>
-<td><p><strong>12.6%</strong></p></td>
-</tr>
-<tr class="row-odd"><td><p>dynamic instruction count</p></td>
-<td><p>0.1-0.3 ms</p></td>
-<td><p>12.9%</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code> header count</p></td>
-<td><p>0.1-0.3 ms</p></td>
-<td><p>13.1%</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> header count</p></td>
-<td><p>0.1-0.3 ms</p></td>
-<td><p>8.0%</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code> header count</p></td>
-<td><p>0.1-0.3 ms</p></td>
-<td><p>8.7%</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">max</span></code> over the five unit counts</p></td>
-<td><p>0.1-0.3 ms</p></td>
-<td><p><strong>9.2%</strong></p></td>
-</tr>
-</tbody>
-</table>
-<p>(Timed in this session: 116-314 us for <code class="docutils literal notranslate"><span class="pre">cycles.estimate</span></code>, 0.6-15.5 ms for
-<code class="docutils literal notranslate"><span class="pre">cycles.kpn_rounds</span></code>, on the same programs.)</p>
-<p>So the KPN round count is <em>less</em> accurate than a single number the assembler
-already computes, and fifty times more expensive: at <code class="docutils literal notranslate"><span class="pre">gemm_16x16x16</span></code> it
-predicts 1484 rounds against 686 measured cycles, and the 1484 is dominated by
-the 4x4 array’s 32 weight-loader and PE processes each taking a round to pass a
-token along a chain that the RTL walks in one cycle. A barrier-synchronous
-scheduler charges a round per <em>process</em> per hop; the hardware charges a cycle
-per <em>link</em>. Fixing that means modelling the array’s chains as pipelines rather
-than as processes, which is a different model, not a calibration of this one.</p>
-<p>It is not a complete deadlock oracle either. On <code class="docutils literal notranslate"><span class="pre">relu_16x16</span></code> it reports
-<code class="docutils literal notranslate"><span class="pre">minimum</span> <span class="pre">channel</span> <span class="pre">depth</span> <span class="pre">1</span></code> and no deadlock, and the RTL does not complete
-(<a class="reference internal" href="#act-specs-rtl-hang"><span class="std std-ref">What the expensive judge found that nothing cheaper did</span></a>). It models the channel <em>counts</em> – who is promised
-how much work – and not the latencies and pipeline depths a real hang can
-come from, so it catches assembler/microarchitecture mismatches and nothing
-else. That is still worth having, and it is worth knowing its edge.</p>
-<p><code class="docutils literal notranslate"><span class="pre">kpn_model</span></code>’s real value is the layer it already occupies in the judge: it
-is the <code class="docutils literal notranslate"><span class="pre">protocol</span></code> check in <code class="docutils literal notranslate"><span class="pre">judge.py</span> <span class="pre">legal</span></code>, where a promised-work
-mismatch is named with the blocked process instead of hanging the simulator.
-It should stay there and stay out of the cycle gate.</p>
-</section>
-<section id="what-the-cheap-gate-is-worth">
-<span id="act-specs-gate-measured"></span><h2>What the cheap gate is worth<a class="headerlink" href="#what-the-cheap-gate-is-worth" title="Link to this heading"><span>¶</span></a></h2>
-<p>Measured with <code class="docutils literal notranslate"><span class="pre">act/calibrate.py</span></code>, which runs one <code class="docutils literal notranslate"><span class="pre">csynth_design</span></code> and then
-one <code class="docutils literal notranslate"><span class="pre">cosim_design</span></code> per program on that same RTL. Everything in this section
-was measured in this session (<code class="docutils literal notranslate"><span class="pre">logs/cosim_act_corpus_sweep.log</span></code> and
-<code class="docutils literal notranslate"><span class="pre">logs/cosim_act_relu_hang.log</span></code>); <code class="docutils literal notranslate"><span class="pre">PUBLISHED_CYCLES</span></code> in <code class="docutils literal notranslate"><span class="pre">cycles.py</span></code> is the
-only attributed number on the page.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">TPU_PRJ</span><span class="o">=</span>/somewhere/with/room<span class="w"> </span>python<span class="w"> </span>act/calibrate.py<span class="w"> </span>specs
-<span class="nv">TPU_PRJ</span><span class="o">=</span>/somewhere/with/room<span class="w"> </span>python<span class="w"> </span>act/calibrate.py<span class="w"> </span>variants
-</pre></div>
-</div>
-<table class="docutils align-default">
-<colgroup>
-<col style="width: 32.5%" />
-<col style="width: 12.5%" />
-<col style="width: 10.0%" />
-<col style="width: 12.5%" />
-<col style="width: 11.2%" />
-<col style="width: 11.2%" />
-<col style="width: 10.0%" />
-</colgroup>
-<thead>
-<tr class="row-odd"><th class="head"><p>spec</p></th>
-<th class="head"><p>critical</p></th>
-<th class="head"><p>work</p></th>
-<th class="head"><p>estimate</p></th>
-<th class="head"><p>cosim</p></th>
-<th class="head"><p>error</p></th>
-<th class="head"><p>in fit</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_4x4x4</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code></p></td>
-<td><p>9</p></td>
-<td><p>188</p></td>
-<td><p><strong>172</strong></p></td>
-<td><p>+9.2%</p></td>
-<td><p>yes</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_8x8x8</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code></p></td>
-<td><p>48</p></td>
-<td><p>251</p></td>
-<td><p><strong>262</strong></p></td>
-<td><p>-4.2%</p></td>
-<td><p>yes</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_12x12x12</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code></p></td>
-<td><p>144</p></td>
-<td><p>407</p></td>
-<td><p><strong>418</strong></p></td>
-<td><p>-2.7%</p></td>
-<td><p>yes</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_16x16x8</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code></p></td>
-<td><p>192</p></td>
-<td><p>484</p></td>
-<td><p><strong>484</strong></p></td>
-<td><p>+0.1%</p></td>
-<td><p>yes</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_16x16x16</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code></p></td>
-<td><p>320</p></td>
-<td><p>692</p></td>
-<td><p><strong>686</strong></p></td>
-<td><p>+0.9%</p></td>
-<td><p>yes</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_relu_16x16x16</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code></p></td>
-<td><p>384</p></td>
-<td><p>796</p></td>
-<td><p>750</p></td>
-<td><p>+6.1%</p></td>
-<td><p>no</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_reuse_m_16x16x4</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code></p></td>
-<td><p>128</p></td>
-<td><p>381</p></td>
-<td><p>383</p></td>
-<td><p>-0.6%</p></td>
-<td><p>no</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_reuse_n_4x4x16</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code></p></td>
-<td><p>36</p></td>
-<td><p>232</p></td>
-<td><p>269</p></td>
-<td><p>-13.9%</p></td>
-<td><p>no</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm_reuse_k_4x16x4</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code></p></td>
-<td><p>36</p></td>
-<td><p>232</p></td>
-<td><p>256</p></td>
-<td><p>-9.5%</p></td>
-<td><p>no</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">batched_matmul_2x4x4x4</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code></p></td>
-<td><p>18</p></td>
-<td><p>202</p></td>
-<td><p>209</p></td>
-<td><p>-3.2%</p></td>
-<td><p>no</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">row_reduce_16x16</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code></p></td>
-<td><p>128</p></td>
-<td><p>381</p></td>
-<td><p>371</p></td>
-<td><p>+2.6%</p></td>
-<td><p>no</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">relu_16x16</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code></p></td>
-<td><p>192</p></td>
-<td><p>484</p></td>
-<td><p><em>never</em></p></td>
-<td><p>–</p></td>
-<td><p>no</p></td>
-</tr>
-</tbody>
-</table>
-<p>Two things fall out of the left column before the model is even discussed.
-<strong>The five published cycle counts reproduce exactly</strong> – 172 / 262 / 418 /
-484 / 686, the published row <em>as it then stood</em> – through a testbench that
-compares all 256 bytes of <code class="docutils literal notranslate"><span class="pre">C</span></code> against
-<code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code> rather than only the <code class="docutils literal notranslate"><span class="pre">M</span> <span class="pre">x</span> <span class="pre">N</span></code> region, which is a stricter
-check than the one the published numbers come from. And two of the corpus’s
-three non-GEMM einsums run on real RTL: <code class="docutils literal notranslate"><span class="pre">batched_matmul_2x4x4x4</span></code>
-(<code class="docutils literal notranslate"><span class="pre">bmk,bkn-&gt;bmn</span></code>) at 209 cycles and <code class="docutils literal notranslate"><span class="pre">row_reduce_16x16</span></code> (<code class="docutils literal notranslate"><span class="pre">mk-&gt;m</span></code>) at 371,
-both with 0 of 256 bytes wrong. The third, <code class="docutils literal notranslate"><span class="pre">relu_16x16</span></code> (<code class="docutils literal notranslate"><span class="pre">mn-&gt;mn</span></code>), is
-<a class="reference internal" href="#act-specs-rtl-hang"><span class="std std-ref">the one that does not</span></a>.</p>
-<p>On the model: <strong>in sample, max error 9.2% over the five points it is fitted
-to; out of sample, max error 13.9% and mean absolute error 6.0% over the six
-held-out specs that produced a cycle number.</strong> The two worst cases are both
-ones where <code class="docutils literal notranslate"><span class="pre">spm</span></code> is
-the critical unit at a small work count, where what the design is actually
-doing is filling the array’s weight and activation chains – a term the model
-does not have, because <code class="docutils literal notranslate"><span class="pre">max</span></code> over the unit counts cannot see a pipeline it
-does not model.</p>
-<p>A 6% mean is good enough to sort candidates that differ by more than that and
-useless for candidates that differ by less. The gate is set at 10% of the
-reference submission’s estimate for that reason: it is a filter on the
-obviously-worse, not a ranking.</p>
-<section id="what-the-expensive-judge-found-that-nothing-cheaper-did">
-<span id="act-specs-rtl-hang"></span><h3>What the expensive judge found that nothing cheaper did<a class="headerlink" href="#what-the-expensive-judge-found-that-nothing-cheaper-did" title="Link to this heading"><span>¶</span></a></h3>
-<p><strong>Two of the programs the judge was given pass every cheap check and then do
-not complete in RTL</strong>: <code class="docutils literal notranslate"><span class="pre">relu_16x16</span></code>’s submission, and the <code class="docutils literal notranslate"><span class="pre">row_blocked</span></code>
-variant of <code class="docutils literal notranslate"><span class="pre">gemm_8x8x8</span></code>. For both, <code class="docutils literal notranslate"><span class="pre">check_program</span></code> accepts, <code class="docutils literal notranslate"><span class="pre">kpn_model</span></code>
-reports minimum channel depth 1 and no deadlock, the Allo simulator is
-bit-exact against <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code>, and Vitis csim reports 0 of 256 bytes wrong –
-and then <code class="docutils literal notranslate"><span class="pre">cosim_design</span></code> never finishes the transaction.</p>
-<p>No deadlock is reported by Vitis’ own detector, so this page does not call it
-one, and nothing here locates the stall. What a hanging run’s log looks like
-beside a completing one is in <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
-<p>The full characterisation, the bisection, and the two hypotheses it rules out
-are <a class="reference internal" href="../developer/limitations.html#limitation-24"><span class="std std-ref">item 24</span></a> of the limitations register, with the repro
-in <code class="docutils literal notranslate"><span class="pre">tests/limits/item24_cosim_hang.py</span></code> and the family in
-<code class="docutils literal notranslate"><span class="pre">act/rtl_hang.py</span></code>. Two things from it are worth carrying here, because they
-are about how a compiler should be judged rather than about this design:</p>
-<ul class="simple">
-<li><p><strong>The minimal case is sixteen instructions, fully unrolled, with no
-``vrelu`` and no epilogue</strong> – plain int8 GEMM tiling. Nothing exotic has to
-be generated to reach it.</p></li>
-<li><p><strong>The hypothesis that an in-nest transfer is the trigger is measurably
-false.</strong> <a class="reference internal" href="act.html"><span class="doc">ACT, and Why We Cite It</span></a> leaves open whether “a transfer inside the emitted nest
-rather than hoisted into a prologue” is what the failing mappings share. It
-is not: both non-completing programs here stage every transfer in a
-prologue, and both <code class="docutils literal notranslate"><span class="pre">weights_reloaded</span></code> mappings, which issue a <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code>
-between <code class="docutils literal notranslate"><span class="pre">mvout</span></code>s inside the output nest, complete (256 cycles at 8x8x8
-and 638 at 16x16x16, 0 of 256 bytes wrong). A staging column would pass both
-failures and flag two mappings that run, so it is not the guard to use.</p></li>
-</ul>
-<p>The part that belongs here is what it does to the judge.</p>
-</section>
 <section id="three-tiers-and-an-estimate-is-not-one-of-them">
-<h3>Three tiers, and an estimate is not one of them<a class="headerlink" href="#three-tiers-and-an-estimate-is-not-one-of-them" title="Link to this heading"><span>¶</span></a></h3>
-<p>The consequence for this judge is that <strong>“is it fast” has a tier above it:
+<span id="act-specs-tiers"></span><h3>Three tiers, and an estimate is not one of them<a class="headerlink" href="#three-tiers-and-an-estimate-is-not-one-of-them" title="Link to this heading"><span>¶</span></a></h3>
+<p>Two programs pass every cheap check and then do not complete in RTL
+(<a class="reference internal" href="act_results.html#act-specs-rtl-hang"><span class="std std-ref">What the expensive judge found that nothing cheaper did</span></a>). The consequence for this judge is that <strong>“is it
+fast” has a tier above it:
 does it run on RTL at all</strong>, and the cheap gate cannot see that tier. So a
 result now says which tier it reached:</p>
 <table class="docutils align-default">
@@ -937,40 +729,32 @@ deadlock oracle. It is not a defect in the spec or in the submission: both
 pass every contract the machine states.</p>
 </section>
 </section>
-<section id="how-to-work-on-this">
-<h2>How to work on this<a class="headerlink" href="#how-to-work-on-this" title="Link to this heading"><span>¶</span></a></h2>
+<section id="limits-and-known-failures">
+<h2>Limits and known failures<a class="headerlink" href="#limits-and-known-failures" title="Link to this heading"><span>¶</span></a></h2>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/spec.py</span></code> – validate the whole corpus and print it.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/baseline.py</span></code> – the reference submission’s static and dynamic
-instruction counts per spec.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/judge.py</span> <span class="pre">rules</span></code> – the rule table and its self-test. Run it
-after any change to <code class="docutils literal notranslate"><span class="pre">check_program</span></code>’s messages; it is what keeps a
-rejection from degrading into a bare exception.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/judge.py</span> <span class="pre">legal</span></code> then <code class="docutils literal notranslate"><span class="pre">correct</span></code> then <code class="docutils literal notranslate"><span class="pre">fast</span></code> – the three
-verdicts, cheap to expensive.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/cycles.py</span></code> – the per-unit work table, the estimate and the
-KPN round count for every spec, side by side.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">act/variants.py</span> <span class="pre">gemm_16x16x16</span></code> – several legal mappings of one
-spec with their estimates, which is the fixture the rank test uses.</p></li>
+<li><p><strong>``gemm_reduce_8x6x8`` is a declared known gap.</strong> No opcode zeroes a row, so
+rounding <code class="docutils literal notranslate"><span class="pre">K</span></code> up sums garbage and nothing else is expressible. The judge
+reports it as <code class="docutils literal notranslate"><span class="pre">KNOWN</span> <span class="pre">GAP</span></code> rather than <code class="docutils literal notranslate"><span class="pre">WRONG</span></code>.</p></li>
+<li><p><strong>The five ``STEADY`` shapes do not fit ``main``’s ``MAXDIM = 16`` build</strong>
+and are reported <code class="docutils literal notranslate"><span class="pre">SKIPPED</span></code> with the reason until <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM</span></code> is raised.</p></li>
+<li><p><strong>The cheap gate cannot see whether a program runs on RTL at all.</strong> Two
+programs pass every cheap check and then do not complete in cosim; the
+characterisation and the bisection are <a class="reference internal" href="../developer/limitations.html#limitation-24"><span class="std std-ref">item 24</span></a>, and
+what it does to the judge is in <a class="reference internal" href="act_results.html#act-specs-rtl-hang"><span class="std std-ref">What the expensive judge found that nothing cheaper did</span></a>.</p></li>
+<li><p><strong>``kpn_model.py`` is neither a cycle model nor a complete deadlock oracle.</strong>
+It is the <code class="docutils literal notranslate"><span class="pre">protocol</span></code> layer of <code class="docutils literal notranslate"><span class="pre">judge.py</span> <span class="pre">legal</span></code> and should stay there;
+measured in <a class="reference internal" href="act_results.html#act-specs-kpn-verdict"><span class="std std-ref">Is kpn_model.py good enough to be the cheap gate?</span></a>.</p></li>
+<li><p><strong>The cycle gate is a filter, not a ranking.</strong> It passes a submission whose
+estimate is within 10% of the reference submission’s; what that is worth is
+measured in <a class="reference internal" href="act_results.html#act-specs-gate-measured"><span class="std std-ref">What the cheap gate is worth</span></a>.</p></li>
 </ul>
-<p>Environment is the fork’s usual one (<code class="docutils literal notranslate"><span class="pre">CLAUDE.md</span></code>): the <code class="docutils literal notranslate"><span class="pre">allo</span></code> env,
-<code class="docutils literal notranslate"><span class="pre">LLVM_BUILD_DIR</span></code> exported by hand, <code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS=8</span></code>. Only <code class="docutils literal notranslate"><span class="pre">correct</span></code>
-and <code class="docutils literal notranslate"><span class="pre">fast</span> <span class="pre">--cosim</span></code> need a build; <code class="docutils literal notranslate"><span class="pre">legal</span></code>, <code class="docutils literal notranslate"><span class="pre">specs</span></code> and <code class="docutils literal notranslate"><span class="pre">rules</span></code> are pure
-Python over the corpus.</p>
 </section>
-<section id="earlier-measurements-and-corrections">
-<h2>Earlier measurements and corrections<a class="headerlink" href="#earlier-measurements-and-corrections" title="Link to this heading"><span>¶</span></a></h2>
-<section id="what-a-hanging-cosim-run-looks-like-in-the-log">
-<h3>What a hanging cosim run looks like in the log<a class="headerlink" href="#what-a-hanging-cosim-run-looks-like-in-the-log" title="Link to this heading"><span>¶</span></a></h3>
-<p>What that looks like, and what it does not: a completing run of the same
-design prints two progress lines and a <code class="docutils literal notranslate"><span class="pre">$finish</span></code> –
-<code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">/</span> <span class="pre">1</span> <span class="pre">&#64;</span> <span class="pre">&quot;109000&quot;</span></code>, then <code class="docutils literal notranslate"><span class="pre">1</span> <span class="pre">/</span> <span class="pre">1</span> <span class="pre">&#64;</span> <span class="pre">&quot;777000&quot;</span></code>, then
-<code class="docutils literal notranslate"><span class="pre">$finish</span> <span class="pre">called</span> <span class="pre">at</span> <span class="pre">time</span> <span class="pre">:</span> <span class="pre">796590</span> <span class="pre">ps</span></code> for a 198-cycle program. A hanging run
-prints the <strong>first</strong> line and never the second. <code class="docutils literal notranslate"><span class="pre">109000</span></code> is picoseconds and
-is simply where Vitis makes its first periodic report, so it is the same
-number in every log, passing or hanging; it is not where the design stops, and
-nothing here locates the stall.</p>
-</section>
+<section id="results-and-history">
+<h2>Results and history<a class="headerlink" href="#results-and-history" title="Link to this heading"><span>¶</span></a></h2>
+<p><a class="reference internal" href="act_results.html"><span class="doc">ACT: Results, Findings and Corrections</span></a> carries the measurements and the corrections for both ACT
+pages: what the cheap gate is worth against cosim, why <code class="docutils literal notranslate"><span class="pre">kpn_model.py</span></code> is not
+the cheap gate, what the expensive judge found that nothing cheaper did, and
+what a hanging cosim run looks like in the log.</p>
 </section>
 </section>
 
@@ -989,13 +773,14 @@ nothing here locates the stall.</p>
             <div class="page_toc">
                 <ul>
 <li><a class="reference internal" href="#">ACT Workload Specs and the Judge</a><ul>
+<li><a class="reference internal" href="#quick-start">Quick start</a></li>
+<li><a class="reference internal" href="#how-it-works">How it works</a><ul>
 <li><a class="reference internal" href="#what-a-spec-says-and-what-it-deliberately-does-not">What a spec says, and what it deliberately does not</a><ul>
 <li><a class="reference internal" href="#three-fields-exist-because-this-isa-forces-the-question-into-the-open">Three fields exist because this ISA forces the question into the open</a></li>
 <li><a class="reference internal" href="#two-layers-one-convention">Two layers, one convention</a></li>
 <li><a class="reference internal" href="#layout">Layout</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#the-corpus">The corpus</a></li>
 <li><a class="reference internal" href="#the-judge">The judge</a><ul>
 <li><a class="reference internal" href="#is-it-legal">Is it legal?</a><ul>
 <li><a class="reference internal" href="#the-rejection-message-is-part-of-the-deliverable">The rejection message is part of the deliverable</a></li>
@@ -1005,17 +790,15 @@ nothing here locates the stall.</p>
 <li><a class="reference internal" href="#is-it-fast">Is it fast?</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#is-kpn-model-py-good-enough-to-be-the-cheap-gate">Is <code class="docutils literal notranslate"><span class="pre">kpn_model.py</span></code> good enough to be the cheap gate?</a></li>
-<li><a class="reference internal" href="#what-the-cheap-gate-is-worth">What the cheap gate is worth</a><ul>
-<li><a class="reference internal" href="#what-the-expensive-judge-found-that-nothing-cheaper-did">What the expensive judge found that nothing cheaper did</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#reference">Reference</a><ul>
+<li><a class="reference internal" href="#the-corpus">The corpus</a></li>
 <li><a class="reference internal" href="#three-tiers-and-an-estimate-is-not-one-of-them">Three tiers, and an estimate is not one of them</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#how-to-work-on-this">How to work on this</a></li>
-<li><a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a><ul>
-<li><a class="reference internal" href="#what-a-hanging-cosim-run-looks-like-in-the-log">What a hanging cosim run looks like in the log</a></li>
-</ul>
-</li>
+<li><a class="reference internal" href="#limits-and-known-failures">Limits and known failures</a></li>
+<li><a class="reference internal" href="#results-and-history">Results and history</a></li>
 </ul>
 </li>
 </ul>
@@ -1031,13 +814,13 @@ nothing here locates the stall.</p>
             <div class="left">
                 
                 <a href="act.html">
-                    <span class="icon">&lt;</span><span>ACT, and Why We Cite It</span></a>
+                    <span class="icon">&lt;</span><span>ACT and the TinyTPU-isa Mapper</span></a>
                 
             </div>
 
             <div class="right">
                 
-                    <a href="../developer/index.html"><span>Developer Setup</span><span class="icon">&gt;</span></a>
+                    <a href="act_results.html"><span>ACT: Results, Findings and Corrections</span><span class="icon">&gt;</span></a>
                 
             </div>
         </div>

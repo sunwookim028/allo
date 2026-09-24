@@ -165,6 +165,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
@@ -174,8 +175,12 @@
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_results.html">TinyTPU-isa vs Gemmini: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
@@ -186,9 +191,13 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia_results.html">CHIA Agentic Co-Design: Results</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia_codesign.html">The Original Co-Design Effort (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT and the TinyTPU-isa Mapper</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act_results.html">ACT: Results, Findings and Corrections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
 <ul class="current">
@@ -250,14 +259,14 @@ does NOT magically resolve deadlocks.</p>
 kernel holds its OMP thread, so a region with more kernel instances than
 threads wedges silently even when the protocol is right. The rule is
 <code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS</span> <span class="pre">&gt;=</span> <span class="pre">number</span> <span class="pre">of</span> <span class="pre">kernel</span> <span class="pre">instances</span></code>; deep FIFOs mask the symptom
-and make it look like a design problem. Measured in <a class="reference internal" href="limitations.html#limitation-11"><span class="std std-ref">11. The dataflow simulator deadlocks when processes outnumber OMP threads — FIXED</span></a> (22-process region: hang at 8 and 16
+and make it look like a design problem. Measured in <a class="reference internal" href="limitations.html#limitation-11"><span class="std std-ref">11. The dataflow simulator deadlocked when processes outnumbered OMP threads – closed</span></a> (22-process region: hang at 8 and 16
 threads, pass at 24 and 32). Every “✓” in the Allo-simulator column of §2 below is
 conditional on that rule.</p>
 </div></blockquote>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>That rule no longer has to be applied by hand: as recorded under
-<a class="reference internal" href="limitations.html#limitation-11"><span class="std std-ref">11. The dataflow simulator deadlocks when processes outnumber OMP threads — FIXED</span></a> (<strong>FIXED</strong> 2026-09-17), the simulator now sizes the
+<a class="reference internal" href="limitations.html#limitation-11"><span class="std std-ref">11. The dataflow simulator deadlocked when processes outnumbered OMP threads – closed</span></a> (<strong>FIXED</strong> 2026-09-17), the simulator now sizes the
 OpenMP team to the section count itself.</p>
 </div>
 <p><strong>Use when</strong>: Functional verification of any design — blocking, non-blocking,
@@ -357,7 +366,7 @@ bidirectional handshake.</p>
 routes <code class="docutils literal notranslate"><span class="pre">csim</span></code> and <code class="docutils literal notranslate"><span class="pre">csyn</span></code>; <code class="docutils literal notranslate"><span class="pre">mode=&quot;cosim&quot;</span></code> is <strong>not</strong> wired into the backend and
 falls through to the <code class="docutils literal notranslate"><span class="pre">XDEVICE</span></code> Makefile / OpenCL-host flow, which is not what
 <code class="docutils literal notranslate"><span class="pre">cosim_design</span></code> wants. Running cosim today needs an external driver —
-<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/cosim.py</span></code> (~180 lines) generates a plain
+<code class="docutils literal notranslate"><span class="pre">examples/tinytpu/cosim.py</span></code> (~180 lines) generates a plain
 C++ testbench and patches the <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> depths Allo does not emit. See <a class="reference internal" href="limitations.html#limitation-16"><span class="std std-ref">16. cosim is not wired into df.build</span></a>.</p>
 </div></blockquote>
 </section>

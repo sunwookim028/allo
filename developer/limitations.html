@@ -165,6 +165,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
@@ -174,8 +175,12 @@
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_results.html">TinyTPU-isa vs Gemmini: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
@@ -186,9 +191,13 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia_results.html">CHIA Agentic Co-Design: Results</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia_codesign.html">The Original Co-Design Effort (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT and the TinyTPU-isa Mapper</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act_results.html">ACT: Results, Findings and Corrections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
 <ul class="current">
@@ -377,7 +386,7 @@ instead of printing the documented error</p></td>
 <td><p>HLS driver</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">hls.py:331-338</span></code> rejects <code class="docutils literal notranslate"><span class="pre">mode=&quot;cosim&quot;</span></code>; <code class="docutils literal notranslate"><span class="pre">vitis.py:410</span></code> emits
 <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> with no <code class="docutils literal notranslate"><span class="pre">depth=</span></code>.</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">tinytpu_vitis/cosim.py</span></code> (216 lines, <code class="docutils literal notranslate"><span class="pre">patch_axi_depths</span></code> at <code class="docutils literal notranslate"><span class="pre">:109</span></code>)
+<td><p><code class="docutils literal notranslate"><span class="pre">tinytpu/cosim.py</span></code> (216 lines, <code class="docutils literal notranslate"><span class="pre">patch_axi_depths</span></code> at <code class="docutils literal notranslate"><span class="pre">:109</span></code>)
 exists because of it</p></td>
 <td><p>~150 lines</p></td>
 <td><p><a class="reference external" href="https://github.com/sunwookim028/allo/blob/main/tests/limits/item16_cosim_not_wired.py">item16_cosim_not_wired.py</a></p></td>
@@ -422,7 +431,7 @@ writer’s.</p></td>
 <td><p>none (Vitis target); blocks a MiniTPU-class delay line on the SystemC
 path</p></td>
 <td><p>the <code class="docutils literal notranslate"><span class="pre">SC_METHOD</span></code> comb mode scoped in <code class="docutils literal notranslate"><span class="pre">c7402f9f</span></code> (five phases)</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">examples/systemc_rtlsim/REPRO.sh</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">tests/systemc/rtlsim/REPRO.sh</span></code></p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#limitation-23"><span class="std std-ref">23</span></a></p></td>
 <td><p>REPRODUCES (on probes)</p></td>
@@ -446,7 +455,7 @@ dead-commented.</p></td>
 Allo-legal</p></td>
 <td><p>SystemC fork: ~50-100 lines (bind one writer and one reader to one
 instance’s two pin sets)</p></td>
-<td><p><a class="reference external" href="https://github.com/sunwookim028/allo/tree/main/examples/accelerator/tinytpu_vitis/impact/probe_shared">impact/probe_shared/</a></p></td>
+<td><p><a class="reference external" href="https://github.com/sunwookim028/allo/tree/main/examples/tinytpu/impact/probe_shared">impact/probe_shared/</a></p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#limitation-a"><span class="std std-ref">A</span></a></p></td>
 <td><p>REPRODUCES</p></td>
@@ -514,7 +523,7 @@ bitwise ops, so every bitwise op is rejected there.</p></td>
 <td><p><strong>+409 / +361 cycles</strong> at 4x4x4 / 16x16x16 when restored on <code class="docutils literal notranslate"><span class="pre">spad</span></code>
 (measured, <code class="docutils literal notranslate"><span class="pre">v_memset</span></code>); the shipped design avoids it</p></td>
 <td><p>not sized (warn; or reset-time init; or elide – see item)</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">v_memset</span></code> in <a class="reference external" href="https://github.com/sunwookim028/allo/tree/main/examples/accelerator/tinytpu_vitis/impact">impact/</a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">v_memset</span></code> in <a class="reference external" href="https://github.com/sunwookim028/allo/tree/main/examples/tinytpu/impact">impact/</a></p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#limitation-h"><span class="std std-ref">H</span></a></p></td>
 <td><p>REPRODUCES</p></td>
@@ -537,106 +546,69 @@ not prototyped</p></td>
 </section>
 <section id="fixed-or-closed">
 <span id="limitations-closed"></span><h3>Fixed or closed<a class="headerlink" href="#fixed-or-closed" title="Link to this heading"><span>¶</span></a></h3>
+<p>Closed items are tracked as closed GitHub issues, not as rows in this file:
+the issue body carries the status, root cause, fix commit/PR and repro that
+used to live here. This keeps live state in git/GitHub rather than in a
+checked-in snapshot.</p>
 <table class="docutils align-default">
 <colgroup>
-<col style="width: 6.0%" />
-<col style="width: 16.0%" />
-<col style="width: 9.0%" />
-<col style="width: 27.0%" />
-<col style="width: 16.0%" />
-<col style="width: 26.0%" />
+<col style="width: 11.8%" />
+<col style="width: 70.6%" />
+<col style="width: 17.6%" />
 </colgroup>
 <thead>
 <tr class="row-odd"><th class="head"><p>Item</p></th>
-<th class="head"><p>Status</p></th>
-<th class="head"><p>Layer</p></th>
-<th class="head"><p>Root cause</p></th>
-<th class="head"><p>Upstream</p></th>
-<th class="head"><p>Repro</p></th>
+<th class="head"><p>What it was</p></th>
+<th class="head"><p>Issue</p></th>
 </tr>
 </thead>
 <tbody>
 <tr class="row-even"><td><p><a class="reference internal" href="#limitation-1"><span class="std std-ref">1</span></a> (+ <a class="reference internal" href="#limitation-6"><span class="std std-ref">6</span></a>)</p></td>
-<td><p>FIXED by <code class="docutils literal notranslate"><span class="pre">5c4d1b53</span></code></p></td>
-<td><p>frontend</p></td>
-<td><p>Region-scope Stateful not propagated through <code class="docutils literal notranslate"><span class="pre">ASTContext.copy()</span></code>.
-Item 6 was a symptom of this, not a separate bug.</p></td>
-<td><p><strong>fork-only – upstreaming candidate</strong> (the <code class="docutils literal notranslate"><span class="pre">global_op_cache</span></code> copy
-crash itself landed upstream via PR #577)</p></td>
-<td><p><a class="reference external" href="https://github.com/sunwookim028/allo/blob/main/tests/limits/item01_region_stateful.py">item01_region_stateful.py</a>,
-<a class="reference external" href="https://github.com/sunwookim028/allo/blob/main/tests/limits/item06_elif_local_dominance.py">item06_elif_local_dominance.py</a></p></td>
+<td><p>Region-scope <code class="docutils literal notranslate"><span class="pre">&#64;</span> <span class="pre">Stateful</span></code> lowering incomplete</p></td>
+<td><p><a class="reference external" href="https://github.com/sunwookim028/allo/issues/36">#36</a></p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#limitation-2"><span class="std std-ref">2</span></a></p></td>
-<td><p>FIXED by upstream PR #577</p></td>
-<td><p>frontend</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">global_op_cache</span></code> missing from the copied <code class="docutils literal notranslate"><span class="pre">ASTContext</span></code>.</p></td>
-<td><p>upstream</p></td>
-<td><p><a class="reference external" href="https://github.com/sunwookim028/allo/blob/main/tests/limits/item02_kernel_stateful.py">item02_kernel_stateful.py</a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&#64;</span> <span class="pre">Stateful</span></code> could not be declared inside <code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code> bodies</p></td>
+<td><p><a class="reference external" href="https://github.com/sunwookim028/allo/issues/37">#37</a></p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#limitation-3"><span class="std std-ref">3</span></a></p></td>
-<td><p>FIXED by <code class="docutils literal notranslate"><span class="pre">5bc104c8</span></code></p></td>
-<td><p>simulator</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">_process_function_streams</span></code> scanned only the top-level block’s ops.</p></td>
-<td><p><strong>fork-only – upstreaming candidate</strong></p></td>
-<td><p><a class="reference external" href="https://github.com/sunwookim028/allo/blob/main/tests/limits/item03_nested_call_streams.py">item03_nested_call_streams.py</a></p></td>
+<td><p>Simulator dropped nested-call stream lowering</p></td>
+<td><p><a class="reference external" href="https://github.com/sunwookim028/allo/issues/38">#38</a></p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#limitation-7"><span class="std std-ref">7</span></a></p></td>
-<td><p>CANNOT-REPRODUCE (bitwise ops work in the default rule set since
-<code class="docutils literal notranslate"><span class="pre">12f898d7</span></code>, 2023)</p></td>
-<td><p>frontend</p></td>
-<td><p>None in the default rules; the AIE <code class="docutils literal notranslate"><span class="pre">cpp-style</span></code> gap is item F.</p></td>
-<td><p>–</p></td>
-<td><p><a class="reference external" href="https://github.com/sunwookim028/allo/blob/main/tests/limits/item07_bitwise_and.py">item07_bitwise_and.py</a></p></td>
+<td><p>No bitwise <code class="docutils literal notranslate"><span class="pre">&amp;</span></code> operator support</p></td>
+<td><p><a class="reference external" href="https://github.com/sunwookim028/allo/issues/39">#39</a></p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#limitation-9"><span class="std std-ref">9</span></a></p></td>
-<td><p>NOT-A-LIMITATION</p></td>
-<td><p>–</p></td>
-<td><p>The stale <code class="docutils literal notranslate"><span class="pre">.cache/llvm_sim/</span></code> belonged to another project’s Makefile;
-Allo keeps no simulator cache.</p></td>
-<td><p>–</p></td>
-<td><p><a class="reference external" href="https://github.com/sunwookim028/allo/blob/main/tests/limits/item09_sim_cache_helpers.py">item09_sim_cache_helpers.py</a></p></td>
+<td><p>Sim cache invalidation misses imported helpers</p></td>
+<td><p><a class="reference external" href="https://github.com/sunwookim028/allo/issues/40">#40</a></p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#limitation-11"><span class="std std-ref">11</span></a></p></td>
-<td><p>FIXED by <code class="docutils literal notranslate"><span class="pre">f193c057</span></code></p></td>
-<td><p>simulator</p></td>
-<td><p>The OpenMP team defaulted to the core count instead of the section
-count.</p></td>
-<td><p><strong>fork-only – upstreaming candidate</strong>; upstream draft PR #611</p></td>
-<td><p><a class="reference external" href="https://github.com/sunwookim028/allo/blob/main/tests/limits/item11_omp_team_size.py">item11_omp_team_size.py</a></p></td>
+<td><p>Simulator deadlocked when processes outnumbered OMP threads</p></td>
+<td><p><a class="reference external" href="https://github.com/sunwookim028/allo/issues/41">#41</a></p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#limitation-12"><span class="std std-ref">12</span></a></p></td>
-<td><p>FIXED by upstream PR #612 and fork <code class="docutils literal notranslate"><span class="pre">3de74846</span></code>, merged in <code class="docutils literal notranslate"><span class="pre">dc6b8fa6</span></code></p></td>
-<td><p>emitter</p></td>
-<td><p>Bit slices were emitted as signed <code class="docutils literal notranslate"><span class="pre">ap_int&lt;N&gt;</span></code>.</p></td>
-<td><p>upstream</p></td>
-<td><p>–</p></td>
+<td><p>Bit-slices lowered to signed <code class="docutils literal notranslate"><span class="pre">ap_int&lt;N&gt;</span></code>, silently</p></td>
+<td><p><a class="reference external" href="https://github.com/sunwookim028/allo/issues/42">#42</a></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#limitation-13"><span class="std std-ref">13</span></a></p></td>
-<td><p>retracted 2026-09-18 by its own entry (not in the 2026-09-19 pass); the
-convenience gap (no <code class="docutils literal notranslate"><span class="pre">allo.dma</span></code> intrinsic) remains</p></td>
-<td><p>–</p></td>
-<td><p>A contiguous runtime-length copy already infers a variable-length AXI
-burst.</p></td>
-<td><p>–</p></td>
-<td><p>–</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#limitation-20"><span class="std std-ref">20</span></a></p></td>
+<td><p>Emitter could generate a local colliding with a parameter name</p></td>
+<td><p><a class="reference external" href="https://github.com/sunwookim028/allo/issues/43">#43</a></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#limitation-20"><span class="std std-ref">20</span></a></p></td>
-<td><p>FIXED by <code class="docutils literal notranslate"><span class="pre">aece11c9</span></code></p></td>
-<td><p>emitter</p></td>
-<td><p>Generated identifiers and parameter names shared no namespace.</p></td>
-<td><p><strong>fork-only – upstreaming candidate</strong></p></td>
-<td><p><a class="reference external" href="https://github.com/sunwookim028/allo/blob/main/tests/limits/item20_emitter_name_collision.py">item20_emitter_name_collision.py</a></p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#limitation-21"><span class="std std-ref">21</span></a></p></td>
-<td><p>FIXED by <code class="docutils literal notranslate"><span class="pre">bbea2af0</span></code> (<code class="docutils literal notranslate"><span class="pre">s.dependence</span></code>); TinyTPU-isa uses it since
-<code class="docutils literal notranslate"><span class="pre">e24e433b</span></code></p></td>
-<td><p>frontend, emitter</p></td>
-<td><p>No schedule primitive and no emitter path for <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span></code>.</p></td>
-<td><p><strong>fork-only – upstreaming candidate</strong></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">tests/test_vhls.py::test_dependence_pragma*</span></code></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#limitation-21"><span class="std std-ref">21</span></a></p></td>
+<td><p>No <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span></code> primitive</p></td>
+<td><p><a class="reference external" href="https://github.com/sunwookim028/allo/issues/10">#10</a> (predates this
+migration; not reused for anything else). Its section below is kept in
+full rather than trimmed: the legality rule that landed after the fix
+(<code class="docutils literal notranslate"><span class="pre">allo/dependence.py</span></code>) and the <code class="docutils literal notranslate"><span class="pre">s.split</span></code> defect it found are live,
+not closed.</p></td>
 </tr>
 </tbody>
 </table>
+<p><a class="reference internal" href="#limitation-13"><span class="std std-ref">Item 13</span></a> is <strong>not</strong> in this table: it was largely
+retracted, but a real convenience gap (no <code class="docutils literal notranslate"><span class="pre">allo.dma</span></code> intrinsic) remains
+under the same item number, so its status is not unambiguous enough to close
+as a GitHub issue outright – see its own section below.</p>
 <p>Two sub-items sit inside rows of the open table: 10(b) and 17(b) are
 CANNOT-REPRODUCE.</p>
 </section>
@@ -702,78 +674,23 @@ not restated here: combinational wires (fork issue #9), HLS dependence pragma
 to items 1-2 below), streams as top-level inputs (fork issue #12), and the
 nested sub-region Stream compile-time-constant shape constraint (fork issue #4;
 item <a class="reference internal" href="#limitation-h"><span class="std std-ref">H</span></a>, not item 3 as an earlier revision said).</p>
-<section id="region-scope-stateful-lowering-is-incomplete-on-main">
-<span id="limitation-1"></span><h3>1. Region-scope <code class="docutils literal notranslate"><span class="pre">&#64;</span> <span class="pre">Stateful</span></code> lowering is incomplete on <code class="docutils literal notranslate"><span class="pre">main</span></code><a class="headerlink" href="#region-scope-stateful-lowering-is-incomplete-on-main" title="Link to this heading"><span>¶</span></a></h3>
-<div class="admonition-status-re-verified-2026-09-19 admonition">
-<p class="admonition-title">Status (re-verified 2026-09-19)</p>
-<p>FIXED by <code class="docutils literal notranslate"><span class="pre">5c4d1b53</span></code> (fork-only; upstreaming candidate). Item 6 is merged into this item.</p>
-</div>
-<ul class="simple">
-<li><p>Declaring <code class="docutils literal notranslate"><span class="pre">int32[N]</span> <span class="pre">&#64;</span> <span class="pre">Stateful</span> <span class="pre">=</span> <span class="pre">0</span></code> at <code class="docutils literal notranslate"><span class="pre">&#64;df.region</span></code> body scope (so the
-buffer is shared across every <code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code> in the region) is the
-natural way to express a Gemmini-style decoder + driver split with
-shared spad / acc / imem.</p></li>
-<li><p>On <code class="docutils literal notranslate"><span class="pre">allo/main</span></code>, this either crashes with
-<code class="docutils literal notranslate"><span class="pre">AttributeError:</span> <span class="pre">'ASTContext'</span> <span class="pre">object</span> <span class="pre">has</span> <span class="pre">no</span> <span class="pre">attribute</span> <span class="pre">'global_op_cache'</span></code>
-or trips an MLIR <code class="docutils literal notranslate"><span class="pre">Assertion</span> <span class="pre">'value'</span> <span class="pre">failed</span></code> (null Value) when a kernel
-reads-and-writes a region-scope Stateful inside a loop or branch.</p></li>
-<li><p>Update (2026-07-15): the <code class="docutils literal notranslate"><span class="pre">AttributeError:</span> <span class="pre">'ASTContext'</span> <span class="pre">object</span> <span class="pre">has</span> <span class="pre">no</span> <span class="pre">attribute</span> <span class="pre">'global_op_cache'</span></code> copy-crash landed on <code class="docutils literal notranslate"><span class="pre">main</span></code> via upstream
-PR #577 (global_op_cache copy fix). The broader region-scope stateful
-propagation block (<code class="docutils literal notranslate"><span class="pre">stateful_var_map</span></code> / <code class="docutils literal notranslate"><span class="pre">stateful_counter</span></code> through
-<code class="docutils literal notranslate"><span class="pre">ASTContext.copy()</span></code>, per-function <code class="docutils literal notranslate"><span class="pre">global_op_cache</span></code> reset, anchoring
-<code class="docutils literal notranslate"><span class="pre">memref.get_global</span></code> at each function’s entry block) remains fork-local
-on <code class="docutils literal notranslate"><span class="pre">main</span></code>; it did not need its own branch (the former
-<code class="docutils literal notranslate"><span class="pre">feature/region-scope-stateful</span></code> branch, commit <code class="docutils literal notranslate"><span class="pre">5c4d1b5</span></code>, is deleted).</p></li>
-<li><p>Net effect: the crash fix is upstream; the sharing-scratchpad/acc-across-
-decoder-and-driver-kernels feature itself is still fork-local, tracked in
-fork issue #7.</p></li>
-</ul>
+<section id="region-scope-stateful-lowering-was-incomplete-item-6-closed">
+<span id="limitation-1"></span><h3>1. Region-scope <code class="docutils literal notranslate"><span class="pre">&#64;</span> <span class="pre">Stateful</span></code> lowering was incomplete (+ item 6) – closed<a class="headerlink" href="#region-scope-stateful-lowering-was-incomplete-item-6-closed" title="Link to this heading"><span>¶</span></a></h3>
+<p>FIXED by <code class="docutils literal notranslate"><span class="pre">5c4d1b53</span></code> (fork-only; upstreaming candidate). Closed as
+<a class="reference external" href="https://github.com/sunwookim028/allo/issues/36">issue #36</a>, which carries
+the root cause, the fix and the repro.</p>
 </section>
-<section id="stateful-cannot-be-declared-inside-df-kernel-bodies">
-<span id="limitation-2"></span><h3>2. <code class="docutils literal notranslate"><span class="pre">&#64;</span> <span class="pre">Stateful</span></code> cannot be declared inside <code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code> bodies<a class="headerlink" href="#stateful-cannot-be-declared-inside-df-kernel-bodies" title="Link to this heading"><span>¶</span></a></h3>
-<div class="admonition-status-re-verified-2026-09-19 admonition">
-<p class="admonition-title">Status (re-verified 2026-09-19)</p>
-<p>FIXED by upstream PR #577.</p>
-</div>
-<ul class="simple">
-<li><p>Putting <code class="docutils literal notranslate"><span class="pre">pc:</span> <span class="pre">int32[1]</span> <span class="pre">&#64;</span> <span class="pre">Stateful</span> <span class="pre">=</span> <span class="pre">0</span></code> inside a <code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code> triggers
-<code class="docutils literal notranslate"><span class="pre">AttributeError:</span> <span class="pre">'ASTContext'</span> <span class="pre">object</span> <span class="pre">has</span> <span class="pre">no</span> <span class="pre">attribute</span> <span class="pre">'global_op_cache'</span></code>.</p></li>
-<li><p>Forces all PC / loop-counter / preload-latch state to be hoisted to
-region scope, even when conceptually private to a single kernel.</p></li>
-<li><p>For an L2 decoder this means 8 single-element <code class="docutils literal notranslate"><span class="pre">int32[1]</span> <span class="pre">&#64;</span> <span class="pre">Stateful</span></code>
-arrays at region scope (<code class="docutils literal notranslate"><span class="pre">pc</span></code>, <code class="docutils literal notranslate"><span class="pre">halted</span></code>, <code class="docutils literal notranslate"><span class="pre">iter_count</span></code>, <code class="docutils literal notranslate"><span class="pre">iter_idx</span></code>,
-<code class="docutils literal notranslate"><span class="pre">loop_start_pc</span></code>, <code class="docutils literal notranslate"><span class="pre">iter_stride_a/b/d</span></code>) just to get persistence.</p></li>
-<li><p><strong>Priority: High</strong> — currently forces 8 single-element region-scope arrays
-in the L2 decoder.</p></li>
-</ul>
+<section id="stateful-could-not-be-declared-inside-df-kernel-bodies-closed">
+<span id="limitation-2"></span><h3>2. <code class="docutils literal notranslate"><span class="pre">&#64;</span> <span class="pre">Stateful</span></code> could not be declared inside <code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code> bodies – closed<a class="headerlink" href="#stateful-could-not-be-declared-inside-df-kernel-bodies-closed" title="Link to this heading"><span>¶</span></a></h3>
+<p>FIXED by upstream PR #577. Closed as
+<a class="reference external" href="https://github.com/sunwookim028/allo/issues/37">issue #37</a>, which carries
+the root cause and the repro.</p>
 </section>
-<section id="simulator-drops-nested-call-stream-lowering">
-<span id="limitation-3"></span><h3>3. Simulator drops nested-call stream lowering<a class="headerlink" href="#simulator-drops-nested-call-stream-lowering" title="Link to this heading"><span>¶</span></a></h3>
-<div class="admonition-status-re-verified-2026-09-19 admonition">
-<p class="admonition-title">Status (re-verified 2026-09-19)</p>
-<p>FIXED by <code class="docutils literal notranslate"><span class="pre">5bc104c8</span></code> (fork-only; upstreaming candidate).</p>
-</div>
-<ul>
-<li><p><code class="docutils literal notranslate"><span class="pre">_process_function_streams</span></code> in <code class="docutils literal notranslate"><span class="pre">allo/backend/simulator.py</span></code> only
-scans <code class="docutils literal notranslate"><span class="pre">func.body.blocks[0].operations</span></code> for <code class="docutils literal notranslate"><span class="pre">func.call</span></code> ops. If a
-PE call (e.g. <code class="docutils literal notranslate"><span class="pre">mxu_fp32</span></code>) is nested inside an <code class="docutils literal notranslate"><span class="pre">affine.for</span></code> /
-<code class="docutils literal notranslate"><span class="pre">affine.if</span></code> (the natural shape of a decoder + driver split), the
-callee is never recursively processed. Its <code class="docutils literal notranslate"><span class="pre">allo.stream_put</span> <span class="pre">/</span> <span class="pre">get</span></code>
-ops survive into LLVM lowering, where <code class="docutils literal notranslate"><span class="pre">convert-func-to-llvm</span></code> fails
-with:</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>cannot be converted to LLVM IR: missing
-`LLVMTranslationDialectInterface` registration for dialect for op:
-func.func
-</pre></div>
-</div>
-</li>
-<li><p>The fix is mechanical (deep-scan <code class="docutils literal notranslate"><span class="pre">func_d.CallOp</span></code> via
-<code class="docutils literal notranslate"><span class="pre">recursive_collect_ops</span></code> in addition to the top-level scan) but it has
-to be patched into the library — there is no user-side workaround
-short of inlining the sub-region.</p></li>
-<li><p>Symptom is opaque: error points at the <em>callee</em> <code class="docutils literal notranslate"><span class="pre">func.func</span></code>, not at
-the top-level for-loop that hides the call.</p></li>
-</ul>
+<section id="simulator-dropped-nested-call-stream-lowering-closed">
+<span id="limitation-3"></span><h3>3. Simulator dropped nested-call stream lowering – closed<a class="headerlink" href="#simulator-dropped-nested-call-stream-lowering-closed" title="Link to this heading"><span>¶</span></a></h3>
+<p>FIXED by <code class="docutils literal notranslate"><span class="pre">5bc104c8</span></code> (fork-only; upstreaming candidate). Closed as
+<a class="reference external" href="https://github.com/sunwookim028/allo/issues/38">issue #38</a>, which carries
+the root cause, the fix and the repro.</p>
 </section>
 <section id="math-exp-math-log-are-not-recognized-by-the-ast-builder">
 <span id="limitation-4"></span><h3>4. <code class="docutils literal notranslate"><span class="pre">math.exp</span></code> / <code class="docutils literal notranslate"><span class="pre">math.log</span></code> are not recognized by the AST builder<a class="headerlink" href="#math-exp-math-log-are-not-recognized-by-the-ast-builder" title="Link to this heading"><span>¶</span></a></h3>
@@ -806,45 +723,18 @@ takes a while to diagnose.</p></li>
 <li><p><strong>Priority: Medium</strong> — silent/misdirected error.</p></li>
 </ul>
 </section>
-<section id="local-int32-decls-inside-elif-branches-don-t-dominate-uses">
-<span id="limitation-6"></span><h3>6. Local <code class="docutils literal notranslate"><span class="pre">int32</span></code> decls inside <code class="docutils literal notranslate"><span class="pre">elif</span></code> branches don’t dominate uses<a class="headerlink" href="#local-int32-decls-inside-elif-branches-don-t-dominate-uses" title="Link to this heading"><span>¶</span></a></h3>
-<div class="admonition-status-re-verified-2026-09-19 admonition">
-<p class="admonition-title">Status (re-verified 2026-09-19)</p>
-<p>FIXED by <code class="docutils literal notranslate"><span class="pre">5c4d1b53</span></code> – and the diagnosis below was wrong. Plain locals in <code class="docutils literal notranslate"><span class="pre">elif</span></code> arms always worked; the failure was item 1’s cause. Merged into <a class="reference internal" href="#limitation-1"><span class="std std-ref">1. Region-scope &#64; Stateful lowering is incomplete on main</span></a>.</p>
-</div>
-<ul class="simple">
-<li><p>Pattern that fails: declaring a fresh local inside an <code class="docutils literal notranslate"><span class="pre">elif</span></code> branch
-and then referencing it in another branch’s calc.</p></li>
-<li><p>For example, <code class="docutils literal notranslate"><span class="pre">eff_d:</span> <span class="pre">int32</span> <span class="pre">=</span> <span class="pre">rs1_lo</span> <span class="pre">+</span> <span class="pre">d_off</span></code> inside
-<code class="docutils literal notranslate"><span class="pre">elif</span> <span class="pre">funct7</span> <span class="pre">==</span> <span class="pre">FUNCT7_PRELOAD:</span></code> and <code class="docutils literal notranslate"><span class="pre">new_idx:</span> <span class="pre">int32</span> <span class="pre">=</span> <span class="pre">iter_idx[0]</span> <span class="pre">+</span> <span class="pre">1</span></code>
-inside <code class="docutils literal notranslate"><span class="pre">elif</span> <span class="pre">funct7</span> <span class="pre">==</span> <span class="pre">FUNCT7_LOOP_END:</span></code> produced MLIR that didn’t
-verify (cryptic dominance / null-Value errors during lowering).</p></li>
-<li><p>Workaround: hoist every such temporary out of the if/elif chain so it
-is declared in a block that dominates all uses. This bloats the
-decoder body.</p></li>
-<li><p><strong>Priority: Medium</strong> — bloats the decoder.</p></li>
-</ul>
+<section id="local-int32-decls-inside-elif-branches-don-t-dominate-uses-closed">
+<span id="limitation-6"></span><h3>6. Local <code class="docutils literal notranslate"><span class="pre">int32</span></code> decls inside <code class="docutils literal notranslate"><span class="pre">elif</span></code> branches don’t dominate uses – closed<a class="headerlink" href="#local-int32-decls-inside-elif-branches-don-t-dominate-uses-closed" title="Link to this heading"><span>¶</span></a></h3>
+<p>Merged into <a class="reference internal" href="#limitation-1"><span class="std std-ref">1. Region-scope &#64; Stateful lowering was incomplete (+ item 6) – closed</span></a> – the diagnosis for this item was wrong:
+plain locals in <code class="docutils literal notranslate"><span class="pre">elif</span></code> arms always worked, and the failure was item 1’s
+cause. See <a class="reference external" href="https://github.com/sunwookim028/allo/issues/36">issue #36</a>.</p>
 </section>
-<section id="no-bitwise-operator-support-in-allo-expression-dsl">
-<span id="limitation-7"></span><h3>7. No bitwise <code class="docutils literal notranslate"><span class="pre">&amp;</span></code> operator support in Allo expression DSL<a class="headerlink" href="#no-bitwise-operator-support-in-allo-expression-dsl" title="Link to this heading"><span>¶</span></a></h3>
-<div class="admonition-status-re-verified-2026-09-19 admonition">
-<p class="admonition-title">Status (re-verified 2026-09-19)</p>
-<p>CANNOT-REPRODUCE: bitwise ops work in the default typing rules since <code class="docutils literal notranslate"><span class="pre">12f898d7</span></code> (2023). Only the AIE <code class="docutils literal notranslate"><span class="pre">cpp-style</span></code> rules lack them: <a class="reference internal" href="#limitation-f"><span class="std std-ref">F. The AIE cpp-style typing rules reject every bitwise op</span></a>.</p>
-</div>
-<ul>
-<li><p>For decoding instruction flag bits we wanted <code class="docutils literal notranslate"><span class="pre">(iflags</span> <span class="pre">&amp;</span> <span class="pre">2)</span> <span class="pre">&gt;&gt;</span> <span class="pre">1</span></code>.</p></li>
-<li><p>Allo rejects <code class="docutils literal notranslate"><span class="pre">&amp;</span></code> inside <code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code> bodies; we end up emulating bit
-extraction with arithmetic:</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>a_stride_on: int32 = (iflags // 2) - ((iflags // 4) * 2)
-b_stride_on: int32 = (iflags // 4) - ((iflags // 8) * 2)
-d_stride_on: int32 = (iflags // 8) - ((iflags // 16) * 2)
-</pre></div>
-</div>
-</li>
-<li><p>Works, but verbose and obscures intent (the reader has to recognize
-the division-pair as a single-bit extraction).</p></li>
-<li><p><strong>Priority: Low</strong> — arithmetic emulation works.</p></li>
-</ul>
+<section id="no-bitwise-operator-support-in-allo-expression-dsl-closed">
+<span id="limitation-7"></span><h3>7. No bitwise <code class="docutils literal notranslate"><span class="pre">&amp;</span></code> operator support in Allo expression DSL – closed<a class="headerlink" href="#no-bitwise-operator-support-in-allo-expression-dsl-closed" title="Link to this heading"><span>¶</span></a></h3>
+<p>CANNOT-REPRODUCE: bitwise ops work in the default typing rules since
+<code class="docutils literal notranslate"><span class="pre">12f898d7</span></code> (2023). Only the AIE <code class="docutils literal notranslate"><span class="pre">cpp-style</span></code> rules lack them:
+<a class="reference internal" href="#limitation-f"><span class="std std-ref">F. The AIE cpp-style typing rules reject every bitwise op</span></a>. Closed as
+<a class="reference external" href="https://github.com/sunwookim028/allo/issues/39">issue #39</a>.</p>
 </section>
 <section id="single-mxu-call-rule-allo-region-instantiation">
 <span id="limitation-8"></span><h3>8. Single-MXU-call rule (Allo region instantiation)<a class="headerlink" href="#single-mxu-call-rule-allo-region-instantiation" title="Link to this heading"><span>¶</span></a></h3>
@@ -866,24 +756,11 @@ but the compiler needs us to flatten them.</p></li>
 <li><p><strong>Priority: Medium</strong> — forces unnatural code structure.</p></li>
 </ul>
 </section>
-<section id="sim-cache-invalidation-misses-imported-helpers">
-<span id="limitation-9"></span><h3>9. Sim cache invalidation misses imported helpers<a class="headerlink" href="#sim-cache-invalidation-misses-imported-helpers" title="Link to this heading"><span>¶</span></a></h3>
-<div class="admonition-status-re-verified-2026-09-19 admonition">
-<p class="admonition-title">Status (re-verified 2026-09-19)</p>
-<p>NOT-A-LIMITATION: the <code class="docutils literal notranslate"><span class="pre">.cache/llvm_sim/</span></code> cache belonged to another project’s Makefile; Allo keeps no simulator cache.</p>
-</div>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">.cache/llvm_sim/</span></code> is keyed on the level’s <code class="docutils literal notranslate"><span class="pre">tpu.py</span></code> and top-level
-<code class="docutils literal notranslate"><span class="pre">tpu_config.py</span></code> only. Editing an imported helper (e.g.
-<code class="docutils literal notranslate"><span class="pre">levels/_common/mxu_fp32.py</span></code> or <code class="docutils literal notranslate"><span class="pre">kernels/*.py</span></code>) does not invalidate
-the cache.</p></li>
-<li><p>Stale cache will hide compilation failures: the build appears to
-succeed (cache hit), runtime then misbehaves.</p></li>
-<li><p>Has bitten this project at least twice during the session — commit
-messages claim “validated” because the cached object loaded fine,
-but a clean rebuild fails.</p></li>
-<li><p><strong>Priority: High</strong> (allo-tpu side) — repeated stale-cache “validated”.</p></li>
-</ul>
+<section id="sim-cache-invalidation-misses-imported-helpers-closed">
+<span id="limitation-9"></span><h3>9. Sim cache invalidation misses imported helpers – closed<a class="headerlink" href="#sim-cache-invalidation-misses-imported-helpers-closed" title="Link to this heading"><span>¶</span></a></h3>
+<p>NOT-A-LIMITATION: the <code class="docutils literal notranslate"><span class="pre">.cache/llvm_sim/</span></code> cache belonged to another
+project’s Makefile; Allo keeps no simulator cache. Closed as
+<a class="reference external" href="https://github.com/sunwookim028/allo/issues/40">issue #40</a>.</p>
 </section>
 <section id="error-messages-point-at-lowered-mlir-not-source">
 <span id="limitation-10"></span><h3>10. Error messages point at lowered MLIR, not source<a class="headerlink" href="#error-messages-point-at-lowered-mlir-not-source" title="Link to this heading"><span>¶</span></a></h3>
@@ -915,7 +792,7 @@ so debugging via “build twice and diff” doesn’t work.</p></li>
 </section>
 <section id="surfaced-while-building-an-instruction-programmable-tpu-2026-09">
 <h2>Surfaced while building an instruction-programmable TPU (2026-09)<a class="headerlink" href="#surfaced-while-building-an-instruction-programmable-tpu-2026-09" title="Link to this heading"><span>¶</span></a></h2>
-<p>A second pass, from building <code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/</span></code> on <code class="docutils literal notranslate"><span class="pre">main</span></code>:
+<p>A second pass, from building <code class="docutils literal notranslate"><span class="pre">examples/tinytpu/</span></code> on <code class="docutils literal notranslate"><span class="pre">main</span></code>:
 an int8 instruction-programmable tiled-GEMM accelerator taken through the
 Vitis dataflow path to <strong>RTL co-simulation</strong>, and compared against a data-type-
 and mesh-matched Gemmini (<a class="reference internal" href="../designs/gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>).</p>
@@ -923,124 +800,20 @@ and mesh-matched Gemmini (<a class="reference internal" href="../designs/gemmini
 markdown and <strong>none of them had reached</strong> <code class="docutils literal notranslate"><span class="pre">notes/</span></code> (the fork’s former notes
 directory, now this documentation), which is why they are consolidated here. They are ordered by what they would cost an Allo user, not
 by when they were found.</p>
-<section id="the-dataflow-simulator-deadlocks-when-processes-outnumber-omp-threads-fixed">
-<span id="limitation-11"></span><h3>11. The dataflow simulator deadlocks when processes outnumber OMP threads — <strong>FIXED</strong><a class="headerlink" href="#the-dataflow-simulator-deadlocks-when-processes-outnumber-omp-threads-fixed" title="Link to this heading"><span>¶</span></a></h3>
-<div class="admonition-status-re-verified-2026-09-19 admonition">
-<p class="admonition-title">Status (re-verified 2026-09-19)</p>
-<p>FIXED by <code class="docutils literal notranslate"><span class="pre">f193c057</span></code> (fork-only; upstreaming candidate, upstream draft PR #611).</p>
-</div>
-<p>The simulator appears to give each <code class="docutils literal notranslate"><span class="pre">df.kernel</span></code> instance an OMP thread and to
-block that thread on an empty/full stream. With fewer threads than processes, a
-blocked process can hold a thread its own producer needed, and the region
-wedges <strong>silently</strong> – no message, no indication of which process is blocked on
-which channel.</p>
-<p>Measured on a 22-process region (<code class="docutils literal notranslate"><span class="pre">T*T</span> <span class="pre">+</span> <span class="pre">6</span></code>) at 16x16x16 with stream depth 16:</p>
-<table class="docutils align-default">
-<thead>
-<tr class="row-odd"><th class="head"><p><code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS</span></code></p></th>
-<th class="head"><p>8</p></th>
-<th class="head"><p>16</p></th>
-<th class="head"><p>24</p></th>
-<th class="head"><p>32</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p></p></td>
-<td><p>hang</p></td>
-<td><p>hang</p></td>
-<td><p>pass</p></td>
-<td><p>pass</p></td>
-</tr>
-</tbody>
-</table>
-<p>The threshold is exactly the process count. With 32 threads the design runs at
-<strong>depth 4</strong>, and a shape that had never passed at <em>any</em> depth passed at depth 8.</p>
-<ul class="simple">
-<li><p>Deep FIFOs mask it, by letting producers finish before anyone must block, so
-the symptom presents as “required stream depth grows with the program” – a
-plausible-looking <em>design</em> problem. This cost multiple sessions.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">CLAUDE.md</span></code> currently advises <code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS=8</span></code>, which is fine for the small
-regions in <code class="docutils literal notranslate"><span class="pre">tests/dataflow</span></code> but is <strong>not a safe default</strong>. The rule is
-<code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS</span> <span class="pre">&gt;=</span> <span class="pre">number</span> <span class="pre">of</span> <span class="pre">kernel</span> <span class="pre">instances</span></code>.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/kpn_model.py</span></code> is a ~140-line model of a
-channel graph that reports which processes are blocked on which channels and
-at what occupancy. It found this in one run. That report is cheap.</p></li>
-<li><p><strong>FIXED 2026-09-17</strong> in <code class="docutils literal notranslate"><span class="pre">allo/backend/simulator.py</span></code>
-<code class="docutils literal notranslate"><span class="pre">_inject_omp_parallel_sections</span></code>: the OpenMP team is now sized to the section
-count (<code class="docutils literal notranslate"><span class="pre">num_threads</span> <span class="pre">=</span> <span class="pre">len(pe_call_define_ops)</span></code>) instead of defaulting to the
-core count. Our 22-process design now runs every shape exactly at
-<code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS=8</span></code>, the value that used to hang; the golden tests and the
-upstream dataflow suite still pass.</p></li>
-<li><p>Credit: independently found and fixed by <code class="docutils literal notranslate"><span class="pre">chhzh123</span></code> on the SPMW branch
-(<code class="docutils literal notranslate"><span class="pre">a03edb85</span></code>, 2026-09-05) from the other direction – “56 at 8x8 FEATHER on a
-48-core host”. Two unrelated projects hitting the same wall is the argument
-for it being upstreamed rather than carried.</p></li>
-<li><p><strong>Diagnosis, tier 0 – DONE 2026-09-18</strong> (<code class="docutils literal notranslate"><span class="pre">7bc6d413</span></code>). <code class="docutils literal notranslate"><span class="pre">LLVMOMPModule.__call__</span></code>
-now arms a watchdog around the blocking <code class="docutils literal notranslate"><span class="pre">execution_engine.invoke</span></code>, default ON
-at 600 s (<code class="docutils literal notranslate"><span class="pre">ALLO_SIM_TIMEOUT=&lt;sec&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">=0</span></code> to silence). On a real deadlock it
-prints the top function, the kernel-instance count, <code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS</span></code>, the
-pid, the likely causes, and an explicit note that the process is NOT being
-killed and Ctrl-C will not work (the simulator is inside a blocking C call),
-with the <code class="docutils literal notranslate"><span class="pre">kill</span> <span class="pre">-9</span></code> line. It repeats with geometric backoff.</p>
-<ul>
-<li><p>The watchdog is <strong>one reused thread parked on a</strong> <code class="docutils literal notranslate"><span class="pre">Condition</span></code>, not a
-per-call <code class="docutils literal notranslate"><span class="pre">threading.Timer</span></code>: the Timer version was measured at <strong>+170 us per
-call</strong>, a fifth of a small region’s runtime and inside the window
-<code class="docutils literal notranslate"><span class="pre">tests/dataflow/mesh_perf.py</span></code> measures throughput over – a watchdog that
-perturbs what it watches. The reused thread costs <strong>+12.6 us</strong>.</p></li>
-<li><p>It is advisory: nothing is killed, nothing is raised, and a healthy run that
-trips the timeout still returns a correct result. There is a test asserting
-exactly that, which is what makes defaulting it ON defensible.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_sim_timeout.py</span></code>, 4 tests, 15 s, cannot hang the suite.</p></li>
-</ul>
-</li>
-<li><p><strong>Still open: tier 1, the per-channel report.</strong> The watchdog says <em>that</em> the
-region is stuck, not <em>who</em> is stuck on <em>which</em> channel. The natural hook now
-exists: <code class="docutils literal notranslate"><span class="pre">fc08bb6b</span></code> collapsed three byte-identical spin-wait sites into one
-<code class="docutils literal notranslate"><span class="pre">_build_spin_wait_loop</span></code>, so instrumenting the generated spin – beside the
-<code class="docutils literal notranslate"><span class="pre">usleep(1)</span></code> it already contains – is a one-line change rather than three.
-The remaining cost is a runtime shared library to receive the callback, and
-its risk is linkage (see the <code class="docutils literal notranslate"><span class="pre">LLVM_BUILD_DIR</span></code> / GLIBC pitfall).
-<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/kpn_model.py</span></code> shows the report format;
-what does not transfer is its mechanism – it is a single-threaded
-cooperative scheduler that can observe “a full sweep advanced nobody”, and
-the real simulator’s processes are opaque JIT’d code on OpenMP threads.</p></li>
-</ul>
+<section id="the-dataflow-simulator-deadlocked-when-processes-outnumbered-omp-threads-closed">
+<span id="limitation-11"></span><h3>11. The dataflow simulator deadlocked when processes outnumbered OMP threads – closed<a class="headerlink" href="#the-dataflow-simulator-deadlocked-when-processes-outnumbered-omp-threads-closed" title="Link to this heading"><span>¶</span></a></h3>
+<p>FIXED 2026-09-17 by <code class="docutils literal notranslate"><span class="pre">f193c057</span></code> (fork-only; upstreaming candidate, upstream
+draft PR #611): the OpenMP team is now sized to the section count instead of
+defaulting to the core count. A tier-0 diagnostic watchdog (<code class="docutils literal notranslate"><span class="pre">7bc6d413</span></code>) was
+added at the same time; the tier-1 per-channel report remains unbuilt –
+track as a fresh enhancement rather than here. Closed as
+<a class="reference external" href="https://github.com/sunwookim028/allo/issues/41">issue #41</a>.</p>
 </section>
-<section id="bit-slices-lower-to-signed-ap-int-n-silently-and-the-simulator-disagrees">
-<span id="limitation-12"></span><h3>12. Bit-slices lower to <em>signed</em> <code class="docutils literal notranslate"><span class="pre">ap_int&lt;N&gt;</span></code>, silently, and the simulator disagrees<a class="headerlink" href="#bit-slices-lower-to-signed-ap-int-n-silently-and-the-simulator-disagrees" title="Link to this heading"><span>¶</span></a></h3>
-<div class="admonition-status-re-verified-2026-09-19 admonition">
-<p class="admonition-title">Status (re-verified 2026-09-19)</p>
-<p>FIXED by upstream PR #612 together with fork <code class="docutils literal notranslate"><span class="pre">3de74846</span></code>, merged into <code class="docutils literal notranslate"><span class="pre">main</span></code> in <code class="docutils literal notranslate"><span class="pre">dc6b8fa6</span></code>.</p>
-</div>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Pending re-verification (added 2026-09-19): bit-slice emission has since
-changed. Commit <code class="docutils literal notranslate"><span class="pre">3de74846</span></code> (“hls: emit bit slices as unsigned”,
-2026-09-18) on the fork, and upstream PR #612 (“Preserve unsigned
-bit-slice types during HLS codegen”, <code class="docutils literal notranslate"><span class="pre">094ab413</span></code>, merged into <code class="docutils literal notranslate"><span class="pre">main</span></code> by
-<code class="docutils literal notranslate"><span class="pre">dc6b8fa6</span></code> on 2026-09-19), both address this item. Its status above is
-left as last recorded until it is re-verified.</p>
-</div>
-<p><code class="docutils literal notranslate"><span class="pre">w[54:61]</span></code> on an unsigned value emits:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">ap_int</span><span class="o">&lt;</span><span class="mi">7</span><span class="o">&gt;</span><span class="w"> </span><span class="n">v268</span><span class="p">;</span><span class="w">  </span><span class="n">v268</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">w02</span><span class="p">(</span><span class="mi">60</span><span class="p">,</span><span class="w"> </span><span class="mi">54</span><span class="p">);</span>
-<span class="kt">int32_t</span><span class="w"> </span><span class="n">nr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v268</span><span class="p">;</span><span class="w">                     </span><span class="c1">// 64 -&gt; 0b1000000 -&gt; -64</span>
-</pre></div>
-</div>
-<p>so any field whose top bit is set reads back <strong>negative</strong>. A loop bounded by it
-runs zero times.</p>
-<ul class="simple">
-<li><p>Cost: an ISA row-count field of 64 silently loaded nothing and the design
-produced zeros – <strong>251 of 256 outputs wrong</strong>. It failed exactly at the
-sign-bit boundary (63 fine, 64 not).</p></li>
-<li><p><strong>The dataflow simulator treats the slice as unsigned and passed the same
-program.</strong> This is a genuine simulator/RTL divergence, and it is the reason
-this bug survived every functional check that had been passing.</p></li>
-<li><p>Workaround: an N-bit field safely carries <code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">..</span> <span class="pre">2^(N-1)</span> <span class="pre">-</span> <span class="pre">1</span></code>; budget one
-spare bit per field and assert it at the assembler.</p></li>
-<li><p><strong>Priority: High.</strong> Either lower unsigned slices to <code class="docutils literal notranslate"><span class="pre">ap_uint&lt;N&gt;</span></code>, or make the
-simulator model the sign so the two agree.</p></li>
-</ul>
+<section id="bit-slices-lowered-to-signed-ap-int-n-silently-and-the-simulator-disagreed-closed">
+<span id="limitation-12"></span><h3>12. Bit-slices lowered to <em>signed</em> <code class="docutils literal notranslate"><span class="pre">ap_int&lt;N&gt;</span></code>, silently, and the simulator disagreed – closed<a class="headerlink" href="#bit-slices-lowered-to-signed-ap-int-n-silently-and-the-simulator-disagreed-closed" title="Link to this heading"><span>¶</span></a></h3>
+<p>FIXED by upstream PR #612 together with fork <code class="docutils literal notranslate"><span class="pre">3de74846</span></code>, merged into
+<code class="docutils literal notranslate"><span class="pre">main</span></code> in <code class="docutils literal notranslate"><span class="pre">dc6b8fa6</span></code>. Closed as
+<a class="reference external" href="https://github.com/sunwookim028/allo/issues/42">issue #42</a>.</p>
 </section>
 <section id="no-program-controlled-dma-struck-largely-retracted-the-gap-is-convenience-not-capability">
 <span id="limitation-13"></span><h3>13. “No program-controlled DMA” (struck) – <strong>largely RETRACTED</strong>; the gap is convenience, not capability<a class="headerlink" href="#no-program-controlled-dma-struck-largely-retracted-the-gap-is-convenience-not-capability" title="Link to this heading"><span>¶</span></a></h3>
@@ -1205,7 +978,7 @@ the <em>program</em>. csynth was not broken either time – it was correctly bou
 the machine the encoding permitted. The mirror-image case is a model that
 predicts a <em>schedule</em> being read as a prediction about the emitter you
 actually shipped.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/cosim.py</span></code> is a working driver: it
+<li><p><code class="docutils literal notranslate"><span class="pre">examples/tinytpu/cosim.py</span></code> is a working driver: it
 generates a plain C++ testbench from the same program and reference the
 simulator uses, patches <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> depths (cosim requires them; Allo emits none),
 and drives <code class="docutils literal notranslate"><span class="pre">vitis_hls</span></code>. It is ~180 lines and could be folded into the backend.</p></li>
@@ -1375,37 +1148,11 @@ broadcast is the cause</p></td>
 </table>
 <p>The actual cause was #11, in the simulator, not in any of these.</p>
 </section>
-<section id="the-emitter-can-generate-a-local-whose-name-collides-with-a-parameter">
-<span id="limitation-20"></span><h3>20. The emitter can generate a local whose name collides with a parameter<a class="headerlink" href="#the-emitter-can-generate-a-local-whose-name-collides-with-a-parameter" title="Link to this heading"><span>¶</span></a></h3>
-<div class="admonition-status-re-verified-2026-09-19 admonition">
-<p class="admonition-title">Status (re-verified 2026-09-19)</p>
-<p>FIXED by <code class="docutils literal notranslate"><span class="pre">aece11c9</span></code> (fork-only; upstreaming candidate).</p>
-</div>
-<p>A kernel body that produces enough SSA temporaries can emit a local with the
-same name as one of the function’s own parameters, giving C++ that does not
-compile:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">mover_0</span><span class="p">(</span><span class="kt">int32_t</span><span class="w"> </span><span class="n">v0</span><span class="p">[</span><span class="mi">8</span><span class="p">],</span><span class="w"> </span><span class="kt">int8_t</span><span class="w"> </span><span class="n">v1</span><span class="p">[</span><span class="mi">256</span><span class="p">],</span><span class="w"> </span><span class="n">hls</span><span class="o">::</span><span class="n">stream</span><span class="o">&lt;</span><span class="w"> </span><span class="kt">int32_t</span><span class="w"> </span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">v2</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="p">...</span>
-<span class="w">  </span><span class="kt">int8_t</span><span class="w"> </span><span class="n">v2</span><span class="p">;</span><span class="w">          </span><span class="c1">// shadows the stream parameter</span>
-<span class="w">  </span><span class="n">v2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v50</span><span class="p">;</span>
-<span class="w">  </span><span class="p">...</span><span class="w">                 </span><span class="c1">// later use of v2 as a stream:</span>
-<span class="p">}</span>
-<span class="c1">// ERROR: [HLS 207-3746] subscripted value is not an array, pointer, or vector</span>
-</pre></div>
-</div>
-<ul class="simple">
-<li><p>Found while probing m_axi burst behaviour (item 13): a <code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code> taking
-three arguments, the third a <code class="docutils literal notranslate"><span class="pre">Stream</span></code>, with a <code class="docutils literal notranslate"><span class="pre">meta_for</span></code> body creating
-several temporaries. The parameter list is numbered <code class="docutils literal notranslate"><span class="pre">v0,</span> <span class="pre">v1,</span> <span class="pre">v2</span></code> and the
-body’s temporaries restart into the same namespace.</p></li>
-<li><p>The failure is late and the message is unhelpful: it surfaces from the C++
-front end as a subscript error on a name the user never wrote, with no
-indication that a collision happened. Nothing in Allo warns.</p></li>
-<li><p>Workaround: change the kernel’s arity or restructure the body so the counters
-do not meet – which is to say, guess.</p></li>
-<li><p><strong>Priority: Medium.</strong> It is silent at the Allo level, and the diagnostic
-points nowhere near the cause.</p></li>
-</ul>
+<section id="the-emitter-could-generate-a-local-whose-name-collided-with-a-parameter-closed">
+<span id="limitation-20"></span><h3>20. The emitter could generate a local whose name collided with a parameter – closed<a class="headerlink" href="#the-emitter-could-generate-a-local-whose-name-collided-with-a-parameter-closed" title="Link to this heading"><span>¶</span></a></h3>
+<p>FIXED by <code class="docutils literal notranslate"><span class="pre">aece11c9</span></code> (fork-only; upstreaming candidate). Closed as
+<a class="reference external" href="https://github.com/sunwookim028/allo/issues/43">issue #43</a>, which carries
+the root cause, the fix and the repro.</p>
 </section>
 <section id="no-pragma-hls-dependence-primitive-so-a-false-dependence-cannot-be-asserted-away">
 <span id="limitation-21"></span><h3>21. No <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span></code> primitive, so a false dependence cannot be asserted away<a class="headerlink" href="#no-pragma-hls-dependence-primitive-so-a-false-dependence-cannot-be-asserted-away" title="Link to this heading"><span>¶</span></a></h3>
@@ -1513,13 +1260,13 @@ with T while the 2.3% does not. The shipped design is back to the nested form
 at II=2.</p></li>
 <li><p><strong>Priced, 2026-09-19</strong> (replacing “the 2.3% itself, forgone”): injecting
 <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span> <span class="pre">variable=ar</span> <span class="pre">inter</span> <span class="pre">false</span></code> into the emitted
-<code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code> (<code class="docutils literal notranslate"><span class="pre">v_accudep</span></code>, now under <code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/impact/</span></code>)
+<code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code> (<code class="docutils literal notranslate"><span class="pre">v_accudep</span></code>, now under <code class="docutils literal notranslate"><span class="pre">examples/tinytpu/impact/</span></code>)
 measures <strong>35 cycles</strong> at 16x16x16 on the then-shipped design (919 -&gt; 884; 5
 at 4x4x4), and <strong>95</strong> once the design fixes are in (<code class="docutils literal notranslate"><span class="pre">v_design_dep</span></code>). The
 pragma form costs <strong>1,744 FF</strong> in <code class="docutils literal notranslate"><span class="pre">accu</span></code> against <strong>17,438</strong> for the
 reverted rotation. Before the fix the only way to get it was patching
 <code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code> between <code class="docutils literal notranslate"><span class="pre">s.build(mode=&quot;csyn&quot;)</span></code> and running Vitis.
-Attribution: <a class="reference internal" href="../designs/gemmini_comparison.html#gemmini-gap-attribution"><span class="std std-ref">Where the deficit came from, and what was landed</span></a>.</p></li>
+Attribution: <a class="reference internal" href="../designs/gemmini_results.html#gemmini-gap-attribution"><span class="std std-ref">Where the deficit came from, and what was landed</span></a>.</p></li>
 <li><p><strong>A dependence claim is a contract, and the primitive does not check it.</strong>
 Landing the claim on TinyTPU-isa showed that <code class="docutils literal notranslate"><span class="pre">inter</span> <span class="pre">false</span></code> on <code class="docutils literal notranslate"><span class="pre">ar</span></code> is
 true only for programs that never read an accumulator row within two
@@ -1548,7 +1295,7 @@ kernel’s outermost loop into <code class="docutils literal notranslate"><span 
 induction variable is unused) made <code class="docutils literal notranslate"><span class="pre">acc</span></code> run unthrottled, and that
 <code class="docutils literal notranslate"><span class="pre">72c70dcb</span></code>’s guard missed it because <code class="docutils literal notranslate"><span class="pre">acc</span></code> has no memory port. The guard was
 extended to any loop body containing a <code class="docutils literal notranslate"><span class="pre">WireGetOp</span></code> (<code class="docutils literal notranslate"><span class="pre">guard_experiment/</span></code> under
-<code class="docutils literal notranslate"><span class="pre">examples/systemc_rtlsim/</span></code>), <code class="docutils literal notranslate"><span class="pre">pe_split.py</span></code> was re-emitted from
+<code class="docutils literal notranslate"><span class="pre">tests/systemc/rtlsim/</span></code>), <code class="docutils literal notranslate"><span class="pre">examples/systemc/pe_split.py</span></code> was re-emitted from
 <code class="docutils literal notranslate"><span class="pre">choonsik1/SystemC-emitter</span></code> with and without it, synthesised with Catapult
 2024.2, and simulated under Xcelium 24.03:</p>
 <ul class="simple">
@@ -1653,11 +1400,11 @@ alignment 1(bytes)
 </div>
 <p><strong>Scope, and it is the point of this item: every result below was measured on
 PROBES</strong> – small standalone kernels written to provoke that message – <strong>not on
-the real design</strong> (<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/microarch_isa.py</span></code>).
+the real design</strong> (<code class="docutils literal notranslate"><span class="pre">examples/tinytpu/microarch_isa.py</span></code>).
 Whether the real design reproduces <code class="docutils literal notranslate"><span class="pre">HLS</span> <span class="pre">214-307</span></code> at all is an <strong>open question</strong>,
 under separate investigation as of 2026-09-18. Three files already assert the
 widening block as a whole-design fact –
-<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/microarch_isa.py:247</span></code>,
+<code class="docutils literal notranslate"><span class="pre">examples/tinytpu/microarch_isa.py:247</span></code>,
 <code class="docutils literal notranslate"><span class="pre">RESULTS_ISA.md:467</span></code>, <code class="docutils literal notranslate"><span class="pre">COMPARISON.md:280</span></code> – and the probes do <strong>not</strong> establish
 that. Nothing here upgrades them; a probe result is not a design result.</p>
 <p>What the probes did settle:</p>
@@ -1746,8 +1493,8 @@ a cure and not a characterisation. Cheap half:
 <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">tests/limits/item24_cosim_hang.py</span></code> (seconds, no Vitis). RTL half:
 <code class="docutils literal notranslate"><span class="pre">ALLO_LIMITS_COSIM=1</span></code> on the same file (one csynth, ten cosims, tens of
 minutes). Family and bisection:
-<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/act/rtl_hang.py</span></code>; log:
-<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/logs/cosim_act_rtl_hang_bisect.log</span></code>.</p>
+<code class="docutils literal notranslate"><span class="pre">examples/tinytpu/act/rtl_hang.py</span></code>; log:
+<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/logs/cosim_act_rtl_hang_bisect.log</span></code>.</p>
 </div>
 <p>A legal, bit-exact TinyTPU-isa program of <strong>sixteen instructions</strong> passes every
 check the fork has short of RTL and then does not finish in <code class="docutils literal notranslate"><span class="pre">cosim_design</span></code>:</p>
@@ -1783,7 +1530,7 @@ check the fork has short of RTL and then does not finish in <code class="docutil
 </tbody>
 </table>
 <p>This is the second independent occurrence. The first is on
-<a class="reference internal" href="../extensions/act.html"><span class="doc">ACT, and Why We Cite It</span></a>, where two row-tiled ACT mappings behaved the same way
+<a class="reference internal" href="../extensions/act.html"><span class="doc">ACT and the TinyTPU-isa Mapper</span></a>, where two row-tiled ACT mappings behaved the same way
 and the flow withdrew its “5 encodable” claim in favour of “3 confirmed on
 RTL”; that instance was found by a different tree, from a different generator,
 on the same design.</p>
@@ -1879,7 +1626,7 @@ unrolled.</p></li>
 minimal case is in it. Conversely <code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> at 16x16x16 has a <code class="docutils literal notranslate"><span class="pre">vrelu</span></code>
 in a loop and completes in 750 cycles.</p></li>
 <li><p><strong>Not “a transfer inside the emitted nest rather than hoisted into a
-prologue”</strong> – the hypothesis left open on <a class="reference internal" href="../extensions/act.html"><span class="doc">ACT, and Why We Cite It</span></a>. Measured
+prologue”</strong> – the hypothesis left open on <a class="reference internal" href="../extensions/act.html"><span class="doc">ACT and the TinyTPU-isa Mapper</span></a>. Measured
 the other way round, twice each: <strong>both</strong> non-completing programs have every
 transfer in a prologue, and <strong>both</strong> <code class="docutils literal notranslate"><span class="pre">weights_reloaded</span></code> mappings, which
 issue a <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> between <code class="docutils literal notranslate"><span class="pre">mvout</span></code>s inside the output nest, complete
@@ -2272,7 +2019,7 @@ anything that cosims a program which may not finish should do the same.</p></li>
 <p>Found while re-verifying the items above (A-F, with repros under
 <code class="docutils literal notranslate"><span class="pre">tests/limits/</span></code>) and while pricing the TinyTPU-isa deficit to Gemmini (G and
 the shared-memory item; the variants are on <code class="docutils literal notranslate"><span class="pre">main</span></code> under
-<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/impact/</span></code>, folded in from branch
+<code class="docutils literal notranslate"><span class="pre">examples/tinytpu/impact/</span></code>, folded in from branch
 <code class="docutils literal notranslate"><span class="pre">impact-limits</span></code> – commits <code class="docutils literal notranslate"><span class="pre">f98c0dac</span></code> and <code class="docutils literal notranslate"><span class="pre">55405e00</span></code> – since deleted).</p>
 <section id="shared-on-chip-memory-the-one-owner-rule-is-allo-s-not-vitis-s">
 <span id="limitation-shared-memory"></span><h3>Shared on-chip memory: the one-owner rule is Allo’s, not Vitis’s<a class="headerlink" href="#shared-on-chip-memory-the-one-owner-rule-is-allo-s-not-vitis-s" title="Link to this heading"><span>¶</span></a></h3>
@@ -2458,21 +2205,21 @@ sub-region – about five lines, not yet prototyped.</p>
 </li>
 <li><a class="reference internal" href="#corrections-from-the-2026-09-19-re-verification-and-impact-analysis">Corrections from the 2026-09-19 re-verification and impact analysis</a></li>
 <li><a class="reference internal" href="#surfaced-while-building-the-l2-tpu-flashattention">Surfaced while building the L2 TPU (FlashAttention)</a><ul>
-<li><a class="reference internal" href="#region-scope-stateful-lowering-is-incomplete-on-main">1. Region-scope <code class="docutils literal notranslate"><span class="pre">&#64;</span> <span class="pre">Stateful</span></code> lowering is incomplete on <code class="docutils literal notranslate"><span class="pre">main</span></code></a></li>
-<li><a class="reference internal" href="#stateful-cannot-be-declared-inside-df-kernel-bodies">2. <code class="docutils literal notranslate"><span class="pre">&#64;</span> <span class="pre">Stateful</span></code> cannot be declared inside <code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code> bodies</a></li>
-<li><a class="reference internal" href="#simulator-drops-nested-call-stream-lowering">3. Simulator drops nested-call stream lowering</a></li>
+<li><a class="reference internal" href="#region-scope-stateful-lowering-was-incomplete-item-6-closed">1. Region-scope <code class="docutils literal notranslate"><span class="pre">&#64;</span> <span class="pre">Stateful</span></code> lowering was incomplete (+ item 6) – closed</a></li>
+<li><a class="reference internal" href="#stateful-could-not-be-declared-inside-df-kernel-bodies-closed">2. <code class="docutils literal notranslate"><span class="pre">&#64;</span> <span class="pre">Stateful</span></code> could not be declared inside <code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code> bodies – closed</a></li>
+<li><a class="reference internal" href="#simulator-dropped-nested-call-stream-lowering-closed">3. Simulator dropped nested-call stream lowering – closed</a></li>
 <li><a class="reference internal" href="#math-exp-math-log-are-not-recognized-by-the-ast-builder">4. <code class="docutils literal notranslate"><span class="pre">math.exp</span></code> / <code class="docutils literal notranslate"><span class="pre">math.log</span></code> are not recognized by the AST builder</a></li>
 <li><a class="reference internal" href="#variable-shadowing-between-region-params-and-kernel-local-names">5. Variable shadowing between region params and kernel-local names</a></li>
-<li><a class="reference internal" href="#local-int32-decls-inside-elif-branches-don-t-dominate-uses">6. Local <code class="docutils literal notranslate"><span class="pre">int32</span></code> decls inside <code class="docutils literal notranslate"><span class="pre">elif</span></code> branches don’t dominate uses</a></li>
-<li><a class="reference internal" href="#no-bitwise-operator-support-in-allo-expression-dsl">7. No bitwise <code class="docutils literal notranslate"><span class="pre">&amp;</span></code> operator support in Allo expression DSL</a></li>
+<li><a class="reference internal" href="#local-int32-decls-inside-elif-branches-don-t-dominate-uses-closed">6. Local <code class="docutils literal notranslate"><span class="pre">int32</span></code> decls inside <code class="docutils literal notranslate"><span class="pre">elif</span></code> branches don’t dominate uses – closed</a></li>
+<li><a class="reference internal" href="#no-bitwise-operator-support-in-allo-expression-dsl-closed">7. No bitwise <code class="docutils literal notranslate"><span class="pre">&amp;</span></code> operator support in Allo expression DSL – closed</a></li>
 <li><a class="reference internal" href="#single-mxu-call-rule-allo-region-instantiation">8. Single-MXU-call rule (Allo region instantiation)</a></li>
-<li><a class="reference internal" href="#sim-cache-invalidation-misses-imported-helpers">9. Sim cache invalidation misses imported helpers</a></li>
+<li><a class="reference internal" href="#sim-cache-invalidation-misses-imported-helpers-closed">9. Sim cache invalidation misses imported helpers – closed</a></li>
 <li><a class="reference internal" href="#error-messages-point-at-lowered-mlir-not-source">10. Error messages point at lowered MLIR, not source</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#surfaced-while-building-an-instruction-programmable-tpu-2026-09">Surfaced while building an instruction-programmable TPU (2026-09)</a><ul>
-<li><a class="reference internal" href="#the-dataflow-simulator-deadlocks-when-processes-outnumber-omp-threads-fixed">11. The dataflow simulator deadlocks when processes outnumber OMP threads — <strong>FIXED</strong></a></li>
-<li><a class="reference internal" href="#bit-slices-lower-to-signed-ap-int-n-silently-and-the-simulator-disagrees">12. Bit-slices lower to <em>signed</em> <code class="docutils literal notranslate"><span class="pre">ap_int&lt;N&gt;</span></code>, silently, and the simulator disagrees</a></li>
+<li><a class="reference internal" href="#the-dataflow-simulator-deadlocked-when-processes-outnumbered-omp-threads-closed">11. The dataflow simulator deadlocked when processes outnumbered OMP threads – closed</a></li>
+<li><a class="reference internal" href="#bit-slices-lowered-to-signed-ap-int-n-silently-and-the-simulator-disagreed-closed">12. Bit-slices lowered to <em>signed</em> <code class="docutils literal notranslate"><span class="pre">ap_int&lt;N&gt;</span></code>, silently, and the simulator disagreed – closed</a></li>
 <li><a class="reference internal" href="#no-program-controlled-dma-struck-largely-retracted-the-gap-is-convenience-not-capability">13. “No program-controlled DMA” (struck) – <strong>largely RETRACTED</strong>; the gap is convenience, not capability</a><ul>
 <li><a class="reference internal" href="#the-retraction-2026-09-18">The retraction (2026-09-18)</a></li>
 <li><a class="reference internal" href="#the-general-lesson">The general lesson</a></li>
@@ -2486,7 +2233,7 @@ sub-region – about five lines, not yet prototyped.</p>
 <li><a class="reference internal" href="#try-get-try-put-on-the-tapa-target-fail-to-emit-with-a-generic-message">19. <code class="docutils literal notranslate"><span class="pre">try_get</span></code>/<code class="docutils literal notranslate"><span class="pre">try_put</span></code> on the TAPA target fail to emit, with a generic message</a></li>
 <li><a class="reference internal" href="#a-failure-mode-worth-naming-an-unused-capability-measures-as-a-worthless-one">A failure mode worth naming: an unused capability measures as a worthless one</a></li>
 <li><a class="reference internal" href="#theories-tested-and-disproved">Theories tested and disproved</a></li>
-<li><a class="reference internal" href="#the-emitter-can-generate-a-local-whose-name-collides-with-a-parameter">20. The emitter can generate a local whose name collides with a parameter</a></li>
+<li><a class="reference internal" href="#the-emitter-could-generate-a-local-whose-name-collided-with-a-parameter-closed">20. The emitter could generate a local whose name collided with a parameter – closed</a></li>
 <li><a class="reference internal" href="#no-pragma-hls-dependence-primitive-so-a-false-dependence-cannot-be-asserted-away">21. No <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span></code> primitive, so a false dependence cannot be asserted away</a></li>
 <li><a class="reference internal" href="#the-systemc-fork-s-wire-is-semantically-incomplete-and-wrong-in-rtl-not-just-in-simulation">22. The SystemC fork’s <code class="docutils literal notranslate"><span class="pre">Wire</span></code> is semantically incomplete – and wrong in RTL, not just in simulation</a><ul>
 <li><a class="reference internal" href="#two-incidental-findings">Two incidental findings</a></li>

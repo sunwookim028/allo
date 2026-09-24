@@ -539,7 +539,7 @@ MAXDIM -> resources
 
 One ``csynth_design`` per configuration, ``xcu280-fsvh2892-2L-e``, 3.33 ns
 target (``csynth_sweep.py``; reports kept under
-``examples/accelerator/tinytpu_vitis/csynth_reports/``).
+``examples/tinytpu/csynth_reports/``).
 
 .. list-table::
    :header-rows: 1
@@ -1788,7 +1788,8 @@ more at small shapes than large ones.
 **2. The residual steady-state gap, ~5 700 cycles at 64x64x64** (22 123 against
 an ideal 16 384; Gemmini is at 20 375 against the same ideal, so ~4 000 of it
 is not ours specifically). Per the timeline attribution in
-``impact/results/`` and ``chia_agent/evidence/``, the three components are
+``dev/records/tinytpu/impact-results/`` and
+``dev/records/tinytpu/chia-evidence/``, the three components are
 operand staging ahead of the first MAC, the serial DMA before the first
 weight, and the drain. None has been built. The method is
 ``impact/profile.sh``: re-run cosim with ``-enable_dataflow_profiling``, re-run
@@ -1819,7 +1820,7 @@ What would have to change, in order of **measured** value:
    what the program needs.
 #. **Profile at 64x64x64 before touching term 2.** Every existing timeline was
    taken at 16x16x16, where term 1 dominates and term 2 is invisible, so the
-   operand-staging/DMA/drain split in ``impact/results/`` is an estimate made
+   operand-staging/DMA/drain split in ``dev/records/tinytpu/impact-results/`` is an estimate made
    in the wrong regime.
 #. **For T=8, widen the encoding fields.** T=8's deficit does not converge
    because 64x64x64 is still in its ramp (57.8% of peak); reaching steady
@@ -1980,7 +1981,7 @@ Reproducing
    source $(conda info --base)/etc/profile.d/conda.sh && conda activate allo
    export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build OMP_NUM_THREADS=8
    export PYTHONPATH=$PWD
-   cd examples/accelerator/tinytpu_vitis
+   cd examples/tinytpu
 
    # functional, seconds -- the gates every configuration must pass
    TPU_SET=all python bench_isa.py                 # ALL EXACT
@@ -2019,7 +2020,7 @@ Gemmini, in a **separate shell** (``env.sh`` replaces the ``allo`` conda env):
 .. code-block:: bash
 
    R=/home/sk3463/chipyard/generators/gemmini/software/gemmini-rocc-tests
-   cp examples/accelerator/tinytpu_vitis/gemmini/allo_bare_steady.c $R/bareMetalC/
+   cp examples/tinytpu/gemmini/allo_bare_steady.c $R/bareMetalC/
    cd /home/sk3463/chipyard && source env.sh
    make -C $R/build/bareMetalC -f $R/bareMetalC/Makefile \
         abs_top_srcdir=$R XLEN=64 src_dir=$R/bareMetalC allo_bare_steady-baremetal
@@ -2033,7 +2034,7 @@ A shape change is C-only. A **config** change (DIM, dtype, capacity) needs
 elaboration, so the DIM=4 header must be snapshotted first and the C rebuilt
 immediately afterwards. Check the boot banner says the DIM you expect. The
 config patches for both matched points are committed at
-``examples/accelerator/tinytpu_vitis/gemmini/``.
+``examples/tinytpu/gemmini/``.
 
 .. note::
 
@@ -2057,6 +2058,35 @@ config patches for both matched points are committed at
    :doc:`tinytpu_isa` for the design, :doc:`gemmini_comparison` for the
    latency-set comparison at MAXDIM=16 and the gap attribution,
    :doc:`minitpu` for MiniTPU.
+
+
+Where the other pages' results live
+===================================
+
+This page is the benchmark set. The reference pages for each design and each
+flow carry no measurements of their own; their results, corrections and
+retractions are on a results page of their own, listed here so that a
+superseded figure can be traced from whichever page quoted it.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
+
+   * - results page
+     - what it carries
+   * - :doc:`tinytpu_isa_results`
+     - the five-shape latency row at ``MAXDIM=16``, resources, the one
+       standard-cell synthesis figure, and how the published row moved
+   * - :doc:`gemmini_results`
+     - the matched comparison, the marginal-cost sweep, area and frequency,
+       and the parity-baseline results
+   * - :doc:`/extensions/chia_results`
+     - the CHIA loop's paid runs, what they do and do not demonstrate, and
+       the planned experiments
+   * - :doc:`/extensions/chia_codesign`
+     - the retired ``chia-codesign`` effort and its claim register
+   * - :doc:`tinytpu_history`
+     - the design's longer optimisation history
 
 
 Earlier measurements and corrections
@@ -2195,7 +2225,24 @@ which is the exposure that moved the published MAXDIM=16 row by one cycle
    8x8x8     285   (was 285)      16x16x16   493   (was 493)
    16x16x8   424   (was 424)      64x64x64  7083   (was 7083)
 
-every one bit-exact and identical. That is consistent with the mechanism
+every one bit-exact and identical.
+
+.. note::
+
+   **That reading was taken at ``QD=8`` and no longer reproduces.** Channel
+   depth became 16 in ``63ee6ec7``, and the same sweep on ``main`` 92f0618f
+   returns **286 / 425 / 490** at 8x8x8, 16x16x8 and 16x16x16 and **6916** at
+   64x64x64 --- ``+1 / +1 / -3 / -167``. The re-export in
+   ``rtl_handoff/T8_MAXDIM64/`` carries that row and the invocation it was
+   measured with. The *claim* this paragraph makes survives intact: the
+   burst-``DMA_WORDS`` refactor left the T=8 column alone, which is why the
+   whole of the shift above is attributable to ``QD``, and the sign pattern is
+   the one ``63ee6ec7`` measured at T=4 --- small shapes pay deeper-FIFO
+   pipeline skew, large shapes gain because the sequencer runs further ahead.
+   The gain is far larger here: -2.4% at 64x64x64 against -1.2% at T=4, since
+   an 8x8 array starves sooner when the queue is shallow.
+
+That is consistent with the mechanism
 rather than merely reassuring: at T=8/MAXDIM=64 the memory *sizes* do not
 change (``OPERAND_ROWS`` is 512 either way), only ``rbA``/``rbB`` grew by one
 word --- which is what took BRAM 58 -> 62 and nothing else. **The burst loop
@@ -2204,7 +2251,8 @@ configurations**: T=4/MAXDIM=16, T=4/MAXDIM=64 and T=8/MAXDIM=64. That is
 what licenses the widening being a pure opt-in.
 
 The entry most exposed was **16x16x8**, the only shape where this design beats
-Gemmini on a supportable margin, and it returned 424 exactly.
+Gemmini on a supportable margin, and it returned 424 exactly --- and 425 at
+``QD=16``, one cycle, which does not move that margin.
 
 An earlier reading of the same bar
 ----------------------------------

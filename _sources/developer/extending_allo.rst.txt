@@ -485,7 +485,7 @@ separately from the units it wires.
 
 **The evidence.**
 
-* ``examples/accelerator/tinytpu_vitis/microarch_isa.py``: one
+* ``examples/tinytpu/microarch_isa.py``: one
   ``@df.region()`` taking no arguments, 8 ``@df.kernel``\ s all nested inside
   it as closures, 0 defined at module level. 16 stream declarations, **29
   capture edges**, and every stream has exactly one producer kernel and one
@@ -630,7 +630,7 @@ primitive can tile or reorder them together.
 
 **The evidence.** Measured on a two-level loop-nest mapspace for TinyTPU-isa
 (branch ``act-investigation``,
-``examples/accelerator/tinytpu_vitis/act_nest.py``; reproduced here):
+``examples/tinytpu/act_nest.py``; reproduced here):
 **1,226 nests enumerated, 3 encodable, and 1,150 of them refused at one
 instruction field, ``acc``.** The ``k = 0`` tile has to be a peelable prefix,
 which pins the reduction innermost and unsplit and kills every permutation that

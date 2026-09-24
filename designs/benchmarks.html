@@ -26,7 +26,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="The Workload Suite: PyTorch MLPs on TinyTPU" href="workload_suite.html" />
-    <link rel="prev" title="TinyTPU-isa vs Gemmini: A Matched Comparison" href="gemmini_comparison.html" /> 
+    <link rel="prev" title="TinyTPU-isa vs Gemmini: Results and History" href="gemmini_results.html" /> 
   </head><body data-dark_mode_code_blocks="true">
 
 <div id="top_nav">
@@ -166,6 +166,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
@@ -175,8 +176,12 @@
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gemmini_results.html">TinyTPU-isa vs Gemmini: Results and History</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">The Benchmark Set</a></li>
 <li class="toctree-l1"><a class="reference internal" href="workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_history.html">TinyTPU-isa: Design History</a></li>
@@ -187,9 +192,13 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia_results.html">CHIA Agentic Co-Design: Results</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia_codesign.html">The Original Co-Design Effort (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT and the TinyTPU-isa Mapper</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act_results.html">ACT: Results, Findings and Corrections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
 <ul>
@@ -789,7 +798,7 @@ instruction stream.</p>
 <h3>MAXDIM -&gt; resources<a class="headerlink" href="#maxdim-resources" title="Link to this heading"><span>¶</span></a></h3>
 <p>One <code class="docutils literal notranslate"><span class="pre">csynth_design</span></code> per configuration, <code class="docutils literal notranslate"><span class="pre">xcu280-fsvh2892-2L-e</span></code>, 3.33 ns
 target (<code class="docutils literal notranslate"><span class="pre">csynth_sweep.py</span></code>; reports kept under
-<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/csynth_reports/</span></code>).</p>
+<code class="docutils literal notranslate"><span class="pre">examples/tinytpu/csynth_reports/</span></code>).</p>
 <table class="docutils align-default">
 <colgroup>
 <col style="width: 8.9%" />
@@ -2166,7 +2175,8 @@ more at small shapes than large ones.</p>
 <p><strong>2. The residual steady-state gap, ~5 700 cycles at 64x64x64</strong> (22 123 against
 an ideal 16 384; Gemmini is at 20 375 against the same ideal, so ~4 000 of it
 is not ours specifically). Per the timeline attribution in
-<code class="docutils literal notranslate"><span class="pre">impact/results/</span></code> and <code class="docutils literal notranslate"><span class="pre">chia_agent/evidence/</span></code>, the three components are
+<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/impact-results/</span></code> and
+<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/chia-evidence/</span></code>, the three components are
 operand staging ahead of the first MAC, the serial DMA before the first
 weight, and the drain. None has been built. The method is
 <code class="docutils literal notranslate"><span class="pre">impact/profile.sh</span></code>: re-run cosim with <code class="docutils literal notranslate"><span class="pre">-enable_dataflow_profiling</span></code>, re-run
@@ -2195,7 +2205,7 @@ shapes, where the waste is 16x, and nothing at 64^3, where the full row is
 what the program needs.</p></li>
 <li><p><strong>Profile at 64x64x64 before touching term 2.</strong> Every existing timeline was
 taken at 16x16x16, where term 1 dominates and term 2 is invisible, so the
-operand-staging/DMA/drain split in <code class="docutils literal notranslate"><span class="pre">impact/results/</span></code> is an estimate made
+operand-staging/DMA/drain split in <code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/impact-results/</span></code> is an estimate made
 in the wrong regime.</p></li>
 <li><p><strong>For T=8, widen the encoding fields.</strong> T=8’s deficit does not converge
 because 64x64x64 is still in its ramp (57.8% of peak); reaching steady
@@ -2355,7 +2365,7 @@ writing the gap down is the alternative to quietly omitting it.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">source</span><span class="w"> </span><span class="k">$(</span>conda<span class="w"> </span>info<span class="w"> </span>--base<span class="k">)</span>/etc/profile.d/conda.sh<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>conda<span class="w"> </span>activate<span class="w"> </span>allo
 <span class="nb">export</span><span class="w"> </span><span class="nv">LLVM_BUILD_DIR</span><span class="o">=</span>/home/sk3463/llvm-allo-6b09f739/build<span class="w"> </span><span class="nv">OMP_NUM_THREADS</span><span class="o">=</span><span class="m">8</span>
 <span class="nb">export</span><span class="w"> </span><span class="nv">PYTHONPATH</span><span class="o">=</span><span class="nv">$PWD</span>
-<span class="nb">cd</span><span class="w"> </span>examples/accelerator/tinytpu_vitis
+<span class="nb">cd</span><span class="w"> </span>examples/tinytpu
 
 <span class="c1"># functional, seconds -- the gates every configuration must pass</span>
 <span class="nv">TPU_SET</span><span class="o">=</span>all<span class="w"> </span>python<span class="w"> </span>bench_isa.py<span class="w">                 </span><span class="c1"># ALL EXACT</span>
@@ -2391,7 +2401,7 @@ outright if <code class="docutils literal notranslate"><span class="pre">/home</
 filesystem shared with several other agents.</p>
 <p>Gemmini, in a <strong>separate shell</strong> (<code class="docutils literal notranslate"><span class="pre">env.sh</span></code> replaces the <code class="docutils literal notranslate"><span class="pre">allo</span></code> conda env):</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">R</span><span class="o">=</span>/home/sk3463/chipyard/generators/gemmini/software/gemmini-rocc-tests
-cp<span class="w"> </span>examples/accelerator/tinytpu_vitis/gemmini/allo_bare_steady.c<span class="w"> </span><span class="nv">$R</span>/bareMetalC/
+cp<span class="w"> </span>examples/tinytpu/gemmini/allo_bare_steady.c<span class="w"> </span><span class="nv">$R</span>/bareMetalC/
 <span class="nb">cd</span><span class="w"> </span>/home/sk3463/chipyard<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">source</span><span class="w"> </span>env.sh
 make<span class="w"> </span>-C<span class="w"> </span><span class="nv">$R</span>/build/bareMetalC<span class="w"> </span>-f<span class="w"> </span><span class="nv">$R</span>/bareMetalC/Makefile<span class="w"> </span><span class="se">\</span>
 <span class="w">     </span><span class="nv">abs_top_srcdir</span><span class="o">=</span><span class="nv">$R</span><span class="w"> </span><span class="nv">XLEN</span><span class="o">=</span><span class="m">64</span><span class="w"> </span><span class="nv">src_dir</span><span class="o">=</span><span class="nv">$R</span>/bareMetalC<span class="w"> </span>allo_bare_steady-baremetal
@@ -2406,7 +2416,7 @@ make<span class="w"> </span>-C<span class="w"> </span><span class="nv">$R</span>
 elaboration, so the DIM=4 header must be snapshotted first and the C rebuilt
 immediately afterwards. Check the boot banner says the DIM you expect. The
 config patches for both matched points are committed at
-<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/gemmini/</span></code>.</p>
+<code class="docutils literal notranslate"><span class="pre">examples/tinytpu/gemmini/</span></code>.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p><strong>The published 175/265/421/482/674 are a MAXDIM=16 measurement</strong>, and the
@@ -2429,6 +2439,44 @@ benchmark’s provenance, the MAXDIM=64 sweep is the matched comparison.</p>
 latency-set comparison at MAXDIM=16 and the gap attribution,
 <a class="reference internal" href="minitpu.html"><span class="doc">MiniTPU: Reference Architecture</span></a> for MiniTPU.</p>
 </div>
+</section>
+<section id="where-the-other-pages-results-live">
+<h2>Where the other pages’ results live<a class="headerlink" href="#where-the-other-pages-results-live" title="Link to this heading"><span>¶</span></a></h2>
+<p>This page is the benchmark set. The reference pages for each design and each
+flow carry no measurements of their own; their results, corrections and
+retractions are on a results page of their own, listed here so that a
+superseded figure can be traced from whichever page quoted it.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 40.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>results page</p></th>
+<th class="head"><p>what it carries</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><a class="reference internal" href="tinytpu_isa_results.html"><span class="doc">TinyTPU-isa: Results and History</span></a></p></td>
+<td><p>the five-shape latency row at <code class="docutils literal notranslate"><span class="pre">MAXDIM=16</span></code>, resources, the one
+standard-cell synthesis figure, and how the published row moved</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="gemmini_results.html"><span class="doc">TinyTPU-isa vs Gemmini: Results and History</span></a></p></td>
+<td><p>the matched comparison, the marginal-cost sweep, area and frequency,
+and the parity-baseline results</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../extensions/chia_results.html"><span class="doc">CHIA Agentic Co-Design: Results</span></a></p></td>
+<td><p>the CHIA loop’s paid runs, what they do and do not demonstrate, and
+the planned experiments</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../extensions/chia_codesign.html"><span class="doc">The Original Co-Design Effort (chia-codesign)</span></a></p></td>
+<td><p>the retired <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> effort and its claim register</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="tinytpu_history.html"><span class="doc">TinyTPU-isa: Design History</span></a></p></td>
+<td><p>the design’s longer optimisation history</p></td>
+</tr>
+</tbody>
+</table>
 </section>
 <section id="earlier-measurements-and-corrections">
 <h2>Earlier measurements and corrections<a class="headerlink" href="#earlier-measurements-and-corrections" title="Link to this heading"><span>¶</span></a></h2>
@@ -2543,7 +2591,23 @@ which is the exposure that moved the published MAXDIM=16 row by one cycle
 16x16x8   424   (was 424)      64x64x64  7083   (was 7083)
 </pre></div>
 </div>
-<p>every one bit-exact and identical. That is consistent with the mechanism
+<p>every one bit-exact and identical.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>That reading was taken at ``QD=8`` and no longer reproduces.</strong> Channel
+depth became 16 in <code class="docutils literal notranslate"><span class="pre">63ee6ec7</span></code>, and the same sweep on <code class="docutils literal notranslate"><span class="pre">main</span></code> 92f0618f
+returns <strong>286 / 425 / 490</strong> at 8x8x8, 16x16x8 and 16x16x16 and <strong>6916</strong> at
+64x64x64 — <code class="docutils literal notranslate"><span class="pre">+1</span> <span class="pre">/</span> <span class="pre">+1</span> <span class="pre">/</span> <span class="pre">-3</span> <span class="pre">/</span> <span class="pre">-167</span></code>. The re-export in
+<code class="docutils literal notranslate"><span class="pre">rtl_handoff/T8_MAXDIM64/</span></code> carries that row and the invocation it was
+measured with. The <em>claim</em> this paragraph makes survives intact: the
+burst-<code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code> refactor left the T=8 column alone, which is why the
+whole of the shift above is attributable to <code class="docutils literal notranslate"><span class="pre">QD</span></code>, and the sign pattern is
+the one <code class="docutils literal notranslate"><span class="pre">63ee6ec7</span></code> measured at T=4 — small shapes pay deeper-FIFO
+pipeline skew, large shapes gain because the sequencer runs further ahead.
+The gain is far larger here: -2.4% at 64x64x64 against -1.2% at T=4, since
+an 8x8 array starves sooner when the queue is shallow.</p>
+</div>
+<p>That is consistent with the mechanism
 rather than merely reassuring: at T=8/MAXDIM=64 the memory <em>sizes</em> do not
 change (<code class="docutils literal notranslate"><span class="pre">OPERAND_ROWS</span></code> is 512 either way), only <code class="docutils literal notranslate"><span class="pre">rbA</span></code>/<code class="docutils literal notranslate"><span class="pre">rbB</span></code> grew by one
 word — which is what took BRAM 58 -&gt; 62 and nothing else. <strong>The burst loop
@@ -2551,7 +2615,8 @@ is now shown cycle-neutral at ``DMA_WORDS=1`` in three independent
 configurations</strong>: T=4/MAXDIM=16, T=4/MAXDIM=64 and T=8/MAXDIM=64. That is
 what licenses the widening being a pure opt-in.</p>
 <p>The entry most exposed was <strong>16x16x8</strong>, the only shape where this design beats
-Gemmini on a supportable margin, and it returned 424 exactly.</p>
+Gemmini on a supportable margin, and it returned 424 exactly — and 425 at
+<code class="docutils literal notranslate"><span class="pre">QD=16</span></code>, one cycle, which does not move that margin.</p>
 </section>
 <section id="an-earlier-reading-of-the-same-bar">
 <h3>An earlier reading of the same bar<a class="headerlink" href="#an-earlier-reading-of-the-same-bar" title="Link to this heading"><span>¶</span></a></h3>
@@ -2626,6 +2691,7 @@ the five-trial measurement shows the precaution was one shape too strong.</p>
 <li><a class="reference internal" href="#where-the-remaining-cycles-go">Where the remaining cycles go</a></li>
 <li><a class="reference internal" href="#the-workload-set-a-gpt-2-projection-placeholder">The workload set: a GPT-2 projection (placeholder)</a></li>
 <li><a class="reference internal" href="#reproducing">Reproducing</a></li>
+<li><a class="reference internal" href="#where-the-other-pages-results-live">Where the other pages’ results live</a></li>
 <li><a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a><ul>
 <li><a class="reference internal" href="#the-channel-depth-moved-the-row-and-not-uniformly">2026-09-24: the channel depth moved the row, and not uniformly</a></li>
 <li><a class="reference internal" href="#why-naming-the-window-mattered">Why naming the window mattered</a></li>
@@ -2648,8 +2714,8 @@ the five-trial measurement shows the precaution was one shape too strong.</p>
         <div class="button_nav">
             <div class="left">
                 
-                <a href="gemmini_comparison.html">
-                    <span class="icon">&lt;</span><span>TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>
+                <a href="gemmini_results.html">
+                    <span class="icon">&lt;</span><span>TinyTPU-isa vs Gemmini: Results and History</span></a>
                 
             </div>
 

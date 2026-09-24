@@ -24,8 +24,8 @@
     <script src="../_static/js/petite-vue.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="TinyTPU-isa vs Gemmini: A Matched Comparison" href="gemmini_comparison.html" />
-    <link rel="prev" title="TinyTPU-isa: A Programmable GEMM Accelerator" href="tinytpu_isa.html" /> 
+    <link rel="next" title="The IP Library’s Gaps, and the Adder Tree" href="ip_gaps.html" />
+    <link rel="prev" title="TinyTPU-isa: Results and History" href="tinytpu_isa_results.html" /> 
   </head><body data-dark_mode_code_blocks="true">
 
 <div id="top_nav">
@@ -165,6 +165,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
@@ -174,8 +175,12 @@
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gemmini_results.html">TinyTPU-isa vs Gemmini: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="benchmarks.html">The Benchmark Set</a></li>
 <li class="toctree-l1"><a class="reference internal" href="workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_history.html">TinyTPU-isa: Design History</a></li>
@@ -186,9 +191,13 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia_results.html">CHIA Agentic Co-Design: Results</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia_codesign.html">The Original Co-Design Effort (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT and the TinyTPU-isa Mapper</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act_results.html">ACT: Results, Findings and Corrections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
 <ul>
@@ -219,7 +228,7 @@
   <section id="the-unit-library-composing-a-region-from-units">
 <h1>The Unit Library: Composing a Region from Units<a class="headerlink" href="#the-unit-library-composing-a-region-from-units" title="Link to this heading"><span>¶</span></a></h1>
 <p>TinyTPU-isa is not written as a design any more. It is written as eight units
-in <code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/ip/units/</span></code>, one per module, and one
+in <code class="docutils literal notranslate"><span class="pre">examples/tinytpu/ip/units/</span></code>, one per module, and one
 <em>architecture</em> – <code class="docutils literal notranslate"><span class="pre">ip/tinytpu.py</span></code> – that names the channels wiring them, the
 parameters sizing them and the order they are declared in.
 <code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code> is what is left of the design file: the parameter set read
@@ -245,7 +254,7 @@ as a parameter.</p></li>
 it was pasted into happens to have declared, under whatever names. This is the
 mechanism behind “the design is a monolith”: it is not that the units were
 tangled, it is that a unit had nothing to declare.</p>
-<p><code class="docutils literal notranslate"><span class="pre">ip/compose.py</span></code> works with that rather than against it: it composes the
+<p><code class="docutils literal notranslate"><span class="pre">allo/compose.py</span></code> works with that rather than against it: it composes the
 region’s <strong>source</strong>. A unit is an ordinary module-level function; an
 <code class="docutils literal notranslate"><span class="pre">Architecture</span></code> emits a <code class="docutils literal notranslate"><span class="pre">&#64;df.region()</span></code> that nests all of them, declares the
 channels above them, and binds every free name in their bodies from its own
@@ -449,7 +458,7 @@ size. Reads no environment variable.</p></td>
 <td><p>The instruction encoding: opcodes, field layout, <code class="docutils literal notranslate"><span class="pre">enc</span></code>, <code class="docutils literal notranslate"><span class="pre">enc_agu</span></code>.
 <code class="docutils literal notranslate"><span class="pre">ISA_NAMESPACE</span></code> is what a unit’s <code class="docutils literal notranslate"><span class="pre">isa=</span></code> declaration draws from.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ip/compose.py</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">allo/compose.py</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">Channel</span></code>, <code class="docutils literal notranslate"><span class="pre">Memory</span></code>, <code class="docutils literal notranslate"><span class="pre">Unit</span></code>, <code class="docutils literal notranslate"><span class="pre">Architecture</span></code>: the composition
 itself, with no knowledge of TinyTPU.</p></td>
 </tr>
@@ -469,12 +478,25 @@ knows.</p></td>
 <code class="docutils literal notranslate"><span class="pre">TinyTPU</span></code>, which ties a parameter set to its region, its directives,
 its assembler and its reference programs.</p></td>
 </tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ip/reduce.py</span></code></p></td>
+<td><p>The <strong>second</strong> architecture, <code class="docutils literal notranslate"><span class="pre">DotTree</span></code>: an adder-tree reduction
+instead of the systolic chain, out of the same <code class="docutils literal notranslate"><span class="pre">Unit</span></code>, <code class="docutils literal notranslate"><span class="pre">Channel</span></code>,
+<code class="docutils literal notranslate"><span class="pre">Memory</span></code> and <code class="docutils literal notranslate"><span class="pre">Architecture</span></code>. <a class="reference internal" href="ip_gaps.html#ip-gaps-compose"><span class="std std-ref">What compose.py did not need</span></a> is what it
+tests – <code class="docutils literal notranslate"><span class="pre">compose.py</span></code> needed no change to admit a different reduction
+topology, because the topology is the pair (which units, which
+channels).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ip/placeholders.py</span></code></p></td>
+<td><p><strong>Nothing here is implemented.</strong> One declaration per unfilled row of
+<a class="reference internal" href="ip_gaps.html#ip-gaps-table"><span class="std std-ref">The gap table</span></a>, each raising <code class="docutils literal notranslate"><span class="pre">NotBuilt</span></code> with what would make it
+real.</p></td>
+</tr>
 </tbody>
 </table>
 </section>
 <section id="instantiating-it">
 <h2>Instantiating it<a class="headerlink" href="#instantiating-it" title="Link to this heading"><span>¶</span></a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">examples.accelerator.tinytpu_vitis.ip</span><span class="w"> </span><span class="kn">import</span> <span class="n">TinyTPU</span><span class="p">,</span> <span class="n">TpuParams</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">examples.tinytpu.ip</span><span class="w"> </span><span class="kn">import</span> <span class="n">TinyTPU</span><span class="p">,</span> <span class="n">TpuParams</span>
 
 <span class="n">wide</span> <span class="o">=</span> <span class="n">TinyTPU</span><span class="p">(</span><span class="n">TpuParams</span><span class="p">(</span><span class="n">T</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">MAXDIM</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">IMEM_SIZE</span><span class="o">=</span><span class="mi">56</span><span class="p">),</span> <span class="n">name</span><span class="o">=</span><span class="s2">"tinytpu_t8"</span><span class="p">)</span>
 <span class="n">module</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">wide</span><span class="o">.</span><span class="n">region</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="s2">"simulator"</span><span class="p">)</span>
@@ -659,11 +681,12 @@ rather than two names;</p></li>
 </ol>
 <p><code class="docutils literal notranslate"><span class="pre">chia_agent/param_check.py</span></code> and <code class="docutils literal notranslate"><span class="pre">gate_runner.py</span></code> need no change: they work
 through <code class="docutils literal notranslate"><span class="pre">microarch_isa</span></code>’s module attributes, which are unchanged.</p>
-<p><code class="docutils literal notranslate"><span class="pre">impact/make_variants.py</span></code> is textually coupled the same way – it builds the
-historical ablation variants by patching <code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code> – and is equally
-stale. Its measurements are recorded on <a class="reference internal" href="tinytpu_history.html"><span class="doc">TinyTPU-isa: Design History</span></a>; regenerating
-them would want the variants expressed as alternative <em>architectures</em> over the
-same units, which is the first thing the library makes possible.</p>
+<p><code class="docutils literal notranslate"><span class="pre">impact/make_variants.py</span></code> was textually coupled the same way – it built the
+historical ablation variants by patching <code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code> – and went stale
+the same way, so it has been deleted. Its measurements are recorded on
+<a class="reference internal" href="tinytpu_history.html"><span class="doc">TinyTPU-isa: Design History</span></a>; regenerating them would want the variants expressed as
+alternative <em>architectures</em> over the same units, which is the first thing the
+library makes possible.</p>
 </section>
 </section>
 
@@ -714,14 +737,14 @@ same units, which is the first thing the library makes possible.</p>
         <div class="button_nav">
             <div class="left">
                 
-                <a href="tinytpu_isa.html">
-                    <span class="icon">&lt;</span><span>TinyTPU-isa: A Programmable GEMM Accelerator</span></a>
+                <a href="tinytpu_isa_results.html">
+                    <span class="icon">&lt;</span><span>TinyTPU-isa: Results and History</span></a>
                 
             </div>
 
             <div class="right">
                 
-                    <a href="gemmini_comparison.html"><span>TinyTPU-isa vs Gemmini: A Matched Comparison</span><span class="icon">&gt;</span></a>
+                    <a href="ip_gaps.html"><span>The IP Library’s Gaps, and the Adder Tree</span><span class="icon">&gt;</span></a>
                 
             </div>
         </div>

@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>CHIA Agentic Co-Design: Results &#8212; Allo Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic_mod.css?v=9b2032db" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=db78e746"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/petite-vue.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="The Original Co-Design Effort (chia-codesign)" href="chia_codesign.html" />
+    <link rel="prev" title="CHIA Agentic Co-Design" href="chia.html" /> 
+  </head><body data-dark_mode_code_blocks="true">
+
+<div id="top_nav">
+    
+
+    <nav>
+        
+            
+        
+
+        <p id="toggle_sidebar">
+            <a href="#" title="Toggle sidebar">|||</a>
+        </p>
+        <h1><a href="../index.html" title="Go to homepage">Allo Documentation</a></h1>
+            <a id="source_link" href="https://github.com/sunwookim028/allo">
+    
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512">
+            <path fill="white" d="M 244.8,8 C 106.1,8 0,113.3 0,252 c 0,110.9 69.8,205.8 169.5,239.2 12.8,2.3 17.3,-5.6 17.3,-12.1 0,-6.2 -0.3,-40.4 -0.3,-61.4 0,0 -70,15 -84.7,-29.8 0,0 -11.4,-29.1 -27.8,-36.6 0,0 -22.9,-15.7 1.6,-15.4 0,0 24.9,2 38.6,25.8 21.9,38.6 58.6,27.5 72.9,20.9 2.3,-16 8.8,-27.1 16,-33.7 -55.9,-6.2 -112.3,-14.3 -112.3,-110.5 0,-27.5 7.6,-41.3 23.6,-58.9 -2.6,-6.5 -11.1,-33.3 2.6,-67.9 20.9,-6.5 69,27 69,27 20,-5.6 41.5,-8.5 62.8,-8.5 21.3,0 42.8,2.9 62.8,8.5 0,0 48.1,-33.6 69,-27 13.7,34.7 5.2,61.4 2.6,67.9 16,17.7 25.8,31.5 25.8,58.9 0,96.5 -58.9,104.2 -114.8,110.5 9.2,7.9 17,22.9 17,46.4 0,33.7 -0.3,75.4 -0.3,83.6 0,6.5 4.6,14.4 17.3,12.1 C 428.2,457.8 496,362.9 496,252 496,113.3 383.5,8 244.8,8 Z"/>
+        </svg>
+    
+</a>
+        
+
+        <a id="mode_toggle" href="#" @click.prevent="handleClick" :title="mode">
+    <template v-if="mode == 'light'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_light"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M67.48,18.073c1.913,-1.912 1.913,-5.018 0,-6.931c-1.912,-1.912 -5.018,-1.912 -6.931,0l-6.798,6.799c-1.912,1.912 -1.912,5.018 0,6.931c1.913,1.912 5.018,1.912 6.931,-0l6.798,-6.799Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.728,61.108c1.912,-1.913 1.912,-5.018 -0,-6.931c-1.913,-1.913 -5.019,-1.913 -6.931,-0l-6.799,6.798c-1.912,1.913 -1.912,5.019 0,6.931c1.913,1.913 5.019,1.913 6.931,0l6.799,-6.798Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.682,54.177c-1.913,-1.913 -5.018,-1.913 -6.931,-0c-1.912,1.913 -1.912,5.018 0,6.931l6.798,6.798c1.913,1.913 5.019,1.913 6.931,0c1.913,-1.912 1.913,-5.018 0,-6.931l-6.798,-6.798Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M4.901,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,-0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M18.929,11.142c-1.912,-1.912 -5.018,-1.912 -6.931,0c-1.912,1.913 -1.912,5.019 0,6.931l6.799,6.799c1.912,1.912 5.018,1.912 6.931,-0c1.912,-1.913 1.912,-5.019 -0,-6.931l-6.799,-6.799Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.108,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c-0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c-0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'dark'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_dark"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.901,2.196 -4.901,4.901c0,2.705 2.197,4.901 4.901,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.662,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.989,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.732,61.103c1.91,-1.91 1.91,-5.011 0,-6.921l-0.009,-0.01c-1.91,-1.91 -5.012,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.909,1.91 5.011,1.91 6.92,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.672,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.52,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l-0,-0.01c-0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.901,2.196 -4.901,4.901c0,2.704 2.197,4.9 4.901,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.73,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 -0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.098,34.623c-2.699,0 -4.891,2.192 -4.891,4.892l-0,0.019c-0,2.699 2.192,4.891 4.891,4.891c2.7,0 4.892,-2.192 4.892,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.892,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'darkest'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_darkest"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><path d="M39.315,23.791c8.684,-0 15.734,7.05 15.734,15.733c0,8.684 -7.05,15.734 -15.734,15.734c-8.683,0 -15.733,-7.05 -15.733,-15.734c-0,-8.683 7.05,-15.733 15.733,-15.733Zm0,4.737c6.069,0 10.997,4.927 10.997,10.996c-0,6.069 -4.928,10.996 -10.997,10.996c-6.068,0 -10.996,-4.927 -10.996,-10.996c0,-6.069 4.928,-10.996 10.996,-10.996Z" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.216,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.9,2.196 -4.9,4.901c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.666,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.99,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.737,61.103c1.909,-1.91 1.909,-5.011 -0,-6.921l-0.01,-0.01c-1.91,-1.91 -5.011,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.91,1.91 5.011,1.91 6.921,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.676,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.524,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l0,-0.01c0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.216,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901c-0,2.704 2.196,4.9 4.9,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.734,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.103,34.623c-2.7,0 -4.892,2.192 -4.892,4.892l-0,0.019c-0,2.699 2.192,4.891 4.892,4.891c2.699,0 4.891,-2.192 4.891,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.891,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+</a>
+
+<script>
+(function() {
+    const LOCAL_STORAGE_KEY = 'piccoloThemeMode'
+
+    var initialMode = localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (initialMode) {
+        // Make sure the value in local storage is valid
+        if (['light', 'dark', 'darkest'].indexOf(initialMode) == -1) {
+            initialMode = 'light'
+            localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+        }
+    } else {
+        // Check if the client prefers dark mode
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialMode = 'dark'
+        } else {
+            initialMode = 'light'
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+    }
+
+    document.documentElement.dataset.mode = initialMode
+
+    PetiteVue.createApp({
+        'mode': initialMode,
+        handleClick() {
+            let currentMode = this.mode
+
+            if (currentMode == 'light') {
+                this.mode = 'dark'
+            } else if (currentMode == 'dark') {
+                this.mode = 'darkest'
+            } else if (currentMode == 'darkest') {
+                this.mode = 'light'
+            }
+
+            document.documentElement.dataset.mode = this.mode
+            localStorage.setItem(LOCAL_STORAGE_KEY, this.mode)
+
+            console.log(this.mode)
+        }
+    }).mount('#mode_toggle')
+})()
+</script>
+            <p class="mobile_search_link">
+                <a href="../search.html" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65 64" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                        <path d="M14.873 40.009c-2.315-3.943-3.642-8.532-3.642-13.429C11.231 11.91 23.141 0 37.811 0s26.58 11.91 26.58 26.58-11.91 26.58-26.58 26.58a26.44 26.44 0 0 1-14.277-4.161L9.739 62.794a3.12 3.12 0 0 1-4.413 0L.913 58.382c-1.217-1.218-1.217-3.196 0-4.413l13.96-13.96zM37.811 8.054c10.225 0 18.526 8.301 18.526 18.526s-8.301 18.526-18.526 18.526-18.526-8.301-18.526-18.526S27.586 8.054 37.811 8.054z" fill="#fff" />
+                    </svg>
+                </a>
+            </p>
+        
+
+        <div class="searchbox_wrapper">
+            
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+    </nav>
+</div>
+
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Paper</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../paper.html">A Co-Design Compilation Flow as a Harness for Language Models to Improve It</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup/index.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_01_get_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_02_vhls.html">Vivado/Vitis HLS Backend</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Deep Dive</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dive/frontend_syntax.html">Frontend Syntax Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/dataflow.html">Dataflow Programming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_01_data_types.html">Data Types and Type Casting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_02_template.html">Template Kernels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_03_composition.html">Kernel Composition</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/ip.html">IP Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/pytorch.html">PyTorch Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_05_verifier.html">Equivalence Checking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_04_features.html">Other Features</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Backends</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_results.html">TinyTPU-isa vs Gemmini: Results and History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/minitpu.html">MiniTPU: Reference Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Extensions</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
+<li class="toctree-l1"><a class="reference internal" href="chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">CHIA Agentic Co-Design: Results</a></li>
+<li class="toctree-l1"><a class="reference internal" href="chia_codesign.html">The Original Co-Design Effort (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="act.html">ACT and the TinyTPU-isa Mapper</a></li>
+<li class="toctree-l1"><a class="reference internal" href="act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="act_results.html">ACT: Results, Findings and Corrections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/extending_allo.html">Extending Allo’s Abstractions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/stream_ports.html">Stream Ports: a Unit with an Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">Schedule Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html#data-types">Data Types</a></li>
+</ul>
+
+        </div>
+      </div>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="chia-agentic-co-design-results">
+<h1>CHIA Agentic Co-Design: Results<a class="headerlink" href="#chia-agentic-co-design-results" title="Link to this heading"><span>¶</span></a></h1>
+<p>What the CHIA loop (<a class="reference internal" href="chia.html"><span class="doc">CHIA Agentic Co-Design</span></a>) has measured: the paid runs, the
+claims they support and the claims they do not, the experiments planned
+against them, and the figures and statements this page has had to withdraw.
+The loop itself – how to run it, the guards, the evaluator – is on
+<a class="reference internal" href="chia.html"><span class="doc">CHIA Agentic Co-Design</span></a>. The retired <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> effort is on
+<a class="reference internal" href="chia_codesign.html"><span class="doc">The Original Co-Design Effort (chia-codesign)</span></a>.</p>
+<section id="takeaways">
+<h2>Takeaways<a class="headerlink" href="#takeaways" title="Link to this heading"><span>¶</span></a></h2>
+<ul class="simple">
+<li><p><strong>It works end to end on real tools.</strong> Every accepted number is RTL cosim
+cycles plus csynth area and clock, bit-exact against a frozen reference
+model. About <strong>$85</strong> spent on the CHIA2026 account so far; the harness is
+also exercised with no model at all.</p></li>
+<li><p><strong>It finds real design changes, not yet novel ones.</strong> Best so far: a DMA
+burst widening worth 55-61 % of the steady-state gap to Gemmini (not
+landed; its banked form synthesises with no cycle loss).</p></li>
+<li><p><strong>An agent proposed an architectural legality rule that passed its
+discriminating test and is nonetheless unsound in both directions.</strong>
+<code class="docutils literal notranslate"><span class="pre">s.memory_ports</span></code> refused a design needing two write ports and accepted the
+bit-exact banked one; it also accepts a block-partitioned design that needs
+two, and refuses a sequential one that needs one. The property was <strong>seeded</strong>
+(the arm was told where to look, never what to build).</p></li>
+<li><p><strong>A *rate* of discovery is still not shown:</strong> every search is n=1 per arm.</p></li>
+<li><p><strong>The recurring hazard is instruments that fail open.</strong> Four in one night
+reported success after failing. A negative result counts only if the
+instrument can be shown to have run.</p></li>
+</ul>
+</section>
+<section id="contributions">
+<h2>Contributions<a class="headerlink" href="#contributions" title="Link to this heading"><span>¶</span></a></h2>
+<ul class="simple">
+<li><p><strong>A judge agents cannot fool.</strong> Nine mechanical guards – most added after an
+agent found the hole each closes – mean a win is accepted only when real
+RTL measures it, which is why a worker’s false win claim re-scored as
+exactly baseline.</p></li>
+<li><p><strong>A pre-registered search result.</strong> The less directed <code class="docutils literal notranslate"><span class="pre">open</span></code> arm, told to
+choose its own target from the numbers, independently reached the same
+address-generator widening that directed analysis had found, with the
+refusal bottleneck migrating and cycles flat exactly as predicted in
+advance.</p></li>
+<li><p><strong>Why agent-built compiler extensions are hard to evaluate.</strong> A new
+primitive has no callers, so an agent-implemented one scored neutral <em>and</em>
+passed 291 tests while aborting the compiler on first use – any gate ladder
+that exercises a compiler only through existing designs cannot see a new
+capability in either direction.</p></li>
+<li><p><strong>A resource predicate is the wrong shape for a port claim.</strong> Counting
+occupants against capacity discards <em>which</em> element is touched in <em>which</em>
+cycle, and both measured failure directions recover exactly that discarded
+information. The sound form is a calendar – the index map composed with the
+initiation interval, both of which the IR already carries. MiniTPU’s
+assembler (theirs, not ours) does not have the bug because its <code class="docutils literal notranslate"><span class="pre">write_port</span></code>
+is a <strong>set of cycles</strong> rather than a count; they note their register file has
+one write port and no banking, so they avoided the bug by not yet having the
+structure that creates it, which makes this predictive rather than a
+comparison of care.</p></li>
+</ul>
+</section>
+<section id="what-the-loop-has-measured-against-the-principle">
+<h2>What the loop has, measured against the principle<a class="headerlink" href="#what-the-loop-has-measured-against-the-principle" title="Link to this heading"><span>¶</span></a></h2>
+<p>An agent can make an informed co-design decision only after it has measured how
+a software function performs – in <strong>timing and power</strong> – across <strong>an array of
+hardware architectures</strong>. Measured against that, today’s loop has the first
+half of each:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 22.0%" />
+<col style="width: 38.0%" />
+<col style="width: 40.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"></th>
+<th class="head"><p>have</p></th>
+<th class="head"><p>missing</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>timing</strong></p></td>
+<td><p>RTL cosim cycles, bit-exact, deterministic</p></td>
+<td><p>–</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>power</strong></p></td>
+<td><p>DC estimate, default toggle rates, <em>indicative only</em></p></td>
+<td><p>activity-based power (switching from cosim into synthesis)</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>architectures</strong></p></td>
+<td><p>one design family (TinyTPU-isa, T=4/T=8), two substrates (FPGA,
+45 nm), two references (Gemmini, MiniTPU)</p></td>
+<td><p>the parametrized IP library that would supply a real array</p></td>
+</tr>
+</tbody>
+</table>
+<p>Why the array matters is already measured: a DMA widening that is free on an
+FPGA emits a dual-write-port memory that standard cells cannot build, and only
+the second substrate said so.</p>
+</section>
+<section id="first-paid-run-2026-09-19">
+<h2>First paid run, 2026-09-19<a class="headerlink" href="#first-paid-run-2026-09-19" title="Link to this heading"><span>¶</span></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/chia-evidence/isa-run1-20260919/</span></code>: 2 workers x at most 3 iterations, $30 cap,
+<code class="docutils literal notranslate"><span class="pre">gemini-3.1-pro-preview</span></code> on <code class="docutils literal notranslate"><span class="pre">chia2026-tinytpu</span></code>, seeded with measured facts
+from the shipped design’s 16x16x16 timeline
+(<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/chia-evidence/timeline-476a70d8-16x16x16/</span></code>: 211 cycles of <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> and no MAC
+before cycle 285; the drain after the last PE). The pre-flight gate passed
+before any worker started.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 13.0%" />
+<col style="width: 8.0%" />
+<col style="width: 45.0%" />
+<col style="width: 22.0%" />
+<col style="width: 12.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>worker</p></th>
+<th class="head"><p>iter</p></th>
+<th class="head"><p>what it tried</p></th>
+<th class="head"><p>verdict</p></th>
+<th class="head"><p>cost (DB)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>front-end</p></td>
+<td><p>1</p></td>
+<td><p>widen <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code>’s operand bursts to 4 rows per iteration</p></td>
+<td><p>172 / 627, bit-exact, stress 492/492; accepted (-59)</p></td>
+<td><p>$5.17</p></td>
+</tr>
+<tr class="row-odd"><td><p>front-end</p></td>
+<td><p>2</p></td>
+<td><p>rewrite of the GEMM program generator</p></td>
+<td><p>deadlock, gate timeout at 240 s</p></td>
+<td><p>$8.78</p></td>
+</tr>
+<tr class="row-even"><td><p>tail</p></td>
+<td><p>1</p></td>
+<td><p>contiguous <code class="docutils literal notranslate"><span class="pre">dma_st</span></code> write-back (session timed out); debug session
+removed the leftovers</p></td>
+<td><p>exactly baseline, 172 / 686 (+0)</p></td>
+<td><p>$4.36 + $1.20</p></td>
+</tr>
+<tr class="row-odd"><td><p>tail</p></td>
+<td><p>2</p></td>
+<td><p>relay kernels between <code class="docutils literal notranslate"><span class="pre">accu</span></code> and <code class="docutils literal notranslate"><span class="pre">dma_st</span></code></p></td>
+<td><p>176 / 686 (+4), rejected</p></td>
+<td><p>$9.03</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>$28.54</strong> over five sessions (all counted against CHIA2026’s $100 cap), 100
+min wall; both workers stopped on the soft cap before iteration 3.</p>
+<p><strong>The finding, verified independently.</strong> <code class="docutils literal notranslate"><span class="pre">accept.py</span></code> on front-end iteration
+1, on a clean checkout: <strong>172 / 262 / 376 / 425 / 627</strong> (0 / 0 / -42 / -59 /
+-59, <strong>-160</strong> over the five shapes), bit-exact, <code class="docutils literal notranslate"><span class="pre">stress_isa</span></code> 492/492, RTL
+stress 0 mismatches at every shape, 2.431 ns. It costs <strong>2.3x the block RAM</strong>
+(BRAM18K 42 -&gt; 98), +20% LUT and +40% FF: -59 cycles (8.6%) at 16x16x16. Read
+by hand, the only functional change is <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code>’s burst loops; rows read past
+a program’s span stay inside the operand and land in buffer words the program
+never names. The diff as written also <strong>deleted the 260-line design
+docstring</strong> and hard-coded <code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">=</span> <span class="pre">4</span></code> – both invisible to the gate at the time,
+and the reason for guards 6 and 7. Re-expressed parametrically with the
+docstring intact (<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/chia-evidence/isa-run1-20260919/param_burst.diff</span></code>, no model
+call) it gives identical cycles and area, passes the same acceptance, and is
+exact at MAXDIM 8 and 12. <strong>It is not landed</strong>: whether the burst widening is
+worth its block RAM is a separate decision.</p>
+<p>Two observations worth keeping:</p>
+<ul class="simple">
+<li><p><strong>A worker reported a false improvement.</strong> The tail worker’s debug session
+claimed “172 cycles (down from 680)” and “686 (down from 1457)”; its final
+diff was one added <code class="docutils literal notranslate"><span class="pre">pass</span></code> and the harness scored it exactly at the
+baseline. The loop never takes an agent’s number, and this is why.</p></li>
+<li><p><strong>Timed-out sessions are billed but reported as $0.</strong> Three of the five
+sessions hit opencode’s 40-minute timeout. The loop’s per-worker figures
+(from opencode’s export of each call) record them as $0.00 – $5.17 and
+$1.20 in the workers’ logs – while opencode’s database charges them in full,
+<strong>$22.17</strong> here. Every cap therefore reads the database (<code class="docutils literal notranslate"><span class="pre">spend.py</span></code>), never
+the per-call usage.</p></li>
+</ul>
+<p>A capped smoke run on the earlier design is recorded in
+<a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
+</section>
+<section id="what-is-and-is-not-demonstrated">
+<h2>What Is and Is Not Demonstrated<a class="headerlink" href="#what-is-and-is-not-demonstrated" title="Link to this heading"><span>¶</span></a></h2>
+<p>The evidence behind the takeaways at the top of this page, one line per claim.</p>
+<p><strong>Demonstrated</strong></p>
+<ul class="simple">
+<li><p><strong>An agent proposed an architectural legality rule, and the harness proved it
+discriminates.</strong> Pilot B (2026-09-22, <code class="docutils literal notranslate"><span class="pre">chia-abstraction</span></code>):
+<code class="docutils literal notranslate"><span class="pre">s.memory_ports(target,</span> <span class="pre">write_ports)</span></code> refuses when
+<code class="docutils literal notranslate"><span class="pre">stores</span> <span class="pre">&gt;</span> <span class="pre">write_ports</span> <span class="pre">x</span> <span class="pre">banks</span></code>, <em>before</em> touching the IR. At a
+harness-owned call site on a frozen design it <strong>refused</strong> the dual-write
+probe (one RAM, two write statements) and <strong>accepted</strong> the cyclically banked
+one (two instances, one write each), which was then bit-exact under csim.
+Every other gate clean: 294/294 tests, <code class="docutils literal notranslate"><span class="pre">stress_isa</span></code> 492/492, all design
+cases bit-exact, 20 limits verdicts unchanged, resources flat, +0 cycles. It
+named its own unchecked premise unprompted. <strong>The property was seeded</strong>; the
+abstraction was not. Its diagnosis was half wrong – it claimed the language
+could not <em>state</em> port counts, which is false on its own tree, so the gap was
+enforcement only.</p></li>
+<li><p><strong>The same rule is unsound in both directions</strong>, measured by applying it:
+<code class="docutils literal notranslate"><span class="pre">Partition.Block</span></code> factor 2 is <strong>accepted</strong> although both stores land in
+bank 0 and that RTL emits two writes per bank; an unpipelined two-store loop
+is <strong>refused</strong> although sequential stores need one port. Published here in
+the same breath as the success, because a page reporting the primitive and
+not its holes would repeat the failure this project keeps finding in its own
+instruments.</p></li>
+<li><p><strong>The loop runs end to end on real tools</strong> (<code class="docutils literal notranslate"><span class="pre">chia_agent/</span></code> on <code class="docutils literal notranslate"><span class="pre">main</span></code>).
+Every accepted figure is RTL cosim cycles plus csynth area and clock,
+bit-exact against a frozen reference model.</p></li>
+<li><p><strong>It catches a false claim.</strong> Run 1 (2026-09-19): a worker reported an
+improvement that re-scored as exactly baseline.</p></li>
+<li><p><strong>It finds a real change.</strong> Run 1: a DMA burst widening, -160 cycles over five
+shapes, bit-exact, stress and RTL-stress clean, at 2.3x block RAM. Not
+landed; the dual-ported form does not synthesise to standard cells and the
+banked form does, with identical cycles (<a class="reference internal" href="../designs/benchmarks.html"><span class="doc">The Benchmark Set</span></a>).</p></li>
+<li><p><strong>A pre-registered prediction held.</strong> Run 2 (2026-09-22, two arms): both arms
+passed every gate and raised the encodable count – 3 to 8 for the directed
+arm, 3 to 7 for the less directed <code class="docutils literal notranslate"><span class="pre">open</span></code> arm – while the chosen nest, and
+therefore the cycles, did not move and area rose. The <code class="docutils literal notranslate"><span class="pre">open</span></code> arm’s first
+attempt made 16 nests encodable that computed the <strong>wrong answer</strong>, and the
+reference-model sweep caught all 16.</p></li>
+<li><p><strong>The retired ``chia-codesign`` claims C1-C8</strong> replay deterministically,
+including the two agent-found variants (4.07x and 1.98x) at exact numerics.</p></li>
+</ul>
+<p><strong>Not demonstrated</strong></p>
+<ul class="simple">
+<li><p><strong>A rate of discovery.</strong> Every search is n=1 per arm. A rate does not need a
+seed – it is a property of the sampling process – so replication (E1 below)
+is the next paid run.</p></li>
+<li><p><strong>That such a rule is sound.</strong> <code class="docutils literal notranslate"><span class="pre">s.memory_ports</span></code> is a heuristic and errs
+both ways (above). The correct rule needs the layout map and the initiation
+interval; neither is consulted.</p></li>
+<li><p><strong>That an agent can *find* an architectural gap unaided.</strong> The open arm,
+given measurements only – and, in the 2026-09-22 run, the shared diagnosis
+as well; see the next entry – landed in <strong>both</strong> of its runs on <code class="docutils literal notranslate"><span class="pre">bind_storage</span></code>
+– a surface Allo already has as <code class="docutils literal notranslate"><span class="pre">Memory(resource=,</span> <span class="pre">storage_type=)</span></code>, which
+both HLS emitters already emit. Its spelling was new; its capability was not.
+It also chose the property its most concrete seeded measurement pointed at,
+which was pre-registered in advance as weak evidence of identification.</p></li>
+<li><p><strong>An unguided condition.</strong> The two arms of the 2026-09-22 run are not
+equally guided, and neither is unguided. This was audited against the
+prompts as actually sent, not from memory, and the result is less flattering
+than the design intended. A <strong>shared system message</strong> carried the corrected
+diagnosis – monotonicity, <code class="docutils literal notranslate"><span class="pre">f2</span></code> as a legal AGU target, Kt=2, that a term on
+<code class="docutils literal notranslate"><span class="pre">f2</span></code> costs one of three – and the freeze rule (<code class="docutils literal notranslate"><span class="pre">isa_ref</span></code> consumes
+<code class="docutils literal notranslate"><span class="pre">expand</span></code>) to <strong>both</strong> arms. The <code class="docutils literal notranslate"><span class="pre">acc-follows-k</span></code> angle added the full
+(Kt, Nt) masking grid, <code class="docutils literal notranslate"><span class="pre">AGU_TERMS=4</span></code>, and the second-cause census
+(897 / 274); the <code class="docutils literal notranslate"><span class="pre">open</span></code> angle withheld the grid behind a pointer and
+withheld the census entirely. Neither arm was given a mechanism: the strings
+<code class="docutils literal notranslate"><span class="pre">saturat</span></code> and <code class="docutils literal notranslate"><span class="pre">predicat</span></code> appear in neither worker’s system message nor
+either angle. Two consequences bound what may be claimed. First,
+<code class="docutils literal notranslate"><span class="pre">acc-follows-k</span></code> is handed the entire intellectual content of the co-design
+finding before it thinks, so a win from it passes a <em>procedural</em> test for
+search – no human inside an iteration – while being, substantively,
+directed work with an automated typist; it must never be quoted as “the loop
+found this”. Second, <code class="docutils literal notranslate"><span class="pre">open</span></code> is <em>less directed</em>, not undirected: the shared
+message hands it the corrected diagnosis anyway, so <strong>this run contains no
+unguided condition at all.</strong> The strongest attributional claim either arm
+supports is <strong>“the loop found a mechanism, given the diagnosis”</strong> – not
+“the loop found the idea”. The diagnosis was ours, measured and written down
+before the run; a run that tests whether a loop can reach the diagnosis
+itself would have to withhold it from the system message, and is not this
+run. The two arms are therefore reported <strong>separately, always</strong>, and
+labelled <em>directed</em> and <em>less directed</em>: pooling them would let the directed
+arm’s result borrow the other’s credibility.</p></li>
+<li><p><strong>Novelty.</strong> The burst widening is a sensible engineering change, not a
+discovery.</p></li>
+</ul>
+<p><strong>Known defects, being repaired.</strong> Run 2 was stopped after 2 of 5 iterations by
+a per-run cap that summed the whole account rather than its own sessions. The
+$0 guard suite, 57 cases at landing, does not currently pass (one stale
+assertion, one crash in the loop phase).</p>
+</section>
+<section id="the-planned-experiments">
+<h2>The Planned Experiments<a class="headerlink" href="#the-planned-experiments" title="Link to this heading"><span>¶</span></a></h2>
+<p>Written 2026-09-22, before the runs, so that the design of each experiment can
+be read against its result rather than after it. <strong>$300 is authorised for the
+overnight runs and about $500 remains for the experiments below.</strong> The split of
+the overnight money is recorded in <code class="docutils literal notranslate"><span class="pre">chia_agent/allocation.json</span></code>: the
+abstraction-maintaining track is weighted 2:1 over the design-point search,
+because the search’s pipeline is proven while the abstraction work is the open
+question. Cumulative spend was $28.54 when the split was made.</p>
+<p>The gate enforces <code class="docutils literal notranslate"><span class="pre">CHIA_TOTAL_CAP_USD</span></code> as a <em>cumulative</em> ceiling on
+<code class="docutils literal notranslate"><span class="pre">chia2026_spend()</span></code> and cannot tell two concurrent tracks apart, so a track’s
+share is honoured by that track setting its own ceiling. Two tracks drawing on
+one account means a track that sees spend climbing faster than its own runs
+explain is seeing the other track, not an accounting bug.</p>
+<section id="the-one-thing-every-experiment-below-is-designed-to-fix">
+<h3>The one thing every experiment below is designed to fix<a class="headerlink" href="#the-one-thing-every-experiment-below-is-designed-to-fix" title="Link to this heading"><span>¶</span></a></h3>
+<p>Every claim this page makes about the TinyTPU-isa search is <strong>n=1</strong>. One paid
+run found one improvement. That is enough to show the loop works and not enough
+to say anything about how well it works, and no amount of further single runs
+will change that. So the planned experiments buy <em>replication and rate</em> before
+they buy anything else, and each one states in advance what result would count
+as a negative.</p>
+</section>
+<section id="e1-rate-of-discovery-replicated">
+<h3>E1. Rate of discovery, replicated<a class="headerlink" href="#e1-rate-of-discovery-replicated" title="Link to this heading"><span>¶</span></a></h3>
+<p>Run the design-point search from the same baseline <strong>at least three times</strong>
+with different seeds, and report the distribution rather than the best run:
+how many candidates were proposed, how many passed the static gates, how many
+passed acceptance, and what each accepted candidate bought. The deliverable is
+an accept rate with an interval around it.</p>
+<p>A negative result here is publishable and should be reported as such: if two
+of three runs find nothing, the honest claim is that the loop finds an
+improvement <em>sometimes</em>, and the paper says so.</p>
+<p>Prerequisite, and it is not optional: <strong>seed the search</strong>. Outstanding item 2
+below has blocked this since 2026-09-07. Without a seed a run is re-runnable
+but not repeatable, and a distribution over unrepeatable runs cannot be
+attributed to the search rather than to sampling.</p>
+</section>
+<section id="e2-does-the-refusal-bound-the-search">
+<h3>E2. Does the refusal bound the search?<a class="headerlink" href="#e2-does-the-refusal-bound-the-search" title="Link to this heading"><span>¶</span></a></h3>
+<p>Of 1,226 candidate loop nests, <strong>1,150 are refused at ``acc``</strong>, and <em>why</em> went
+through two wrong diagnoses before the right one, which is itself worth
+recording. It is not that <code class="docutils literal notranslate"><span class="pre">acc</span></code> is a static instruction field with no
+predicate on an induction variable — this page said that, and it is false.
+<code class="docutils literal notranslate"><span class="pre">acc</span></code> is <code class="docutils literal notranslate"><span class="pre">mm</span></code>’s <code class="docutils literal notranslate"><span class="pre">f2</span></code>, <code class="docutils literal notranslate"><span class="pre">f2</span></code> is a legal AGU target, and driving it from
+the reduce loop assembles for exactly two k-tiles before rejecting at Kt≥3. <strong>The
+obstacle is additive monotonicity in the address term</strong>, not staticness (see
+<a class="reference internal" href="act.html"><span class="doc">ACT and the TinyTPU-isa Mapper</span></a>).</p>
+<p>That correction matters because it changes what the fix costs: making a static
+field dynamic is a different and more expensive change than saturating a term
+or predicating it on <code class="docutils literal notranslate"><span class="pre">iv_now[level]</span> <span class="pre">==</span> <span class="pre">0</span></code>, and a search framed on the wrong
+diagnosis would have priced the wrong hardware.</p>
+<p>A second correction, to the arithmetic rather than the mechanism: a <strong>first-cause
+census hides overlap.</strong> By first cause it is 1,150 <code class="docutils literal notranslate"><span class="pre">acc</span></code> / 55 <code class="docutils literal notranslate"><span class="pre">ar-distance</span></code> /
+13 <code class="docutils literal notranslate"><span class="pre">AGU_TERMS</span></code> / 3 <code class="docutils literal notranslate"><span class="pre">LOOP_DEPTH</span></code>, but <strong>930 of those nests also violate the
+accumulator RAW-distance contract</strong>, so relieving <code class="docutils literal notranslate"><span class="pre">acc</span></code> alone does not free
+1,150 nests. Sorted by the express/refuse distinction it is <strong>1,166 express
+against 55 refuse</strong>: Allo can <em>build</em> nearly all of these, and our machine
+cannot <em>encode</em> most of them.</p>
+<p>The experiment: run the search unchanged, then against a design that relieves
+the monotonicity constraint, and compare what each finds. If the second finds
+strictly better design points, the refusal is a real bound and the ISA is the
+thing to fix. If it finds nothing better, the reachable nests already contain
+the good designs — also a result, and a cheaper one to act on.</p>
+<p>There is already evidence for the second outcome, which should be stated before
+the experiment rather than after: widening <code class="docutils literal notranslate"><span class="pre">AGU_TERMS</span></code> from 3 to 4 raises the
+encodable count and <strong>does not change the chosen nest</strong>, so the RTL runs the
+same stream, the cycles do not move, and the area rises. A cost with no benefit.
+If relieving <code class="docutils literal notranslate"><span class="pre">acc</span></code> unlocks 1,150 nests and the pick <em>still</em> does not move,
+then the mapping space was never the binding constraint on this machine — a
+stronger and more surprising claim than a cycle win, and the one this experiment
+is now most likely to produce.</p>
+</section>
+<section id="e3-can-an-agent-maintain-the-abstractions-and-at-what-rate">
+<h3>E3. Can an agent maintain the abstractions, and at what rate?<a class="headerlink" href="#e3-can-an-agent-maintain-the-abstractions-and-at-what-rate" title="Link to this heading"><span>¶</span></a></h3>
+<p>The track this project most wants to measure, and the one expected to fail most
+often. An agent is asked to extend Allo itself – a dialect operation, a type, a
+schedule primitive or a pass – rather than to edit a design. Success means the
+extension arrives the way <code class="docutils literal notranslate"><span class="pre">s.dependence(...)</span></code> did: with its analyses, its
+legality rule, tests, and the golden dataflow tests still passing.</p>
+<p>Bounded attempts with a hard pass/fail gate, not one long run, because the
+result wanted is the <em>shape of the success rate</em> and its failure modes, not one
+expensive lucky sample. Keep every transcript: when an agent cannot extend a
+compiler abstraction, <em>why</em> it could not is the evidence.</p>
+<p>The stated hypothesis, from the CAKE result (a typed IR reaching 1.144x where
+raw generation reached 0.928x at equal budget): an agent given a typed
+abstraction with construction-time checking succeeds more often than one given
+free rein over the emitter. Testing that needs both arms, so run both.</p>
+</section>
+<section id="e4-co-design-both-sides-moving">
+<h3>E4. Co-design, both sides moving<a class="headerlink" href="#e4-co-design-both-sides-moving" title="Link to this heading"><span>¶</span></a></h3>
+<p>Everything above moves one side at a time. The claim the paper wants is
+co-design: a search that changes the instruction set and the microarchitecture
+together, where neither change is worth anything alone. The evidence for it is
+a design point plus the demonstration that ablating either half loses the gain.
+That ablation is the experiment, and it is cheap once a candidate exists –
+it is two extra evaluations, no model calls.</p>
+</section>
+<section id="what-will-not-be-spent-on">
+<h3>What will not be spent on<a class="headerlink" href="#what-will-not-be-spent-on" title="Link to this heading"><span>¶</span></a></h3>
+<ul class="simple">
+<li><p><strong>Breadth for its own sake.</strong> A fourth hypothesis at n=1 is worth less than a
+second run of an existing one.</p></li>
+<li><p><strong>Re-deriving numbers that are already recorded.</strong> The evidence directories
+hold every accepted diff with its reports; replay is free.</p></li>
+<li><p><strong>The semantics-alignment variant.</strong> Stopped; see
+<a class="reference internal" href="../designs/minitpu.html"><span class="doc">MiniTPU: Reference Architecture</span></a>.</p></li>
+</ul>
+</section>
+<section id="e5-held-out-rediscovery">
+<h3>E5. Held-out rediscovery<a class="headerlink" href="#e5-held-out-rediscovery" title="Link to this heading"><span>¶</span></a></h3>
+<p>An extension does not have to be novel to be evidence. If an agent reaches an
+abstraction the fork already has, <strong>without being told it exists</strong>, that is a
+measurable result and a much cheaper one to grade than novelty, because the
+right answer is already in the tree with its tests.</p>
+<p>The design: take a fork-local primitive whose history is known – the worked
+example is <code class="docutils literal notranslate"><span class="pre">s.dependence(...)</span></code>, which exists because a real defect could not
+be expressed any other way – remove it from the agent’s view along with the
+documentation that names it, and give the agent only the symptom that motivated
+it. Grade on whether the agent arrives at an abstraction with the same power,
+and on what it proposes instead when it does not.</p>
+<p>This is the one experiment in this list with a known correct answer, which makes
+it the right place to calibrate how much guidance an agent needs before the
+open-ended attempts in E3 are worth paying for.</p>
+</section>
+<section id="why-the-design-driver-s-end-state-matters-to-all-of-this">
+<h3>Why the design driver’s end state matters to all of this<a class="headerlink" href="#why-the-design-driver-s-end-state-matters-to-all-of-this" title="Link to this heading"><span>¶</span></a></h3>
+<p>The target is not one accelerator. It is <strong>a library of parametrized, modular
+TPU IPs that compose into different architectural choices</strong> – the named class
+being Groq’s LPU, OpenAI’s Jalapeno, Meta’s MTIA and AMD’s XDNA – with TinyTPU
+as something such a library <em>instantiates</em> rather than something to extend.</p>
+<p>That is what “generalizable across design cases” has to mean here, and it is
+the standard a proposed extension should be judged against: an abstraction that
+makes a second architecture expressible is worth more than one that makes the
+current design faster. It also tells E3 and E5 what to reward. An agent that
+parametrizes an IP block so it can be composed differently has done the thing
+the project wants, even if the immediate design gets no faster.</p>
+</section>
+</section>
+<section id="earlier-measurements-and-corrections">
+<h2>Earlier measurements and corrections<a class="headerlink" href="#earlier-measurements-and-corrections" title="Link to this heading"><span>¶</span></a></h2>
+<p>A superseded run, a withdrawn claim, and the earlier co-design effort that
+this one replaced. The current state is in the sections above.</p>
+<section id="earlier-capped-smoke-run-2026-09-19-old-design-old-project">
+<h3>Earlier: capped smoke run, 2026-09-19, old design, old project<a class="headerlink" href="#earlier-capped-smoke-run-2026-09-19-old-design-old-project" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/chia-evidence/isa-smoke-20260919-035443/</span></code>: 2 workers against the design shipped
+until <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code> (252 / 383 / 591 / 667 / 919), $15 hard cap, billed to the
+general project <code class="docutils literal notranslate"><span class="pre">test-adrs</span></code>. <strong>$15.15</strong>, 56 min, <strong>no candidate completed</strong>:
+opencode timed MCP calls out at 60 s while a cosim takes minutes, a hung
+evaluator blocked the tool server so the next session saw no tools, a
+deadlocked candidate held the gate for 900 s, CHIA silently retried a
+40-minute prompt, and unified diffs were the agents’ main failure mode. All
+five were fixed before run 1 (40-minute MCP timeout, async tools, 240 s gate
+timeout with process-group kill, <code class="docutils literal notranslate"><span class="pre">retries=1</span></code>, <code class="docutils literal notranslate"><span class="pre">replace_text</span></code>).</p>
+</section>
+<section id="withdrawn-the-open-arm-called-unguided">
+<h3>Withdrawn: the <code class="docutils literal notranslate"><span class="pre">open</span></code> arm called “unguided”<a class="headerlink" href="#withdrawn-the-open-arm-called-unguided" title="Link to this heading"><span>¶</span></a></h3>
+<p>Earlier revisions of this page called the <code class="docutils literal notranslate"><span class="pre">open</span></code> arm of the 2026-09-22 run
+<strong>unguided</strong>. The prompt audit recorded under
+<a class="reference internal" href="#what-is-and-is-not-demonstrated">What Is and Is Not Demonstrated</a> – taken against the prompts as actually
+sent – shows it was handed the corrected diagnosis through the shared system
+message, so it was <em>less directed</em>, not undirected. The word is withdrawn.
+The arm’s pre-registered result – the refusal bottleneck migrating and the
+cycles flat – is not affected; what changes is only what the arm may be said
+to have started from.</p>
+</section>
+<section id="withdrawn-t-is-not-varied">
+<h3>Withdrawn: “T is not varied”<a class="headerlink" href="#withdrawn-t-is-not-varied" title="Link to this heading"><span>¶</span></a></h3>
+<p>An earlier revision of this page said “T is not varied: the shipped design
+supports T=4 only”, in guard 6 of <a class="reference internal" href="chia.html#chia-isa-loop"><span class="std std-ref">the loop’s reference section</span></a>.
+<strong>That was wrong.</strong> The measurement that refutes it is in that guard.
+<code class="docutils literal notranslate"><span class="pre">param_check.py</span></code>’s own docstring described the column-block-2 problem
+correctly all along; the conclusion drawn from it was the error.</p>
+</section>
+</section>
+<section id="the-original-co-design-effort">
+<h2>The original co-design effort<a class="headerlink" href="#the-original-co-design-effort" title="Link to this heading"><span>¶</span></a></h2>
+<p>The earlier <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> search, its claim register and its setup are on
+their own page: <a class="reference internal" href="chia_codesign.html"><span class="doc">The Original Co-Design Effort (chia-codesign)</span></a>.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+    
+        <div id="show_right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&lt;</span><span>Page contents</span></a></p>
+        </div>
+
+        <div id="right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
+            <div class="page_toc">
+                <ul>
+<li><a class="reference internal" href="#">CHIA Agentic Co-Design: Results</a><ul>
+<li><a class="reference internal" href="#takeaways">Takeaways</a></li>
+<li><a class="reference internal" href="#contributions">Contributions</a></li>
+<li><a class="reference internal" href="#what-the-loop-has-measured-against-the-principle">What the loop has, measured against the principle</a></li>
+<li><a class="reference internal" href="#first-paid-run-2026-09-19">First paid run, 2026-09-19</a></li>
+<li><a class="reference internal" href="#what-is-and-is-not-demonstrated">What Is and Is Not Demonstrated</a></li>
+<li><a class="reference internal" href="#the-planned-experiments">The Planned Experiments</a><ul>
+<li><a class="reference internal" href="#the-one-thing-every-experiment-below-is-designed-to-fix">The one thing every experiment below is designed to fix</a></li>
+<li><a class="reference internal" href="#e1-rate-of-discovery-replicated">E1. Rate of discovery, replicated</a></li>
+<li><a class="reference internal" href="#e2-does-the-refusal-bound-the-search">E2. Does the refusal bound the search?</a></li>
+<li><a class="reference internal" href="#e3-can-an-agent-maintain-the-abstractions-and-at-what-rate">E3. Can an agent maintain the abstractions, and at what rate?</a></li>
+<li><a class="reference internal" href="#e4-co-design-both-sides-moving">E4. Co-design, both sides moving</a></li>
+<li><a class="reference internal" href="#what-will-not-be-spent-on">What will not be spent on</a></li>
+<li><a class="reference internal" href="#e5-held-out-rediscovery">E5. Held-out rediscovery</a></li>
+<li><a class="reference internal" href="#why-the-design-driver-s-end-state-matters-to-all-of-this">Why the design driver’s end state matters to all of this</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a><ul>
+<li><a class="reference internal" href="#earlier-capped-smoke-run-2026-09-19-old-design-old-project">Earlier: capped smoke run, 2026-09-19, old design, old project</a></li>
+<li><a class="reference internal" href="#withdrawn-the-open-arm-called-unguided">Withdrawn: the <code class="docutils literal notranslate"><span class="pre">open</span></code> arm called “unguided”</a></li>
+<li><a class="reference internal" href="#withdrawn-t-is-not-varied">Withdrawn: “T is not varied”</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#the-original-co-design-effort">The original co-design effort</a></li>
+</ul>
+</li>
+</ul>
+
+            </div>
+        </div>
+    
+
+      <div class="clearer"></div>
+    </div>
+    <div class="button_nav_wrapper">
+        <div class="button_nav">
+            <div class="left">
+                
+                <a href="chia.html">
+                    <span class="icon">&lt;</span><span>CHIA Agentic Co-Design</span></a>
+                
+            </div>
+
+            <div class="right">
+                
+                    <a href="chia_codesign.html"><span>The Original Co-Design Effort (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</span><span class="icon">&gt;</span></a>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Allo Authors.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+
+<p id="theme_credit">Styled using the <a href="https://github.com/piccolo-orm/piccolo_theme">Piccolo Theme</a></p>
+  </body>
+</html>

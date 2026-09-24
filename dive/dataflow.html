@@ -165,6 +165,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
@@ -174,8 +175,12 @@
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_results.html">TinyTPU-isa vs Gemmini: Results and History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
@@ -186,9 +191,13 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia_results.html">CHIA Agentic Co-Design: Results</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia_codesign.html">The Original Co-Design Effort (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT and the TinyTPU-isa Mapper</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extensions/act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act_results.html">ACT: Results, Findings and Corrections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
 <ul>
@@ -666,6 +675,93 @@ The element at index <code class="docutils literal notranslate"><span class="pre
 <span class="n">mod</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="s2">"vitis_hls"</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">"hw_emu"</span><span class="p">,</span> <span class="n">project</span><span class="o">=</span><span class="s2">"myproject.prj"</span><span class="p">)</span>
 </pre></div>
 </div>
+<p>Every primitive below is a method on the <code class="docutils literal notranslate"><span class="pre">Schedule</span></code> object <code class="docutils literal notranslate"><span class="pre">df.customize</span></code>
+returns (<code class="docutils literal notranslate"><span class="pre">allo/customize.py</span></code>); the full parameter lists and validation
+rules are on their docstrings, autodoc’d onto <a class="reference internal" href="../api/index.html"><span class="doc">Schedule Primitives</span></a>.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 24.4%" />
+<col style="width: 75.6%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Primitive</p></th>
+<th class="head"><p>What it does</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">s.split(axis,</span> <span class="pre">factor)</span></code></p></td>
+<td><p>Tiles the loop at <code class="docutils literal notranslate"><span class="pre">axis</span></code> into two nested loops of size <code class="docutils literal notranslate"><span class="pre">factor</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">s.reorder(*args)</span></code></p></td>
+<td><p>Reorders the nested loops named in <code class="docutils literal notranslate"><span class="pre">args</span></code> so the first one listed
+becomes outermost.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">s.unroll(axis,</span> <span class="pre">factor=0)</span></code></p></td>
+<td><p>Unrolls the loop at <code class="docutils literal notranslate"><span class="pre">axis</span></code> by <code class="docutils literal notranslate"><span class="pre">factor</span></code> (<code class="docutils literal notranslate"><span class="pre">0</span></code> unrolls fully).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">s.fuse(*args)</span></code></p></td>
+<td><p>Combines the loops named in <code class="docutils literal notranslate"><span class="pre">args</span></code> into a single loop.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">s.partition(target,</span> <span class="pre">partition_type=Partition.Complete,</span> <span class="pre">dim=0,</span> <span class="pre">factor=0)</span></code></p></td>
+<td><p>Partitions an array and propagates the new layout to every caller and
+callee.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">s.buffer_at(target,</span> <span class="pre">axis)</span></code></p></td>
+<td><p>Adds an on-chip buffer for values of <code class="docutils literal notranslate"><span class="pre">target</span></code> written inside the
+loop at <code class="docutils literal notranslate"><span class="pre">axis</span></code>, instead of writing them out immediately.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">s.reshape(target,</span> <span class="pre">shape)</span></code></p></td>
+<td><p>Reinterprets an array’s shape, e.g. to <code class="docutils literal notranslate"><span class="pre">(32,</span> <span class="pre">4,</span> <span class="pre">8)</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">s.pipeline(axis,</span> <span class="pre">initiation_interval=1,</span> <span class="pre">rewind=False)</span></code></p></td>
+<td><p>Pipelines the loop at <code class="docutils literal notranslate"><span class="pre">axis</span></code> to the given initiation interval.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">s.dependence(axis,</span> <span class="pre">target,</span> <span class="pre">dep_type=&quot;inter&quot;,</span> <span class="pre">direction=None,</span> <span class="pre">distance=None,</span> <span class="pre">dependent=False,</span> <span class="pre">dep_class=None)</span></code></p></td>
+<td><p><strong>Fork-only</strong> (not upstream): emits Vitis’s <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span></code>
+for one array in one loop – the programmer’s claim that the array’s
+accesses across (or within) iterations do not alias, which lets a
+loop the scheduler cannot otherwise prove independent pipeline at
+II=1. Like <code class="docutils literal notranslate"><span class="pre">align_value</span></code> below, it is a promise: if it is false the
+RTL computes a wrong answer while every software simulation, which
+ignores the pragma, still passes. See <a class="reference internal" href="../backends/vitis.html"><span class="doc">AMD Vitis HLS (FPGA)</span></a>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">s.parallel(axis)</span></code></p></td>
+<td><p>Marks the loop at <code class="docutils literal notranslate"><span class="pre">axis</span></code> to be computed in parallel with the loops
+it is nested with.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">s.inline(axis=None)</span></code></p></td>
+<td><p>Inlines the function at <code class="docutils literal notranslate"><span class="pre">axis</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">s.dataflow(axis)</span></code></p></td>
+<td><p>Applies a dataflow attribute to the function at <code class="docutils literal notranslate"><span class="pre">axis</span></code>, enabling
+task-level parallelism for functions using streams or <code class="docutils literal notranslate"><span class="pre">s.to</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">s.compute_at(from_loop,</span> <span class="pre">target_loop)</span></code></p></td>
+<td><p>Merges two loops over the same range, moving <code class="docutils literal notranslate"><span class="pre">from_loop</span></code>’s body to
+<code class="docutils literal notranslate"><span class="pre">target_loop</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">s.reuse_at(target,</span> <span class="pre">axis)</span></code></p></td>
+<td><p>Creates a reuse buffer for an array accessed with sliding-window
+overlap across iterations of the loop at <code class="docutils literal notranslate"><span class="pre">axis</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">s.to(target,</span> <span class="pre">dst,</span> <span class="pre">axis=None,</span> <span class="pre">depth=-1)</span></code></p></td>
+<td><p>Turns an array into a streaming channel between two stages.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">s.unfold(band_name,</span> <span class="pre">axes)</span></code></p></td>
+<td><p>Unrolls a named loop band along one or more axes, producing distinct
+instances rather than a single unrolled body.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">s.compose(schs,</span> <span class="pre">id=None,</span> <span class="pre">instantiate=None)</span></code></p></td>
+<td><p>Composes a called kernel’s own schedule into the caller’s.</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Fork-local backend configuration.</strong> <code class="docutils literal notranslate"><span class="pre">s.build(...,</span> <span class="pre">configs={...})</span></code> also
+takes backend-specific keys that are not <code class="docutils literal notranslate"><span class="pre">Schedule</span></code> methods. <code class="docutils literal notranslate"><span class="pre">align_value</span></code>
+(Vitis only, <strong>fork-only</strong>, not upstream) is the one in active use:
+<code class="docutils literal notranslate"><span class="pre">configs={&quot;align_value&quot;:</span> <span class="pre">64}</span></code> emits <code class="docutils literal notranslate"><span class="pre">__attribute__((align_value(64)))</span></code> on
+every <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> pointer argument – also a promise, not a checked fact; see
+<a class="reference internal" href="../backends/vitis.html"><span class="doc">AMD Vitis HLS (FPGA)</span></a> for what it buys and what it does not.</p>
 </section>
 </section>
 <section id="complete-example-producer-consumer">

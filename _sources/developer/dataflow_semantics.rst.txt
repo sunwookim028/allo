@@ -188,7 +188,7 @@ bidirectional handshake.
    routes ``csim`` and ``csyn``; ``mode="cosim"`` is **not** wired into the backend and
    falls through to the ``XDEVICE`` Makefile / OpenCL-host flow, which is not what
    ``cosim_design`` wants. Running cosim today needs an external driver —
-   ``examples/accelerator/tinytpu_vitis/cosim.py`` (~180 lines) generates a plain
+   ``examples/tinytpu/cosim.py`` (~180 lines) generates a plain
    C++ testbench and patches the ``m_axi`` depths Allo does not emit. See :ref:`limitation-16`.
 
 
