@@ -448,7 +448,16 @@ Quick start
    export PATH=$MGC_HOME/bin:$PATH
    export MGLS_LICENSE_FILE=1717@en-license-05.coecis.cornell.edu   # Catapult + PowerPro
    export CDS_LIC_FILE=...                                          # Xcelium, for the switching sim
-   export NC_ROOT=/opt/cadence/XCELIUM2403                          # or configs={"ncsim_root": ...}
+
+.. important::
+
+   **Expect to pass** ``configs={"ncsim_root": ...}``. The switching simulation runs in Xcelium,
+   and the backend looks for it in ``configs["ncsim_root"]``, then ``$NC_ROOT`` / ``$XCELIUM_HOME``
+   / ``$CDS_INST_DIR``, then ``xrun`` on ``PATH``. On zhang-21 **none of those are set**, so the
+   explicit config is what works there; on a host configured like it, a run without one fails
+   immediately at ``build()``. Nothing is guessed and no path is compiled in: rather than emit a
+   tcl with an empty ``/NCSim/NC_ROOT`` -- which would run no simulation and report zero power --
+   the build raises.
 
 .. code-block:: python
 
@@ -459,13 +468,14 @@ Quick start
        project="my_ppa_project",
        configs={
            "testbench": "tb.cpp",       # REQUIRED: CCS_MAIN + CCS_DESIGN(top)(...)
+           "ncsim_root": "/opt/cadence/XCELIUM2403",   # Xcelium root; zhang-21's, as an example
            "clock_period": 5.0,         # ns
            "library": "nangate-45nm_beh",
        },
    )
    stats = mod()   # runs synthesis + switching + power, prints a table, returns a dict
 
-Roughly 80 s for a 16-tap MAC on zhang-21. The table it prints carries latency, area, total /
+56 s for the 16-tap MAC below on zhang-21. The table it prints carries latency, area, total /
 dynamic / static power, the SAIF annotation coverage, a per-instance power breakdown, and the
 caveat below.
 
@@ -546,8 +556,9 @@ model, no place-and-route parasitics. A power figure without that attached is no
 Limits and known failures
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 * No testbench, no power: ``build()`` raises. This is the intended behaviour.
-* No Xcelium root resolvable: ``build()`` raises rather than emitting a tcl that silently runs no
-  simulation.
+* No Xcelium root resolvable: ``build()`` raises rather than emitting a tcl with an empty
+  ``NC_ROOT`` that silently runs no simulation. Discovery from the environment finds nothing on a
+  host like zhang-21, where none of the variables are set -- pass ``ncsim_root``.
 * Zero dynamic power, a missing ``power.rpt``, or 0 % SAIF annotation after a run: ``mod()`` raises
   instead of printing a zero.
 * ``synth_top`` (synthesizing a submodule) is untested with ppa: SCVerify wraps the design top, so
@@ -559,21 +570,32 @@ Limits and known failures
 
 Results and history
 ~~~~~~~~~~~~~~~~~~~
-The one measured power run is ``dev/records/catapult_handoff/zhang21_power_2026-09-24/`` (zhang-21,
+**The worked example** is ``dev/records/catapult_handoff/ppa_mac16/`` with its result in
+``ppa_mac16/zhang21_run_2026-09-24/``: the first ``mode="ppa"`` run to go end to end through Allo's
+own emitted tcl, **unmodified**, on zhang-21 (Catapult 2024.2/1130128, Xcelium 24.03-s005, exit 0
+in 56 s). An Allo-emitted 16-tap int8 MAC driven by a 200-transaction SCVerify testbench:
+**272.69 µW = 252.19 dynamic + 20.50 static**, 100.00 % annotation on both flop outputs and user
+nets, ``MAC16 TB errors=0`` and SCVerify ``Simulation PASSED``; latency 16 / throughput 18, area
+1180.529 score units, ``mac16_core_inst`` 272.09 µW with its FSM at 4.07 µW. ``use_ccs_block`` was
+**not** needed -- SCVerify wrapped the ``#pragma hls_design top`` DUT directly. That directory also
+holds ``check_ppa.py``, the success criterion written before the run, which was then shown to go
+red on three doctored copies of the passing outputs (testbench errors, a zeroed dynamic row, 0 %
+annotation).
+
+The earlier measured run, by hand rather than through this mode, is ``dev/records/catapult_handoff/zhang21_power_2026-09-24/`` (zhang-21,
 Catapult 2024.2/1130128 with PowerPro, nangate45 ``typical`` 1.1 V, 5 ns clock): a 16-tap int8 MAC
 driven by 200 transactions, **248.47 µW total -- 229.67 dynamic, 18.80 static**. The control with
 every input zero gives 83.80 µW dynamic, with combinational power falling 147.96 → 15.03 µW while
 the clock network stays at 19.93 µW. The number tracks activity, which is what makes it a
 measurement rather than a default-toggle estimate.
 
-That run was made by hand, because ``mode="ppa"`` did not work: it emitted the ``csyn`` tcl (stopping
-at ``go extract``, so no power step ever ran), and its parser looked for a ``Total Power:`` string
-that PowerPro's report does not contain, so it would have printed ``N/A`` even for a successful run.
-Both are fixed here, and the parser is tested against that committed report. **Not yet verified:**
-no ``mode="ppa"`` run has been executed end to end -- the emitted tcl reproduces the measured
-sequence step for step, but ``ace-01`` has no Catapult licence. The run that would verify it is
-prepared in ``dev/records/catapult_handoff/ppa_mac16/`` (project, testbench, commands, and a
-``check_ppa.py`` that is the success criterion), for the licence host to execute.
+That one had to be run by hand, because ``mode="ppa"`` did not work: it emitted the ``csyn`` tcl
+(stopping at ``go extract``, so no power step ever ran), and its parser looked for a
+``Total Power:`` string that PowerPro's report does not contain, so it would have printed ``N/A``
+even for a successful run. Both are fixed, the parser is tested against that committed report, and
+the ``ppa_mac16`` run above is the confirmation on the licence host. The two figures differ
+(272.69 vs 248.47 µW) because the Allo-emitted top has a different port interface and netlist from
+the hand-written ``mac.cpp``; the stimulus is the same.
 
 **RTL-to-GDSII with OpenROAD.** For physical PPA, the synthesizable RTL at
 ``<project>/Catapult/<top>.v1/rtl.v`` can be passed to

@@ -257,14 +257,19 @@ def resolve_ncsim_root(configs=None):
     Resolution order (first hit wins):
       1. configs["ncsim_root"]
       2. $NC_ROOT / $XCELIUM_HOME / $CDS_INST_DIR
-      3. the parent of the directory holding `xrun` on PATH
+      3. the install root above `xrun` on PATH
     Raises ValueError when nothing resolves, rather than emitting a default path that
-    only exists on one host.
+    only exists on one host OR an empty root that silently runs no simulation. On
+    zhang-21 none of 1-3 are set, so the explicit config is the one that works.
     """
     import shutil
 
     configs = configs or {}
+    # A blank or whitespace-only value is NOT a root. Treated as given it would emit
+    # `/NCSim/NC_ROOT ` with nothing after it, which points Catapult at nothing and
+    # produces the silent no-simulation failure this whole mode exists to prevent.
     cand = configs.get("ncsim_root")
+    cand = cand.strip() if isinstance(cand, str) else cand
     if cand:
         # An EXPLICIT root is taken as given even when it does not exist here: the
         # project is often generated on a machine without the tools (ace-01) and run
@@ -282,16 +287,35 @@ def resolve_ncsim_root(configs=None):
             return cand
     xrun = shutil.which("xrun")
     if xrun:
-        return os.path.dirname(os.path.dirname(os.path.realpath(xrun)))
+        root = os.path.dirname(os.path.dirname(os.path.realpath(xrun)))
+        # Xcelium keeps its binaries under a platform subdirectory -- zhang-21 has
+        # both `tools/bin` and `tools.lnx86/bin` -- and NC_ROOT wants the directory
+        # ABOVE that, not `<root>/tools`. Guessing one level too deep would emit a
+        # root that exists but holds no install: a wrong path, silently.
+        base = os.path.basename(root)
+        if base == "tools" or base.startswith("tools."):
+            root = os.path.dirname(root)
+        return root
+    # NOTHING RESOLVED -> raise. Emitting the tcl with an empty (or guessed) NC_ROOT
+    # would send Catapult looking at nothing, and a switching step that simulates
+    # nothing still "succeeds" -- exactly the silent zero this mode exists to prevent.
+    # MEASURED: on zhang-21, NC_ROOT, XCELIUM_HOME and CDS_INST_DIR are all unset and
+    # `xrun` is not on PATH, so discovery finds nothing there and the explicit config
+    # is what works. Hence it is named first.
     raise ValueError(
         "mode=\"ppa\" runs an RTL simulation to get switching activity, and no "
-        "Xcelium install was found. Set configs={'ncsim_root': '<xcelium root>'} or "
-        "export NC_ROOT / XCELIUM_HOME (the directory containing bin/xrun), or put "
-        "xrun on PATH. Xcelium also needs its licence: export CDS_LIC_FILE.\n"
+        "Xcelium install was found -- so nothing is emitted, because a tcl with an "
+        "empty /NCSim/NC_ROOT simulates nothing and reports a power of zero.\n"
+        "Pass it explicitly: configs={'ncsim_root': '<xcelium root>'}. That is what "
+        "works on a host where none of the environment variables are set (zhang-21 is "
+        "one: there the root is /opt/cadence/XCELIUM2403, whose binaries live under "
+        "tools/bin and tools.lnx86/bin -- an EXAMPLE, not a default; no site's path is "
+        "compiled in).\n"
+        "Otherwise export NC_ROOT, XCELIUM_HOME or CDS_INST_DIR, or put `xrun` on "
+        "PATH. Xcelium also needs its licence: export CDS_LIC_FILE.\n"
         "Catapult's default simulator is QuestaSim; this flow does not use it because "
-        "the one configuration measured end to end (dev/records/catapult_handoff/"
-        "zhang21_power_2026-09-24/) drives Xcelium, and a Questa install without "
-        "`vsim` silently simulates nothing and yields a power number of zero."
+        "a Questa install without `vsim` silently simulates nothing and yields a power "
+        "number of zero (dev/records/catapult_handoff/zhang21_power_2026-09-24/)."
     )
 
 

@@ -533,6 +533,51 @@ def test_ppa_tcl_runs_the_power_steps():
         ).read()
 
 
+def test_ppa_refuses_to_emit_an_unresolved_ncsim_root(monkeypatch, tmp_path):
+    """Nothing resolves -> raise. NEVER emit an empty /NCSim/NC_ROOT.
+
+    On zhang-21 none of NC_ROOT / XCELIUM_HOME / CDS_INST_DIR are set and `xrun` is
+    not on PATH, so this is the live path there, not a hypothetical one. An empty
+    root would point Catapult at nothing, and a switching step that simulates nothing
+    still "succeeds" -- the silent zero this mode exists to prevent.
+    """
+    import shutil as _shutil
+    from allo.backend.catapult import resolve_ncsim_root
+
+    for var in ("NC_ROOT", "XCELIUM_HOME", "CDS_INST_DIR"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setattr(_shutil, "which", lambda name: None)
+
+    for configs in ({}, {"ncsim_root": ""}, {"ncsim_root": "   "}, {"ncsim_root": None}):
+        with pytest.raises(ValueError, match="ncsim_root"):
+            resolve_ncsim_root(configs)
+
+    s = _mac16()
+    tb = tmp_path / "tb.cpp"
+    tb.write_text("// tb\n")
+    with pytest.raises(ValueError, match="ncsim_root"):
+        s.build(
+            target="catapult",
+            mode="ppa",
+            project=str(tmp_path / "prj"),
+            configs={"testbench": str(tb)},
+        )
+
+
+def test_ncsim_root_from_xrun_skips_the_tools_component(monkeypatch, tmp_path):
+    """Xcelium keeps binaries in <root>/tools/bin; NC_ROOT is the directory above."""
+    import shutil as _shutil
+    from allo.backend.catapult import resolve_ncsim_root
+
+    for var in ("NC_ROOT", "XCELIUM_HOME", "CDS_INST_DIR"):
+        monkeypatch.delenv(var, raising=False)
+    xrun = tmp_path / "XCELIUM2403" / "tools" / "bin" / "xrun"
+    xrun.parent.mkdir(parents=True)
+    xrun.write_text("")
+    monkeypatch.setattr(_shutil, "which", lambda name: str(xrun))
+    assert resolve_ncsim_root({}) == str(tmp_path / "XCELIUM2403")
+
+
 def test_parse_real_power_report():
     """Parse the report a real PowerPro run wrote (not an invented format)."""
     from allo.backend.catapult import parse_power_report
