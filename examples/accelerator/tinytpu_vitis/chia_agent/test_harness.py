@@ -30,12 +30,18 @@ Cases, each with an expected verdict:
                                                tools and the evaluator; a unit
                                                specialised to MAXDIM=16 REJECTED
                                                at gate:param
-  accept  accept.py on (b)                     bit-exact at all five shapes, and
-                                               reported as NOT a win
+  control  the run's measured control          a forged or foreign control
+                                               record refused; an unrecorded
+                                               design still cross-checked
+                                               against the published numbers
+  accept  accept.py on (b)                     bit-exact at all five shapes, a
+                                               control measured in the same run
+                                               before the diff, and reported as
+                                               NOT a win
 
     conda activate chia_env
-    python test_harness.py                       # everything, ~35 min
-    python test_harness.py --phases e,c,g        # cheap subset, ~3 min
+    python test_harness.py                       # everything, ~45 min
+    python test_harness.py --phases control,e,c,g   # cheap subset, ~3 min
     python test_harness.py --phases e,c,d,abf,loop,accept
 
 Writes `<run-dir>/results.json` and exits non-zero if any case failed.
@@ -84,12 +90,24 @@ logging.getLogger("mcp").setLevel(logging.WARNING)
 #: The five benchmark shapes have one definition (`{PKG}/shapes.py`);
 #: `evaluate` loads it by path and this takes the names from there rather than
 #: writing them out a sixth time. The cycles are positional against it.
-from evaluate import ALL_SHAPES  # noqa: E402
+import control  # noqa: E402
+from evaluate import ALL_SHAPES, PARAM_CONFIGS  # noqa: E402
 
 #: The unmodified design (README, accept.py control run).
 BASELINE_ALL = dict(zip(ALL_SHAPES, (172, 262, 418, 484, 686)))
 BASELINE = {s: BASELINE_ALL[s] for s in ("4x4x4", "16x16x16")}
 GATE_TIMEOUT = 240
+
+
+def genuine_control(**changes) -> dict:
+    """A control record as `accept.py` measures one for the design at HEAD;
+    `changes` makes a forgery out of it."""
+    return {**control.record(
+        cycles=dict(BASELINE_ALL), design=control.blobs("HEAD"), ref="HEAD",
+        estimated_ns=2.431, seconds=284.0, vouched=True, pristine_tree=True,
+        driver="cosim",
+        source="measured in this run from git at HEAD, before the candidate "
+               "diff was applied"), **changes}
 
 #: (file, old, new): exact, unique replacements on the HEAD design.
 MUTANTS = {
@@ -173,6 +191,16 @@ def mutate(name: str) -> str:
     text = head(f)
     assert text.count(old) == 1, name
     return text.replace(old, new, 1)
+
+
+def tails(swarm_output: str, worker: Path | None, lines=15) -> str:
+    """The last lines of what the swarm and its worker said, for a failure
+    whose cause is in them."""
+    out = ["-- swarm --", *swarm_output.splitlines()[-lines:]]
+    log = worker / "worker.log" if worker else None
+    if log and log.exists():
+        out += ["-- worker.log --", *log.read_text().splitlines()[-lines:]]
+    return "\n".join(out)
 
 
 def unified(name: str, before: str, after: str) -> str:
@@ -445,7 +473,8 @@ class Suite:
 
     def sandbox_probe(self):
         """The evaluator's sandbox, probed directly: candidate processes may
-        write their work directory and nothing else."""
+        write their work directory and nothing else -- the run's control record
+        among the things they cannot reach."""
         import importlib.util
         spec = importlib.util.spec_from_file_location("evaluate_", AGENT_DIR / "evaluate.py")
         ev = importlib.util.module_from_spec(spec)
@@ -457,6 +486,9 @@ class Suite:
         tree = work / "tree"
         (tree / PKG).mkdir(parents=True, exist_ok=True)
         (tree / PKG / "cosim.py").write_text("frozen\n")
+        ctl = self.run_dir / "control.json"
+        ctl.write_text(json.dumps(genuine_control()))
+        before = ctl.read_bytes()
         code = ("import sys\n"
                 "for p in sys.argv[1:]:\n"
                 "    try:\n"
@@ -464,12 +496,16 @@ class Suite:
                 "    except OSError as e: print('DENIED', p, e.errno)\n")
         targets = [str(tree / PKG / "cosim.py"), str(REPO / "allo" / "__init__.py"),
                    str(AGENT_DIR / "evaluate.py"), str(work / "isa_sweep.prj"),
-                   str(Path.home() / ".bashrc")]
+                   str(Path.home() / ".bashrc"), str(ctl)]
         rc, out, _ = ev.run(["python3", "-c", code, *targets], work, dict(os.environ),
                             60, work=work, tree=tree)
         wrote = [l.split()[1] for l in out.splitlines() if l.startswith("WROTE")]
         check("e.sandbox", "only the work dir (not tree/repo/evaluator/home) writable",
               f"writable={wrote}", wrote == [str(work / "isa_sweep.prj")])
+        check("e.candidate-cannot-forge-the-control",
+              "the run's control record is unwritable and unchanged",
+              f"denied={str(ctl) not in wrote}, unchanged={ctl.read_bytes() == before}",
+              str(ctl) not in wrote and ctl.read_bytes() == before)
 
     # c ------------------------------------------------------------------
     async def phase_c(self):
@@ -541,12 +577,18 @@ class Suite:
               f"{(v.get('detail') or '')[:80]!r}",
               r.startswith("Replaced") and not v.get("ok")
               and v.get("stage") == "gate:param")
-        # The unmodified design passes it, at both configurations.
+        # The unmodified design passes it, at every configuration the gate
+        # names -- taken from PARAM_CONFIGS, not restated here, because this
+        # check asserted "8 and 12" for a while after a third configuration
+        # (varying T) was added and was no longer checking the whole gate.
         self.reset("tpta")
         v = await A.verdict("run_functional_check")
         param = (v.get("gate") or {}).get("param", {})
-        check("g.unmodified passes gate:param", "ok, PARAM OK at MAXDIM 8 and 12",
-              param, v.get("ok") and len(param) == 2)
+        want = {",".join(f"{k}={v2}" for k, v2 in cfg.items())
+                for cfg in PARAM_CONFIGS}
+        check("g.unmodified passes gate:param",
+              f"ok, PARAM OK at all {len(want)}: {sorted(want)}", param,
+              v.get("ok") and set(param) == want)
         self.reset("tpta")
 
     # d ------------------------------------------------------------------
@@ -625,6 +667,17 @@ class Suite:
         print("== loop: swarm.py + opencode + fake model (no LLM)", flush=True)
         from fake_model import FakeModel
         from spend import spent_since
+        # The prerequisite, named here rather than left to be read out of a
+        # worker log: without it CHIA's OpenCodeLLM fails per iteration with
+        # "[Errno 2] No such file or directory: 'opencode'", every iteration
+        # makes no edit, and the phase's own failures all say something else.
+        # A fresh worktree does not have it: node_modules/ is gitignored.
+        if not (AGENT_DIR / "node_modules/.bin/opencode").exists():
+            check("loop.opencode-installed",
+                  "node_modules/.bin/opencode (npm ci --prefix chia_agent)",
+                  "missing: this worktree has no opencode, so the loop phase "
+                  "cannot drive the scripted model", False)
+            return
         f, old, new = MUTANTS["spad_zero"]
         f2, old2, new2 = MUTANTS["narrow16"]
         cosim = head("cosim.py")
@@ -668,16 +721,27 @@ class Suite:
         (self.run_dir / "loop-swarm.log").write_text(p.stdout + p.stderr)
         (self.run_dir / "loop-fake-model.json").write_text(
             json.dumps(fake.log, indent=1, default=str))
-        worker = next(d for d in run_dir.iterdir() if d.is_dir())
-        entries = [json.loads(l) for l in (worker / "variants.jsonl").read_text()
-                   .splitlines() if l.strip()]
+        worker = next((d for d in run_dir.iterdir() if d.is_dir()), None)
+        log = worker / "variants.jsonl" if worker else None
+        if log is None or not log.exists():
+            # Report why the loop produced nothing, rather than dying on the
+            # absent file: the cause is in the swarm's and the worker's output,
+            # and a FileNotFoundError here sends the next reader after the
+            # wrong thing (a refused pre-flight, a dirty frozen path and a
+            # tool server that never started all look like this).
+            check("loop.ran", "the loop wrote variants.jsonl",
+                  f"swarm exited {p.returncode}, no variants.jsonl under "
+                  f"{run_dir}:\n" + tails(p.stdout + p.stderr, worker), False)
+            return
+        entries = [json.loads(l) for l in log.read_text().splitlines()
+                   if l.strip()]
         by = {(e["kind"], e["iteration"]): e for e in entries}
         print(f"  swarm exited {p.returncode} after {time.time() - t:.0f}s; "
               f"{len(fake.log)} model sessions; fake errors {fake.errors}")
         check("loop.fake-model", "5 scripted sessions consumed, no errors",
               f"{len(fake.log)} sessions, errors={fake.errors}",
               len(fake.log) == 5 and not fake.errors and not fake.scripts)
-        base = by.get(("baseline", 0), {}).get("verdict", {})
+        base = by.get(("baseline", 0), {}).get("verdict") or {}
         check("loop.baseline", f"cycles == {BASELINE}", base.get("cycles"),
               base.get("cycles") == BASELINE)
         # What the agent itself received from score_cycles, mid-turn.
@@ -696,17 +760,17 @@ class Suite:
               f"accepted={e1.get('accepted')} reason={e1.get('reason')}",
               e1.get("accepted") is False and e1.get("reason") == "no diff")
         e2 = by.get(("candidate", 2), {})
-        v2 = e2.get("verdict", {})
+        v2 = e2.get("verdict") or {}   # None when the iteration made no diff
         check("b.spad_zero via loop", "bit-exact, delta > 0, REJECTED (not better)",
               f"ok={v2.get('ok')} {v2.get('cycles')} delta={e2.get('delta_cycles')} "
               f"accepted={e2.get('accepted')}",
               v2.get("ok") and (e2.get("delta_cycles") or 0) > 0
               and e2.get("accepted") is False)
         e3 = by.get(("candidate", 3), {})
+        v3 = e3.get("verdict") or {}
         check("c.narrow16 via loop", "REJECTED at gate:stress (after 1 debug session)",
-              f"stage={e3.get('verdict', {}).get('stage')} accepted={e3.get('accepted')}",
-              e3.get("verdict", {}).get("stage") == "gate:stress"
-              and e3.get("accepted") is False)
+              f"stage={v3.get('stage')} accepted={e3.get('accepted')}",
+              v3.get("stage") == "gate:stress" and e3.get("accepted") is False)
         e4 = by.get(("candidate", 4), {})
         replies = [c.get("result", "")[:40] for c in (fake.log[4]["calls"]
                                                        if len(fake.log) > 4 else [])]
@@ -720,12 +784,118 @@ class Suite:
         check("loop.artifacts", "best.diff empty, summary.json with no best",
               f"best.diff={best!r} best={summary.get('best')}",
               best == "" and summary.get("best") is None)
+        # This run's own cost, from what the loop recorded per model call.
+        # `spent_since` is a TIME WINDOW over opencode's global database, so a
+        # concurrent CHIA run on the same host lands in it -- conservative for
+        # a spend cap, and not the question here.
+        mine = sum(c.get("cost_usd", 0) for e in entries
+                   for c in e.get("llm_calls") or [])
         usd = spent_since(t0)["usd"]
-        check("loop.spend", "$0.00", f"${usd:.2f}", usd == 0)
+        check("loop.spend", "this run's own model calls cost $0.00",
+              f"${mine:.2f} (opencode's DB window, every run on this host: "
+              f"${usd:.2f})", mine == 0)
         check("loop.opencode-tools", "only the 7 MCP tools advertised to the model",
               fake.log[0]["tools"] if fake.log else None,
               bool(fake.log) and len(fake.log[0]["tools"]) == 7
               and all("tpufrontend_" in t for t in fake.log[0]["tools"]))
+
+    # control -------------------------------------------------------------
+    def phase_control(self):
+        """What surrounds the measured control: the record a claim may rest on,
+        and the cross-check that stays loud when the design's blobs move."""
+        print("== control: the run's measured control and its cross-check",
+              flush=True)
+        import accept
+        design = control.blobs("HEAD")
+        want = {f: subprocess.run(["git", "rev-parse", f"HEAD:{PKG}/{f}"], cwd=REPO,
+                                  capture_output=True, text=True).stdout.strip()
+                for f in ("microarch_isa.py", "isa_dsl.py")}
+        check("control.design-identity", "the two editable blobs at HEAD", design,
+              design == want and all(design.values()))
+        check("control.genuine-record-usable", "no problems",
+              control.unusable(genuine_control(), design, "cosim") or "none",
+              not control.unusable(genuine_control(), design, "cosim"))
+        forgeries = {
+            "verdict not vouched": genuine_control(vouched=False),
+            "measured by another driver": genuine_control(driver="codesign_cosim"),
+            "measured on a dirty checkout": genuine_control(pristine_tree=False),
+            "another design's control": genuine_control(
+                blobs={f: "0" * 40 for f in design}),
+            "a shape left out": genuine_control(
+                cycles={s: c for s, c in list(BASELINE_ALL.items())[:4]}),
+            "a shape invented": genuine_control(
+                cycles=dict(BASELINE_ALL, **{"32x32x32": 1})),
+            "cycles never measured": genuine_control(
+                cycles={s: None for s in BASELINE_ALL}),
+            "a clock the design cannot meet": genuine_control(estimated_ns=4.0),
+            "not a record at all": None,
+        }
+        for label, rec in forgeries.items():
+            problems = control.unusable(rec, design, "cosim")
+            check(f"control.refused: {label}", "refused, with a reason",
+                  problems, bool(problems))
+        # accept.py's --control path: the same refusal, through a file.
+        peer = self.run_dir / "peer-accept.json"
+        peer.write_text(json.dumps({"control": genuine_control()}))
+        reused = accept.reuse_control(peer, design, "cosim")
+        check("control.reuse-genuine", "reused, and says where from",
+              reused["source"][:40], reused["cycles"] == BASELINE_ALL
+              and reused["source"].startswith("reused from"))
+        peer.write_text(json.dumps(
+            {"control": genuine_control(cycles=dict(BASELINE_ALL, **{"4x4x4": 1}),
+                                        blobs={f: "0" * 40 for f in design})}))
+        try:
+            accept.reuse_control(peer, design, "cosim")
+            refused = "accepted a foreign control"
+        except accept.NoControl as why:
+            refused = str(why)[:80]
+        check("control.reuse-foreign-refused", "NoControl, nothing compared",
+              refused, refused.startswith("refusing the control in"))
+        # A control measured by another driver describes the same hardware with
+        # a different program: reusing it across drivers is a free win.
+        peer.write_text(json.dumps({"control": genuine_control()}))
+        try:
+            accept.reuse_control(peer, design, "codesign_cosim")
+            crossed = "reused across drivers"
+        except accept.NoControl as why:
+            crossed = str(why).split(": ", 1)[-1][:70]
+        check("control.reuse-across-drivers-refused",
+              "NoControl: the candidate's driver is not the control's",
+              crossed, crossed.startswith("measured by 'cosim'"))
+        # The cross-check: a prose-only edit moves the blobs, and the check
+        # must still compare -- that silent "no-baseline" is what it replaces.
+        agree = control.crosscheck(dict(BASELINE_ALL), design, "cosim")
+        check("control.crosscheck-agrees", "agree, against the published numbers",
+              f"{agree['status']} vs {agree['against'][:40]}",
+              agree["status"] == "agree" and not control.banner(agree))
+        moved = control.crosscheck(dict(BASELINE_ALL, **{"4x4x4": 171}), design,
+                                   "cosim")
+        check("control.crosscheck-disagrees-loudly", "DISAGREES, with a banner",
+              f"{moved['status']} delta={moved['delta']['4x4x4']}",
+              moved["status"] == "DISAGREES"
+              and "DISAGREES" in control.banner(moved))
+        recorded = control.crosscheck(dict(BASELINE_ALL), dict(zip(
+            ("microarch_isa.py", "isa_dsl.py"),
+            ("98b20b8b3f9ecf289604a428ffdb28997964b9dd",
+             "8f2e9aa9f518ef320cab163adc95e05737c777be"))), "cosim")
+        check("control.crosscheck-recorded-design", "agree, against its own entry",
+              f"{recorded['status']} vs {recorded['against'][:40]}",
+              recorded["status"] == "agree"
+              and recorded["against"].startswith("the control recorded"))
+        # Another driver measures another program on the same hardware, so this
+        # driver's numbers are not its cross-check: it has none until measured.
+        other = control.crosscheck(dict(BASELINE_ALL), design, "codesign_cosim")
+        check("control.crosscheck-unrecorded-driver",
+              "UNRECORDED, loud, not silently checked against cosim's numbers",
+              f"{other['status']} recorded={other['recorded']}",
+              other["status"] == "UNRECORDED" and other["recorded"] is None
+              and "UNRECORDED" in control.banner(other).upper())
+        search = control.crosscheck(dict(BASELINE), design, "cosim")
+        check("control.crosscheck-search-shapes",
+              "agree over the two scored shapes alone",
+              f"{search['status']} {search['compared']}",
+              search["status"] == "agree" and search["compared"]
+              == sorted(BASELINE))
 
     # accept --------------------------------------------------------------
     def phase_accept(self):
@@ -745,12 +915,30 @@ class Suite:
               f"ok={res.get('ok')} claim={res.get('claim')} {cyc}",
               res.get("ok") and res.get("claim") == "not-better"
               and len(cyc) == 5, accept=res)
+        # The control the claim rests on: measured in this same run, off the
+        # same build, while the candidate was still nowhere on disk. The
+        # candidate is slower at every shape, so a control that moved with it
+        # would show here.
+        ctl = res.get("control") or {}
+        check("accept.control-measured-before-the-diff",
+              f"measured in the run, pristine tree, {BASELINE_ALL}",
+              f"source={(ctl.get('source') or '')[:60]!r} "
+              f"cycles={ctl.get('cycles')} vouched={ctl.get('vouched')} "
+              f"pristine={ctl.get('pristine_tree')}",
+              "before the candidate diff" in (ctl.get("source") or "")
+              and ctl.get("cycles") == BASELINE_ALL and ctl.get("vouched")
+              and ctl.get("pristine_tree")
+              and ctl.get("blobs") == control.blobs("HEAD"))
+        cc = res.get("crosscheck") or {}
+        check("accept.crosscheck", "agree with the published five-shape control",
+              f"{cc.get('status')} delta={cc.get('delta')}",
+              cc.get("status") == "agree")
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--phases", default="e,c,g,d,abf,loop,accept")
+    ap.add_argument("--phases", default="control,e,c,g,d,abf,loop,accept")
     ap.add_argument("--run-dir", type=Path, default=REPO / "chia_runs"
                     / f"harness-test-{time.strftime('%Y%m%d-%H%M%S')}")
     a = ap.parse_args()
@@ -763,7 +951,7 @@ def main() -> int:
         for ph in phases:
             if ph in ("e", "c", "d", "abf", "g"):
                 asyncio.run(getattr(suite, f"phase_{ph}")())
-            elif ph in ("loop", "accept"):
+            elif ph in ("control", "loop", "accept"):
                 getattr(suite, f"phase_{ph}")()
             else:
                 raise SystemExit(f"unknown phase {ph}")

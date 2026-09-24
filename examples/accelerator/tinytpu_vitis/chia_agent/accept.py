@@ -4,33 +4,44 @@ The search scores two shapes in a composed evaluation tree. That is a search
 convenience, not evidence. A claim is accepted only by this script:
 
 1. a fresh `git worktree` of `--ref` (default HEAD) under `.chia_scratch/`,
-2. the candidate diff applied with `git apply` (it may touch only
-   microarch_isa.py and isa_dsl.py -- anything else is refused),
-3. that checkout's own `mlir/` bindings built in-tree against $LLVM_BUILD_DIR
+2. that checkout's own `mlir/` bindings built in-tree against $LLVM_BUILD_DIR
    (~40 s; no symlink into any other checkout),
-4. `bench_isa.py`, main's `stress_isa.py` (the correctness gate),
+3. **the control**: `cosim.py` on the committed design, all five shapes, in
+   that same worktree and off that same build, while the candidate's diff is
+   still nowhere on disk -- the number every candidate in the run is compared
+   against (`--control` reuses an earlier control run's, so one measurement
+   serves a whole run),
+4. the candidate diff applied with `git apply` (it may touch only
+   microarch_isa.py and isa_dsl.py -- anything else is refused),
+5. `bench_isa.py`, main's `stress_isa.py` (the correctness gate),
    `cosim.py`, and `cosim.py` again with `TPU_TB=stress` (the RTL correctness
    testbench; `--no-rtl-stress` skips it), with no `TPU_*` variable set except `TPU_PRJ` (where the Vitis
    project goes) -- so all five SHAPES, default memory model -- each run from
    that checkout under `chia_agent/gate_runner.py`, which vouches for each
    verdict with a per-run nonce instead of trusting printed lines,
-5. results and logs copied into `--out` BEFORE the worktree is removed.
+6. results and logs copied into `--out` BEFORE the worktree is removed.
 
 `ok` means *correct*: bit-exact at all five shapes, ALL EXACT, stress_isa,
-clock.
-Whether it is a *win* is a separate field, `claim`, against the unmodified
-design's five cosim numbers at `--ref`:
+clock. Whether it is a *win* is a separate field, `claim`, and it is decided
+against the control of step 3 -- a number produced minutes earlier on this
+machine, not one published at some past commit:
 
-    win          ok, and the five-shape total is lower
+    win          ok, and the five-shape total is lower than the control's
     not-better   ok, and it is not -- correct but no improvement; nothing to claim
     rejected     not ok
-    no-baseline  ok, but no baseline is known for this design (pass --baseline)
+    no-control   the control could not be measured or reused; nothing is
+                 comparable, and no result of this run means anything
 
-The baseline is recorded below per design (keyed by the git blob ids of the two
-editable files), or read from a control run's `accept.json` via `--baseline`.
+The control's own five testbenches are bit-exact per shape, which is what the
+comparison needs; the committed design's functional gates are main's business
+(`reproduce.sh`), not re-litigated here. `control.RECORDED` and the published
+numbers are a CROSS-CHECK on the measured control, never the control itself: a
+disagreement prints a banner and exits 3, because it means either the tools
+moved or the design changed behaviour.
 
     python accept.py --diff RUN/worker/best.diff --out RUN/accept-worker
-    python accept.py --out RUN/accept-baseline          # no diff: the control
+    python accept.py --out RUN/control                  # no diff: the control
+    python accept.py --diff D --out O --control RUN/control/accept.json
 """
 
 from __future__ import annotations
@@ -50,49 +61,31 @@ AGENT_DIR = Path(__file__).resolve().parent
 REPO = AGENT_DIR.parents[3]
 PKG = "examples/accelerator/tinytpu_vitis"
 sys.path.insert(0, str(AGENT_DIR))
+import control  # noqa: E402
 #: The nonce-vouched gate call has ONE definition, in evaluate.py, and this
 #: script imports it. It used to exist here as a second copy; a
 #: security-critical primitive that can drift between two copies is the one
 #: kind of duplication this harness cannot afford.
-from evaluate import ALL_SHAPES, vouch  # noqa: E402
+from evaluate import vouch  # noqa: E402
 ALLO_PYTHON = os.environ.get(
     "TINYTPU_ALLO_PYTHON", "/home/sk3463/miniconda3/envs/allo/bin/python")
 LLVM_BUILD_DIR = os.environ.get(
     "LLVM_BUILD_DIR", "/home/sk3463/llvm-allo-6b09f739/build")
 ENV_BIN = str(Path(ALLO_PYTHON).parent)
-#: Control runs of the unmodified design: (microarch_isa.py blob, isa_dsl.py
-#: blob) -> five-shape cosim cycles. Measured by this script with no --diff.
-#: The cycles are positional against `ALL_SHAPES`, which is the one five-shape
-#: definition (`{PKG}/shapes.py`); the keys are not written out again here.
-#:
-#: NOTE: no entry matches HEAD. A prose-only edit to `microarch_isa.py`
-#: (docstring corrections, two dead constants removed; no change to the design)
-#: moved its blob away from the 476a70d8 entry below, and re-recording the
-#: control needs a fresh five-shape cosim run, which is not this change's to
-#: make. Until one is recorded, acceptance reports `claim: "no-baseline"`
-#: unless `--baseline` names a control run's accept.json.
-BASELINES = {
-    # main @ e2451b81 (the branch point before the rebase)
-    ("ac5174fe43f449e9b0b1693cda1aff6c74ab71d3",
-     "10de511a2ddf7a8fa8fbf8d0de588ddbb690290f"):
-        dict(zip(ALL_SHAPES, (252, 383, 591, 667, 919))),
-    # main @ e620576d (check_program in assemble(), docstring fixes)
-    ("cb26d5683338184f02bfcb6be13bc1ace4e5e3e9",
-     "e3b55230b4c6308dfa5e7d729d49e6056040d663"):
-        dict(zip(ALL_SHAPES, (252, 383, 591, 667, 919))),
-    # main @ 476a70d8 (e24e433b: wld double-buffer, program prefetch, accu at
-    # II=1 via s.dependence). Main's published numbers; re-measured by a no-diff
-    # control through this script, evidence/accept-control-476a70d8/.
-    ("98b20b8b3f9ecf289604a428ffdb28997964b9dd",
-     "8f2e9aa9f518ef320cab163adc95e05737c777be"):
-        dict(zip(ALL_SHAPES, (172, 262, 418, 484, 686))),
-}
-
 
 BWRAP = shutil.which("bwrap")
 #: bench_isa / stress on the unmodified design take ~5-10 s each; a deadlocked
 #: candidate would otherwise hold the acceptance for the full cosim timeout.
 GATE_TIMEOUT = 600
+COSIM_ROW = r"^\s*(\d+)x\s*(\d+)x\s*(\d+)\s+cycles=(\S+)\s+(.*)$"
+#: The frozen check that measures cycles, for the control and the candidate
+#: alike. A mode that scores through another driver passes its own name to
+#: both passes, and `control.unusable` refuses a record from the other one.
+DRIVER = "cosim"
+
+
+class NoControl(SystemExit):
+    """No control measurement, so nothing this run measured is comparable."""
 
 
 def sh(cmd, cwd, env=None, log=None, timeout=7200, stdin=None):
@@ -135,6 +128,102 @@ def boxed(cmd, writable: Path):
             "--unshare-pid", "--die-with-parent", "--", *cmd]
 
 
+def build_bindings(wt: Path, env, out: Path) -> str:
+    rc, o, sec = sh(["cmake", "-G", "Ninja", "-S", "mlir", "-B", "mlir/build",
+                     f"-DMLIR_DIR={LLVM_BUILD_DIR}/lib/cmake/mlir",
+                     f"-DPython3_EXECUTABLE={ALLO_PYTHON}",
+                     f"-DPython_EXECUTABLE={ALLO_PYTHON}",
+                     "-DMLIR_BINDINGS_PYTHON_NB_DOMAIN=allo"], wt, env,
+                    out / "cmake.log")
+    if rc:
+        raise SystemExit("cmake failed; see cmake.log")
+    rc, o, sec = sh(["ninja", "-C", "mlir/build", "-j", "48"], wt, env,
+                    out / "ninja.log")
+    if rc:
+        raise SystemExit("ninja failed; see ninja.log")
+    rc, o, _ = sh([ALLO_PYTHON, "-c", "import allo,os;print(os.path.realpath("
+                   "allo.__file__))"], "/", env)
+    assert o.strip().startswith(str(wt)), o
+    return o.strip()
+
+
+def cosim_pass(wt: Path, env, work: Path, out: Path, prefix="", driver=DRIVER):
+    """One nonce-vouched five-shape cosim with its project inside `work`.
+
+    `driver` is the frozen check that does the measuring, and the control and
+    the candidate must go through the SAME one: a second driver describes the
+    same hardware with a different program, so comparing across two of them
+    shows the driver's difference as the candidate's win.
+
+    Returns ({vouched, rows, estimated_ns, seconds}, the run's output)."""
+    work.mkdir(parents=True, exist_ok=True)
+    prj = work / "isa_sweep.prj"
+    ok, rc, text, sec = vouched(driver, wt, work, dict(env, TPU_PRJ=str(prj)),
+                                out / f"{prefix}cosim.log", work)
+    for f in prj.glob("cosim_*.log"):
+        shutil.copy2(f, out / f"{prefix}{f.name}")
+    est = None
+    xml = prj / "out.prj/solution1/syn/report/csynth.xml"
+    if xml.exists():
+        shutil.copy2(xml, out / f"{prefix}csynth.xml")
+        est = float(re.search(r"<EstimatedClockPeriod>([\d.]+)",
+                              xml.read_text()).group(1))
+    rows = {f"{m}x{k}x{n}": {"cycles": None if c == "None" else int(c),
+                             "tb": tb.strip()}
+            for m, k, n, c, tb in re.findall(COSIM_ROW, text, re.M)}
+    return {"vouched": ok, "rows": rows, "estimated_ns": est,
+            "seconds": sec}, text
+
+
+def five_exact(rows: dict) -> bool:
+    return len(rows) == 5 and all(
+        v["cycles"] is not None
+        and v["tb"] == (f"TB {s} mismatches = 0 / "
+                        f"{int(s.split('x')[0]) * int(s.split('x')[2])}")
+        for s, v in rows.items())
+
+
+def measure_control(wt: Path, env, out: Path, ref: str, design: dict, tracked,
+                    keep: bool, driver=DRIVER) -> dict:
+    """The committed design, measured in THIS worktree off THIS build, before
+    the candidate's diff exists on disk. That ordering is what a candidate
+    cannot get past: no line of it has been written, let alone run, when these
+    cycles are measured."""
+    if tracked().strip():
+        raise NoControl(f"refusing to measure the control on a checkout that is "
+                        f"not pristine:\n{tracked()}")
+    work = wt / ".control"
+    passed, _ = cosim_pass(wt, env, work, out, "control-", driver)
+    if tracked().strip():
+        raise NoControl(f"the control measurement changed tracked files:\n{tracked()}")
+    if not keep:
+        shutil.rmtree(work, ignore_errors=True)   # hundreds of MB, already read
+    if not (passed["vouched"] and five_exact(passed["rows"])):
+        raise NoControl(f"the control did not measure: vouched="
+                        f"{passed['vouched']}, rows={passed['rows']}; see "
+                        f"{out / 'control-cosim.log'}")
+    return control.record(
+        cycles={s: v["cycles"] for s, v in passed["rows"].items()},
+        design=design, ref=ref, estimated_ns=passed["estimated_ns"],
+        seconds=passed["seconds"], vouched=True, pristine_tree=True,
+        driver=driver,
+        source=f"measured in this run from git at {ref[:8]}, before the "
+               f"candidate diff was applied")
+
+
+def reuse_control(path: Path, design: dict, driver=DRIVER) -> dict:
+    """An earlier control run's record, for the same design and the same
+    measurement driver, or nothing."""
+    try:
+        rec = (json.loads(path.read_text()) or {}).get("control")
+    except (OSError, json.JSONDecodeError) as why:
+        raise NoControl(f"cannot read the control in {path}: {why}")
+    problems = control.unusable(rec, design, driver)
+    if problems:
+        raise NoControl(f"refusing the control in {path}: {'; '.join(problems)}")
+    return dict(rec, source=f"reused from {path}: {rec['source']}")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--diff", type=Path)
@@ -143,8 +232,9 @@ def main():
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--no-rtl-stress", action="store_true",
                     help="skip cosim.py's TPU_TB=stress correctness testbench")
-    ap.add_argument("--baseline", type=Path,
-                    help="a control run's accept.json (default: recorded BASELINES)")
+    ap.add_argument("--control", type=Path,
+                    help="an earlier control run's accept.json: reuse its measured "
+                         "control (same design only) instead of measuring again")
     a = ap.parse_args()
     out = a.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -152,11 +242,21 @@ def main():
                          text=True, check=True).stdout.strip()
     wt = REPO / ".chia_scratch" / f"accept-{out.name}-{int(time.time())}"
     result = {"ref": ref, "diff": str(a.diff) if a.diff else None, "ok": False,
+              "design": control.blobs(ref),
               "measurement": "cosim: Vitis HLS 2023.2 + xsim C/RTL cosim (RTL), "
                              "clean checkout, all five SHAPES, TPU_* unset"}
     subprocess.run(["git", "worktree", "add", "--detach", str(wt), ref], cwd=REPO,
                    check=True, capture_output=True)
     try:
+        tracked = lambda: sh(["git", "status", "--porcelain",
+                              "--untracked-files=no"], wt)[1]
+        env = {k: v for k, v in os.environ.items() if not k.startswith("TPU_")}
+        env.update(PATH=f"{ENV_BIN}:{env['PATH']}", LLVM_BUILD_DIR=LLVM_BUILD_DIR,
+                   OMP_NUM_THREADS="8", PYTHONPATH=str(wt),
+                   PYTHONDONTWRITEBYTECODE="1")
+        result["sandbox"] = bool(BWRAP)
+        # What the diff may touch, before anything is measured: a diff that is
+        # refused anyway must not cost a five-shape cosim first.
         if a.diff:
             diff = a.diff.read_text()
             touched = set(re.findall(r"^\+\+\+ b/(\S+)", diff, re.M)) | set(
@@ -164,6 +264,20 @@ def main():
             if not touched or not touched <= {"microarch_isa.py", "isa_dsl.py"}:
                 raise SystemExit(f"refusing: diff touches {sorted(touched)}")
             (out / "candidate.diff").write_text(diff)
+        result["allo_resolves_to"] = build_bindings(wt, env, out)
+
+        # The control next, off this build, with the candidate still nowhere
+        # on disk. A no-diff run IS the control: its own measurement below.
+        ctl = None
+        if a.control:
+            ctl = reuse_control(a.control, result["design"], DRIVER)
+        elif a.diff:
+            ctl = measure_control(wt, env, out, ref, result["design"], tracked,
+                                  a.keep, DRIVER)
+        if ctl:
+            result["control"] = ctl
+
+        if a.diff:
             rc, o, _ = sh(["git", "apply", f"--directory={PKG}", "-p1",
                            str(a.diff.resolve())], wt)
             if rc:
@@ -185,33 +299,8 @@ def main():
             raise SystemExit(f"refusing: spec policy: {problems}")
         rc, o, _ = sh(["git", "status", "--porcelain"], wt)
         result["checkout_status"] = o.strip().splitlines()
-        tracked = lambda: sh(["git", "status", "--porcelain",
-                              "--untracked-files=no"], wt)[1]
-
-        env = {k: v for k, v in os.environ.items() if not k.startswith("TPU_")}
-        env.update(PATH=f"{ENV_BIN}:{env['PATH']}", LLVM_BUILD_DIR=LLVM_BUILD_DIR,
-                   OMP_NUM_THREADS="8", PYTHONPATH=str(wt),
-                   PYTHONDONTWRITEBYTECODE="1")
-        rc, o, sec = sh(["cmake", "-G", "Ninja", "-S", "mlir", "-B", "mlir/build",
-                         f"-DMLIR_DIR={LLVM_BUILD_DIR}/lib/cmake/mlir",
-                         f"-DPython3_EXECUTABLE={ALLO_PYTHON}",
-                         f"-DPython_EXECUTABLE={ALLO_PYTHON}",
-                         "-DMLIR_BINDINGS_PYTHON_NB_DOMAIN=allo"], wt, env,
-                        out / "cmake.log")
-        if rc:
-            raise SystemExit("cmake failed; see cmake.log")
-        rc, o, sec = sh(["ninja", "-C", "mlir/build", "-j", "48"], wt, env,
-                        out / "ninja.log")
-        if rc:
-            raise SystemExit("ninja failed; see ninja.log")
-        rc, o, _ = sh([ALLO_PYTHON, "-c", "import allo,os;print(os.path.realpath("
-                       "allo.__file__))"], "/", env)
-        result["allo_resolves_to"] = o.strip()
-        assert o.strip().startswith(str(wt)), o
 
         cos = wt / ".cosim"
-        cos.mkdir()
-        result["sandbox"] = bool(BWRAP)
         clean = tracked()
 
         def untouched(stage):
@@ -219,6 +308,7 @@ def main():
                 result["tamper"] = f"tracked files changed during {stage}"
                 raise SystemExit(result["tamper"])
 
+        cos.mkdir()
         ok1, rc, o, sec = vouched("bench_isa", wt, wt, env, out / "bench_isa.log", cos,
                                   timeout=GATE_TIMEOUT)
         untouched("bench_isa")
@@ -247,24 +337,12 @@ def main():
                                              if "PARAM " in l][-1:]}
         # cosim.py puts its project next to itself by default; keep it in the
         # writable .cosim directory instead.
-        ok3, rc3, o3, sec3 = vouched("cosim", wt, cos,
-                                     dict(env, TPU_PRJ=str(cos / "isa_sweep.prj")),
-                                     out / "cosim.log", cos)
+        candidate, o3 = cosim_pass(wt, env, cos, out, driver=DRIVER)
         untouched("cosim")
-        rows = re.findall(r"^\s*(\d+)x\s*(\d+)x\s*(\d+)\s+cycles=(\S+)\s+(.*)$", o3, re.M)
-        result["cosim"] = {f"{m}x{k}x{n}": {"cycles": None if c == "None" else int(c),
-                                            "tb": tb.strip()}
-                           for m, k, n, c, tb in rows}
-        result["cosim_seconds"] = sec3
-        prj = cos / "isa_sweep.prj"
-        for f in prj.glob("cosim_*.log"):
-            shutil.copy2(f, out / f.name)
-        xml = prj / "out.prj/solution1/syn/report/csynth.xml"
-        if xml.exists():
-            shutil.copy2(xml, out / "csynth.xml")
-            t = xml.read_text()
-            result["estimated_ns"] = float(re.search(
-                r"<EstimatedClockPeriod>([\d.]+)", t).group(1))
+        ok3, result["cosim"] = candidate["vouched"], candidate["rows"]
+        result["cosim_seconds"] = candidate["seconds"]
+        if candidate["estimated_ns"] is not None:
+            result["estimated_ns"] = candidate["estimated_ns"]
         # The RTL correctness testbench (main's cosim.py TPU_TB=stress): several
         # calls on one RTL instance, corner/full/boundary/mid operands, C
         # prefilled and compared in full, plus a vector program. It is what
@@ -287,39 +365,49 @@ def main():
                       and "COSIM OK (testbench=stress)" in o4)
             result["cosim_rtl_stress"] = {"vouched": ok4, "ok": rtl_ok,
                                           "shapes": lines4, "seconds": sec4}
-        exact = all(v["tb"] == f"TB {s} mismatches = 0 / "
-                    f"{int(s.split('x')[0]) * int(s.split('x')[2])}"
-                    and v["cycles"] is not None for s, v in result["cosim"].items())
+        exact = five_exact(result["cosim"])
         result["ok"] = (ok1 and result["bench_isa"]["all_exact"]
-                        and ok2 and ok3 and param_ok and len(result["cosim"]) == 5
-                        and exact and result.get("estimated_ns", 99) <= 3.33
+                        and ok2 and ok3 and param_ok and exact
+                        and result.get("estimated_ns", 99) <= 3.33
                         and rtl_ok)
-        if a.baseline:
-            base = {s: v["cycles"] for s, v in
-                    json.loads(a.baseline.read_text())["cosim"].items()}
-        else:
-            blobs = tuple(subprocess.run(
-                ["git", "rev-parse", f"{ref}:{PKG}/{f}"], cwd=REPO,
-                capture_output=True, text=True).stdout.strip()
-                for f in ("microarch_isa.py", "isa_dsl.py"))
-            base = BASELINES.get(blobs)
-        result["baseline"] = base
+        if ctl is None:
+            ctl = control.record(
+                cycles={s: v["cycles"] for s, v in result["cosim"].items()},
+                design=result["design"], ref=ref, seconds=candidate["seconds"],
+                estimated_ns=candidate["estimated_ns"], vouched=ok3,
+                pristine_tree=not result["checkout_status"], driver=DRIVER,
+                source="no diff was applied: this run's own measurement is "
+                       "the control")
+            ctl["problems"] = control.unusable(ctl, result["design"], DRIVER)
+            result["control"] = ctl
+        # The cross-check is on the CONTROL, so it is reported even for a
+        # candidate that was rejected: the tools may have moved under both.
+        if not ctl.get("problems"):
+            result["crosscheck"] = control.crosscheck(
+                ctl["cycles"], result["design"], ctl["driver"])
         if not result["ok"]:
             result["claim"] = "rejected"
-        elif not base or set(base) != set(result["cosim"]):
-            result["claim"] = "no-baseline"
+        elif ctl.get("problems"):
+            result["claim"] = "no-control"
         else:
             got = {s: v["cycles"] for s, v in result["cosim"].items()}
-            result["delta"] = {s: got[s] - base[s] for s in base}
+            result["delta"] = {s: got[s] - ctl["cycles"][s] for s in ctl["cycles"]}
             result["delta_total"] = sum(result["delta"].values())
             result["claim"] = "win" if result["delta_total"] < 0 else "not-better"
+    except NoControl:
+        result["claim"] = "no-control"
+        raise
     finally:
         (out / "accept.json").write_text(json.dumps(result, indent=1))
         print(json.dumps(result, indent=1))
+        print(control.banner(result.get("crosscheck") or {}), end="")
         # Results are already under --out; only now may the checkout go.
         if not a.keep:
             subprocess.run(["git", "worktree", "remove", "--force", str(wt)],
                            cwd=REPO, capture_output=True)
+    cc = result.get("crosscheck") or {}
+    if cc and cc.get("status") != "agree":
+        raise SystemExit(3)
 
 
 if __name__ == "__main__":

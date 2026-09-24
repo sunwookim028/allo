@@ -10,7 +10,12 @@ agent's word or the agent's own tool output:
   score  cosim.py at the search shapes           (RTL cosim cycles, ~2-4 min)
 
 A candidate is kept only if it passes both and strictly lowers the summed cosim
-cycles; otherwise the spec is rewound and the next iteration is told why.
+cycles; otherwise the spec is rewound and the next iteration is told why. What
+it is lowered against is measured, not looked up: iteration 0 scores the
+unmodified design in this environment, records the design's blob ids with it,
+and cross-checks it against the published numbers (`control.py`) so that a
+toolchain that moved is loud at the start of the run rather than implicit in
+every verdict after it.
 
 A spend cap is enforced before every model call: if the global spend since the
 run started (opencode's own DB, all workers) plus the largest single call seen
@@ -32,6 +37,7 @@ import ray
 from chia.base.ChiaFunction import get
 from chia.models.opencode import AdditionalModelProvider, RateLimitError
 
+import control
 import preflight
 from allo_tool import AlloSpecTool, EDITABLE
 from llm import IsaOpenCodeLLM
@@ -142,14 +148,20 @@ class BudgetExhausted(Exception):
 
 
 class Budget:
-    """Global spend cap across every worker, read from opencode's DB."""
+    """Global spend cap across every worker, read from opencode's DB.
 
-    def __init__(self, cap_usd: float, t0_ms: int):
-        self.cap, self.t0 = cap_usd, t0_ms
+    `billable` is what pre-flight decided: the scripted test model on loopback
+    cannot be billed, and opencode's DB has no project on a session, so its
+    window also holds any OTHER CHIA run on this host. Counting that against a
+    run that cannot spend is how `test_harness.py`'s loop phase came to refuse
+    its first model call at $0 while another track's paid run was live."""
+
+    def __init__(self, cap_usd: float, t0_ms: int, billable: bool = True):
+        self.cap, self.t0, self.billable = cap_usd, t0_ms, billable
         self.largest_call = DEFAULT_CALL_USD
 
     def spent(self) -> float:
-        return spent_since(self.t0)["usd"]
+        return spent_since(self.t0)["usd"] if self.billable else 0.0
 
     def check(self, what: str):
         spent = self.spent()
@@ -258,8 +270,16 @@ def run(task, iterations, max_debug_attempts, log_dir: Path, spec_dir: Path,
         print("=" * 72)
         baseline = tool.evaluate(work="harness")
         print(f"  {summarize(baseline)}", flush=True)
+        design = control.blobs("HEAD")
+        cross = (control.crosscheck(baseline["cycles"], design, "cosim")
+                 if baseline.get("ok") else None)
         _record(log_path, {"iteration": 0, "kind": "baseline", "accepted": True,
-                           "head": head, "verdict": baseline})
+                           "head": head, "design": design, "crosscheck": cross,
+                           "verdict": baseline})
+        if cross:
+            print(f"  cross-check against {cross['against']}: "
+                  f"{cross['status']} {cross['delta']}", flush=True)
+            print(control.banner(cross), end="", flush=True)
         if not baseline.get("ok"):
             print(baseline.get("detail", "")[-3000:])
             return 1
@@ -413,11 +433,11 @@ def main() -> None:
     # Before any worker, tool server or model call: the right billing account,
     # the API, a per-run cap, and room under the cumulative cap.
     t0 = args.t0_ms or int(time.time() * 1000)
-    preflight.require(args.budget_usd, run_t0_ms=t0)
+    charge = preflight.require(args.budget_usd, run_t0_ms=t0)
     args.budget_usd = float(args.budget_usd)
     spec = args.spec_dir or args.log_dir / "spec"
     work = args.work_dir or REPO_ROOT / ".chia_scratch" / args.log_dir.name / "eval"
-    budget = Budget(args.budget_usd, t0)
+    budget = Budget(args.budget_usd, t0, charge.get("mode") != "test-model")
     raise SystemExit(run(args.task, args.iterations, args.max_debug_attempts,
                          args.log_dir.resolve(), spec.resolve(), work.resolve(),
                          args.tool_name, budget))

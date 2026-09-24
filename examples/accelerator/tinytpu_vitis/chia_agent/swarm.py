@@ -220,9 +220,15 @@ def main() -> None:
             print(f"launching worker '{worker}'", flush=True)
             procs.append((worker, launch(worker, angle, run_dir, args.iterations,
                                          soft, t0_ms)))
+        # opencode's DB stores no project on a session, so this window also
+        # holds any other CHIA run on the host. That is the safe direction for
+        # a cap on real money, and no direction at all for a run that cannot
+        # spend any: with the scripted test model, pre-flight has already
+        # established that no cloud model is reachable.
+        billable = charge.get("mode") != "test-model"
         while any(p.poll() is None for _, p in procs):
             spent = spent_since(t0_ms)["usd"]
-            if spent >= args.budget_usd:
+            if billable and spent >= args.budget_usd:
                 print(f"HARD CAP: spent ${spent:.2f} >= ${args.budget_usd:.2f}; "
                       f"killing workers", flush=True)
                 capped = True
