@@ -156,7 +156,7 @@ on designs, or is it a design?*
   the Allo designs stay in `examples/systemc/`, the harness and testbenches
   become `tests/systemc/` (cross-check under `tests/systemc/rtlsim/`), and the
   logs, verdicts and archived emitter output become `dev/records/systemc/`. The
-  one design that was buried in the harness directory, `pe_split.py`, moved up
+  one design that was buried in the harness directory, `dot_product_four_links.py`, moved up
   to `examples/systemc/`.
 - `rtl_export/` was a bad name for something that is not a separate tool.
   `export_rtl.py` packages a configuration's Verilog *for the ASIC handoff* —

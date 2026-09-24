@@ -154,7 +154,7 @@ def main():
 ```
 
 **Non‑determinism.** Some designs are legitimately non‑deterministic (arrival order under
-arbitration; see the `nb_nondeterminism` designs). For those the golden compare must be
+arbitration; see the `nb_producer_consumer` designs). For those the golden compare must be
 **order‑tolerant** (multiset / per‑flow order), exactly like `replay_ref.py`'s payload‑set
 check — not a positional diff. Mark them `compare: multiset` in the manifest and have the
 design's cosim checker use the tolerant comparison. cosim's built‑in SCVerify diff is

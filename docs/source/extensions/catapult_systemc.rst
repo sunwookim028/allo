@@ -315,7 +315,7 @@ Is it the free-running-loop rewrite? No
 rewrote its outermost loop to ``while (1)`` **under** ``__SYNTHESIS__`` -- precisely a bug that
 leaves a design correct in csim and wrong in RTL. The netlists above are from ``0eff4888``
 (2026-08-01), 19 days older. But ``72c70dcb``'s guard requires *a load from a memory port inside
-the loop body*, and ``acc`` is declared ``args=[]`` (``examples/systemc/pe_split.py``), so
+the loop body*, and ``acc`` is declared ``args=[]`` (``examples/systemc/dot_product_four_links.py``), so
 the guard structurally cannot fire for it, while its unused ``i`` does trigger the rewrite. ``mul``
 is rewritten too, but it reads Streams, whose handshake makes a free-running loop harmless. The
 proposed fix was to extend the guard so that a ``get()`` from a ``Wire`` or ``Channel`` in the loop
@@ -323,7 +323,7 @@ body counts as evidence of finite streaming. This was stated as a hypothesis fro
 not a measurement.
 
 **The test (2026-09-18,** ``6b84f7b1`` **): a negative result.** ``guard_experiment/guard.patch``
-stops the rewrite for any loop that reads a ``Wire``. ``pe_split.py`` was re-emitted from
+stops the rewrite for any loop that reads a ``Wire``. ``dot_product_four_links.py`` was re-emitted from
 ``choonsik1/allo:SystemC-emitter`` with and without it, synthesised with Catapult 2024.2, and simulated
 under Xcelium 24.03:
 

@@ -1,7 +1,7 @@
 # usage: python run_sc.py emit.py <outdir> [variant ...]
-# Writes a csyn Catapult project per pe_split variant (default wire stream channel).
+# Writes a csyn Catapult project per dot-product-link variant (default wire stream channel).
 import os, sys
-# pe_split.py is a design, and lives with the other designs. Find the repo root
+# The design lives with the other designs. Find the repo root
 # by searching UPWARD for a marker -- never by counting levels (dev/roadmap.md).
 _D = os.path.dirname(os.path.abspath(__file__))
 while not (os.path.exists(os.path.join(_D, "pyproject.toml"))
@@ -12,7 +12,7 @@ while not (os.path.exists(os.path.join(_D, "pyproject.toml"))
     _D = _P
 sys.path.insert(0, os.path.join(_D, "examples", "systemc"))
 import allo.dataflow as df
-import pe_split  # examples/systemc/pe_split.py
+import dot_product_four_links as pe_split  # examples/systemc/dot_product_four_links.py
 
 out = os.path.abspath(sys.argv[1])
 for v in sys.argv[2:] or ["wire", "stream", "channel"]:

@@ -75,7 +75,7 @@ Target and reasoning in `dev/repo_layout.md`. Ordered by dependency:
    deleted in a later commit.
 4. **`examples/systemc_rtlsim/` split by kind** — **Done 2026-09-24.** Neither
    SystemC directory was a design directory. The Allo designs (including
-   `pe_split.py`) are now `examples/systemc/`; the testbenches, shims and run
+   `dot_product_four_links.py`) are now `examples/systemc/`; the testbenches, shims and run
    scripts are `tests/systemc/` (with the cross-check under
    `tests/systemc/rtlsim/`); the logs and archived emitter output are
    `dev/records/systemc/`.

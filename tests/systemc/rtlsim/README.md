@@ -8,7 +8,7 @@ Full write-up, including what each result means:
 `docs/source/extensions/catapult_systemc.rst`
 (https://sunwookim028.github.io/allo/extensions/catapult_systemc.html).
 
-The design under test is [`examples/systemc/pe_split.py`](../../../examples/systemc/pe_split.py)
+The design under test is [`examples/systemc/dot_product_four_links.py`](../../../examples/systemc/dot_product_four_links.py)
 — one running dot product expressed four ways, differing only at the `mul → acc`
 boundary. The recorded results are in
 [`dev/records/systemc/rtlsim/`](../../../dev/records/systemc/rtlsim/):
@@ -25,7 +25,7 @@ one pass and one fail, kept for diffing).
 | `tb_mulacc.v` | the isolated `mul → boundary → acc` testbench; drives both input streams and sinks the result, so every handshake is controlled |
 | `tb_top.v` | the four-kernel-PE testbench, preloading `AlloMem` by hierarchical poke |
 | `mgc_shim.v` | behavioural stand-in for the one Catapult library cell the archived netlists use |
-| `guard_experiment/` | the negative result: `guard.patch` extends the free-running-loop guard to any loop reading a `Wire`, and `rtl_base/` vs `rtl_guard/` are the netlists before and after. `emit.py` re-emits `pe_split.py`; `run_sc.py` runs it against `$ALLO_ROOT`. |
+| `guard_experiment/` | the negative result: `guard.patch` extends the free-running-loop guard to any loop reading a `Wire`, and `rtl_base/` vs `rtl_guard/` are the netlists before and after. `emit.py` re-emits `dot_product_four_links.py`; `run_sc.py` runs it against `$ALLO_ROOT`. |
 
 ## Netlists
 

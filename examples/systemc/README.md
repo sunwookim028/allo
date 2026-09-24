@@ -9,10 +9,10 @@ matters because one of them is the evidence behind a published limitation. Both
 are expressed as Allo designs, which is why they are here rather than under
 `tests/`, but neither is a pattern to copy:
 
-- **`demos/nb_nondeterminism.py`** empirically demonstrates that non-blocking
+- **`demos/nb_producer_consumer.py`** empirically demonstrates that non-blocking
   stream operations are non-deterministic under the current simulator — it
   exists to establish a finding, and its output is the finding.
-- **`pe_split.py`** asks whether a `Wire` removes the modularity tax, by
+- **`dot_product_four_links.py`** asks whether a `Wire` removes the modularity tax, by
   expressing one dot product four ways (fused, `Wire`, `Stream`, `Channel`).
   The comparison is the point; no single one of the four is *the* design.
 
@@ -44,12 +44,12 @@ python pc_channel.py csim      # build + run csim, check B == A   (needs MGC_HOM
 | `tiled_systolic.py` | tiled GEMM | stream-output, self-synchronizing termination |
 | `mem_port_reverse.py` | reversed array access | random-access memory ports (`AlloMem`) |
 | `mem_port_scatter.py` | scattered writes | memory-port stores, replica write-merge |
-| `pe_split.py` | one dot product, four ways | `Wire` vs `Stream` vs `Channel` vs fused — the modularity-tax comparison |
+| `dot_product_four_links.py` | one dot product, four ways | `Wire` vs `Stream` vs `Channel` vs fused — the modularity-tax comparison |
 
 `demos/` holds the smallest possible programs for one language feature each:
 link types (`link_types_demo.py`), a stream (`stream_producer_consumer.py`), a wire
 (`wire_producer_consumer.py`), non-blocking stream ops (`nb_stream_rtl.py`) and the
-non-determinism they show in the untimed simulator (`nb_nondeterminism.py`).
+non-determinism they show in the untimed simulator (`nb_producer_consumer.py`).
 
 Running a design writes its generated SystemC next to itself. Those `.cpp` files are
 **output, not source** — the archived copies are under `dev/records/systemc/generated/`.
