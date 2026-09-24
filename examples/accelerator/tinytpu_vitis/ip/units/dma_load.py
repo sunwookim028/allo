@@ -43,11 +43,25 @@ def dma_ld(dram_a: int8[MAXDIM * MAXDIM], dram_b: int8[MAXDIM * MAXDIM]):
     b_rows: int32 = span_word[16:32]
 
     # One variable-length burst per matrix, covering exactly the DRAM rows the
-    # program names: a per-row strided read is a separate four-beat AXI
-    # transaction per row (`[HLS 214-115] Multiple burst reads of length 4`,
-    # II=4). Merging the two into one loop bounded by max(a_rows, b_rows)
-    # halves the burst time and was measured to move nothing -- the bursts are
-    # already hidden behind the sequencer's prefetch.
+    # program names. Merging the two into one loop bounded by
+    # max(a_rows, b_rows) halves the burst time and was measured to move
+    # nothing -- the bursts are already hidden behind the sequencer's prefetch.
+    #
+    # THE "STRIDED COSTS 4x" JUSTIFICATION FOR STAGING IS STALE, and it is the
+    # reason this mirror exists. It was measured before `align_value(64)` and
+    # `-m_axi_max_widen_bitwidth 512` were in the build; with them gmem1/gmem2
+    # are 32 bits -- exactly one packed word at T=4 -- so a row read is one
+    # beat, Vitis emits NO `[HLS 214-115]` note for the operand ports at all
+    # (the only one left is gmem0, the 512-bit instruction port), and a flat
+    # per-row `m_axi` loop closes at `Final II = 1, Depth = 17`. Measured on
+    # `dma_ld_0_1_Pipeline_VITIS_LOOP_645_1` of a T=4 MAXDIM=16 QD=16 build
+    # on 2026-09-24, and independently in docs/source/backends/vitis.rst
+    # ("two burst loops from II=4 to II=1").
+    #
+    # So the mirror must be defended on what it still buys -- amortising
+    # re-read of a row the program names more than once -- not on burst shape.
+    # dev/records/tinytpu/big_shapes_settlement.rst has the cycle cost of
+    # removing it: +6 / 0 / -2 / -6 / +10 on the published five.
     #
     # The burst WIDTH is a parameter. At DMA_WORDS=1 this is the shipped loop,
     # one packed word an iteration; above 1 each iteration reads DMA_WORDS
