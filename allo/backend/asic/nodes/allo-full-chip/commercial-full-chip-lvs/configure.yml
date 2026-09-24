@@ -1,0 +1,58 @@
+name: commercial-full-chip-lvs
+
+inputs:
+  - adk
+  - design_merged.gds
+  - design.lvs.v
+  - macro-registry
+  - srams
+  - cleanup-node.py
+
+outputs:
+  - lvs.report
+  - design.schematic.spi
+  - design_merged.lvs.v
+  - full-chip-lvs-metrics.json
+  - full-chip-lvs-cleanup-metrics.json
+
+commands:
+  - bash run.sh
+  - python3 inputs/cleanup-node.py --node commercial-full-chip-lvs --output full-chip-lvs-cleanup-metrics.json svdb
+
+parameters:
+  design_name: undefined
+  # Reuse the full-chip physical-verification policy: report preserves an
+  # INCORRECT LVS result for experiment summaries; error remains strict.
+  drc_check_policy: error
+  lvs_nthreads: 4
+  lvs_power_name: VDD
+  lvs_ground_name: VSS
+  lvs_hcells_file: ''
+  lvs_connect_names: ''
+  lvs_verify_netlist: 1
+  lvs_extra_spice_include: ''
+  cleanup_enabled: True
+
+debug:
+  - calibredrv -m inputs/design_merged.gds -l inputs/adk/calibre.layerprops -rve -lvs svdb
+
+preconditions:
+  - assert Tool( 'calibre' )
+  - assert Tool( 'v2lvs' )
+  - assert File( 'inputs/adk' )
+  - assert File( 'inputs/design_merged.gds' )
+  - assert File( 'inputs/design.lvs.v' )
+  - assert File( 'inputs/macro-registry' )
+
+postconditions:
+  - assert File( 'outputs/lvs.report' )
+  - assert File( 'outputs/design.schematic.spi' )
+  - assert File( 'outputs/design_merged.lvs.v' )
+  - assert File( 'outputs/full-chip-lvs-metrics.json' )
+  - assert File( 'outputs/full-chip-lvs-cleanup-metrics.json' )
+  - >-
+    assert 'drc_check_policy: report' in File( 'configure.yml' ) or
+    '#     INCORRECT     #' not in File( 'outputs/lvs.report' )
+  - >-
+    assert 'drc_check_policy: report' in File( 'configure.yml' ) or
+    '#     CORRECT     #' in File( 'outputs/lvs.report' )

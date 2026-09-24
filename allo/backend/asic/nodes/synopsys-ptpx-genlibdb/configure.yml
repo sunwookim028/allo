@@ -1,0 +1,76 @@
+#=========================================================================
+# Synopsys PTPX -- Generate .lib, then compile .db with LC
+#=========================================================================
+
+name: synopsys-ptpx-genlibdb
+
+#-------------------------------------------------------------------------
+# Inputs and Outputs
+#-------------------------------------------------------------------------
+
+inputs:
+  - adk
+  - design.vcs.v
+  - design.spef.gz
+  - design.pt.sdc
+  - srams
+  - sram-contract.json
+  - resolve-sram-contract.py
+
+outputs:
+  - design.lib
+  - design.db
+
+#-------------------------------------------------------------------------
+# Commands
+#-------------------------------------------------------------------------
+
+commands:
+  - if [[ -f inputs/sram-contract.json ]]; then python3 inputs/resolve-sram-contract.py --contract inputs/sram-contract.json --root inputs/srams --tcl-output sram-views.tcl; fi
+  - mkdir -p logs
+  - pt_shell -file START.tcl -output_log_file logs/pt.log
+  - lc_shell -f scripts/lib2db.tcl | tee logs/lib2db.log
+  - mkdir -p outputs
+  - ln -sf ../{design_name}.db  outputs/design.db
+  - ln -sf ../{design_name}.lib outputs/design.lib
+
+#  - ln -sf ../*.db  design.db
+#  - ln -sf ../*.lib design.lib
+
+#-------------------------------------------------------------------------
+# Parameters
+#-------------------------------------------------------------------------
+
+parameters:
+  design_name: undefined
+  order:
+    - read_design.tcl
+    - extract_model.tcl
+    - write-interface-timing.tcl
+
+#-------------------------------------------------------------------------
+# Assertions
+#-------------------------------------------------------------------------
+
+preconditions:
+
+  - assert Tool( 'pt_shell' )                # tool check
+  - assert Tool( 'lc_shell' )                # tool check
+  - assert File( 'inputs/adk' )              # must exist
+  - assert File( 'inputs/design.vcs.v' )     # must exist
+  - assert File( 'inputs/design.pt.sdc' )    # must exist
+# - assert File( 'inputs/design.spef.gz' )   # spef is optional
+  - >-
+    assert not File( 'inputs/sram-contract.json' ) or
+    File( 'inputs/resolve-sram-contract.py' )
+
+postconditions:
+
+  - assert File( 'outputs/design.lib' )      # must exist
+  - assert File( 'outputs/design.db' )       # must exist
+
+  # Basic error checking
+
+  - assert 'Error:' not in File( 'logs/pt.log' )
+  - assert 'Unresolved references' not in File( 'logs/pt.log' )
+  - assert 'Unable to resolve' not in File( 'logs/pt.log' )

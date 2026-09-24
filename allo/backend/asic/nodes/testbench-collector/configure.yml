@@ -1,0 +1,43 @@
+name: testbench-collector
+
+inputs:
+  - testbench.sv
+  - test_vectors.txt
+  - design.args
+
+outputs:
+  - testbench
+  - testbench-contract.json
+  - testbench-collection-report.json
+
+commands:
+  - python3 collect_testbench.py
+
+parameters:
+  construct_path: undefined
+  testbench_path: testbench
+  testbench_file: undefined
+  consume_upstream_testbench: False
+  testbench_manifest: ""
+  testbench_top: tb
+  dut_instance: dut
+  testbench_include_dirs: "."
+  testbench_defines: ""
+  simulation_args_file: ""
+  pass_marker: TEST_PASS
+  failure_marker: TEST_FAIL
+  simulation_timeout_seconds: 3600
+
+preconditions:
+  - assert File( 'collect_testbench.py' )
+
+postconditions:
+  - assert File( 'outputs/testbench' )
+  - assert File( 'outputs/testbench/testbench.f' )
+  - assert File( 'outputs/testbench/testbench-compile.args' )
+  - assert File( 'outputs/testbench/testbench-runtime.args' )
+  - assert File( 'outputs/testbench-contract.json' )
+  - assert File( 'outputs/testbench-collection-report.json' )
+  - >-
+    assert '"status": "passed"' in
+    File( 'outputs/testbench-collection-report.json' )

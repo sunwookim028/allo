@@ -1,0 +1,2 @@
+# FreePDK45/Nangate standard-cell simulation model configuration.
++define+TETRAMAX

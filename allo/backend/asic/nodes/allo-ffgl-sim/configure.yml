@@ -1,0 +1,61 @@
+name: allo-ffgl-sim
+
+inputs:
+  - adk
+  - design.v
+  - testbench.sv
+  - vitis-axi-memory-bfm.sv
+  - vitis-axilite-master-bfm.sv
+  - workload-vectors
+  - testbench-contract.json
+  - macro-registry
+  - srams
+  - cleanup-node.py
+
+outputs:
+  - run.vcd
+  - compile.log
+  - simulation.log
+  - simulation-report.json
+  - ffgl-cleanup-metrics.json
+
+commands:
+  - bash run.sh
+  - python3 inputs/cleanup-node.py --node allo-ffgl-sim --output ffgl-cleanup-metrics.json simv simv.daidir csrc DVEfiles ucli.key .vcs.timestamp
+
+parameters:
+  testbench_name: allo_generated_testbench
+  waveform: True
+  cleanup_enabled: True
+
+preconditions:
+  - assert Tool( 'vcs' )
+  - assert File( 'run.sh' )
+  - assert File( 'report_sim.py' )
+  - assert File( 'inputs/adk' )
+  - assert File( 'inputs/design.v' )
+  - assert File( 'inputs/testbench.sv' )
+  - assert File( 'inputs/workload-vectors' )
+  - assert File( 'inputs/testbench-contract.json' )
+  - |
+      import json
+      from pathlib import Path
+      backend = json.loads(Path('inputs/testbench-contract.json').read_text()).get('backend')
+      assert backend in {'vitis', 'catapult', 'systemc'}
+      assert backend != 'vitis' or Path('inputs/vitis-axi-memory-bfm.sv').is_file()
+      assert backend != 'vitis' or Path('inputs/vitis-axilite-master-bfm.sv').is_file()
+
+postconditions:
+  - assert File( 'outputs/run.vcd' )
+  - assert File( 'outputs/compile.log' )
+  - assert File( 'outputs/simulation.log' )
+  - assert File( 'outputs/simulation-report.json' )
+  - assert File( 'outputs/ffgl-cleanup-metrics.json' )
+  - |
+      import json
+      from pathlib import Path
+      report = json.loads(Path('outputs/simulation-report.json').read_text())
+      assert report['mode'] == 'ffgl'
+      assert report['status'] == 'passed'
+      assert report['pass_marker_found']
+      assert report['vcd_bytes'] > 0

@@ -1,0 +1,20 @@
+name: asic-flow-finalize
+
+inputs:
+  - flow-summary.json
+
+outputs:
+  - final-cleanup-metrics.json
+
+commands:
+  - python3 finalize.py
+
+parameters:
+  cleanup_enabled: True
+
+preconditions:
+  - assert File( 'inputs/flow-summary.json' )
+  - assert File( 'finalize.py' )
+
+postconditions:
+  - assert File( 'outputs/final-cleanup-metrics.json' )

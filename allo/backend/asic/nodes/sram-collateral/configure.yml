@@ -1,0 +1,48 @@
+#=========================================================================
+# Standard SRAM Collateral
+#=========================================================================
+
+name: sram-collateral
+
+inputs:
+  - srams
+
+outputs:
+  - srams
+  - sram-contract.json
+  - sram-metadata.json
+  - sram-info.txt
+
+commands:
+  - python3 manage_srams.py
+
+parameters:
+  sram_mode: none
+  provided_sram_path: undefined
+  generate_method: openram
+  construct_path: undefined
+  sram_manifest: rtl/sram_manifest.yml
+  python_bin: python
+  openram_script: ""
+  tech_name: freepdk45
+  process_corner: TT
+  supply_voltage: 1.1
+  temperature: 25
+  check_lvsdrc: False
+  route_supplies: True
+  analytical_delay: True
+
+preconditions:
+  - assert Tool( 'python3' )
+  - assert File( 'manage_srams.py' )
+  - assert File( 'run_openram.sh' )
+  - |
+    import subprocess
+    import sys
+    subprocess.run([sys.executable, 'manage_srams.py', '--preflight'], check=True)
+
+postconditions:
+  - assert File( 'outputs/srams' )
+  - assert File( 'outputs/sram-contract.json' )
+  - assert File( 'outputs/sram-metadata.json' )
+  - assert File( 'outputs/sram-info.txt' )

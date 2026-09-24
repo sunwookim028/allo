@@ -1,0 +1,137 @@
+#! /usr/bin/env bash
+#=========================================================================
+# OpenRAM backend
+#=========================================================================
+# Preserved from openram-sram-generation/run.sh. Mode selection, preflight,
+# validation, and contract publication are owned by manage_srams.py.
+
+set -euo pipefail
+
+mkdir -p outputs/srams work/logs
+
+: "${construct_path:?Missing parameter: construct_path}"
+: "${sram_manifest:?Missing parameter: sram_manifest}"
+: "${python_bin:=python}"
+: "${openram_script:=}"
+
+construct_dir="$(cd "$(dirname "$construct_path")" && pwd)"
+
+if [[ "$sram_manifest" = /* ]]; then
+  manifest_path="$sram_manifest"
+else
+  manifest_path="$construct_dir/$sram_manifest"
+fi
+
+if [ ! -f "$manifest_path" ]; then
+  echo "ERROR: SRAM manifest does not exist: $manifest_path"
+  exit 1
+fi
+
+"$python_bin" - <<'PY'
+import openram
+import pathlib
+
+openram_root = pathlib.Path(openram.__file__).resolve().parent
+sram_compiler = openram_root / "sram_compiler.py"
+
+if not sram_compiler.is_file():
+    raise SystemExit(f"ERROR: Missing OpenRAM SRAM compiler: {sram_compiler}")
+PY
+
+if [ -z "$openram_script" ]; then
+  openram_script="$("$python_bin" - <<'PY'
+import openram, pathlib
+print(pathlib.Path(openram.__file__).resolve().parent / "sram_compiler.py")
+PY
+)"
+fi
+
+"$python_bin" scripts/gen_openram_cfgs.py \
+  --manifest "$manifest_path" \
+  --template templates/openram_cfg.py.in \
+  --out-dir work/cfgs \
+  --tech-name "$tech_name" \
+  --process-corner "$process_corner" \
+  --supply-voltage "$supply_voltage" \
+  --temperature "$temperature" \
+  --check-lvsdrc "$check_lvsdrc" \
+  --route-supplies "$route_supplies" \
+  --analytical-delay "$analytical_delay"
+
+cp "$manifest_path" outputs/srams/sram_manifest.yml
+
+shopt -s nullglob
+cfgs=(work/cfgs/*_cfg.py)
+
+if [ "${#cfgs[@]}" -eq 0 ]; then
+  echo "ERROR: No OpenRAM cfg files generated in work/cfgs"
+  exit 1
+fi
+
+for cfg in "${cfgs[@]}"; do
+  name="$(basename "$cfg" _cfg.py)"
+  outdir="outputs/srams/$name"
+  mkdir -p "$outdir"
+
+  echo "--- Generating SRAM: $name ---"
+  rm -rf "work/$name"
+  mkdir -p "work/$name"
+
+  openram_args=(-v -v)
+
+  if [ "$analytical_delay" != "True" ] && [ "$analytical_delay" != "true" ]; then
+    openram_args+=("-c")
+  fi
+
+  (
+    cd work
+
+    touch "$name/$name.log"
+    tail -n +1 -f "$name/$name.log" &
+    tail_pid=$!
+
+    "$python_bin" "$openram_script" "${openram_args[@]}" "cfgs/${name}_cfg.py"
+    status=$?
+
+    kill "$tail_pid" 2>/dev/null || true
+    wait "$tail_pid" 2>/dev/null || true
+
+    exit "$status"
+  ) 2>&1 | tee "$outdir/$name.openram.log"
+
+  cp "$cfg" "$outdir/"
+  cp "work/$name"/*.v "$outdir/" 2>/dev/null || true
+  cp "work/$name"/*.lef "$outdir/" 2>/dev/null || true
+  cp "work/$name"/*.gds "$outdir/" 2>/dev/null || true
+  cp "work/$name"/*.lib "$outdir/" 2>/dev/null || true
+  # Publish only the self-contained netlist intended for LVS. OpenRAM's other
+  # SPICE files are characterization artifacts and can contain temporary paths.
+  lvs_spice="work/$name/$name.lvs.sp"
+  if [ ! -f "$lvs_spice" ]; then
+    echo "ERROR: OpenRAM did not produce the LVS netlist: $lvs_spice"
+    exit 1
+  fi
+  cp "$lvs_spice" "$outdir/"
+
+  voltage_tag="${supply_voltage/./p}"
+  lib_files=("$outdir"/*_"$process_corner"_"${voltage_tag}"V_"${temperature}"C.lib)
+
+  if [ "${#lib_files[@]}" -eq 0 ]; then
+    echo "WARNING: OpenRAM did not produce a ${process_corner}_${voltage_tag}V_${temperature}C .lib for $name"
+    echo "WARNING: Falling back to the first available .lib for $name"
+    lib_files=("$outdir"/*.lib)
+
+    if [ "${#lib_files[@]}" -eq 0 ]; then
+      echo "ERROR: OpenRAM did not produce a .lib for $name"
+      exit 1
+    fi
+  fi
+
+  lib_file="${lib_files[0]}"
+  lib_name="$(basename "$lib_file" .lib)_lib"
+
+  lc_shell -x "read_lib $lib_file; write_lib $lib_name -format db -output $outdir/$name.db; exit" \
+    2>&1 | tee "$outdir/$name.lc_shell.log"
+
+  test -f "$outdir/$name.db"
+done

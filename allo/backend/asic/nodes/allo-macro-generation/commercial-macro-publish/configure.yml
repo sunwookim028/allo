@@ -1,0 +1,24 @@
+name: commercial-macro-publish
+
+inputs:
+  - signoff-batch
+  - asic-manifest-final.json
+
+outputs:
+  - macro-registry
+  - macro-registry.json
+  - macro-registry.tcl
+  - macro-publish.log
+
+commands:
+  - python publish_macros.py
+
+preconditions:
+  - assert File( 'inputs/signoff-batch' )
+  - assert File( 'inputs/asic-manifest-final.json' )
+
+postconditions:
+  - assert File( 'outputs/macro-registry' )
+  - assert File( 'outputs/macro-registry.json' )
+  - assert File( 'outputs/macro-registry.tcl' )
+  - assert 'ERROR:' not in File( 'outputs/macro-publish.log' )
