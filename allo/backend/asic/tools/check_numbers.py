@@ -35,6 +35,7 @@ Exit 0 if clean, 1 if any figure is unaccounted for.
 """
 
 import argparse
+import json
 import os
 import re
 import sys
@@ -115,6 +116,45 @@ def ground_truth(reports):
     return out
 
 
+#: A run whose timing did not close, and the acknowledgement that lets it pass.
+#: The DC node reports status "passed" and returncode 0 on a design that does
+#: not close -- its postconditions check that synthesis COMPLETED, not that
+#: timing closed -- so a green node is not a closed design. A figure from such
+#: a run may still be quoted, but only deliberately.
+ACKNOWLEDGED_MISSES = {
+    "gemmini_DIM8_full": "misses by -0.01 ns on 3.33, 80 paths in 491,512 "
+                         "cells; reported as 'not targeted at this constraint' "
+                         "rather than as slower, and no frequency claim rests "
+                         "on it",
+}
+
+
+def timing_violations(reports):
+    """Runs whose results.json reports violating paths, and are not acknowledged.
+
+    Fails closed: a results.json that cannot be read is reported, not skipped.
+    """
+    out = []
+    for variant in sorted(os.listdir(reports)):
+        rj = os.path.join(reports, variant, "results.json")
+        if not os.path.isfile(rj):
+            continue
+        try:
+            with open(rj) as fh:
+                data = json.load(fh)
+        except (OSError, ValueError) as exc:
+            out.append(f"{variant}: results.json unreadable ({exc})")
+            continue
+        n = data.get("violating_paths")
+        if n is None:
+            for key in ("timing", "qor"):
+                if isinstance(data.get(key), dict):
+                    n = data[key].get("violating_paths", n)
+        if n and variant not in ACKNOWLEDGED_MISSES:
+            out.append(f"{variant}: {n} violating path(s) and no acknowledgement")
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--reports", required=True,
@@ -162,7 +202,18 @@ def main():
               " ALLOWED entry with a reason.")
         return 1
 
-    print("\nAREA NUMBERS OK: every figure quoted in the docs is accounted for.")
+    misses = timing_violations(args.reports)
+    if misses:
+        print("\nRUNS THAT DID NOT CLOSE, and are not acknowledged:")
+        for m in misses:
+            print(f"  {m}")
+        print("\nA synthesis node reports success when synthesis COMPLETED, not\n"
+              "when timing CLOSED. Quote such a run only deliberately: add it to\n"
+              "ACKNOWLEDGED_MISSES with the reason, as one already is.")
+        return 1
+
+    print("\nAREA NUMBERS OK: every figure quoted in the docs is accounted for,\n"
+          "and every run either closed or is acknowledged as not having.")
     return 0
 
 

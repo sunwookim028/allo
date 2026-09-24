@@ -367,10 +367,17 @@ from the opposite direction, on someone else's design.
      - 37.2%
      - **≈80%**
 
-**Their logic is gate-heavy; ours is flop-heavy — at both sizes, and
-regardless of the memory treatment.** No node scaling, no capacity matching and
-no exclusion rule enters that comparison; it is a share of each design's own
-logic. It is therefore a structural statement about **what HLS emits versus
+**Their logic is gate-heavy; ours is flop-heavy, at both sizes.** No node
+scaling, no capacity matching and no exclusion rule enters that comparison; it
+is a share of each design's own logic.
+
+*Corrected after the full DIM=8 run.* An earlier version of this paragraph
+added "and regardless of the memory treatment", which is true of our design and
+**false of theirs**: with memories rendered as flip-flops their share moves from
+37.2% to **60.7%**, while ours is ≈80% either way. So the substrate distortion
+is **larger for their design than for ours** — the opposite of what we
+expected — and the gate-versus-flop statement holds on the logic-only pair
+only. It is stated that way now. It is therefore a structural statement about **what HLS emits versus
 what a Chisel generator emits**, not about either accelerator, and it is the
 most transferable result the area track produced.
 
@@ -381,6 +388,27 @@ ours. It must be written as *"closes at 3.33 ns"* and never as headroom: a
 `0.00` that reads as "met" in a table becomes "both close at 3.33 ns, equally"
 in prose. If a frequency comparison is ever attempted, Gemmini's is the number
 that moves first.
+
+**6.2e One change, measured two ways.** Gemmini DIM=8 *full* is
+**1,138,578 µm²**, against 990,938 at DIM=4 — **+14.9%** for doubling the mesh.
+The logic-only pair gives **+37.3%** for the same change. The stubbed
+scratchpad and accumulator are 53.9% of the full figure, and that mass is
+insensitive to the mesh, so it dilutes the delta.
+
+**The same design change reads as +14.9% or +37.3% depending only on how the
+memories were treated.** That is the strongest argument in this work for
+quoting the logic-only pair — stronger than the gate-versus-flop share above,
+because it is *one change measured two ways* rather than an inference about
+which component dominates.
+
+**And that run misses timing**, the only one in the set that does not close:
+worst slack −0.01 ns on a 3.33 ns target, 80 violating paths in a
+491,512-cell design. Per the methodology fixed before any number existed, this
+is reported as **"the comparison design's RTL was not targeted at this
+constraint"**, not as "it is slower": 0.3% of the period is what a longer
+period, a higher effort or a retarget would absorb, and a synthesis-stage
+estimate is a floor rather than an achieved frequency. The miss is stated and
+the inference refused.
 
 **The clean pair is still two runs away.** Our 1,396,966 against their 524,402
 is 2.66×, but that is our T=4/MAXDIM=64 against their DIM=8 — not a
