@@ -53,7 +53,7 @@ def top(A: int32[N], B: int32[N]):
 
 if __name__ == "__main__":
     # (a) emit + inspect the SystemC
-    code = df.build(top, target="vitis_hls").hls_code
+    code = df.build(top, target="systemc").hls_code
     open("stream_boundary.cpp", "w").write(code)
     print("wrote stream_boundary.cpp")
     assert "SC_MODULE(compute_0)" in code
@@ -62,7 +62,7 @@ if __name__ == "__main__":
     # (b) csim the whole region (simulation ignores the port/DCE issue)
     import os
     if os.environ.get("MGC_HOME"):
-        mod = df.build(top, target="vitis_hls", mode="csim", project="vstream_boundary.prj")
+        mod = df.build(top, target="systemc", mode="csim", project="stream_boundary.prj")
         A = np.arange(N, dtype=np.int32)
         B = np.zeros(N, dtype=np.int32)
         mod(A, B)  # Option B fills B with the design's output

@@ -61,3 +61,29 @@ narrower -- a region path that rebuilds with a default target, a cached
 Not settled here: this checkout's MLIR bindings predate the SystemC merge, so
 `import allo.dataflow` raises before reaching any of it. It needs one run on a
 tree with current bindings, which is minutes of work for someone who has one.
+
+## The emission finding, settled (2026-09-24)
+
+The static trace was right and the observation was wrong. On a tree with current
+bindings, `df.build(top, target="systemc").hls_code` returns **SystemC**:
+`SC_MODULE(compute_0)`, `Connections`, no `ap_int.h`, no `hls_stream.h`. The same
+build with `target="vitis_hls"` returns the Vitis C++ that was seen. All three
+hops work.
+
+What was actually broken is the example. `cea8274a` (2026-08-10, a docs wording
+pass) changed `examples/systemc/stream_boundary.py` from `target="systemc"` to
+`target="vitis_hls"` — both the emit and the csim — while leaving the
+`assert "SC_MODULE(compute_0)" in code` that only a SystemC emission can satisfy.
+So the script asked for Vitis and then asserted SystemC, and running it produced
+exactly the symptom: "`hls_code` returns Vitis HLS C++". Reverted; the assertion
+passes again, and `stream_boundary.py` regenerates SystemC rather than depending
+on `generated/stream_boundary.cpp`.
+
+It does not reproduce the archive byte-for-byte — 476 normalised lines differ,
+all emitter evolution since the archive was taken (float helpers, `ac_channel`
+self-FIFOs, the vendor `Connections::Fifo`). `tests/systemc/synth_*.tcl` still
+read the archived `.cpp`, which is the honest thing for a record to do.
+
+`tiled_systolic.py` is untouched and still asserts `AlloMem<` / `AlloMemW<`
+against an emitter that writes `AlloMemPins<`. That one really is a design
+change, as this file already said.
