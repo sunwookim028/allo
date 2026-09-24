@@ -613,5 +613,91 @@ def test_zero_power_is_not_a_result():
             assert_power_measured(tmpdir)
 
 
+# =============================================================================
+# A @df.region() top, which is what a real design is -- and the two things that
+# have to hold for SCVerify to be able to drive one.
+# =============================================================================
+
+
+def _region():
+    """A minimal `@df.region()`: a VOID top with array arguments, the shape
+    every real design (TinyTPU included) has."""
+    import allo.dataflow as df
+
+    @df.region()
+    def rtop(A: int32[16], B: int32[16], C: int32[16]):
+        @df.kernel(mapping=[1], args=[A, B, C])
+        def core(a: int32[16], b: int32[16], c: int32[16]):
+            for i in range(16):
+                c[i] = a[i] + b[i]
+
+    return df.customize(rtop)
+
+
+def test_region_top_is_shaped_for_scverify():
+    """SCVerify wraps the function marked `#pragma hls_design top`. For a region
+    that top is a VOID function with array parameters -- the same shape as the
+    `mac16` top SCVerify wrapped on zhang-21 -- and `-DESIGN_HIERARCHY` must name
+    it. If either stopped holding, the ppa handoff could not be driven."""
+    s = _region()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tb = os.path.join(tmpdir, "tb.cpp")
+        with open(tb, "w", encoding="utf-8") as f:
+            f.write("// tb\n")
+        prj = os.path.join(tmpdir, "prj")
+        s.build(
+            target="catapult",
+            mode="ppa",
+            project=prj,
+            wrap_io=False,
+            configs={"testbench": tb, "ncsim_root": tmpdir, "clock_period": 5.0},
+        )
+        code = open(os.path.join(prj, "kernel.cpp"), encoding="utf-8").read()
+        assert "#pragma hls_design top\nvoid rtop(" in code
+        assert "int32_t v" in code.split("void rtop(")[1].split(")")[0]
+        tcl = open(os.path.join(prj, "run.tcl"), encoding="utf-8").read()
+        assert "directive set -DESIGN_HIERARCHY rtop" in tcl
+        # No CCS_BLOCK: `#pragma hls_design top` is what Allo emits, and that was
+        # enough for SCVerify on the mac16 run.
+        assert "USE_CCS_BLOCK" not in tcl
+
+
+def test_catapult_header_linkage_matches_the_kernel():
+    """kernel.h must declare the top the way kernel.cpp DEFINES it.
+
+    The Catapult emitter writes a plain C++ `void <name>(...)`. A header saying
+    `extern "C"` does not match it, and anything compiling the project as
+    generated -- the emitted Makefile, Catapult's `solution app linkage` csim --
+    fails to link. `__call__` used to paper over this by rewriting the header
+    just before compiling."""
+    s = _mac16()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        s.build(target="catapult", mode="csyn", project=tmpdir)
+        header = open(os.path.join(tmpdir, "kernel.h"), encoding="utf-8").read()
+        code = open(os.path.join(tmpdir, "kernel.cpp"), encoding="utf-8").read()
+        assert 'extern "C"' not in header
+        assert "void mac16(" in header and "void mac16(" in code
+        assert 'extern "C"' not in code
+
+
+def test_ppa_accepts_a_testbench_already_in_the_project():
+    """A generator that writes the testbench and the project into ONE handoff
+    directory is the normal case; copying a file onto itself must not raise."""
+    s = _mac16()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tb = os.path.join(tmpdir, "tb.cpp")
+        with open(tb, "w", encoding="utf-8") as f:
+            f.write("// tb\n")
+        s.build(
+            target="catapult",
+            mode="ppa",
+            project=tmpdir,          # the testbench is ALREADY in here
+            configs={"testbench": tb, "ncsim_root": tmpdir, "clock_period": 5.0},
+        )
+        assert open(tb, encoding="utf-8").read() == "// tb\n"
+        assert 'solution file add "$sfd/tb.cpp" -type C++ -exclude true' in open(
+            os.path.join(tmpdir, "run.tcl"), encoding="utf-8"
+        ).read()
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

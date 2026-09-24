@@ -553,6 +553,41 @@ both. Every PE appears with nonzero activity -- all 16 of the 4x4 array, all
 just the wrapper around it. The files are 41 MB and 87 MB: SAIF is a per-net
 summary, so size follows the net count, not the run length.
 
+.. _tinytpu-isa-catapult-power:
+
+The other power path: Catapult PowerPro
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The section above is about *this* flow -- Vitis RTL into commercial synthesis
+with ``sram_mode='none'`` -- and its verdict stands for it. A second,
+independent path exists: Allo's Catapult backend at ``mode="ppa"``, which
+synthesizes the design itself to ``nangate-45nm_beh`` and gets activity by
+simulating a C++ testbench against the pre-power RTL, then annotating the
+resulting SAIF with PowerPro. It needs a testbench SCVerify can drive, which
+TinyTPU had none of; ``examples/tinytpu/ppa_catapult.py`` writes one, together
+with the whole project, into
+``dev/records/catapult_handoff/ppa_tinytpu/``.
+
+**It has not been run.** ace-01 has no Catapult, so what exists is a handoff
+for the licence host plus the criterion script to judge it by, both described
+in that directory's ``RUNME.md`` and in :doc:`/backends/catapult`. The
+testbench is four calls on one instance -- three 16x16x16 GEMMs, one with
+ReLU, and ``isa_dsl.vector_program(8)`` -- with **uniform full-range int8**
+operands rather than the ``[-4, 4]`` used for cycles, because that
+distribution holds the top five bits of every operand constant and would bias
+power low. Every case is checked against Allo's own simulator before the
+testbench is written, and the testbench checks itself inside the simulation.
+
+**What it would and would not settle.** It removes two of this section's three
+objections differently rather than partially: the activity is simulated, and
+the memories are Catapult's ``ccs_sample_mem`` rather than registers, so the
+figure is not dominated by clock power into flip-flop arrays. It does *not*
+remove the third -- it is still pre-layout, with a wireload model and
+PowerPro's clock-tree estimate in place of parasitics. Whether that clears the
+bar this section sets is a judgement to make when there is a number, not
+before; what is settled today is only that the measurement is now possible and
+that nothing about TinyTPU blocks it.
+
 .. _tinytpu-isa-verify:
 
 .. _tinytpu-isa-conformance:

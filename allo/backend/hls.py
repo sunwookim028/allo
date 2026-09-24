@@ -522,7 +522,12 @@ class HLSModule:
                     import shutil as _shutil
 
                     _tb = resolve_ppa_testbench(configs)
-                    _shutil.copy(_tb, os.path.join(project, os.path.basename(_tb)))
+                    _dst = os.path.join(project, os.path.basename(_tb))
+                    # A testbench that is ALREADY in the project directory is
+                    # the normal case when a generator writes both into the
+                    # same handoff dir; shutil.copy would raise SameFileError.
+                    if os.path.abspath(_tb) != os.path.abspath(_dst):
+                        _shutil.copy(_tb, _dst)
                 with open(f"{project}/run.tcl", "w", encoding="utf-8") as outfile:
                     if platform in {"catapult", "systemc"}:
                         outfile.write(codegen_tcl_catapult(top_func_name, configs))
@@ -666,9 +671,19 @@ class HLSModule:
                 # ap_(u)int<...> types. When Catapult emits ac_int<...> (e.g., for
                 # non-standard integer widths), separate_header can raise ValueError.
                 # Fall back to including kernel.cpp directly if that happens.
+                #
+                # `extern_c=False`: the Catapult emitter writes the top as a
+                # plain C++ `void <name>(...)` with NO `extern "C"` (unlike the
+                # Vitis emitter, which wraps it). A header declaring it with C
+                # linkage does not match that definition, so anything compiling
+                # the project AS GENERATED -- the emitted Makefile, Catapult's
+                # own `solution app linkage` csim, a hand g++ -- fails to link.
+                # `__call__` already rewrote the header with extern_c=False
+                # before compiling, which is why `mod()` worked and the
+                # committed project did not; this makes the two agree.
                 try:
                     header, self.args = separate_header(
-                        self.hls_code, self.top_func_name
+                        self.hls_code, self.top_func_name, extern_c=False
                     )
                 except ValueError:
                     header = '#pragma once\n#include "kernel.cpp"\n'
