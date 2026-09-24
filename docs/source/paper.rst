@@ -266,6 +266,50 @@ a structural difference rather than an efficiency gap — TileLink at this width
 does not produce this structure — and it is §6.2's finding arriving from the
 comparison rather than from our own hierarchy.
 
+**6.2d The shape difference, at two sizes.** Gemmini DIM=8 logic-only is
+**524,402 µm²**, timing met, same flow and same stub rule. Two readings follow,
+and the second is the one that does not depend on any argument we could be
+accused of choosing.
+
+*Doubling the mesh costs +37.3% of logic* (382,026 → 524,402) for **4× the
+PEs** — sub-linear, which is what one expects when control and the memory path
+dominate rather than the array. That is the adapter finding of §6.2 arriving
+from the opposite direction, on someone else's design.
+
+*And the non-combinational share is stable and opposite on the two designs:*
+
+.. list-table::
+   :header-rows: 1
+
+   * -
+     - Gemmini DIM=4
+     - Gemmini DIM=8
+     - ours, every run
+   * - non-combinational share of logic
+     - 38.3%
+     - 37.2%
+     - **≈80%**
+
+**Their logic is gate-heavy; ours is flop-heavy — at both sizes, and
+regardless of the memory treatment.** No node scaling, no capacity matching and
+no exclusion rule enters that comparison; it is a share of each design's own
+logic. It is therefore a structural statement about **what HLS emits versus
+what a Chisel generator emits**, not about either accelerator, and it is the
+most transferable result the area track produced.
+
+**A caution that belongs beside the frequency numbers.** Gemmini DIM=8's worst
+path group closes at **exactly 0.00 ns** — zero violating paths, zero hold, a
+genuine pass, but with nothing spare, against +0.20 to +0.21 ns on every one of
+ours. It must be written as *"closes at 3.33 ns"* and never as headroom: a
+`0.00` that reads as "met" in a table becomes "both close at 3.33 ns, equally"
+in prose. If a frequency comparison is ever attempted, Gemmini's is the number
+that moves first.
+
+**The clean pair is still two runs away.** Our 1,396,966 against their 524,402
+is 2.66×, but that is our T=4/MAXDIM=64 against their DIM=8 — not a
+single-variable comparison. The pair that answers the question is our
+T=8/MAXDIM=64 at QD=16 against this run, and both remain queued.
+
 **Two methodological points are now settled on evidence rather than argument.**
 First, the exclusion of our instruction-fetch adapter: **no cells inside the
 Gemmini boundary match instruction fetch at all.** What exists is command queue
