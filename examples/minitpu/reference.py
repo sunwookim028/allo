@@ -17,20 +17,28 @@ numpy is more accurate:
   ALU in BF16, ascending (``vadd``), which is where the error actually comes
   from.
 
-acc24 is emulated by rounding a float32 to 15 fraction bits. That is **exact**
-for the range: ``MXU_ACC_W = 1 + 8 + 15`` gives acc24 the *same 8-bit exponent
-field as float32*, so the subnormal and overflow thresholds are identical, not
-inherited approximations. It holds because the accumulator is float; a
-dtype-parametrised variant with an integer accumulator would break it silently.
+acc24 is emulated by rounding a float32 to 15 fraction bits. ``MXU_ACC_W =
+1 + 8 + 15`` gives acc24 float32's 8-bit exponent field and bias, so the
+**normal** range is the same -- smallest normal 2^-126 for both. The edges
+differ, because the significand is narrower: largest finite (2 - 2^-15)*2^127
+against float32's (2 - 2^-23)*2^127, and subnormals carry 15 fraction bits
+rather than 23, so the smallest non-zero differs by 2^8. Both edges are
+outside the operating range for BF16 inputs. The reasoning holds only because
+the accumulator is float; an int32 accumulator in some future configuration
+would break it silently.
 
-The one measured difference from the RTL: a float32 add followed by an acc24
-round can double-round where the RTL rounds the exact sum once. Measured over
-24 million random acc24 operand pairs, the two disagree on **6,933 of them
-(0.03 %)**, always by one ulp of acc24 (2^-16 relative), which usually
-disappears at the final BF16 rounding. MiniTPU's own host reference
-(``tools/accum_precision.py``) takes the same float32 path, so this model and
-that one agree; neither can be held to silicon until the golden vector set
-MiniTPU's owner is building exists.
+**This reference is not bit-exact to silicon, and cannot be.**
+``mxu_acc24_add_pipe`` rounds the *exact* sum to acc24 once per add; a float32
+add followed by an acc24 round can round twice, so round-once is the silicon
+behaviour and this float32 path is the divergent one. Measured here over 24
+million random acc24 pairs: 6,933 disagreements (0.03 %). Reproduced by
+MiniTPU's owner over 4,000,000 pairs across 40 binades: 0.0636 %, exactly one
+acc24 ulp every time. MiniTPU's ``tools/accum_precision.py`` takes the same
+float32 path.
+
+As accuracy this is noise -- one acc24 ulp is 2^-15 against a BF16 output
+rounded at 2^-8, 128x coarser, so it reaches the result about one time in 128,
+some 5e-6 per add. As bit-exactness it is decisive: see ``README.md``.
 """
 
 import numpy as np

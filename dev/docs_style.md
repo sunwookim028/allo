@@ -98,6 +98,26 @@ if there is a lot. Never above the Reference section.
   is ever enforced, the honest form is a directive in the page naming the run
   it quotes -- declared by the author, checkable by a tool. That is a docs
   change, not a checker change, and it is not done.
+- **Record the derivation beside the figure.** *A derived number inherits the
+  truth of its derivation and carries none of the derivation with it.* Once
+  "36.4 % of peak" is written down, nothing in the number objects when the
+  mechanism it was derived from turns out not to exist -- and a second page
+  quoting it inherits the error with none of the provenance. This is not
+  hypothetical: `designs/gemmini_results.rst` carried 36.4 % as a bound set by
+  "one `mxu_matrix_ctrl` FSM" that does not exist, priced our emitter at "52 %
+  of the bound" on top of it, and built a ceiling-versus-overhead argument on
+  top of that. All three fell together in September 2026, and the only thing
+  that would have caught it earlier was the derivation sitting next to the
+  figure where a reader could check it.
+
+  `check_numbers.py` already enforces this for area: every area-shaped figure
+  in the docs must match a committed report or carry a named exemption.
+  Nothing enforced it for an efficiency figure. Until something does, write
+  the derivation out -- the workload, the instrument, the date -- next to any
+  number that is not read directly off a report, and say plainly whether it is
+  a measurement or a bound. The two are different objects and neither survives
+  being mistaken for the other.
+
 - **Move history down or out.** Dated measurements belong in `dev/records/`;
   the page states the current state, with a pointer.
 - **Cut the hedges.** Write the measured fact. Caveats belong in one place next

@@ -32,15 +32,28 @@ worktree.
 the model counts cycles; the 168-cycle 16x16x16, the 52-cycle matrix step and
 the 85-cycle result latency are not reproduced and were never targeted.
 
-## Double rounding, measured
+## Double rounding, measured -- a bit-exactness result, not an accuracy one
 
-`acc24` is emulated as float32 rounded to 15 fraction bits. For *range* that is
-exact -- acc24 has float32's 8-bit exponent field, so the thresholds are
-identical. The one real difference is that a float32 add followed by an acc24
-round can double-round where the RTL rounds the exact sum once. Over 24 million
-random acc24 operand pairs the two disagree on **6,933 (0.03 %)**, always by
-one ulp of acc24. MiniTPU's `tools/accum_precision.py` takes the same float32
-path.
+`acc24` is emulated as float32 rounded to 15 fraction bits. acc24 has
+float32's 8-bit exponent field and bias, so the **normal** range matches
+(smallest normal `2^-126`); the edges differ, since the significand is
+narrower -- largest finite `(2 - 2^-15)·2^127` against `(2 - 2^-23)·2^127`, and
+the smallest non-zero differs by `2^8`. Both edges are outside the operating
+range for BF16 inputs.
+
+`mxu_acc24_add_pipe` rounds the **exact** sum to acc24 once per add, so
+round-once is the silicon behaviour and the float32 path is the divergent one.
+Over 24 million random acc24 pairs the two disagree on **6,933 (0.03 %)**.
+MiniTPU's owner reproduced it over 4,000,000 pairs across 40 binades:
+**0.0636 %, exactly one acc24 ulp every time**. Their
+`tools/accum_precision.py` takes the same float32 path.
+
+**Not an accuracy figure.** One acc24 ulp is `2^-15`; the BF16 output is
+rounded at `2^-8`, 128x coarser, so the difference reaches the result about one
+time in 128 -- roughly `5e-6` per add, far below the BF16 floor every tolerance
+in either project derives from. It matters for **bit-exactness**: a model that
+reaches acc24 through float32 cannot be held bit-exact to silicon, and the
+failure looks like a handful of one-ulp elements with no pattern.
 
 ## Fork gates re-run on this branch, 2026-09-24
 

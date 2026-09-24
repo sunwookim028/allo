@@ -159,7 +159,17 @@ testbench, Verilator or board). No date promised. It is on their roadmap for
 their own reasons: it is the instrument that would hold their functional
 emulator to silicon, which they have never had either. **Until it exists,
 nothing here is checked against MiniTPU's arithmetic -- only against our
-reading of it.** Their `tools/emulate_image.py` is fp64 throughout with one
+reading of it.**
+
+**One requirement we place on the set when it arrives**, agreed with MiniTPU's
+owner and written into their `docs/ARITHMETIC.md` and roadmap: its expected
+values must come from the RTL, or from a reference that rounds the exact sum
+to acc24 **once per add** and never reaches acc24 through float32. A golden
+set generated the float32 way would inherit the very divergence it exists to
+detect (divergence 5 below), and would certify this model as correct on
+exactly the inputs where it is not. `run.py` runs `[32,64]@[64,16]`, their
+compiler's floor shape, so the set can land against a shape the gate already
+covers. Their `tools/emulate_image.py` is fp64 throughout with one
 rounding at VREG writeback and no acc24 at all; their docs call it "useless as
 a numerical oracle" in those words, which is why `reference.py` exists rather
 than being borrowed.
@@ -193,26 +203,50 @@ Stated, not hidden. In rough order of how much they matter.
    (`tile_starts`, `mxu.sv:170`) but not the row skew. The 61-deep west-edge
    activation skew line (`LHS_SKEW_DEPTH`, `mxu.sv:50`) is not modelled: it is
    purely a timing device.
-4. **acc24 is emulated in float32 -- and for range that is exact, not an
-   approximation.** `MXU_ACC_W = 1 + 8 + 15` gives acc24 *the same 8-bit
-   exponent field as float32*; only the significand differs, 15 bits against
-   23. Subnormal and overflow thresholds are therefore identical, and no
-   BF16 x BF16 product can leave the range by construction, since BF16 inputs
-   carry the same 8-bit exponent. An earlier revision of this list called this
-   an inherited approximation; it was wrong, and MiniTPU's owner corrected it.
-   **It holds because the accumulator is float.** A dtype-parametrised variant
-   with an int32 accumulator in one configuration and a float one in another
-   would break this silently, so it is a fact about this design and not a
-   general licence.
+4. **acc24 is emulated in float32: same normal range, different behaviour at
+   both edges.** `MXU_ACC_W = 1 + 8 + 15` gives acc24 float32's 8-bit exponent
+   field and bias, so the **normal** range is the same -- smallest normal
+   `2^-126` for both. The edges differ, because the significand is narrower:
+   the largest finite is `(2 - 2^-15)·2^127` against float32's
+   `(2 - 2^-23)·2^127`, so the overflow point differs in its last ulp; and
+   subnormals carry 15 fraction bits rather than 23, so gradual-underflow
+   granularity differs and the smallest non-zero differs by `2^8`.
 
-   The one real difference: a float32 add followed by an acc24 round can
-   double-round where the RTL rounds the exact sum once. Measured over 24
-   million random acc24 operand pairs, the two disagree on **6,933 (0.03 %)**,
-   always by one ulp of acc24, which usually vanishes at the final BF16
-   rounding. `tools/accum_precision.py` takes the same float32 path, so this
-   model and MiniTPU's own host reference agree; **neither can be held to
-   silicon until the golden vector set exists** (see below).
-5. **A NaN whose payload lives entirely in the dropped low 8 fraction bits
+   Both edges are outside the operating range for BF16 inputs, so this does
+   not bite here -- but it is a difference, not an identity. (This list has
+   said both wronger things in turn: first that the thresholds were an
+   inherited approximation, then that they were identical. Neither was right.
+   MiniTPU's `docs/ARITHMETIC.md` already records that their own
+   `tools/accum_precision.py` gets these edges wrong.) **It holds only because
+   the accumulator is float**: a dtype-parametrised variant with an int32
+   accumulator in one configuration would break the reasoning silently.
+5. **The float32 path double-rounds, and that is a bit-exactness property, not
+   an accuracy one.** `mxu_acc24_add_pipe` rounds the **exact** sum to acc24
+   once per add. A float32 add followed by an acc24 round can round twice, so
+   **round-once is the silicon behaviour and the float32 path is the divergent
+   one** -- on this model's side and on `tools/accum_precision.py`'s alike.
+   Measured here over 24 million random acc24 pairs: disagreement on **6,933
+   (0.03 %)**. Reproduced independently by MiniTPU's owner over 4,000,000
+   pairs spanning 40 binades: **0.0636 %**, and **exactly one acc24 ulp every
+   time**. Same finding, different operand spreads.
+
+   **As an accuracy figure this is noise, and the margin is stateable.** One
+   acc24 ulp is `2^-15`; the array output is rounded to BF16 at `2^-8`, which
+   is **128x coarser**. A one-ulp acc24 difference reaches the BF16 result
+   only when it straddles a BF16 rounding boundary -- roughly one time in 128
+   -- so the compound effect is about `5e-6` per add, far below the BF16 floor
+   that every tolerance in either project is derived from. Do not quote the
+   percentage as an accuracy cost; a bare percentage invites exactly that
+   misreading.
+
+   **As a bit-exactness property it is decisive**, and bit-exactness is where
+   both projects are going (our golden-set plan, their roadmap item 8). A
+   model that reaches acc24 through float32 **cannot be held bit-exact to
+   silicon**, and the failure presents as a handful of elements off by one ulp
+   with no pattern -- indistinguishable, to a reader, from a real miscompile.
+   Fixing it means rounding the exact sum once per add rather than letting a
+   float32 add round first.
+6. **A NaN whose payload lives entirely in the dropped low 8 fraction bits
    becomes Inf in the RTL, and stays NaN here.** `pack_bf16` adds the
    round-to-nearest-even constant and takes the top 16 bits, which for such a
    NaN carries into the exponent and yields Inf. This model rounds f32 to bf16
@@ -224,15 +258,15 @@ Stated, not hidden. In rough order of how much they matter.
    otherwise: a carry into the exponent from a large finite value is correct
    IEEE rounding, and overflow inside the chain is classified
    (`SPECIAL_INF`/`SPECIAL_NAN`) rather than wrapped.
-6. **Capacities are shrunk, structures are not.** VMEM is 64 words here and
+7. **Capacities are shrunk, structures are not.** VMEM is 64 words here and
    4096 (512 KiB) on the machine; the structure -- one flat array, two ports,
    whole words only, no arbiter -- is the machine's.
-7. **`OP_FENCE` is not a MiniTPU instruction.** MiniTPU has no scoreboard;
+8. **`OP_FENCE` is not a MiniTPU instruction.** MiniTPU has no scoreboard;
    its assembler proves the schedule and the hardware never checks. Without
    cycles a model cannot make a RAW ordering deterministic that way, so the
    tape carries an explicit retirement fence. It is the one construct here
    with no counterpart in the machine.
-8. **Out of scope, listed so the omission is not mistaken for a claim:** the
+9. **Out of scope, listed so the omission is not mistaken for a claim:** the
    128-bit VLIW bundle and its slots, the shared immediate, the 7-bit `DELAY`
    field, the 4-deep loop stack, the 24-bundle loop buffer, the AGU, the SFU,
    the cross-lane reduction tree and transpose, the DMA descriptor path and
