@@ -4,10 +4,9 @@ Runnable Allo dataflow designs that go through `target="systemc"`. The
 testbenches, run scripts and recorded results that used to sit beside them live
 elsewhere now — see [Where the rest went](#where-the-rest-went).
 
-**Two of these are experiments rather than examples**, and the difference
-matters because one of them is the evidence behind a published limitation. Both
-are expressed as Allo designs, which is why they are here rather than under
-`tests/`, but neither is a pattern to copy:
+**Two of these are designs whose point is a comparison**, so read them as
+experiments rather than as patterns to copy — and one is the evidence behind a
+published limitation:
 
 - **`demos/nb_producer_consumer.py`** empirically demonstrates that non-blocking
   stream operations are non-deterministic under the current simulator — it
@@ -16,8 +15,8 @@ are expressed as Allo designs, which is why they are here rather than under
   expressing one dot product four ways (fused, `Wire`, `Stream`, `Channel`).
   The comparison is the point; no single one of the four is *the* design.
 
-Everything else here is an example in the ordinary sense: a design you can read
-and copy.
+Everything else here is an example in the ordinary sense: a design to read and
+copy.
 
 ## Start here
 
