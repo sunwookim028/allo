@@ -38,6 +38,7 @@ None of these is an agent run and none cost money.
 | `prereg-run3-20260924.md` | run 3's pre-registration, and the template for the next one |
 | `accept-control-476a70d8/` | no-diff acceptance control of the design at `476a70d8`: 172 / 262 / 418 / 484 / 686, the baseline `accept.py` records |
 | `timeline-476a70d8-16x16x16/` | per-process cosim timeline of that design at 16x16x16; the source of run 1's and run 3's seed facts, on the agent's reading list |
+| latest $0 verification | **90/90 cases, 39.4 min** on `--phases s,control,e,c,g,loop` (2026-09-24) -- the first pass of the loop phase since the objective merge, which had left the frozen set not closed under the evaluation's imports, so every candidate died at stage `model` |
 | `harness-test-*/` | LLM-free `test_harness.py` runs (`results.json`: every case, expected against measured) and their `accept.py` on case b |
 | `codesign-suite-20260922.json` | the co-design harness's own suite, 11/11 cases, $0 |
 
