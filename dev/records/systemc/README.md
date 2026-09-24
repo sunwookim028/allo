@@ -37,3 +37,27 @@ Neither is caused by the move — both scripts are byte-identical to what they
 were — and neither is covered by `tests/dataflow/test_systemc_backend.py`, which
 is why they went unnoticed. Recorded here rather than fixed, because fixing them
 is a change to the designs and to the emitter, not to where files live.
+
+
+## A static trace that disagrees with the emission finding (2026-09-24)
+
+The finding above is that `df.build(top, target="systemc").hls_code` returns
+Vitis HLS C++ rather than SystemC. **Reading the code suggests it should
+work**, so whoever picks this up should not assume the dispatch is simply
+missing:
+
+- `allo/dataflow.py:858` forwards `target=target` unchanged into
+  `s.build(...)`; it special-cases only `aie` and `simulator` before that.
+- `allo/customize.py:1532` has `case "systemc": platform = "systemc"`.
+- `allo/backend/hls.py:484` has `case "systemc": success =
+  allo_d.emit_systemc(self.module, buf)`, and `self.hls_code` is read from that
+  same buffer at line 499.
+
+So the three hops that would have to be broken are each present. The
+observation and the trace disagree, which means the cause is somewhere
+narrower -- a region path that rebuilds with a default target, a cached
+`hls_code`, or an emitter that silently falls through and returns success.
+
+Not settled here: this checkout's MLIR bindings predate the SystemC merge, so
+`import allo.dataflow` raises before reaching any of it. It needs one run on a
+tree with current bindings, which is minutes of work for someone who has one.
