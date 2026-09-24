@@ -54,21 +54,23 @@ pytest.importorskip("torch", reason="the suite's front end is torch.fx")
 SOME = ["mlp_tiny", "mlp_bias"]
 
 
-def run(argv):
+def run(argv, build=None):
     env = dict(os.environ, PYTHONPATH=REPO)
     for key in [k for k in env if k.startswith("TPU_")]:
         del env[key]
+    env.update(build or {})
     out = subprocess.run([sys.executable] + argv, capture_output=True,
                          text=True, env=env, cwd=REPO, timeout=1800)
     return out.returncode, out.stdout + out.stderr
 
 
-def workload_gate(claims, models=SOME, docs=REPO, specs=SPECS):
-    return run([WORKLOAD_GATE, "--claims", claims, "--docs", docs,
-                "--specs", specs, "--models"] + list(models))
+def workload_gate(claims, models=SOME, docs=REPO, specs=SPECS, build=None):
+    argv = [WORKLOAD_GATE, "--claims", claims, "--docs", docs,
+            "--specs", specs, "--models"] + list(models)
+    return run(argv, build or {})
 
 
-def pairing_gate(pairings, exports=EXPORTS, reports=REPORTS):
+def pairing_gate(pairings, exports=EXPORTS, reports=REPORTS):  # noqa: D401
     return run([PAIRING_GATE, "--reports", reports, "--exports", exports,
                 "--pairings", pairings])
 
@@ -357,3 +359,30 @@ def test_an_area_run_with_no_settings_snapshot_cannot_be_paired():
     assert code == 0, text
     assert "the superseded MAXDIM=16 export: the area run recorded no " \
            "settings snapshot" in text, text
+
+
+def test_the_published_MAXDIM_16_build_has_no_declared_workload_measurement():
+    """The mistake the project makes most often, refused rather than absorbed.
+
+    TPU_MAXDIM defaults to 64 and the published five-shape row is a MAXDIM=16
+    measurement, so a shell that has pinned MAXDIM=16 for reproduce.sh is a
+    different machine from the one the workload numbers were taken on. The
+    gate must not quote them there.
+    """
+    code, text = workload_gate(CLAIMS, build={"TPU_MAXDIM": "16"})
+    assert code == 1, text
+    assert "T=4 MAXDIM=16" in text, text
+    assert "MAXDIM=64 not 16" in text, text
+
+
+def test_the_widened_build_selects_the_widened_row_rather_than_refusing():
+    """The rule SELECTS as well as rejects, which is why it is worth having.
+
+    At TPU_DMA_WIDEN=1 the live build is DMA_WORDS=16 and the gate must report
+    mlp_tiny's 863, not its 1150 and not a failure. Without this, a checker
+    that simply refused everything would pass every other test in this file.
+    """
+    code, text = workload_gate(CLAIMS, build={"TPU_DMA_WIDEN": "1"})
+    assert code == 0, text
+    assert "DMA_WORDS=16" in text and "863" in text, text
+    assert "1150" not in text, text
