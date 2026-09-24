@@ -188,7 +188,25 @@ python allo/backend/asic/tools/extract_results.py --reports $R \
     --capture-settings T4_MAXDIM64_shipped=<build-dir>
 python allo/backend/asic/tools/extract_results.py --reports $R
 python allo/backend/asic/tools/check_numbers.py   --reports $R
+python allo/backend/asic/tools/check_pairing.py  --reports $R \
+    --exports examples/tinytpu/rtl_handoff \
+    --pairings examples/tinytpu/asic_synthesis/pairings.json
 ```
+
+`check_pairing.py` is the **join**: it decides which cycle count may stand
+beside which area figure. `pairings.json` declares both what is paired and what
+deliberately is not, each refusal with its reason, and the checker re-derives
+every entry in both directions -- a refusal whose cause has been repaired is
+reported as promotable rather than left standing. After a new DC run, add the
+variant to `pairings.json` or the coverage check will fail, which is
+deliberate: silence is how an unpaired figure comes to be quoted.
+
+Two things it refuses today, and both are findings rather than formalities.
+No model-level cycle count from `workloads/` can be paired with any committed
+area: those were measured at `TPU_QD=16` and every committed export predates
+`63ee6ec7` and records no `QD`. And `T8_MAXDIM64`'s area is **orphaned** -- the
+export was re-emitted at `f0ee3223`, after the synthesis run, so its manifest
+md5 no longer matches. One DC run on the current export clears it.
 
 Build directories belong on `/scratch` (local), not NFS. `TINYTPU_RTL` points
 the design at another variant's directory, which must hold `rtl/` and

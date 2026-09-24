@@ -554,6 +554,31 @@ activity annotation would remove one of three objections and leave two.
 machine and one new instruction, with the demonstrating instruction chosen by
 the abstraction's author.
 
+**Cycles and area are joined by declaration, not by proximity.** Cycle counts
+come from Vitis cosim and area from Design Compiler. Each flow is internally
+consistent, so each flow's own check passes while the *join* between them can
+be wrong, and the errors this work made most often lived exactly there. We
+therefore treat a cycle count and an area figure as describing one machine only
+when one of two conditions holds, and a checker
+(``allo/backend/asic/tools/check_pairing.py``) decides which: either both cite
+the **same committed RTL export**, verified by the manifest checksum the
+synthesis run recorded, in which case their configuration agrees by
+construction; or both **declare every configuration parameter** --- ``T``,
+``MAXDIM``, ``QD``, ``DMA_WORDS`` --- and the four agree. A parameter that is
+absent on either side is treated as *cannot pair*, never as a match, because
+the exports predating a parameter record nothing about it and the default at
+the time was usually not today's.
+
+Applying that rule to this repository refuses more than it admits, and two of
+the refusals are results rather than formalities. **No model-level cycle count
+can currently be paired with any committed area figure**: the workload numbers
+were measured at ``QD=16`` and every committed TinyTPU export was emitted
+before ``QD=16`` became the default and records no ``QD``, so the end-to-end
+claim reaches cycles and stops. And the ``T=8`` area is **orphaned**: the
+export it was synthesised from was re-emitted two days later, so the RTL a
+reader finds at that path is not the RTL that area describes. Neither fact was
+visible to any single-flow check; both were produced by the join.
+
 **Instrument failures.** Four instruments were observed reporting success
 without having run: a tool server that answered without binding, a cost meter
 reporting zero for a billed call, a self-consistent manifest describing a

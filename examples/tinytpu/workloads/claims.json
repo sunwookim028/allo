@@ -1,0 +1,153 @@
+{
+  "why": [
+    "What the workload suite is allowed to claim, declared rather than inferred.",
+    "",
+    "The suite already knows the difference between a model that was VERIFIED",
+    "against a reference and one that was only EXECUTED, and until this file",
+    "existed that difference lived in prose on docs/source/designs/workload_suite.rst",
+    "where nothing could check it. Each model below names its tier on the ladder",
+    "examples/tinytpu/act/judge.py defines -- legal, correct, confirmed -- and a",
+    "model at the `confirmed` tier must carry the RTL measurement that earned it,",
+    "with the configuration it was measured at.",
+    "",
+    "A measurement is declared with its configuration because this project's",
+    "most-repeated error is quoting a number from a configuration it was not",
+    "measured on: TPU_MAXDIM defaults to 64 and not 16, and TPU_QD defaulted to 8",
+    "until 63ee6ec7. gate.py compares the live build against these `config`",
+    "blocks and refuses to report a measurement whose configuration it is not",
+    "running -- it does not scale, interpolate or assume.",
+    "",
+    "`quoted_in` is the association DECLARED rather than guessed. Matching a",
+    "number against a set of committed totals is decidable; working out which",
+    "cycle count a figure in prose refers to is not, so the page does not get",
+    "guessed at -- it gets told what it must contain."
+  ],
+  "source": {
+    "measurements": "docs/source/designs/workload_suite.rst, tables 'T=4 MAXDIM=64 DMA_WORDS=1 TPU_QD=16' and 'Per layer, measured on RTL'",
+    "provenance": "Vitis cosim (xsim), ap_start to ap_done, -m_axi_latency 0, one csynth per burst width shared by every layer and every model, bit-exact against isa_ref over all MAXDIM*MAXDIM bytes of C.",
+    "transcribed": "2026-09-24, from the committed page. These rows are a RECORD of a measurement made in an earlier session, not a re-measurement: gate.py can check that they are self-consistent, that they belong to the configuration it is running, and that the page still quotes them, and it cannot check that xsim once printed them."
+  },
+  "models": {
+    "mlp_tiny": {
+      "tier": "confirmed",
+      "layers": [
+        {"name": "mlp_tiny_l0", "module": "fc1", "shape": [4, 16, 16], "relu": true},
+        {"name": "mlp_tiny_l1", "module": "fc2", "shape": [4, 16, 16], "relu": false}
+      ],
+      "refusals": [],
+      "measured": [
+        {
+          "config": {"T": 4, "MAXDIM": 64, "QD": 16, "DMA_WORDS": 1, "m_axi_latency": 0},
+          "per_layer": {"mlp_tiny_l0": 584, "mlp_tiny_l1": 566},
+          "total": 1150
+        },
+        {
+          "config": {"T": 4, "MAXDIM": 64, "QD": 16, "DMA_WORDS": 16, "m_axi_latency": 0},
+          "per_layer": {"mlp_tiny_l0": 443, "mlp_tiny_l1": 420},
+          "total": 863
+        }
+      ],
+      "quoted_in": [
+        ["docs/source/designs/workload_suite.rst", "**1 150**"],
+        ["docs/source/designs/workload_suite.rst", "- 863"]
+      ]
+    },
+    "mlp_deep": {
+      "tier": "confirmed",
+      "layers": [
+        {"name": "mlp_deep_l0", "module": "fc1", "shape": [4, 16, 16], "relu": true},
+        {"name": "mlp_deep_l1", "module": "fc2", "shape": [4, 16, 16], "relu": true},
+        {"name": "mlp_deep_l2", "module": "fc3", "shape": [4, 16, 12], "relu": true},
+        {"name": "mlp_deep_l3", "module": "fc4", "shape": [4, 12, 8], "relu": false}
+      ],
+      "refusals": [],
+      "measured": [
+        {
+          "config": {"T": 4, "MAXDIM": 64, "QD": 16, "DMA_WORDS": 1, "m_axi_latency": 0},
+          "per_layer": {"mlp_deep_l0": 584, "mlp_deep_l1": 584,
+                        "mlp_deep_l2": 542, "mlp_deep_l3": 407},
+          "total": 2117
+        },
+        {
+          "config": {"T": 4, "MAXDIM": 64, "QD": 16, "DMA_WORDS": 16, "m_axi_latency": 0},
+          "per_layer": {"mlp_deep_l0": 443, "mlp_deep_l1": 443,
+                        "mlp_deep_l2": 378, "mlp_deep_l3": 270},
+          "total": 1534
+        }
+      ],
+      "quoted_in": [
+        ["docs/source/designs/workload_suite.rst", "**2 117**"],
+        ["docs/source/designs/workload_suite.rst", "- 1 534"]
+      ]
+    },
+    "mlp_small": {
+      "tier": "confirmed",
+      "layers": [
+        {"name": "mlp_small_l0", "module": "fc1", "shape": [8, 32, 32], "relu": true},
+        {"name": "mlp_small_l1", "module": "fc2", "shape": [8, 32, 16], "relu": false}
+      ],
+      "refusals": [],
+      "measured": [
+        {
+          "config": {"T": 4, "MAXDIM": 64, "QD": 16, "DMA_WORDS": 1, "m_axi_latency": 0},
+          "per_layer": {"mlp_small_l0": 1636, "mlp_small_l1": 1145},
+          "total": 2781
+        },
+        {
+          "config": {"T": 4, "MAXDIM": 64, "QD": 16, "DMA_WORDS": 16, "m_axi_latency": 0},
+          "per_layer": {"mlp_small_l0": 1156, "mlp_small_l1": 665},
+          "total": 1821
+        }
+      ],
+      "quoted_in": [
+        ["docs/source/designs/workload_suite.rst", "**2 781**"],
+        ["docs/source/designs/workload_suite.rst", "- 1 821"]
+      ]
+    },
+    "mlp_wide": {
+      "tier": "correct",
+      "layers": [
+        {"name": "mlp_wide_l0", "module": "fc1", "shape": [64, 64, 64], "relu": true},
+        {"name": "mlp_wide_l1", "module": "fc2", "shape": [64, 64, 64], "relu": false}
+      ],
+      "refusals": [],
+      "measured": [],
+      "not_confirmed": [
+        "Correct and not confirmed. Its programs agree with isa_ref on four",
+        "operand distributions and with PyTorch's own int8 epilogue chain on",
+        "every byte, and Vitis csim reports 0 / 4096 mismatches -- but no RTL",
+        "run of it has ever produced a cycle count.",
+        "",
+        "This is limitations item 24. The re-check the QD=16 default invites has",
+        "already been made and is recorded on the page: six cosim runs over four",
+        "builds and both burst widths, including TPU_QD=16 (600 s bound, last",
+        "RTL progress at the first periodic report) and TPU_QD=32 (1500 s bound,",
+        "33.4 ms of simulated time, about ten million cycles on a program the",
+        "model prices at 22 000). QD=16 is what made mlp_tiny, mlp_deep and",
+        "mlp_small measurable at all; it does not make mlp_wide complete, so",
+        "Kt >= QD is not the whole rule.",
+        "",
+        "This entry is not a skip. gate.py asserts the ABSENCE of a measurement:",
+        "if an RTL number for mlp_wide is ever added here without moving the",
+        "tier to `confirmed`, the gate fails."
+      ]
+    },
+    "mlp_bias": {
+      "tier": "probe",
+      "why": [
+        "In the suite deliberately to NOT map. A gate that made every model pass",
+        "would be the wrong gate: this one asserts that mlp_bias still refuses,",
+        "and names what it must refuse and why, so that a mapper change which",
+        "silently started approximating a bias would fail here."
+      ],
+      "layers": [
+        {"name": "mlp_bias_l0", "module": "fc2", "shape": [4, 16, 16], "relu": false}
+      ],
+      "refusals": [
+        {"where": "fc1", "why_contains": "nn.Linear with bias"},
+        {"where": "sigmoid", "why_contains": "is not an int8 GEMM or a fused ReLU"}
+      ],
+      "measured": []
+    }
+  }
+}

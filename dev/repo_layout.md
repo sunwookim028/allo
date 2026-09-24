@@ -336,10 +336,21 @@ build tree to hash, so that branch reports as *correctly missing*, which is not
 passing. It needs one run on the licensed machine, which the synthesis session
 has offered.
 
-**Not done, and deliberately.** `results.json` now carries `QD` per run, so a
-checker could in principle refuse an area quoted beside cycles from a different
-`QD`. That is not a cheap addition to `check_numbers.py`: today it matches
-area-shaped figures against a set of totals, and associating a figure with the
-cycle counts near it in prose is a different and much larger job. It is also a
-change of what that tool decides, which belongs to the session that wrote it,
-not to a move.
+**Done, in a separate tool, and the premise needed correcting.** The note here
+previously said `results.json` now carries `QD` per run. **It does not** — no
+committed `results.json` has a `QD` field, and only one export's
+`MANIFEST.json` (`T8_MAXDIM64`, added at `f0ee3223`) records one at all. What
+`results.json` does carry is `T`, `MAXDIM`, `TPU_DMA_WIDEN`, the export
+directory, the manifest and its md5, and the emitting `allo` commit.
+
+The refusal was built on that real ground instead, as
+`allo/backend/asic/tools/check_pairing.py` rather than as an addition to
+`check_numbers.py` — the reasoning above was right that associating a figure
+with the cycle counts *near it in prose* is not decidable. So nothing is
+inferred from prose: `pairings.json` **declares** each pair, and the checker
+admits it only on the same committed export (verified by md5) or on four
+configuration keys present and equal on both sides. Missing is `cannot pair`.
+
+The first run found that no model-level cycle count is pairable with any
+committed area (the exports predate `QD` being recorded) and that
+`T8_MAXDIM64`'s area is orphaned by its own re-export.
