@@ -1,0 +1,249 @@
+//  Catapult Ultra Synthesis 2024.2/1130128 (Production Release) Mon Aug 26 21:59:12 PDT 2024
+//  
+//          Copyright (c) Siemens EDA, 1996-2024, All Rights Reserved.
+//                        UNPUBLISHED, LICENSED SOFTWARE.
+//             CONFIDENTIAL AND PROPRIETARY INFORMATION WHICH IS THE
+//                   PROPERTY OF SIEMENS EDA OR ITS LICENSORS.
+//  
+//  Running on Linux sk3463@zhang-21.ece.cornell.edu:1887960 4.18.0-553.126.1.el8_10.x86_64 x86_64 aol
+//  
+//  Package information: SIFLIBS v27.2_0.0, HLS_PKGS v27.2_0.0, 
+//                       SIF_TOOLKITS v27.2_0.0, SIF_XILINX v27.2_0.0, 
+//                       SIF_ALTERA v27.2_0.0, CCS_LIBS v27.2_0.0, 
+//                       CDS_PPRO v2024.1_3, CDS_DesignChecker v2024.2, 
+//                       CDS_OASYS v21.1_3.1, CDS_PSR v24.1_0.20, 
+//                       DesignPad v2.78_1.0, DesignAnalyzer 2024.2/1129066
+//  
+# Connected to license server 1717@en-license-05.coecis.cornell.edu (LIC-13)
+# Catapult product license successfully checked out, elapsed time 00:01 (LIC-14)
+dofile ../../allo-main/tests/systemc/synth_source.tcl
+# > options set Input/CppStandard c++11
+# c++11
+# > solution new -state initial
+# Info: Branching solution 'solution.v2' at state 'initial' (PRJ-2)
+# solution.v2
+# > set root [file normalize [file dir [info script]]]
+# tests/systemc
+# > while {![file exists [file join $root pyproject.toml]]} {
+# >   set up [file dirname $root]
+# >   if {$up eq $root} { error "no repository root above [info script]" }
+# >   set root $up
+# > }
+# > solution file add $root/dev/records/systemc/generated/stream_boundary.cpp -type C++
+# /INPUTFILES/1
+# > directive set -DESIGN_HIERARCHY {source_0}
+# solution design set source_0 -top (HC-8)
+# /DESIGN_HIERARCHY source_0
+# > go analyze
+# Info: Starting transformation 'analyze' on solution 'solution.v2' (SOL-8)
+# Creating project directory '/scratch/users/sk3463/systemc-check/runs/synth_source/Catapult/'. (PRJ-1)
+# Moving session transcript to file "/scratch/users/sk3463/systemc-check/runs/synth_source/catapult.log"
+# Front End called with arguments: -- dev/records/systemc/generated/stream_boundary.cpp (CIN-69)
+# Edison Design Group C++/C Front End - Version 6.6 (CIN-1)
+# solution design set compute_0::run -inline (HC-8)
+# solution design set sink_0::run -inline (HC-8)
+# solution design set tb::src -inline (HC-8)
+# solution design set tb::snk -inline (HC-8)
+# solution design set AlloMem<T,SIZE,ADDRW,DATAW> -inline (HC-8)
+# solution design set tb -inline (HC-8)
+# solution design set top -inline (HC-8)
+# solution design set sink_0 -inline (HC-8)
+# solution design set compute_0 -inline (HC-8)
+# solution design set AlloMemW<T,SIZE,ADDRW,DATAW> -inline (HC-8)
+# solution design set tlm::tlm_transport_to_master<REQ,RSP> -inline (HC-8)
+# solution design set Connections::Fifo<Message,NumEntries,port_marshall_type> -inline (HC-8)
+# solution design set tlm::tlm_transport_channel<REQ,RSP,REQ_CHANNEL,RSP_CHANNEL> -inline (HC-8)
+# solution design set tlm::tlm_req_rsp_channel<REQ,RSP,REQ_CHANNEL,RSP_CHANNEL> -inline (HC-8)
+# solution design set tlm::tlm_slave_to_transport<REQ,RSP> -inline (HC-8)
+# Source file analysis completed (CIN-68)
+# Info: Completed transformation 'analyze' on solution 'solution.v2': elapsed time 7.89 seconds, memory usage 1544868kB, peak memory usage 1544868kB (SOL-9)
+# > go compile
+# Info: Starting transformation 'compile' on solution 'source_0.v1' (SOL-8)
+# Generating synthesis internal form... (CIN-3)
+# $PROJECT_HOME/../../allo-main/dev/records/systemc/generated/stream_boundary.cpp(108): Found top design routine 'source_0' specified by directive (CIN-52)
+# $PROJECT_HOME/../../allo-main/dev/records/systemc/generated/stream_boundary.cpp(114): Inlining member function 'source_0::source_0' on object '' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(2946): Inlining member function 'Connections::In<int32_t, Connections::SYN_PORT>::In' on object 'v0' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(2348): Inlining member function 'Connections::InBlocking<int32_t, Connections::SYN_PORT>::InBlocking' on object 'v0' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(1729): Inlining member function 'Connections::InBlocking_Ports_abs<int32_t>::InBlocking_Ports_abs' on object 'v0' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(1668): Inlining member function 'Connections::InBlocking_abs<int32_t>::InBlocking_abs' on object 'v0' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(1620): Inlining member function 'Connections::CollectAllocs::CollectAllocs' on object 'v0' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(394): Inlining member function 'Connections::ResetChecker::ResetChecker' on object 'v0.read_reset_check' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(4041): Inlining member function 'Connections::Out<int32_t, Connections::SYN_PORT>::Out' on object 'v1' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(3373): Inlining member function 'Connections::OutBlocking<int32_t, Connections::SYN_PORT>::OutBlocking' on object 'v1' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(3097): Inlining member function 'Connections::OutBlocking_Ports_abs<int32_t>::OutBlocking_Ports_abs' on object 'v1' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(3045): Inlining member function 'Connections::OutBlocking_abs<int32_t>::OutBlocking_abs' on object 'v1' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(1620): Inlining member function 'Connections::CollectAllocs::CollectAllocs' on object 'v1' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(394): Inlining member function 'Connections::ResetChecker::ResetChecker' on object 'v1.write_reset_check' (CIN-64)
+# $PROJECT_HOME/../../allo-main/dev/records/systemc/generated/stream_boundary.cpp(119): Inlining member function 'source_0::run' on object '' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(1742): Inlining member function 'Connections::InBlocking_Ports_abs<int32_t>::Reset' on object 'v0' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(402): Inlining member function 'Connections::ResetChecker::reset' on object 'v0.read_reset_check' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(1748): Inlining member function 'sc_core::sc_inout<bool>::write' on object 'v0.rdy' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(3380): Inlining member function 'Connections::OutBlocking<int32_t, Connections::SYN_PORT>::Reset' on object 'v1' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(3110): Inlining member function 'Connections::OutBlocking_Ports_abs<int32_t>::Reset' on object 'v1' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(402): Inlining member function 'Connections::ResetChecker::reset' on object 'v1.write_reset_check' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(3116): Inlining member function 'sc_core::sc_inout<bool>::write' on object 'v1.vld' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(3530): Inlining member function 'Connections::OutBlocking<int32_t, Connections::SYN_PORT>::reset_msg' on object 'v1' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(3531): Inlining member function 'sc_core::sc_inout<Connections::OutBlocking<int32_t, Connections::SYN_PORT>::MsgBits>::write' on object 'v1.dat' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(2356): Synthesizing method 'Connections::InBlocking<int32_t, Connections::SYN_PORT>::Pop' (CIN-13)
+# $MGC_HOME/shared/include/connections/connections.h(2356): Inlining member function 'Connections::InBlocking<int32_t, Connections::SYN_PORT>::Pop' on object 'this' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(1767): Inlining member function 'Connections::InBlocking_Ports_abs<int32_t>::Pop' on object 'this' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(1773): Inlining member function 'sc_core::sc_inout<bool>::write' on object 'this.rdy' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(1776): Inlining member function 'sc_core::sc_inout<bool>::write' on object 'this.rdy' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(2502): Inlining member function 'Connections::InBlocking<int32_t, Connections::SYN_PORT>::read_msg' on object 'this' (CIN-64)
+# $MGC_HOME/shared/include/connections/marshaller.h(149): Inlining member function 'Marshaller<32U>::Marshaller' on object 'marshaller' (CIN-64)
+# $MGC_HOME/shared/include/connections/marshaller.h(268): Inlining member function 'Wrapped<int>::Wrapped' on object 'result' (CIN-64)
+# $MGC_HOME/shared/include/connections/marshaller.h(268): Inlining member function 'Wrapped<int>::Marshall<32U>' on object 'result' (CIN-64)
+# $MGC_HOME/shared/include/connections/marshaller.h(268): Inlining routine 'operator&<32U>' (CIN-14)
+# $MGC_HOME/shared/include/connections/marshaller.h(157): Inlining member function 'Marshaller<32U>::AddField<int, 32>' on object 'marshaller' (CIN-64)
+# $MGC_HOME/shared/include/connections/marshaller.h(73): Inlining routine 'connections_cast_type_to_vector<int, 32>' (CIN-14)
+# $MGC_HOME/shared/include/mc_typeconv.h(211): Inlining routine 'type_to_vector<int, 32>' (CIN-14)
+# $MGC_HOME/shared/include/connections/marshaller.h(79): Inlining routine 'connections_cast_vector_to_type<int, 32>' (CIN-14)
+# $MGC_HOME/shared/include/mc_typeconv.h(532): Inlining routine 'vector_to_type<32>' (CIN-14)
+# $MGC_HOME/shared/include/mc_typeconv.h(408): Inlining routine 'vector_to_type_builtin<32, int>' (CIN-14)
+# $MGC_HOME/shared/include/connections/marshaller.h(136): Inlining member function 'Marshaller<32U>::~Marshaller' on object 'marshaller' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(2356): Optimizing block '/Connections::InBlocking<int32_t,Connections::SYN_PORT>::Pop' ... (CIN-4)
+# $MGC_HOME/shared/include/connections/connections.h(3387): Synthesizing method 'Connections::OutBlocking<int32_t, Connections::SYN_PORT>::Push' (CIN-13)
+# $MGC_HOME/shared/include/connections/connections.h(3387): Inlining member function 'Connections::OutBlocking<int32_t, Connections::SYN_PORT>::Push' on object 'this' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(3136): Inlining member function 'Connections::OutBlocking_Ports_abs<int32_t>::Push' on object 'this' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(3142): Inlining member function 'sc_core::sc_inout<bool>::write' on object 'this.vld' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(3534): Inlining member function 'Connections::OutBlocking<int32_t, Connections::SYN_PORT>::write_msg' on object 'this' (CIN-64)
+# $MGC_HOME/shared/include/connections/marshaller.h(148): Inlining member function 'Marshaller<32U>::Marshaller' on object 'marshaller' (CIN-64)
+# $MGC_HOME/shared/include/connections/marshaller.h(268): Inlining member function 'Wrapped<int>::Wrapped' on object 'wm' (CIN-64)
+# $MGC_HOME/shared/include/connections/marshaller.h(268): Inlining member function 'Wrapped<int>::Marshall<32U>' on object 'wm' (CIN-64)
+# $MGC_HOME/shared/include/connections/marshaller.h(268): Inlining routine 'operator&<32U>' (CIN-14)
+# $MGC_HOME/shared/include/connections/marshaller.h(157): Inlining member function 'Marshaller<32U>::AddField<int, 32>' on object 'marshaller' (CIN-64)
+# $MGC_HOME/shared/include/connections/marshaller.h(73): Inlining routine 'connections_cast_type_to_vector<int, 32>' (CIN-14)
+# $MGC_HOME/shared/include/mc_typeconv.h(211): Inlining routine 'type_to_vector<int, 32>' (CIN-14)
+# $MGC_HOME/shared/include/connections/marshaller.h(79): Inlining routine 'connections_cast_vector_to_type<int, 32>' (CIN-14)
+# $MGC_HOME/shared/include/mc_typeconv.h(532): Inlining routine 'vector_to_type<32>' (CIN-14)
+# $MGC_HOME/shared/include/mc_typeconv.h(408): Inlining routine 'vector_to_type_builtin<32, int>' (CIN-14)
+# $MGC_HOME/shared/include/connections/marshaller.h(172): Inlining member function 'Marshaller<32U>::GetResult' on object 'marshaller' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(3539): Inlining member function 'sc_core::sc_inout<Connections::OutBlocking<int32_t, Connections::SYN_PORT>::MsgBits>::write' on object 'this.dat' (CIN-64)
+# $MGC_HOME/shared/include/connections/marshaller.h(136): Inlining member function 'Marshaller<32U>::~Marshaller' on object 'marshaller' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(3146): Inlining member function 'sc_core::sc_inout<bool>::write' on object 'this.vld' (CIN-64)
+# $MGC_HOME/shared/include/connections/connections.h(3387): Optimizing block '/Connections::OutBlocking<int32_t,Connections::SYN_PORT>::Push' ... (CIN-4)
+# $MGC_HOME/shared/include/connections/connections.h(3387): INOUT port 'm' is only used as an input. (OPT-10)
+# $PROJECT_HOME/../../allo-main/dev/records/systemc/generated/stream_boundary.cpp(108): Optimizing block '/source_0' ... (CIN-4)
+# $PROJECT_HOME/../../allo-main/dev/records/systemc/generated/stream_boundary.cpp(125): Creating instance '/v0.Pop():inst' of ModularIO 'Connections::InBlocking<int32_t,Connections::SYN_PORT>::Pop' (CIN-204)
+# $PROJECT_HOME/../../allo-main/dev/records/systemc/generated/stream_boundary.cpp(126): Creating instance '/v1.Push():inst' of ModularIO 'Connections::OutBlocking<int32_t,Connections::SYN_PORT>::Push' (CIN-204)
+# Info: $PROJECT_HOME/../../allo-main/dev/records/systemc/generated/stream_boundary.cpp(114): Partition '/source_0/SC_CTOR' is found empty and is optimized away. (OPT-12)
+# $PROJECT_HOME/../../allo-main/dev/records/systemc/generated/stream_boundary.cpp(124): Loop '/source_0/run/l_S_i_0_i' iterated at most 8 times. (LOOP-2)
+# Info: $PROJECT_HOME/../../allo-main/dev/records/systemc/generated/stream_boundary.cpp(126): Modular IO 'v1.Push()' is mapped to a builtin modular IO 'ccs_conn_out_wait'. 'Variables' type width = '32', 'Signal' type width = '32'. Mapping : '' (CIN-315)
+# Info: $PROJECT_HOME/../../allo-main/dev/records/systemc/generated/stream_boundary.cpp(125): Modular IO 'v0.Pop()' is mapped to a builtin modular IO 'ccs_conn_in_wait'. 'Signal' type width = '32', 'Variables' type width = '32'. Mapping : '' (CIN-315)
+# Design 'source_0' was read (SOL-1)
+# Makefile for Original Design + Testbench written to file './scverify/Verify_orig_cxx_osci.mk'
+# Makefile for Original Design + Testbench written to file './scverify/Verify_orig_cxx_msim.mk'
+# Info: CDesignChecker Shell script written to '/scratch/users/sk3463/systemc-check/runs/synth_source/Catapult/source_0.v1/CDesignChecker/design_checker.sh'
+# Info: Completed transformation 'compile' on solution 'source_0.v1': elapsed time 3.44 seconds, memory usage 1544868kB, peak memory usage 1544868kB (SOL-9)
+# Info: Design complexity at end of 'compile': Total ops = 17, Real ops = 2, Vars = 17 (SOL-21)
+# > solution library add nangate-45nm_beh
+# > directive set -CLOCKS {clk {-CLOCK_PERIOD 5.0}}
+# /CLOCKS {clk {-CLOCK_PERIOD 5.0}}
+# > go assembly
+# Info: Starting transformation 'libraries' on solution 'source_0.v1' (SOL-8)
+# Info: Please set ComponentLibs/TechLibSearchPath to enable flows that use downstream synthesis tools (LIB-220)
+# Reading component library '$MGC_HOME/pkgs/siflibs/mgc_busdefs.lib' [mgc_busdefs]... (LIB-49)
+# Reading component library '$MGC_HOME/pkgs/siflibs/stdops.lib' [STDOPS]... (LIB-49)
+# Reading component library '$MGC_HOME/pkgs/siflibs/fpops.lib' [FPOPS]... (LIB-49)
+# Reading component library '$MGC_HOME/pkgs/siflibs/ccs_dw_ops.lib' [CCS_DW_OPS]... (LIB-49)
+# Reading component library '$MGC_HOME/pkgs/siflibs/ccs_ioport.lib' [ccs_ioport]... (LIB-49)
+# Reading component library '$MGC_HOME/pkgs/siflibs/mgc_ioport.lib' [mgc_ioport]... (LIB-49)
+# Reading component library '$MGC_HOME/pkgs/cds_assert/assert_ops.lib' [ASSERT_OPS]... (LIB-49)
+# Reading component library '$MGC_HOME/pkgs/cds_assert/assert_mods.lib' [assert_mods]... (LIB-49)
+# Reading component library '$MGC_HOME/pkgs/siflibs/ccs_connections.lib' [ccs_connections]... (LIB-49)
+# Reading component library '$MGC_HOME/pkgs/siflibs/nangate/nangate-45nm_beh.lib' [nangate-45nm_beh]... (LIB-49)
+# Warning: Component library 'nangate-45nm_beh' created with a newer version of Catapult Library Builder, 2025.1/1129627 > 2024.2/1130128 (LIB-83)
+# Info: Completed transformation 'libraries' on solution 'source_0.v1': elapsed time 0.36 seconds, memory usage 1544868kB, peak memory usage 1544868kB (SOL-9)
+# Info: Design complexity at end of 'libraries': Total ops = 17, Real ops = 2, Vars = 17 (SOL-21)
+# Info: Starting transformation 'assembly' on solution 'source_0.v1' (SOL-8)
+# Info: Completed transformation 'assembly' on solution 'source_0.v1': elapsed time 0.05 seconds, memory usage 1544868kB, peak memory usage 1544868kB (SOL-9)
+# Info: Design complexity at end of 'assembly': Total ops = 17, Real ops = 2, Vars = 12 (SOL-21)
+# > go extract
+# Info: Starting transformation 'loops' on solution 'source_0.v1' (SOL-8)
+# $PROJECT_HOME/../../allo-main/dev/records/systemc/generated/stream_boundary.cpp(124): Loop '/source_0/run/l_S_i_0_i' is left rolled. (LOOP-4)
+# $PROJECT_HOME/../../allo-main/dev/records/systemc/generated/stream_boundary.cpp(123): Loop '/source_0/run/while' is left rolled. (LOOP-4)
+# Info: Completed transformation 'loops' on solution 'source_0.v1': elapsed time 0.02 seconds, memory usage 1544868kB, peak memory usage 1544868kB (SOL-9)
+# Info: Design complexity at end of 'loops': Total ops = 17, Real ops = 2, Vars = 12 (SOL-21)
+# Info: Starting transformation 'memories' on solution 'source_0.v1' (SOL-8)
+# Info: Completed transformation 'memories' on solution 'source_0.v1': elapsed time 0.04 seconds, memory usage 1544868kB, peak memory usage 1544868kB (SOL-9)
+# Info: Design complexity at end of 'memories': Total ops = 17, Real ops = 2, Vars = 12 (SOL-21)
+# Info: Starting transformation 'cluster' on solution 'source_0.v1' (SOL-8)
+# Info: Completed transformation 'cluster' on solution 'source_0.v1': elapsed time 0.01 seconds, memory usage 1544868kB, peak memory usage 1544868kB (SOL-9)
+# Info: Design complexity at end of 'cluster': Total ops = 17, Real ops = 2, Vars = 12 (SOL-21)
+# Info: Starting transformation 'architect' on solution 'source_0.v1' (SOL-8)
+# Design 'source_0' contains '2' real operations. (SOL-11)
+# Info: Completed transformation 'architect' on solution 'source_0.v1': elapsed time 0.03 seconds, memory usage 1544868kB, peak memory usage 1544868kB (SOL-9)
+# Info: Design complexity at end of 'architect': Total ops = 19, Real ops = 2, Vars = 13 (SOL-21)
+# Info: Starting transformation 'allocate' on solution 'source_0.v1' (SOL-8)
+# Performing concurrent resource allocation and scheduling on '/source_0/run' (CRAAS-1)
+# Info: Select qualified components for data operations ... (CRAAS-3)
+# Info: Apply resource constraints on data operations ... (CRAAS-4)
+# $PROJECT_HOME/../../allo-main/dev/records/systemc/generated/stream_boundary.cpp(124): Prescheduled LOOP '/source_0/run/l_S_i_0_i' (2 c-steps) (SCHD-7)
+# $PROJECT_HOME/../../allo-main/dev/records/systemc/generated/stream_boundary.cpp(123): Prescheduled LOOP '/source_0/run/while' (0 c-steps) (SCHD-7)
+# $PROJECT_HOME/../../allo-main/dev/records/systemc/generated/stream_boundary.cpp(119): Prescheduled LOOP '/source_0/run/run:rlp' (1 c-steps) (SCHD-7)
+# $PROJECT_HOME/../../allo-main/dev/records/systemc/generated/stream_boundary.cpp(119): Prescheduled SEQUENTIAL '/source_0/run' (total length 17 c-steps) (SCHD-8)
+# Info: $PROJECT_HOME/../../allo-main/dev/records/systemc/generated/stream_boundary.cpp(119): Initial schedule of SEQUENTIAL '/source_0/run': Latency = 15, Area (Datapath, Register, Total) = 38.60, 21.28, 59.88 (CRAAS-11)
+# At least one feasible schedule exists. (CRAAS-9)
+# Info: $PROJECT_HOME/../../allo-main/dev/records/systemc/generated/stream_boundary.cpp(119): Final schedule of SEQUENTIAL '/source_0/run': Latency = 15, Area (Datapath, Register, Total) = 14.96, 21.28, 36.24 (CRAAS-12)
+# Resource allocation and scheduling done. (CRAAS-2)
+# Netlist written to file 'schedule.gnt' (NET-4)
+# Info: Completed transformation 'allocate' on solution 'source_0.v1': elapsed time 0.05 seconds, memory usage 1544868kB, peak memory usage 1544868kB (SOL-9)
+# Info: Design complexity at end of 'allocate': Total ops = 19, Real ops = 2, Vars = 13 (SOL-21)
+# Info: Starting transformation 'schedule' on solution 'source_0.v1' (SOL-8)
+# Performing concurrent resource allocation and scheduling on '/source_0/run' (CRAAS-1)
+# Info: $PROJECT_HOME/../../allo-main/dev/records/systemc/generated/stream_boundary.cpp(125): Creating buffer for wait controller for component 'v0.Pop():mio' (SCHD-46)
+# Report written to file 'cycle.rpt'
+# Info: Completed transformation 'schedule' on solution 'source_0.v1': elapsed time 0.30 seconds, memory usage 1544868kB, peak memory usage 1544868kB (SOL-9)
+# Info: Design complexity at end of 'schedule': Total ops = 85, Real ops = 9, Vars = 55 (SOL-21)
+# Info: Starting transformation 'dpfsm' on solution 'source_0.v1' (SOL-8)
+# Performing FSM extraction... (FSM-1)
+# Warning: Extrapolation detected. Script '/scratch/users/sk3463/systemc-check/runs/synth_source/Catapult/source_0.v1/adjust_char_library.tcl' generated. (LIB-142)
+# Info: Completed transformation 'dpfsm' on solution 'source_0.v1': elapsed time 0.07 seconds, memory usage 1544868kB, peak memory usage 1544868kB (SOL-9)
+# Info: Design complexity at end of 'dpfsm': Total ops = 68, Real ops = 15, Vars = 55 (SOL-21)
+# Info: Starting transformation 'instance' on solution 'source_0.v1' (SOL-8)
+# Netlist written to file 'schematic.nlv' (NET-4)
+# Info: Completed transformation 'instance' on solution 'source_0.v1': elapsed time 0.10 seconds, memory usage 1544868kB, peak memory usage 1544868kB (SOL-9)
+# Info: Design complexity at end of 'instance': Total ops = 68, Real ops = 15, Vars = 62 (SOL-21)
+# Info: Starting transformation 'extract' on solution 'source_0.v1' (SOL-8)
+# Report written to file 'rtl.rpt'
+# Generating SCVerify ccs_wrapper_source_0.vhdl
+# Netlist written to file 'rtl.vhdl' (NET-4)
+# generate concat
+# order file name is: rtl.vhdl_order.txt
+# Add dependent file: /opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/ccs_in_wait_v1.vhd
+# Add dependent file: /opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/ccs_out_wait_v1.vhd
+# Add dependent file: ./rtl.vhdl
+# Finished writing concatenated file: /scratch/users/sk3463/systemc-check/runs/synth_source/Catapult/source_0.v1/concat_rtl.vhdl
+# order file name is: rtl.vhdl_order_sim.txt
+# Add dependent file: /opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/ccs_in_wait_v1.vhd
+# Add dependent file: /opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/ccs_out_wait_v1.vhd
+# Add dependent file: ./rtl.vhdl
+# Finished writing concatenated simulation file: /scratch/users/sk3463/systemc-check/runs/synth_source/Catapult/source_0.v1/concat_sim_rtl.vhdl
+# Generating SCVerify SystemC wrapper
+# Info: Wrote wave database file to /scratch/users/sk3463/systemc-check/runs/synth_source/Catapult/source_0.v1/scverify/ccs_wave_signals.dat
+# Makefile for RTL VHDL written to file './scverify/Verify_rtl_vhdl_msim.mk'
+# Makefile for Concat concat_sim_rtl VHDL written to file './scverify/Verify_concat_sim_rtl_vhdl_msim.mk'
+# Generating SCVerify ccs_wrapper_source_0.v
+# Netlist written to file 'rtl.v' (NET-4)
+# generate concat
+# order file name is: rtl.v_order.txt
+# Add dependent file: /opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/ccs_in_wait_v1.v
+# Add dependent file: /opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/ccs_out_wait_v1.v
+# Add dependent file: ./rtl.v
+# Finished writing concatenated file: /scratch/users/sk3463/systemc-check/runs/synth_source/Catapult/source_0.v1/concat_rtl.v
+# order file name is: rtl.v_order_sim.txt
+# Add dependent file: /opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/ccs_in_wait_v1.v
+# Add dependent file: /opt/siemens/catapult/2024.2/Mgc_home/pkgs/siflibs/ccs_out_wait_v1.v
+# Add dependent file: ./rtl.v
+# Finished writing concatenated simulation file: /scratch/users/sk3463/systemc-check/runs/synth_source/Catapult/source_0.v1/concat_sim_rtl.v
+# Makefile for RTL Verilog written to file './scverify/Verify_rtl_v_msim.mk'
+# Makefile for Concat concat_sim_rtl Verilog written to file './scverify/Verify_concat_sim_rtl_v_msim.mk'
+# Info: Completed transformation 'extract' on solution 'source_0.v1': elapsed time 3.04 seconds, memory usage 1544868kB, peak memory usage 1544868kB (SOL-9)
+# Info: Design complexity at end of 'extract': Total ops = 68, Real ops = 15, Vars = 55 (SOL-21)
+# > project save
+# > exit
+
+real	0m29.498s
+user	0m20.690s
+sys	0m1.552s
+exit=0

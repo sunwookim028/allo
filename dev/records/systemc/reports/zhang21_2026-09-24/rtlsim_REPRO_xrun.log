@@ -1,0 +1,37 @@
+--- 1. the three boundaries, no pacing games -------------------------------
+Stream[int32,2] boundary (control)                         PASS
+Channel[valid_ready] boundary (control)                    PASS
+Wire[int32] boundary (DUT)                                 FAIL  pe_wire  (8/8 wrong)
+--- 2. Wire under every producer/consumer pacing ---------------------------
+Wire  stall_in=1 stall_out=1                               FAIL  pe_wireSTALL_IN=1_STALL_OUT=1  (8/8 wrong)
+Wire  stall_in=1 stall_out=2                               FAIL  pe_wireSTALL_IN=1_STALL_OUT=2  (8/8 wrong)
+Wire  stall_in=1 stall_out=3                               FAIL  pe_wireSTALL_IN=1_STALL_OUT=3  (8/8 wrong)
+Wire  stall_in=2 stall_out=1                               FAIL  pe_wireSTALL_IN=2_STALL_OUT=1  (8/8 wrong)
+Wire  stall_in=2 stall_out=2                               FAIL  pe_wireSTALL_IN=2_STALL_OUT=2  (8/8 wrong)
+Wire  stall_in=2 stall_out=3                               FAIL  pe_wireSTALL_IN=2_STALL_OUT=3  (8/8 wrong)
+Wire  stall_in=3 stall_out=1                               FAIL  pe_wireSTALL_IN=3_STALL_OUT=1  (8/8 wrong)
+Wire  stall_in=3 stall_out=2                               FAIL  pe_wireSTALL_IN=3_STALL_OUT=2  (8/8 wrong)
+Wire  stall_in=3 stall_out=3                               FAIL  pe_wireSTALL_IN=3_STALL_OUT=3  (8/8 wrong)
+Wire  stall_in=4 stall_out=1                               FAIL  pe_wireSTALL_IN=4_STALL_OUT=1  (8/8 wrong)
+Wire  stall_in=4 stall_out=2                               FAIL  pe_wireSTALL_IN=4_STALL_OUT=2  (8/8 wrong)
+Wire  stall_in=4 stall_out=3                               FAIL  pe_wireSTALL_IN=4_STALL_OUT=3  (8/8 wrong)
+Wire  stall_in=5 stall_out=1                               FAIL  pe_wireSTALL_IN=5_STALL_OUT=1  (8/8 wrong)
+Wire  stall_in=5 stall_out=2                               FAIL  pe_wireSTALL_IN=5_STALL_OUT=2  (8/8 wrong)
+Wire  stall_in=5 stall_out=3                               FAIL  pe_wireSTALL_IN=5_STALL_OUT=3  (8/8 wrong)
+Wire  stall_in=6 stall_out=1                               FAIL  pe_wireSTALL_IN=6_STALL_OUT=1  (8/8 wrong)
+Wire  stall_in=6 stall_out=2                               FAIL  pe_wireSTALL_IN=6_STALL_OUT=2  (8/8 wrong)
+Wire  stall_in=6 stall_out=3                               FAIL  pe_wireSTALL_IN=6_STALL_OUT=3  (8/8 wrong)
+--- 3. positive control: same Wire RTL, lockstep imposed by the tb ---------
+Wire + LOCKSTEP, acc released 2 cycles late                FAIL  pe_wireLOCKSTEP_ACC_RST_DELAY=2  (8/8 wrong)
+Wire + LOCKSTEP, acc released 3 cycles late                PASS
+Wire + LOCKSTEP, acc released 4 cycles late                PASS
+Wire + LOCKSTEP, acc released 5 cycles late                FAIL  pe_wireLOCKSTEP_ACC_RST_DELAY=5  (8/8 wrong)
+--- 4. deliberate breakage: each of these MUST go red ----------------------
+Wire+LOCKSTEP, 1 cycle of latency in the wire              FAIL  pe_wireLOCKSTEP_ACC_RST_DELAY=3_BREAK_WIRE  (8/8 wrong)
+Wire+LOCKSTEP, boundary datum xor 1                        FAIL  pe_wireLOCKSTEP_ACC_RST_DELAY=3_BREAK_DATA  (8/8 wrong)
+Channel,        boundary datum xor 1                       FAIL  pe_channelBREAK_DATA  (8/8 wrong)
+Stream,         boundary datum xor 1                       FAIL  pe_streamBREAK_DATA  (8/8 wrong)
+
+real	0m22.046s
+user	0m9.968s
+sys	0m4.988s
