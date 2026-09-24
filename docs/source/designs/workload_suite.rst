@@ -685,6 +685,14 @@ builds, both burst widths:
      - ``@ 33400115000`` ps = **33.4 ms, about 10 million cycles**
      - no completion
 
+**Re-checked on 2026-09-24, after ``QD=16`` became the default** (``63ee6ec7``)
+and cleared item 24 for the three small models. It changes nothing here:
+``mlp_wide_l0`` on a fresh ``csynth`` of ``T=4 MAXDIM=64 QD=16 DMA_WORDS=1``
+still does not complete inside 600 s, with the same signature as the row above
+--- csim exact at ``0 / 4096``, last RTL progress ``@ "109000"`` ps, no second
+periodic report. So ``mlp_wide`` stays *correct and not confirmed*, and
+``workloads/gate.py`` enforces that it carries no cycle count.
+
 Its layers have ``Kt = 16``, so ``Kt >= QD`` holds at ``QD=16``, which is the
 one condition the parity work has a rule for --- but ``QD=32`` breaks that
 condition and does not fix the hang. What ``QD=32`` does change is the
