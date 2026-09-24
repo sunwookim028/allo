@@ -729,7 +729,7 @@ MAXDIM=64``, 2,481,926 at ``T=8, MAXDIM=64`` — and **none for Gemmini**, while
 comparing cycles against Gemmini at a matched array size. A cycle comparison
 with an area column on only one side is not a comparison; it is an
 advertisement. This section is the correction, and the RTL that makes it
-possible is in ``examples/tinytpu/gemmini_rtl/``.
+possible is in ``dev/records/tinytpu/gemmini_rtl/``.
 
 The comparable unit is ``Gemmini``, not the SoC
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1137,9 +1137,9 @@ trade a certain delay for an uncertain saving of two short runs.
 The handoff
 ~~~~~~~~~~~
 
-``gemmini_rtl/DIM4_int8_capmatched/`` and ``gemmini_rtl/DIM8_int8_capmatched/``,
-written by ``export_gemmini_rtl.py``, in the shape ``rtl_handoff/`` already
-uses: flat RTL, ``sv2v_manifest.f`` in dependency order, ``MANIFEST.json``
+``dev/records/tinytpu/gemmini_rtl/DIM4_int8_capmatched/`` and its
+``DIM8_int8_capmatched/`` sibling, written by ``export_gemmini_rtl.py``, in the
+shape ``dev/records/tinytpu/rtl_handoff/`` already uses: flat RTL, ``sv2v_manifest.f`` in dependency order, ``MANIFEST.json``
 naming the top module and carrying the configuration, and a README stating the
 elaborating commit and every cut. The exporter refuses an export whose named
 top module is undefined and one whose resource record is empty — the two guards

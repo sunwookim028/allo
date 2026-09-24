@@ -125,7 +125,7 @@ build directory), and mflowgen's `synthesis-metrics.json`.
 
 ## The Gemmini side of the same flow
 
-`../gemmini_rtl/` holds Gemmini's accelerator — the `Gemmini` module and its
+`dev/records/tinytpu/gemmini_rtl/` holds Gemmini's accelerator — the `Gemmini` module and its
 local memories, with Rocket, the caches, the buses and the DRAM model cut —
 elaborated at DIM=4 and DIM=8, int8/int32, at a memory capacity matched to ours
 so that `sram_mode='none'` means the same thing on both sides. It is for **these
@@ -143,7 +143,7 @@ SystemVerilog (firtool emits packed multidimensional arrays outside any
 `ifdef`, so `normalize_rtl: True` or `analyze -format sverilog` is required,
 unlike for Vitis output), and `SYNTHESIS` must be defined at read time. The
 top-module check is not a problem — `module Gemmini(` carries a comment, not an
-attribute. See `../gemmini_rtl/README.md` and
+attribute. See `dev/records/tinytpu/gemmini_rtl/README.md` and
 `docs/source/designs/gemmini_comparison.rst`, "Area".
 
 ## Reproducing
@@ -189,7 +189,7 @@ python allo/backend/asic/tools/extract_results.py --reports $R \
 python allo/backend/asic/tools/extract_results.py --reports $R
 python allo/backend/asic/tools/check_numbers.py   --reports $R
 python allo/backend/asic/tools/check_pairing.py  --reports $R \
-    --exports examples/tinytpu/rtl_handoff \
+    --exports dev/records/tinytpu/rtl_handoff \
     --pairings examples/tinytpu/asic_synthesis/pairings.json
 ```
 

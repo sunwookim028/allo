@@ -16,21 +16,27 @@ It checks:
   confusing rather than clean
 * ``sv2v``, reporting the version, which is unpinned upstream
 * the vendored node library and ADK definition under ``allo/backend/asic``
-* the RTL directory and file list for the requested variant, under the design
-  given by ``--design`` -- the flow is shared, the design is not, so the design
-  is named on the command line rather than assumed
+* the RTL directory and file list for the requested variant, under the export
+  root given by ``--exports`` -- the flow is shared, neither the design nor its
+  exports are, so both are named on the command line rather than derived. This
+  is the same flag, with the same meaning, that ``check_pairing.py`` takes
 * the fetched ``stdcells.db`` against the md5 recorded in the committed settings
   snapshots -- the ADK payload is not vendored (see
   ``allo/backend/asic/PROVENANCE.md``), so this is what ties a rerun to the
   library the published numbers were measured against
 
-Run: python allo/backend/asic/tools/preflight.py --design DIR
+Run: python allo/backend/asic/tools/preflight.py --design DIR --exports DIR
          [--variant T8_MAXDIM64] [--build DIR]
 
 For the TinyTPU design, from the repository root::
 
     python allo/backend/asic/tools/preflight.py \
-        --design examples/tinytpu/asic_synthesis
+        --design examples/tinytpu/asic_synthesis \
+        --exports dev/records/tinytpu/rtl_handoff
+
+The exports are generated RTL, so they are records and live with the records
+(``dev/repo_layout.md``); Gemmini's are the sibling
+``dev/records/tinytpu/gemmini_rtl``.
 
 Exit 0 if a run is possible, 1 otherwise.
 """
@@ -195,19 +201,30 @@ def check_library(reports, build):
                 "this library are not comparable with the committed set")
 
 
-def check_variant(design, variant):
-    root = os.path.dirname(design)
-    for base in ("rtl_handoff", "gemmini_rtl"):
-        d = os.path.join(root, base, variant)
-        if os.path.isdir(d):
-            lists = [f for f in sorted(os.listdir(d)) if f.startswith("sv2v_manifest")]
-            count = len(glob.glob(os.path.join(d, "*.v"))) + \
-                len(glob.glob(os.path.join(d, "*.sv")))
-            good(f"RTL for {variant}", f"{count} files, lists: {', '.join(lists)}")
-            return
-    missing(f"no RTL directory for {variant}",
-            f"expected {root}/rtl_handoff/{variant} or "
-            f"{root}/gemmini_rtl/{variant}")
+def check_variant(exports, variant):
+    """The variant's RTL under the export root, which is given, not derived.
+
+    This used to take the *design* directory and look one level above it for
+    directories named ``rtl_handoff`` and ``gemmini_rtl``. Both assumptions --
+    that the exports sit beside the design, and that they are named one of two
+    fixed things -- were tree shape encoded in a tool, and both stopped being
+    true when the exports moved to ``dev/records/tinytpu/``. It takes the root
+    now, exactly as ``check_pairing.py`` does.
+    """
+    d = os.path.join(exports, variant)
+    if not os.path.isdir(d):
+        missing(f"no RTL directory for {variant}",
+                f"expected {d} -- pass --exports for the right export root "
+                f"(TinyTPU's are dev/records/tinytpu/rtl_handoff, Gemmini's "
+                f"dev/records/tinytpu/gemmini_rtl)")
+        return
+    lists = [f for f in sorted(os.listdir(d)) if f.startswith("sv2v_manifest")]
+    count = len(glob.glob(os.path.join(d, "*.v"))) + \
+        len(glob.glob(os.path.join(d, "*.sv")))
+    if not count:
+        missing(f"no RTL files for {variant}", f"{d} holds no .v or .sv")
+        return
+    good(f"RTL for {variant}", f"{count} files, lists: {', '.join(lists)}")
 
 
 def main():
@@ -216,6 +233,11 @@ def main():
                     help="a design's synthesis directory, holding "
                          "construct-commercial.py and reports/ "
                          "(e.g. examples/tinytpu/asic_synthesis)")
+    ap.add_argument("--exports", required=True,
+                    help="the design's committed RTL exports, the directory "
+                         "holding one subdirectory per variant "
+                         "(e.g. dev/records/tinytpu/rtl_handoff). The same "
+                         "flag check_pairing.py takes")
     ap.add_argument("--variant", default="T8_MAXDIM64")
     ap.add_argument("--build", help="a build directory, to verify the fetched ADK")
     args = ap.parse_args()
@@ -223,11 +245,14 @@ def main():
     design = os.path.abspath(args.design)
     if not os.path.isdir(design):
         sys.exit(f"no design directory at {design}")
+    exports = os.path.abspath(args.exports)
+    if not os.path.isdir(exports):
+        sys.exit(f"no exports directory at {exports}")
     reports = os.path.join(design, "reports")
 
     check_tools()
     check_flow()
-    check_variant(design, args.variant)
+    check_variant(exports, args.variant)
     check_library(reports, args.build)
 
     for line in ok:

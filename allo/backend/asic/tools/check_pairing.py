@@ -49,7 +49,7 @@ Run::
 
     python allo/backend/asic/tools/check_pairing.py \
         --reports examples/tinytpu/asic_synthesis/reports \
-        --exports examples/tinytpu/rtl_handoff \
+        --exports dev/records/tinytpu/rtl_handoff \
         --pairings examples/tinytpu/asic_synthesis/pairings.json
 
 Exit 0 if every declared pairing holds and every declared refusal still stands,

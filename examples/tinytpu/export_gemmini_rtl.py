@@ -61,7 +61,9 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
-DEST = os.path.join(HERE, "gemmini_rtl")
+#: Beside rtl_handoff/, under dev/records/ -- generated RTL is a record,
+#: not a design source (dev/repo_layout.md).
+DEST = os.path.join(ROOT, "dev", "records", "tinytpu", "gemmini_rtl")
 CHIPYARD = os.environ.get("CHIPYARD", os.path.expanduser("~/chipyard"))
 GENERATED = os.path.join(CHIPYARD, "sims", "verilator", "generated-src")
 TOP = "Gemmini"

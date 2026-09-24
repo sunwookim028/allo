@@ -368,7 +368,8 @@ comes from.
 **FreePDK45 / NanGate, ``view-standard``, 3.33 ns on ``ap_clk``, topographical,
 flatten effort 3, memories as flip-flops** (``sram_mode='none'``), Synopsys DC
 ``W-2024.09``, via mflowgen 0.8.0 at commit ``aee0e5d6``. 37 minutes of wall
-time, synthesising the current shipped design (``rtl_handoff/``,
+time, synthesising the current shipped design
+(``dev/records/tinytpu/rtl_handoff/``,
 ``T4_MAXDIM16_shipped_baseline``).
 
 ============================== ==========================================

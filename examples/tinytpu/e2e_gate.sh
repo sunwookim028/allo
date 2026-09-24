@@ -56,7 +56,7 @@ done
 
 DESIGN=$ROOT/examples/tinytpu
 REPORTS=$DESIGN/asic_synthesis/reports
-EXPORTS=$DESIGN/rtl_handoff
+EXPORTS=$ROOT/dev/records/tinytpu/rtl_handoff
 PAIRINGS=$DESIGN/asic_synthesis/pairings.json
 
 SIMULATOR=""
@@ -110,7 +110,9 @@ cat <<'EOF'
 
      What the remote tier is, on a machine that has one:
 
-       python allo/backend/asic/tools/preflight.py --design examples/tinytpu/asic_synthesis
+       python allo/backend/asic/tools/preflight.py \
+           --design examples/tinytpu/asic_synthesis \
+           --exports dev/records/tinytpu/rtl_handoff
        # ... then the sequence it prints, ~70 min per variant ...
        python allo/backend/asic/tools/extract_results.py --reports examples/tinytpu/asic_synthesis/reports
 
@@ -134,7 +136,7 @@ EOF
 if [ "$PREFLIGHT" = "1" ]; then
     step "     preflight: what this machine is missing"
     "$PY" "$ROOT/allo/backend/asic/tools/preflight.py" \
-        --design "$DESIGN/asic_synthesis" || true
+        --design "$DESIGN/asic_synthesis" --exports "$EXPORTS" || true
     echo "     (a non-zero preflight is expected without a licence and does"
     echo "      not fail this gate; it is information, not a verdict)"
 fi

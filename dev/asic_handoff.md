@@ -277,7 +277,9 @@ and so did the preflight.
 rather than deriving it from its own location. The reports themselves did not
 move: they are TinyTPU's results, and results stay with the design.
 
-    python allo/backend/asic/tools/preflight.py --design examples/tinytpu/asic_synthesis
+    python allo/backend/asic/tools/preflight.py \
+        --design examples/tinytpu/asic_synthesis \
+        --exports dev/records/tinytpu/rtl_handoff
     python allo/backend/asic/tools/extract_results.py --reports examples/tinytpu/asic_synthesis/reports
     python allo/backend/asic/tools/check_numbers.py   --reports examples/tinytpu/asic_synthesis/reports
 

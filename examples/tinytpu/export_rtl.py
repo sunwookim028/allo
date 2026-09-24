@@ -33,7 +33,9 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
-DEST = os.path.join(ROOT, "examples", "tinytpu", "rtl_handoff")
+#: Generated Verilog is a record, not a design source, so it is written
+#: under dev/records/ rather than beside the design (dev/repo_layout.md).
+DEST = os.path.join(ROOT, "dev", "records", "tinytpu", "rtl_handoff")
 TOP = "tinytpu_isa"
 
 # `module <name>` and `<Name> <inst> (` / `<Name> #(... ) <inst> (`.

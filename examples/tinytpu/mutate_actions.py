@@ -141,7 +141,7 @@ def sandbox(name, mutate):
     os.makedirs(os.path.dirname(here), exist_ok=True)
     shutil.copytree(HERE, here, ignore=shutil.ignore_patterns(
         ".mutants*", ".scratch", "__pycache__", "*.log", "logs", "gemmini",
-        "act", "asic_synthesis", "rtl_handoff", "impact"))
+        "act", "asic_synthesis", "impact"))
     shutil.copy(os.path.join(REPO, "examples", "__init__.py"),
                 os.path.join(root, "examples", "__init__.py"))
     os.makedirs(os.path.join(root, os.path.dirname(DOC)), exist_ok=True)

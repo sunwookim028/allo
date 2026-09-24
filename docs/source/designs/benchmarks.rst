@@ -2005,7 +2005,8 @@ Reproducing
    python latency_grid.py                    # shipped, 0/16/64/88/100
    python latency_grid.py --widen            # the burst candidate
 
-   # RTL for the ASIC synthesis handoff, into rtl_handoff/<config>/
+   # RTL for the ASIC synthesis handoff,
+   # into dev/records/tinytpu/rtl_handoff/<config>/
    python export_rtl.py
 
 **Every project is created inside this worktree via** ``TPU_PRJ`` **and deleted
@@ -2233,8 +2234,8 @@ every one bit-exact and identical.
    depth became 16 in ``63ee6ec7``, and the same sweep on ``main`` 92f0618f
    returns **286 / 425 / 490** at 8x8x8, 16x16x8 and 16x16x16 and **6916** at
    64x64x64 --- ``+1 / +1 / -3 / -167``. The re-export in
-   ``rtl_handoff/T8_MAXDIM64/`` carries that row and the invocation it was
-   measured with. The *claim* this paragraph makes survives intact: the
+   ``dev/records/tinytpu/rtl_handoff/T8_MAXDIM64/`` carries that row and the
+   invocation it was measured with. The *claim* this paragraph makes survives intact: the
    burst-``DMA_WORDS`` refactor left the T=8 column alone, which is why the
    whole of the shift above is attributable to ``QD``, and the sign pattern is
    the one ``63ee6ec7`` measured at T=4 --- small shapes pay deeper-FIFO

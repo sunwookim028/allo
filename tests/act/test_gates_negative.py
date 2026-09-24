@@ -44,7 +44,7 @@ SPECS = os.path.join(REPO, "examples", "tinytpu", "workloads", "specs")
 PAIRING_GATE = os.path.join(REPO, "allo", "backend", "asic", "tools",
                             "check_pairing.py")
 REPORTS = os.path.join(REPO, "examples", "tinytpu", "asic_synthesis", "reports")
-EXPORTS = os.path.join(REPO, "examples", "tinytpu", "rtl_handoff")
+EXPORTS = os.path.join(REPO, "dev", "records", "tinytpu", "rtl_handoff")
 PAIRINGS = os.path.join(REPO, "examples", "tinytpu", "asic_synthesis",
                         "pairings.json")
 
