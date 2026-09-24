@@ -88,6 +88,13 @@ read the archived `.cpp`, which is the honest thing for a record to do.
 against an emitter that writes `AlloMemPins<`. That one really is a design
 change, as this file already said.
 
+`generated/vstream_boundary.cpp` is the fossil of the same defect: it is Vitis
+HLS C++ (`ap_int.h`, `hls_stream.h`) in a directory whose table calls itself
+"emitted SystemC", written by `stream_boundary.py` while it was pointed at
+`vitis_hls` and named for the `vstream_boundary.prj` that commit invented.
+Nothing reads it. Kept, because records are not edited to look tidier than the
+runs that made them.
+
 ## The EVA reference, and what the A/B pair had to be (2026-09-24)
 
 `reports/zhang21_2026-09-24/` asked for `cosim_eva_systemc.py` at NSTEP=215
