@@ -61,10 +61,10 @@ module tinytpu_isa_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1 (
         m_axi_gmem1_BUSER,
         v358,
         sext_ln647,
-        rbA_address0,
-        rbA_ce0,
-        rbA_we0,
-        rbA_d0
+        a_onchip_address0,
+        a_onchip_ce0,
+        a_onchip_we0,
+        a_onchip_d0
 );
 
 parameter    ap_ST_fsm_pp0_stage0 = 1'd1;
@@ -123,15 +123,15 @@ input  [0:0] m_axi_gmem1_BID;
 input  [0:0] m_axi_gmem1_BUSER;
 input  [18:0] v358;
 input  [60:0] sext_ln647;
-output  [9:0] rbA_address0;
-output   rbA_ce0;
-output   rbA_we0;
-output  [63:0] rbA_d0;
+output  [9:0] a_onchip_address0;
+output   a_onchip_ce0;
+output   a_onchip_we0;
+output  [63:0] a_onchip_d0;
 
 reg ap_idle;
 reg m_axi_gmem1_RREADY;
-reg rbA_ce0;
-reg rbA_we0;
+reg a_onchip_ce0;
+reg a_onchip_we0;
 
 (* fsm_encoding = "none" *) reg   [0:0] ap_CS_fsm;
 wire    ap_CS_fsm_pp0_stage0;
@@ -251,6 +251,22 @@ always @ (posedge ap_clk) begin
 end
 
 always @ (*) begin
+    if (((1'b0 == ap_block_pp0_stage0_11001) & (ap_enable_reg_pp0_iter2 == 1'b1))) begin
+        a_onchip_ce0 = 1'b1;
+    end else begin
+        a_onchip_ce0 = 1'b0;
+    end
+end
+
+always @ (*) begin
+    if (((1'b0 == ap_block_pp0_stage0_11001) & (ap_enable_reg_pp0_iter2 == 1'b1))) begin
+        a_onchip_we0 = 1'b1;
+    end else begin
+        a_onchip_we0 = 1'b0;
+    end
+end
+
+always @ (*) begin
     if (((icmp_ln647_fu_98_p2 == 1'd1) & (1'b0 == ap_block_pp0_stage0_subdone) & (ap_enable_reg_pp0_iter0 == 1'b1) & (1'b1 == ap_CS_fsm_pp0_stage0))) begin
         ap_condition_exit_pp0_iter0_stage0 = 1'b1;
     end else begin
@@ -315,22 +331,6 @@ always @ (*) begin
 end
 
 always @ (*) begin
-    if (((1'b0 == ap_block_pp0_stage0_11001) & (ap_enable_reg_pp0_iter2 == 1'b1))) begin
-        rbA_ce0 = 1'b1;
-    end else begin
-        rbA_ce0 = 1'b0;
-    end
-end
-
-always @ (*) begin
-    if (((1'b0 == ap_block_pp0_stage0_11001) & (ap_enable_reg_pp0_iter2 == 1'b1))) begin
-        rbA_we0 = 1'b1;
-    end else begin
-        rbA_we0 = 1'b0;
-    end
-end
-
-always @ (*) begin
     case (ap_CS_fsm)
         ap_ST_fsm_pp0_stage0 : begin
             ap_NS_fsm = ap_ST_fsm_pp0_stage0;
@@ -340,6 +340,10 @@ always @ (*) begin
         end
     endcase
 end
+
+assign a_onchip_address0 = zext_ln647_fu_121_p1;
+
+assign a_onchip_d0 = v412_tmp_reg_146;
 
 assign add_ln647_fu_104_p2 = (ap_sig_allocacmp_v361 + 19'd1);
 
@@ -428,10 +432,6 @@ assign m_axi_gmem1_WSTRB = 8'd0;
 assign m_axi_gmem1_WUSER = 1'd0;
 
 assign m_axi_gmem1_WVALID = 1'b0;
-
-assign rbA_address0 = zext_ln647_fu_121_p1;
-
-assign rbA_d0 = v412_tmp_reg_146;
 
 assign zext_ln647_fu_121_p1 = v361_reg_137_pp0_iter1_reg;
 

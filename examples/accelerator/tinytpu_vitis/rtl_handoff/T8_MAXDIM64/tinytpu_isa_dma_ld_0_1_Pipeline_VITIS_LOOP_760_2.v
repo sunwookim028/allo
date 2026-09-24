@@ -61,10 +61,10 @@ module tinytpu_isa_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2 (
         m_axi_gmem2_BUSER,
         v417,
         sext_ln760,
-        rbB_address0,
-        rbB_ce0,
-        rbB_we0,
-        rbB_d0
+        b_onchip_address0,
+        b_onchip_ce0,
+        b_onchip_we0,
+        b_onchip_d0
 );
 
 parameter    ap_ST_fsm_pp0_stage0 = 1'd1;
@@ -123,15 +123,15 @@ input  [0:0] m_axi_gmem2_BID;
 input  [0:0] m_axi_gmem2_BUSER;
 input  [18:0] v417;
 input  [60:0] sext_ln760;
-output  [9:0] rbB_address0;
-output   rbB_ce0;
-output   rbB_we0;
-output  [63:0] rbB_d0;
+output  [9:0] b_onchip_address0;
+output   b_onchip_ce0;
+output   b_onchip_we0;
+output  [63:0] b_onchip_d0;
 
 reg ap_idle;
 reg m_axi_gmem2_RREADY;
-reg rbB_ce0;
-reg rbB_we0;
+reg b_onchip_ce0;
+reg b_onchip_we0;
 
 (* fsm_encoding = "none" *) reg   [0:0] ap_CS_fsm;
 wire    ap_CS_fsm_pp0_stage0;
@@ -299,6 +299,22 @@ always @ (*) begin
 end
 
 always @ (*) begin
+    if (((1'b0 == ap_block_pp0_stage0_11001) & (ap_enable_reg_pp0_iter2 == 1'b1))) begin
+        b_onchip_ce0 = 1'b1;
+    end else begin
+        b_onchip_ce0 = 1'b0;
+    end
+end
+
+always @ (*) begin
+    if (((1'b0 == ap_block_pp0_stage0_11001) & (ap_enable_reg_pp0_iter2 == 1'b1))) begin
+        b_onchip_we0 = 1'b1;
+    end else begin
+        b_onchip_we0 = 1'b0;
+    end
+end
+
+always @ (*) begin
     if (((1'b0 == ap_block_pp0_stage0) & (ap_enable_reg_pp0_iter1 == 1'b1) & (1'b1 == ap_CS_fsm_pp0_stage0))) begin
         gmem2_blk_n_R = m_axi_gmem2_RVALID;
     end else begin
@@ -311,22 +327,6 @@ always @ (*) begin
         m_axi_gmem2_RREADY = 1'b1;
     end else begin
         m_axi_gmem2_RREADY = 1'b0;
-    end
-end
-
-always @ (*) begin
-    if (((1'b0 == ap_block_pp0_stage0_11001) & (ap_enable_reg_pp0_iter2 == 1'b1))) begin
-        rbB_ce0 = 1'b1;
-    end else begin
-        rbB_ce0 = 1'b0;
-    end
-end
-
-always @ (*) begin
-    if (((1'b0 == ap_block_pp0_stage0_11001) & (ap_enable_reg_pp0_iter2 == 1'b1))) begin
-        rbB_we0 = 1'b1;
-    end else begin
-        rbB_we0 = 1'b0;
     end
 end
 
@@ -364,6 +364,10 @@ assign ap_enable_pp0 = (ap_idle_pp0 ^ 1'b1);
 assign ap_enable_reg_pp0_iter0 = ap_start_int;
 
 assign ap_loop_exit_ready = ap_condition_exit_pp0_iter0_stage0;
+
+assign b_onchip_address0 = zext_ln760_fu_121_p1;
+
+assign b_onchip_d0 = v471_tmp_reg_146;
 
 assign icmp_ln760_fu_98_p2 = ((ap_sig_allocacmp_v420 == v417) ? 1'b1 : 1'b0);
 
@@ -428,10 +432,6 @@ assign m_axi_gmem2_WSTRB = 8'd0;
 assign m_axi_gmem2_WUSER = 1'd0;
 
 assign m_axi_gmem2_WVALID = 1'b0;
-
-assign rbB_address0 = zext_ln760_fu_121_p1;
-
-assign rbB_d0 = v471_tmp_reg_146;
 
 assign zext_ln760_fu_121_p1 = v420_reg_137_pp0_iter1_reg;
 

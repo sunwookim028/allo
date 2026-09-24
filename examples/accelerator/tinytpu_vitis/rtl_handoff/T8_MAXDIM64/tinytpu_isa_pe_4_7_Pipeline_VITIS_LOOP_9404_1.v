@@ -50,18 +50,18 @@ input  [2:0] v6243_fifo_cap;
 input   v6243_empty_n;
 output   v6243_read;
 input  [7:0] v6106_dout;
-input  [3:0] v6106_num_data_valid;
-input  [3:0] v6106_fifo_cap;
+input  [4:0] v6106_num_data_valid;
+input  [4:0] v6106_fifo_cap;
 input   v6106_empty_n;
 output   v6106_read;
 input  [31:0] v6163_dout;
-input  [3:0] v6163_num_data_valid;
-input  [3:0] v6163_fifo_cap;
+input  [4:0] v6163_num_data_valid;
+input  [4:0] v6163_fifo_cap;
 input   v6163_empty_n;
 output   v6163_read;
 output  [31:0] v6171_din;
-input  [3:0] v6171_num_data_valid;
-input  [3:0] v6171_fifo_cap;
+input  [4:0] v6171_num_data_valid;
+input  [4:0] v6171_fifo_cap;
 input   v6171_full_n;
 output   v6171_write;
 input  [15:0] empty;
@@ -105,7 +105,7 @@ wire   [31:0] v4231_fu_143_p2;
 wire    ap_loop_init;
 reg   [15:0] v4227_fu_60;
 wire   [15:0] v4227_2_fu_131_p2;
-reg  signed [7:0] w40_fu_64;
+reg  signed [7:0] weight40_fu_64;
 wire   [7:0] v4237_fu_170_p1;
 reg   [31:0] v4233_fu_68;
 wire   [31:0] zext_ln9426_fu_184_p1;
@@ -139,7 +139,7 @@ initial begin
 #0 ap_enable_reg_pp0_iter6 = 1'b0;
 #0 v4228_fu_56 = 32'd0;
 #0 v4227_fu_60 = 16'd0;
-#0 w40_fu_64 = 8'd0;
+#0 weight40_fu_64 = 8'd0;
 #0 v4233_fu_68 = 32'd0;
 #0 ap_done_reg = 1'b0;
 end
@@ -155,7 +155,7 @@ mac_muladd_8s_8s_32s_32_4_1_U995(
     .clk(ap_clk),
     .reset(ap_rst),
     .din0(v6106_dout),
-    .din1(w40_fu_64),
+    .din1(weight40_fu_64),
     .din2(v4242_reg_259_pp0_iter4_reg),
     .ce(grp_fu_209_ce),
     .dout(grp_fu_209_p3)
@@ -306,9 +306,9 @@ end
 always @ (posedge ap_clk) begin
     if ((1'b0 == ap_block_pp0_stage0_11001)) begin
         if (((1'b1 == ap_CS_fsm_pp0_stage0) & (ap_loop_init == 1'b1))) begin
-            w40_fu_64 <= 8'd0;
+            weight40_fu_64 <= 8'd0;
         end else if (((v4234_reg_255 == 1'd0) & (ap_enable_reg_pp0_iter2 == 1'b1))) begin
-            w40_fu_64 <= v4237_fu_170_p1;
+            weight40_fu_64 <= v4237_fu_170_p1;
         end
     end
 end

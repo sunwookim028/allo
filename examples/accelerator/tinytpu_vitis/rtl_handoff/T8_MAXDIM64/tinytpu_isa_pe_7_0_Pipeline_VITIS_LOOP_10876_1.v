@@ -55,23 +55,23 @@ input  [2:0] v6260_fifo_cap;
 input   v6260_empty_n;
 output   v6260_read;
 input  [63:0] v6067_dout;
-input  [3:0] v6067_num_data_valid;
-input  [3:0] v6067_fifo_cap;
+input  [4:0] v6067_num_data_valid;
+input  [4:0] v6067_fifo_cap;
 input   v6067_empty_n;
 output   v6067_read;
 input  [31:0] v6180_dout;
-input  [3:0] v6180_num_data_valid;
-input  [3:0] v6180_fifo_cap;
+input  [4:0] v6180_num_data_valid;
+input  [4:0] v6180_fifo_cap;
 input   v6180_empty_n;
 output   v6180_read;
 output  [255:0] v6196_din;
-input  [3:0] v6196_num_data_valid;
-input  [3:0] v6196_fifo_cap;
+input  [4:0] v6196_num_data_valid;
+input  [4:0] v6196_fifo_cap;
 input   v6196_full_n;
 output   v6196_write;
 output  [7:0] v6124_din;
-input  [3:0] v6124_num_data_valid;
-input  [3:0] v6124_fifo_cap;
+input  [4:0] v6124_num_data_valid;
+input  [4:0] v6124_fifo_cap;
 input   v6124_full_n;
 output   v6124_write;
 input  [15:0] empty;
@@ -121,7 +121,7 @@ wire   [31:0] v4965_fu_160_p2;
 wire    ap_loop_init;
 reg   [15:0] v4961_fu_70;
 wire   [15:0] v4961_2_fu_148_p2;
-reg  signed [7:0] w57_fu_74;
+reg  signed [7:0] weight57_fu_74;
 wire   [7:0] v4971_fu_187_p1;
 reg   [31:0] v4967_fu_78;
 wire   [31:0] zext_ln10898_fu_201_p1;
@@ -156,7 +156,7 @@ initial begin
 #0 ap_enable_reg_pp0_iter6 = 1'b0;
 #0 v4962_fu_66 = 32'd0;
 #0 v4961_fu_70 = 16'd0;
-#0 w57_fu_74 = 8'd0;
+#0 weight57_fu_74 = 8'd0;
 #0 v4967_fu_78 = 32'd0;
 #0 ap_done_reg = 1'b0;
 end
@@ -172,7 +172,7 @@ mac_muladd_8s_8s_32s_32_4_1_U1197(
     .clk(ap_clk),
     .reset(ap_rst),
     .din0(v4977_fu_218_p4),
-    .din1(w57_fu_74),
+    .din1(weight57_fu_74),
     .din2(v4978_reg_295_pp0_iter4_reg),
     .ce(grp_fu_240_ce),
     .dout(grp_fu_240_p3)
@@ -323,9 +323,9 @@ end
 always @ (posedge ap_clk) begin
     if ((1'b0 == ap_block_pp0_stage0_11001)) begin
         if (((1'b1 == ap_CS_fsm_pp0_stage0) & (ap_loop_init == 1'b1))) begin
-            w57_fu_74 <= 8'd0;
+            weight57_fu_74 <= 8'd0;
         end else if (((v4968_reg_286 == 1'd0) & (ap_enable_reg_pp0_iter2 == 1'b1))) begin
-            w57_fu_74 <= v4971_fu_187_p1;
+            weight57_fu_74 <= v4971_fu_187_p1;
         end
     end
 end

@@ -331,9 +331,22 @@ def regenerate_manifests(dest):
     subtly different at worst. This regenerates both lists from the `.v` files
     already in `dest`, by the same code path the export uses, so the two lists
     are consistent with each other and with Gemmini's pair.
+
+    **`_stub.v` files are OUR OWN OUTPUT and must not be read back as input.**
+    This function runs on a directory it has already written into, and a stub
+    is named after the module it replaces -- so it matches `MEM_ARRAY` just as
+    the real file does. Reading them back made the run non-idempotent in two
+    ways: the full list grew to 435 entries and defined the scratchpad and the
+    accumulator TWICE, once from the stub and once from the real module, with
+    the stub first (a duplicate-module elaboration error, and silently the
+    wrong design if a tool takes the first definition); and each stub was
+    re-stubbed from itself, gaining one blank line per run. Excluding them
+    makes regenerating an unchanged directory a byte-identical no-op, which is
+    the only way this is checkable.
     """
     files = {n: open(os.path.join(dest, n), errors="replace").read()
-             for n in sorted(os.listdir(dest)) if n.endswith((".v", ".sv"))}
+             for n in sorted(os.listdir(dest))
+             if n.endswith((".v", ".sv")) and not n.endswith("_stub.v")}
     if not files:
         raise ExportError(f"{dest} holds no .v files")
     if not any(re.search(r"^\s*module\s+%s\s*[(#;]" % re.escape(TOP), t, re.M)
@@ -436,7 +449,24 @@ def write_design(src_verilog, dest, meta=None, resources=None):
     return meta
 
 
-def readme(dest, title, params, commit, cycles, resources, notes):
+def readme(dest, title, params, commit, cycles, resources, notes,
+           invocation=None):
+    """`invocation` is the shell line these cycles were measured with, and it
+    is REQUIRED.
+
+    A cycle row carried over from a previous export, or measured at whichever
+    defaults the shell happened to hold, is this project's most-repeated
+    mistake: `TPU_MAXDIM` defaults to 64 and not 16, and `TPU_QD` defaulted to
+    8 until `63ee6ec7` and to 16 after it, so "I ran cosim" does not name a
+    configuration. Printing the command beside the numbers makes the two
+    checkable against each other by anyone reading the file, and refusing
+    without it means no future export can quietly omit it.
+    """
+    if not invocation:
+        raise ExportError(
+            "readme() needs the exact invocation the cycles were measured "
+            "with. Numbers without the command that produced them are how "
+            "this directory came to quote a pre-QD=16 row.")
     lines = [f"# {title}", "",
              "Vitis HLS 2023.2 generated Verilog for the ASIC synthesis-only",
              "handoff (DC, freepdk-45nm, memories as flip-flops, no P&R).",
@@ -448,7 +478,13 @@ def readme(dest, title, params, commit, cycles, resources, notes):
     lines += ["", f"Emitted from allo commit `{commit}`.", "",
               "## Measured on this configuration", "",
               "Cycles are Vitis `cosim` (xsim), `ap_start` to `ap_done`,",
-              "`-m_axi_latency 0` unless stated, bit-exact against numpy.", ""]
+              "`-m_axi_latency 0` unless stated, bit-exact against numpy.",
+              "",
+              "**Measured on THIS export**, with every variable that matters",
+              "set explicitly -- `TPU_MAXDIM` defaults to 64, not 16, and",
+              "`TPU_QD` defaults to 16 since `63ee6ec7`, so the defaults are",
+              "not a configuration anyone can reconstruct from prose:", "",
+              "```bash"] + invocation.strip().splitlines() + ["```", ""]
     for k, v in cycles.items():
         lines.append(f"- {k}: **{v}** cycles")
     lines += ["", "Vitis `csynth` on `xcu280-fsvh2892-2L-e`, 3.33 ns target:", ""]

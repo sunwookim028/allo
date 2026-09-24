@@ -13,10 +13,10 @@ module tinytpu_isa_sequencer_0_1_Pipeline_VITIS_LOOP_82_3 (
         ap_done,
         ap_idle,
         ap_ready,
-        lp_trip_address0,
-        lp_trip_ce0,
-        lp_trip_we0,
-        lp_trip_d0
+        loop_trip_address0,
+        loop_trip_ce0,
+        loop_trip_we0,
+        loop_trip_d0
 );
 
 parameter    ap_ST_fsm_state1 = 1'd1;
@@ -27,14 +27,14 @@ input   ap_start;
 output   ap_done;
 output   ap_idle;
 output   ap_ready;
-output  [1:0] lp_trip_address0;
-output   lp_trip_ce0;
-output   lp_trip_we0;
-output  [7:0] lp_trip_d0;
+output  [1:0] loop_trip_address0;
+output   loop_trip_ce0;
+output   loop_trip_we0;
+output  [7:0] loop_trip_d0;
 
 reg ap_idle;
-reg lp_trip_ce0;
-reg lp_trip_we0;
+reg loop_trip_ce0;
+reg loop_trip_we0;
 
 (* fsm_encoding = "none" *) reg   [0:0] ap_CS_fsm;
 wire    ap_CS_fsm_state1;
@@ -158,17 +158,17 @@ end
 
 always @ (*) begin
     if (((1'b0 == ap_block_state1_pp0_stage0_iter0) & (1'b1 == ap_CS_fsm_state1))) begin
-        lp_trip_ce0 = 1'b1;
+        loop_trip_ce0 = 1'b1;
     end else begin
-        lp_trip_ce0 = 1'b0;
+        loop_trip_ce0 = 1'b0;
     end
 end
 
 always @ (*) begin
     if (((icmp_ln82_fu_56_p2 == 1'd0) & (1'b0 == ap_block_state1_pp0_stage0_iter0) & (1'b1 == ap_CS_fsm_state1))) begin
-        lp_trip_we0 = 1'b1;
+        loop_trip_we0 = 1'b1;
     end else begin
-        lp_trip_we0 = 1'b0;
+        loop_trip_we0 = 1'b0;
     end
 end
 
@@ -195,9 +195,9 @@ assign ap_loop_exit_ready = ap_condition_exit_pp0_iter0_stage0;
 
 assign icmp_ln82_fu_56_p2 = ((ap_sig_allocacmp_v27_1 == 3'd4) ? 1'b1 : 1'b0);
 
-assign lp_trip_address0 = zext_ln82_fu_68_p1;
+assign loop_trip_address0 = zext_ln82_fu_68_p1;
 
-assign lp_trip_d0 = 8'd0;
+assign loop_trip_d0 = 8'd0;
 
 assign zext_ln82_fu_68_p1 = ap_sig_allocacmp_v27_1;
 

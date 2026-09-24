@@ -8,12 +8,12 @@
 `timescale 1ns/1ps
 //RAW latency 2 
 
-module tinytpu_isa_fifo_w256_d8_A
+module tinytpu_isa_fifo_w256_d16_A
 #(parameter
     MEM_STYLE    = "auto",
     DATA_WIDTH   = 256,
-    ADDR_WIDTH   = 3,
-    DEPTH        = 7)
+    ADDR_WIDTH   = 4,
+    DEPTH        = 15)
 (
     // system signal
     input  wire                  clk,
@@ -55,12 +55,12 @@ module tinytpu_isa_fifo_w256_d8_A
     reg                   dout_vld = 1'b0;
 
 //------------------------Instantiation------------------
-    tinytpu_isa_fifo_w256_d8_A_ram 
+    tinytpu_isa_fifo_w256_d16_A_ram 
     #(  .MEM_STYLE  (MEM_STYLE),
         .DATA_WIDTH (DATA_WIDTH),
         .ADDR_WIDTH (ADDR_WIDTH),
         .DEPTH      (DEPTH)
-    ) U_tinytpu_isa_fifo_w256_d8_A_ram (
+    ) U_tinytpu_isa_fifo_w256_d16_A_ram (
         .clk        (clk),
         .reset      (reset),
         .we         (push),
@@ -185,12 +185,12 @@ module tinytpu_isa_fifo_w256_d8_A
 endmodule
 
 
-module tinytpu_isa_fifo_w256_d8_A_ram
+module tinytpu_isa_fifo_w256_d16_A_ram
 #(parameter
     MEM_STYLE   = "auto",
     DATA_WIDTH  = 256,
-    ADDR_WIDTH  = 3,
-    DEPTH       = 7)
+    ADDR_WIDTH  = 4,
+    DEPTH       = 15)
 (
     input  wire                  clk,
     input  wire                  reset,

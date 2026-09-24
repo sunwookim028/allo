@@ -78,6 +78,17 @@ Re-verified bit-exact on the design as exported: T=4 at MAXDIM=16 is
 **171 / 261 / 417 / 483 / 685**; T=8 at MAXDIM=64 is **285 / 424 / 493** at
 8x8x8, 16x16x8 and 16x16x16, and **7083** at 64x64x64.
 
+**`T8_MAXDIM64/` no longer holds that RTL.** It was re-exported at `QD=16`
+against `main` 92f0618f, and the directory now carries **286 / 425 / 490** at
+those three shapes and **6916** at 64x64x64 (`+1 / +1 / -3 / -167`), with FF
+43911 -> 44303 and LUT 70281 -> 70471. The `T8_MAXDIM64` area row above was
+measured on the superseded `QD=8` export, which survives only in git history
+(the stubbing commit `e3cc595b`); **it is not the area of the RTL now in that
+directory**, and the T 4 -> 8 ratio in the next table pairs it with `QD=8`
+T=4 exports, so it stays valid as a `QD=8`-to-`QD=8` comparison and must not
+be re-quoted against a fresh T=8 run. The other three directories are
+untouched `QD=8` exports.
+
 ### The burst-widened variant needed a dual-write-port memory
 
 The first export of `T4_MAXDIM64_burstwiden` **could not be synthesised**. DC

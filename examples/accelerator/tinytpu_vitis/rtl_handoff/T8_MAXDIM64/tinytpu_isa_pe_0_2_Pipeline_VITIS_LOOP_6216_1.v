@@ -50,18 +50,18 @@ input  [2:0] v6206_fifo_cap;
 input   v6206_empty_n;
 output   v6206_read;
 input  [7:0] v6069_dout;
-input  [3:0] v6069_num_data_valid;
-input  [3:0] v6069_fifo_cap;
+input  [4:0] v6069_num_data_valid;
+input  [4:0] v6069_fifo_cap;
 input   v6069_empty_n;
 output   v6069_read;
 output  [31:0] v6134_din;
-input  [3:0] v6134_num_data_valid;
-input  [3:0] v6134_fifo_cap;
+input  [4:0] v6134_num_data_valid;
+input  [4:0] v6134_fifo_cap;
 input   v6134_full_n;
 output   v6134_write;
 output  [7:0] v6070_din;
-input  [3:0] v6070_num_data_valid;
-input  [3:0] v6070_fifo_cap;
+input  [4:0] v6070_num_data_valid;
+input  [4:0] v6070_fifo_cap;
 input   v6070_full_n;
 output   v6070_write;
 input  [15:0] empty;
@@ -104,7 +104,7 @@ wire   [31:0] v2644_fu_146_p2;
 wire    ap_loop_init;
 reg   [15:0] v2640_fu_62;
 wire   [15:0] v2640_2_fu_134_p2;
-reg  signed [7:0] w3_fu_66;
+reg  signed [7:0] weight2_fu_66;
 wire   [7:0] v2650_fu_173_p1;
 reg   [31:0] v2646_fu_70;
 wire   [31:0] zext_ln6238_fu_187_p1;
@@ -132,7 +132,7 @@ initial begin
 #0 ap_enable_reg_pp0_iter4 = 1'b0;
 #0 v2641_fu_58 = 32'd0;
 #0 v2640_fu_62 = 16'd0;
-#0 w3_fu_66 = 8'd0;
+#0 weight2_fu_66 = 8'd0;
 #0 v2646_fu_70 = 32'd0;
 #0 ap_done_reg = 1'b0;
 end
@@ -145,7 +145,7 @@ tinytpu_isa_mul_8s_8s_16_1_1 #(
     .dout_WIDTH( 16 ))
 mul_8s_8s_16_1_1_U562(
     .din0(v2654_reg_263),
-    .din1(w3_fu_66),
+    .din1(weight2_fu_66),
     .dout(v2664_fu_211_p2)
 );
 
@@ -274,9 +274,9 @@ end
 always @ (posedge ap_clk) begin
     if ((1'b0 == ap_block_pp0_stage0_11001)) begin
         if (((1'b1 == ap_CS_fsm_pp0_stage0) & (ap_loop_init == 1'b1))) begin
-            w3_fu_66 <= 8'd0;
+            weight2_fu_66 <= 8'd0;
         end else if (((v2647_reg_259 == 1'd0) & (ap_enable_reg_pp0_iter2 == 1'b1))) begin
-            w3_fu_66 <= v2650_fu_173_p1;
+            weight2_fu_66 <= v2650_fu_173_p1;
         end
     end
 end

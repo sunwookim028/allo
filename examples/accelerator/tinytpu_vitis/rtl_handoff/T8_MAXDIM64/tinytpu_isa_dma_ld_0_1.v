@@ -242,18 +242,18 @@ input  [0:0] m_axi_gmem2_BID;
 input  [0:0] m_axi_gmem2_BUSER;
 input  [63:0] v340;
 input  [63:0] v5979_dout;
-input  [3:0] v5979_num_data_valid;
-input  [3:0] v5979_fifo_cap;
+input  [4:0] v5979_num_data_valid;
+input  [4:0] v5979_fifo_cap;
 input   v5979_empty_n;
 output   v5979_read;
 output  [63:0] v5985_din;
-input  [3:0] v5985_num_data_valid;
-input  [3:0] v5985_fifo_cap;
+input  [4:0] v5985_num_data_valid;
+input  [4:0] v5985_fifo_cap;
 input   v5985_full_n;
 output   v5985_write;
 output  [63:0] v5984_din;
-input  [3:0] v5984_num_data_valid;
-input  [3:0] v5984_fifo_cap;
+input  [4:0] v5984_num_data_valid;
+input  [4:0] v5984_fifo_cap;
 input   v5984_full_n;
 output   v5984_write;
 
@@ -315,14 +315,14 @@ reg   [18:0] v417_reg_254;
 wire   [31:0] zext_ln755_fu_193_p1;
 wire  signed [60:0] trunc_ln6_fu_198_p4;
 reg   [60:0] trunc_ln6_reg_264;
-reg   [9:0] rbA_address0;
-reg    rbA_ce0;
-reg    rbA_we0;
-wire   [63:0] rbA_q0;
-reg   [9:0] rbB_address0;
-reg    rbB_ce0;
-reg    rbB_we0;
-wire   [63:0] rbB_q0;
+reg   [9:0] a_onchip_address0;
+reg    a_onchip_ce0;
+reg    a_onchip_we0;
+wire   [63:0] a_onchip_q0;
+reg   [9:0] b_onchip_address0;
+reg    b_onchip_ce0;
+reg    b_onchip_we0;
+wire   [63:0] b_onchip_q0;
 wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_ap_start;
 wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_ap_done;
 wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_ap_idle;
@@ -359,10 +359,10 @@ wire   [3:0] grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_m_axi_gmem1_ARREGIO
 wire   [0:0] grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_m_axi_gmem1_ARUSER;
 wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_m_axi_gmem1_RREADY;
 wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_m_axi_gmem1_BREADY;
-wire   [9:0] grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_rbA_address0;
-wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_rbA_ce0;
-wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_rbA_we0;
-wire   [63:0] grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_rbA_d0;
+wire   [9:0] grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_a_onchip_address0;
+wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_a_onchip_ce0;
+wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_a_onchip_we0;
+wire   [63:0] grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_a_onchip_d0;
 wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_ap_start;
 wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_ap_done;
 wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_ap_idle;
@@ -399,10 +399,10 @@ wire   [3:0] grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_m_axi_gmem2_ARREGIO
 wire   [0:0] grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_m_axi_gmem2_ARUSER;
 wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_m_axi_gmem2_RREADY;
 wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_m_axi_gmem2_BREADY;
-wire   [9:0] grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_rbB_address0;
-wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_rbB_ce0;
-wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_rbB_we0;
-wire   [63:0] grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_rbB_d0;
+wire   [9:0] grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_b_onchip_address0;
+wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_b_onchip_ce0;
+wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_b_onchip_we0;
+wire   [63:0] grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_b_onchip_d0;
 wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_ap_start;
 wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_ap_done;
 wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_ap_idle;
@@ -412,10 +412,10 @@ wire   [63:0] grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_v5984_din;
 wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_v5984_write;
 wire   [63:0] grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_v5985_din;
 wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_v5985_write;
-wire   [9:0] grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_rbB_address0;
-wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_rbB_ce0;
-wire   [9:0] grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_rbA_address0;
-wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_rbA_ce0;
+wire   [9:0] grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_b_onchip_address0;
+wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_b_onchip_ce0;
+wire   [9:0] grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_a_onchip_address0;
+wire    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_a_onchip_ce0;
 reg    grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_ap_start_reg;
 wire    ap_CS_fsm_state11;
 wire    ap_CS_fsm_state12;
@@ -452,32 +452,32 @@ initial begin
 #0 grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_ap_start_reg = 1'b0;
 end
 
-tinytpu_isa_dma_ld_0_1_rbA_RAM_AUTO_1R1W #(
+tinytpu_isa_dma_ld_0_1_a_onchip_RAM_AUTO_1R1W #(
     .DataWidth( 64 ),
     .AddressRange( 513 ),
     .AddressWidth( 10 ))
-rbA_U(
+a_onchip_U(
     .clk(ap_clk),
     .reset(ap_rst),
-    .address0(rbA_address0),
-    .ce0(rbA_ce0),
-    .we0(rbA_we0),
-    .d0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_rbA_d0),
-    .q0(rbA_q0)
+    .address0(a_onchip_address0),
+    .ce0(a_onchip_ce0),
+    .we0(a_onchip_we0),
+    .d0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_a_onchip_d0),
+    .q0(a_onchip_q0)
 );
 
-tinytpu_isa_dma_ld_0_1_rbA_RAM_AUTO_1R1W #(
+tinytpu_isa_dma_ld_0_1_a_onchip_RAM_AUTO_1R1W #(
     .DataWidth( 64 ),
     .AddressRange( 513 ),
     .AddressWidth( 10 ))
-rbB_U(
+b_onchip_U(
     .clk(ap_clk),
     .reset(ap_rst),
-    .address0(rbB_address0),
-    .ce0(rbB_ce0),
-    .we0(rbB_we0),
-    .d0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_rbB_d0),
-    .q0(rbB_q0)
+    .address0(b_onchip_address0),
+    .ce0(b_onchip_ce0),
+    .we0(b_onchip_we0),
+    .d0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_b_onchip_d0),
+    .q0(b_onchip_q0)
 );
 
 tinytpu_isa_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1 grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104(
@@ -535,10 +535,10 @@ tinytpu_isa_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1 grp_dma_ld_0_1_Pipeline_VITIS_L
     .m_axi_gmem1_BUSER(1'd0),
     .v358(v358_reg_234),
     .sext_ln647(trunc_ln_reg_244),
-    .rbA_address0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_rbA_address0),
-    .rbA_ce0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_rbA_ce0),
-    .rbA_we0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_rbA_we0),
-    .rbA_d0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_rbA_d0)
+    .a_onchip_address0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_a_onchip_address0),
+    .a_onchip_ce0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_a_onchip_ce0),
+    .a_onchip_we0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_a_onchip_we0),
+    .a_onchip_d0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_a_onchip_d0)
 );
 
 tinytpu_isa_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2 grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113(
@@ -596,10 +596,10 @@ tinytpu_isa_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2 grp_dma_ld_0_1_Pipeline_VITIS_L
     .m_axi_gmem2_BUSER(1'd0),
     .v417(v417_reg_254),
     .sext_ln760(trunc_ln6_reg_264),
-    .rbB_address0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_rbB_address0),
-    .rbB_ce0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_rbB_ce0),
-    .rbB_we0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_rbB_we0),
-    .rbB_d0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_rbB_d0)
+    .b_onchip_address0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_b_onchip_address0),
+    .b_onchip_ce0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_b_onchip_ce0),
+    .b_onchip_we0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_b_onchip_we0),
+    .b_onchip_d0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_b_onchip_d0)
 );
 
 tinytpu_isa_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3 grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122(
@@ -610,27 +610,27 @@ tinytpu_isa_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3 grp_dma_ld_0_1_Pipeline_VITIS_L
     .ap_idle(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_ap_idle),
     .ap_ready(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_ap_ready),
     .v5979_dout(v5979_dout),
-    .v5979_num_data_valid(4'd0),
-    .v5979_fifo_cap(4'd0),
+    .v5979_num_data_valid(5'd0),
+    .v5979_fifo_cap(5'd0),
     .v5979_empty_n(v5979_empty_n),
     .v5979_read(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_v5979_read),
     .v5984_din(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_v5984_din),
-    .v5984_num_data_valid(4'd0),
-    .v5984_fifo_cap(4'd0),
+    .v5984_num_data_valid(5'd0),
+    .v5984_fifo_cap(5'd0),
     .v5984_full_n(v5984_full_n),
     .v5984_write(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_v5984_write),
     .v5985_din(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_v5985_din),
-    .v5985_num_data_valid(4'd0),
-    .v5985_fifo_cap(4'd0),
+    .v5985_num_data_valid(5'd0),
+    .v5985_fifo_cap(5'd0),
     .v5985_full_n(v5985_full_n),
     .v5985_write(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_v5985_write),
     .empty(v346_reg_219),
-    .rbB_address0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_rbB_address0),
-    .rbB_ce0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_rbB_ce0),
-    .rbB_q0(rbB_q0),
-    .rbA_address0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_rbA_address0),
-    .rbA_ce0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_rbA_ce0),
-    .rbA_q0(rbA_q0)
+    .b_onchip_address0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_b_onchip_address0),
+    .b_onchip_ce0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_b_onchip_ce0),
+    .b_onchip_q0(b_onchip_q0),
+    .a_onchip_address0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_a_onchip_address0),
+    .a_onchip_ce0(grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_a_onchip_ce0),
+    .a_onchip_q0(a_onchip_q0)
 );
 
 always @ (posedge ap_clk) begin
@@ -708,6 +708,34 @@ end
 always @ (posedge ap_clk) begin
     if (((1'b1 == ap_CS_fsm_state1) & (1'b0 == ap_block_state1))) begin
         v346_reg_219 <= v346_fu_135_p1;
+    end
+end
+
+always @ (*) begin
+    if ((1'b1 == ap_CS_fsm_state14)) begin
+        a_onchip_address0 = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_a_onchip_address0;
+    end else if ((1'b1 == ap_CS_fsm_state12)) begin
+        a_onchip_address0 = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_a_onchip_address0;
+    end else begin
+        a_onchip_address0 = 'bx;
+    end
+end
+
+always @ (*) begin
+    if ((1'b1 == ap_CS_fsm_state14)) begin
+        a_onchip_ce0 = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_a_onchip_ce0;
+    end else if ((1'b1 == ap_CS_fsm_state12)) begin
+        a_onchip_ce0 = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_a_onchip_ce0;
+    end else begin
+        a_onchip_ce0 = 1'b0;
+    end
+end
+
+always @ (*) begin
+    if ((1'b1 == ap_CS_fsm_state12)) begin
+        a_onchip_we0 = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_a_onchip_we0;
+    end else begin
+        a_onchip_we0 = 1'b0;
     end
 end
 
@@ -790,6 +818,34 @@ always @ (*) begin
         ap_ready = 1'b1;
     end else begin
         ap_ready = 1'b0;
+    end
+end
+
+always @ (*) begin
+    if ((1'b1 == ap_CS_fsm_state14)) begin
+        b_onchip_address0 = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_b_onchip_address0;
+    end else if ((1'b1 == ap_CS_fsm_state12)) begin
+        b_onchip_address0 = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_b_onchip_address0;
+    end else begin
+        b_onchip_address0 = 'bx;
+    end
+end
+
+always @ (*) begin
+    if ((1'b1 == ap_CS_fsm_state14)) begin
+        b_onchip_ce0 = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_b_onchip_ce0;
+    end else if ((1'b1 == ap_CS_fsm_state12)) begin
+        b_onchip_ce0 = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_b_onchip_ce0;
+    end else begin
+        b_onchip_ce0 = 1'b0;
+    end
+end
+
+always @ (*) begin
+    if ((1'b1 == ap_CS_fsm_state12)) begin
+        b_onchip_we0 = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_b_onchip_we0;
+    end else begin
+        b_onchip_we0 = 1'b0;
     end
 end
 
@@ -1026,62 +1082,6 @@ always @ (*) begin
         m_axi_gmem2_RREADY = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_m_axi_gmem2_RREADY;
     end else begin
         m_axi_gmem2_RREADY = 1'b0;
-    end
-end
-
-always @ (*) begin
-    if ((1'b1 == ap_CS_fsm_state14)) begin
-        rbA_address0 = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_rbA_address0;
-    end else if ((1'b1 == ap_CS_fsm_state12)) begin
-        rbA_address0 = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_rbA_address0;
-    end else begin
-        rbA_address0 = 'bx;
-    end
-end
-
-always @ (*) begin
-    if ((1'b1 == ap_CS_fsm_state14)) begin
-        rbA_ce0 = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_rbA_ce0;
-    end else if ((1'b1 == ap_CS_fsm_state12)) begin
-        rbA_ce0 = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_rbA_ce0;
-    end else begin
-        rbA_ce0 = 1'b0;
-    end
-end
-
-always @ (*) begin
-    if ((1'b1 == ap_CS_fsm_state12)) begin
-        rbA_we0 = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_647_1_fu_104_rbA_we0;
-    end else begin
-        rbA_we0 = 1'b0;
-    end
-end
-
-always @ (*) begin
-    if ((1'b1 == ap_CS_fsm_state14)) begin
-        rbB_address0 = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_rbB_address0;
-    end else if ((1'b1 == ap_CS_fsm_state12)) begin
-        rbB_address0 = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_rbB_address0;
-    end else begin
-        rbB_address0 = 'bx;
-    end
-end
-
-always @ (*) begin
-    if ((1'b1 == ap_CS_fsm_state14)) begin
-        rbB_ce0 = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_877_3_fu_122_rbB_ce0;
-    end else if ((1'b1 == ap_CS_fsm_state12)) begin
-        rbB_ce0 = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_rbB_ce0;
-    end else begin
-        rbB_ce0 = 1'b0;
-    end
-end
-
-always @ (*) begin
-    if ((1'b1 == ap_CS_fsm_state12)) begin
-        rbB_we0 = grp_dma_ld_0_1_Pipeline_VITIS_LOOP_760_2_fu_113_rbB_we0;
-    end else begin
-        rbB_we0 = 1'b0;
     end
 end
 

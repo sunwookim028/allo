@@ -64,23 +64,23 @@ input  [2:0] v6242_fifo_cap;
 input   v6242_empty_n;
 output   v6242_read;
 input  [7:0] v6105_dout;
-input  [3:0] v6105_num_data_valid;
-input  [3:0] v6105_fifo_cap;
+input  [4:0] v6105_num_data_valid;
+input  [4:0] v6105_fifo_cap;
 input   v6105_empty_n;
 output   v6105_read;
 input  [31:0] v6162_dout;
-input  [3:0] v6162_num_data_valid;
-input  [3:0] v6162_fifo_cap;
+input  [4:0] v6162_num_data_valid;
+input  [4:0] v6162_fifo_cap;
 input   v6162_empty_n;
 output   v6162_read;
 output  [31:0] v6170_din;
-input  [3:0] v6170_num_data_valid;
-input  [3:0] v6170_fifo_cap;
+input  [4:0] v6170_num_data_valid;
+input  [4:0] v6170_fifo_cap;
 input   v6170_full_n;
 output   v6170_write;
 output  [7:0] v6106_din;
-input  [3:0] v6106_num_data_valid;
-input  [3:0] v6106_fifo_cap;
+input  [4:0] v6106_num_data_valid;
+input  [4:0] v6106_fifo_cap;
 input   v6106_full_n;
 output   v6106_write;
 
@@ -144,23 +144,23 @@ tinytpu_isa_pe_4_6_Pipeline_VITIS_LOOP_9319_1 grp_pe_4_6_Pipeline_VITIS_LOOP_931
     .v6242_empty_n(v6242_empty_n),
     .v6242_read(grp_pe_4_6_Pipeline_VITIS_LOOP_9319_1_fu_32_v6242_read),
     .v6105_dout(v6105_dout),
-    .v6105_num_data_valid(4'd0),
-    .v6105_fifo_cap(4'd0),
+    .v6105_num_data_valid(5'd0),
+    .v6105_fifo_cap(5'd0),
     .v6105_empty_n(v6105_empty_n),
     .v6105_read(grp_pe_4_6_Pipeline_VITIS_LOOP_9319_1_fu_32_v6105_read),
     .v6162_dout(v6162_dout),
-    .v6162_num_data_valid(4'd0),
-    .v6162_fifo_cap(4'd0),
+    .v6162_num_data_valid(5'd0),
+    .v6162_fifo_cap(5'd0),
     .v6162_empty_n(v6162_empty_n),
     .v6162_read(grp_pe_4_6_Pipeline_VITIS_LOOP_9319_1_fu_32_v6162_read),
     .v6170_din(grp_pe_4_6_Pipeline_VITIS_LOOP_9319_1_fu_32_v6170_din),
-    .v6170_num_data_valid(4'd0),
-    .v6170_fifo_cap(4'd0),
+    .v6170_num_data_valid(5'd0),
+    .v6170_fifo_cap(5'd0),
     .v6170_full_n(v6170_full_n),
     .v6170_write(grp_pe_4_6_Pipeline_VITIS_LOOP_9319_1_fu_32_v6170_write),
     .v6106_din(grp_pe_4_6_Pipeline_VITIS_LOOP_9319_1_fu_32_v6106_din),
-    .v6106_num_data_valid(4'd0),
-    .v6106_fifo_cap(4'd0),
+    .v6106_num_data_valid(5'd0),
+    .v6106_fifo_cap(5'd0),
     .v6106_full_n(v6106_full_n),
     .v6106_write(grp_pe_4_6_Pipeline_VITIS_LOOP_9319_1_fu_32_v6106_write),
     .empty(trunc_ln9307_reg_51)

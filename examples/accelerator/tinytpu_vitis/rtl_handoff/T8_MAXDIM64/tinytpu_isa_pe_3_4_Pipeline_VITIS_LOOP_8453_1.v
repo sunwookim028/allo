@@ -55,23 +55,23 @@ input  [2:0] v6232_fifo_cap;
 input   v6232_empty_n;
 output   v6232_read;
 input  [7:0] v6095_dout;
-input  [3:0] v6095_num_data_valid;
-input  [3:0] v6095_fifo_cap;
+input  [4:0] v6095_num_data_valid;
+input  [4:0] v6095_fifo_cap;
 input   v6095_empty_n;
 output   v6095_read;
 input  [31:0] v6152_dout;
-input  [3:0] v6152_num_data_valid;
-input  [3:0] v6152_fifo_cap;
+input  [4:0] v6152_num_data_valid;
+input  [4:0] v6152_fifo_cap;
 input   v6152_empty_n;
 output   v6152_read;
 output  [31:0] v6160_din;
-input  [3:0] v6160_num_data_valid;
-input  [3:0] v6160_fifo_cap;
+input  [4:0] v6160_num_data_valid;
+input  [4:0] v6160_fifo_cap;
 input   v6160_full_n;
 output   v6160_write;
 output  [7:0] v6096_din;
-input  [3:0] v6096_num_data_valid;
-input  [3:0] v6096_fifo_cap;
+input  [4:0] v6096_num_data_valid;
+input  [4:0] v6096_fifo_cap;
 input   v6096_full_n;
 output   v6096_write;
 input  [15:0] empty;
@@ -120,7 +120,7 @@ wire   [31:0] v3757_fu_154_p2;
 wire    ap_loop_init;
 reg   [15:0] v3753_fu_64;
 wire   [15:0] v3753_2_fu_142_p2;
-reg  signed [7:0] w29_fu_68;
+reg  signed [7:0] weight29_fu_68;
 wire   [7:0] v3763_fu_181_p1;
 reg   [31:0] v3759_fu_72;
 wire   [31:0] zext_ln8475_fu_195_p1;
@@ -154,7 +154,7 @@ initial begin
 #0 ap_enable_reg_pp0_iter6 = 1'b0;
 #0 v3754_fu_60 = 32'd0;
 #0 v3753_fu_64 = 16'd0;
-#0 w29_fu_68 = 8'd0;
+#0 weight29_fu_68 = 8'd0;
 #0 v3759_fu_72 = 32'd0;
 #0 ap_done_reg = 1'b0;
 end
@@ -170,7 +170,7 @@ mac_muladd_8s_8s_32s_32_4_1_U863(
     .clk(ap_clk),
     .reset(ap_rst),
     .din0(v6095_dout),
-    .din1(w29_fu_68),
+    .din1(weight29_fu_68),
     .din2(v3768_reg_275_pp0_iter4_reg),
     .ce(grp_fu_220_ce),
     .dout(grp_fu_220_p3)
@@ -321,9 +321,9 @@ end
 always @ (posedge ap_clk) begin
     if ((1'b0 == ap_block_pp0_stage0_11001)) begin
         if (((1'b1 == ap_CS_fsm_pp0_stage0) & (ap_loop_init == 1'b1))) begin
-            w29_fu_68 <= 8'd0;
+            weight29_fu_68 <= 8'd0;
         end else if (((v3760_reg_266 == 1'd0) & (ap_enable_reg_pp0_iter2 == 1'b1))) begin
-            w29_fu_68 <= v3763_fu_181_p1;
+            weight29_fu_68 <= v3763_fu_181_p1;
         end
     end
 end

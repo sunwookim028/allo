@@ -2196,7 +2196,24 @@ which is the exposure that moved the published MAXDIM=16 row by one cycle
    8x8x8     285   (was 285)      16x16x16   493   (was 493)
    16x16x8   424   (was 424)      64x64x64  7083   (was 7083)
 
-every one bit-exact and identical. That is consistent with the mechanism
+every one bit-exact and identical.
+
+.. note::
+
+   **That reading was taken at ``QD=8`` and no longer reproduces.** Channel
+   depth became 16 in ``63ee6ec7``, and the same sweep on ``main`` 92f0618f
+   returns **286 / 425 / 490** at 8x8x8, 16x16x8 and 16x16x16 and **6916** at
+   64x64x64 --- ``+1 / +1 / -3 / -167``. The re-export in
+   ``rtl_handoff/T8_MAXDIM64/`` carries that row and the invocation it was
+   measured with. The *claim* this paragraph makes survives intact: the
+   burst-``DMA_WORDS`` refactor left the T=8 column alone, which is why the
+   whole of the shift above is attributable to ``QD``, and the sign pattern is
+   the one ``63ee6ec7`` measured at T=4 --- small shapes pay deeper-FIFO
+   pipeline skew, large shapes gain because the sequencer runs further ahead.
+   The gain is far larger here: -2.4% at 64x64x64 against -1.2% at T=4, since
+   an 8x8 array starves sooner when the queue is shallow.
+
+That is consistent with the mechanism
 rather than merely reassuring: at T=8/MAXDIM=64 the memory *sizes* do not
 change (``OPERAND_ROWS`` is 512 either way), only ``rbA``/``rbB`` grew by one
 word --- which is what took BRAM 58 -> 62 and nothing else. **The burst loop
@@ -2205,7 +2222,8 @@ configurations**: T=4/MAXDIM=16, T=4/MAXDIM=64 and T=8/MAXDIM=64. That is
 what licenses the widening being a pure opt-in.
 
 The entry most exposed was **16x16x8**, the only shape where this design beats
-Gemmini on a supportable margin, and it returned 424 exactly.
+Gemmini on a supportable margin, and it returned 424 exactly --- and 425 at
+``QD=16``, one cycle, which does not move that margin.
 
 An earlier reading of the same bar
 ----------------------------------

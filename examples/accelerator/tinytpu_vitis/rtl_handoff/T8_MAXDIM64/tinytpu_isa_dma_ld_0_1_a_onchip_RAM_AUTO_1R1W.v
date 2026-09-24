@@ -4,7 +4,7 @@
 // Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
 // ==============================================================
 `timescale 1 ns / 1 ps
-module tinytpu_isa_dma_ld_0_1_rbA_RAM_AUTO_1R1W (
+module tinytpu_isa_dma_ld_0_1_a_onchip_RAM_AUTO_1R1W (
      
     address0, ce0,
     d0, we0, 

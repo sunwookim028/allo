@@ -55,23 +55,23 @@ input  [2:0] v6204_fifo_cap;
 input   v6204_empty_n;
 output   v6204_read;
 input  [63:0] v6060_dout;
-input  [3:0] v6060_num_data_valid;
-input  [3:0] v6060_fifo_cap;
+input  [4:0] v6060_num_data_valid;
+input  [4:0] v6060_fifo_cap;
 input   v6060_empty_n;
 output   v6060_read;
 output  [63:0] v6061_din;
-input  [3:0] v6061_num_data_valid;
-input  [3:0] v6061_fifo_cap;
+input  [4:0] v6061_num_data_valid;
+input  [4:0] v6061_fifo_cap;
 input   v6061_full_n;
 output   v6061_write;
 output  [31:0] v6132_din;
-input  [3:0] v6132_num_data_valid;
-input  [3:0] v6132_fifo_cap;
+input  [4:0] v6132_num_data_valid;
+input  [4:0] v6132_fifo_cap;
 input   v6132_full_n;
 output   v6132_write;
 output  [7:0] v6068_din;
-input  [3:0] v6068_num_data_valid;
-input  [3:0] v6068_fifo_cap;
+input  [4:0] v6068_num_data_valid;
+input  [4:0] v6068_fifo_cap;
 input   v6068_full_n;
 output   v6068_write;
 input  [15:0] empty;
@@ -119,7 +119,7 @@ wire   [31:0] v2559_fu_157_p2;
 wire    ap_loop_init;
 reg   [15:0] v2555_fu_66;
 wire   [15:0] v2555_2_fu_145_p2;
-reg  signed [7:0] w_fu_70;
+reg  signed [7:0] weight_fu_70;
 wire   [7:0] v2565_fu_184_p1;
 reg   [31:0] v2561_fu_74;
 wire   [31:0] zext_ln6064_fu_198_p1;
@@ -147,7 +147,7 @@ initial begin
 #0 ap_enable_reg_pp0_iter4 = 1'b0;
 #0 v2556_fu_62 = 32'd0;
 #0 v2555_fu_66 = 16'd0;
-#0 w_fu_70 = 8'd0;
+#0 weight_fu_70 = 8'd0;
 #0 v2561_fu_74 = 32'd0;
 #0 ap_done_reg = 1'b0;
 end
@@ -160,7 +160,7 @@ tinytpu_isa_mul_8s_8s_16_1_1 #(
     .dout_WIDTH( 16 ))
 mul_8s_8s_16_1_1_U539(
     .din0(v2572_reg_283),
-    .din1(w_fu_70),
+    .din1(weight_fu_70),
     .dout(v2582_fu_226_p2)
 );
 
@@ -289,9 +289,9 @@ end
 always @ (posedge ap_clk) begin
     if ((1'b0 == ap_block_pp0_stage0_11001)) begin
         if (((1'b1 == ap_CS_fsm_pp0_stage0) & (ap_loop_init == 1'b1))) begin
-            w_fu_70 <= 8'd0;
+            weight_fu_70 <= 8'd0;
         end else if (((v2562_reg_274 == 1'd0) & (ap_enable_reg_pp0_iter2 == 1'b1))) begin
-            w_fu_70 <= v2565_fu_184_p1;
+            weight_fu_70 <= v2565_fu_184_p1;
         end
     end
 end

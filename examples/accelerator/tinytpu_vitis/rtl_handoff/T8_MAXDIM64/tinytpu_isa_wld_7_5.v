@@ -49,13 +49,13 @@ output   ap_ready;
 output   start_out;
 output   start_write;
 input  [63:0] v6056_dout;
-input  [3:0] v6056_num_data_valid;
-input  [3:0] v6056_fifo_cap;
+input  [4:0] v6056_num_data_valid;
+input  [4:0] v6056_fifo_cap;
 input   v6056_empty_n;
 output   v6056_read;
 output  [63:0] v6057_din;
-input  [3:0] v6057_num_data_valid;
-input  [3:0] v6057_fifo_cap;
+input  [4:0] v6057_num_data_valid;
+input  [4:0] v6057_fifo_cap;
 input   v6057_full_n;
 output   v6057_write;
 output  [31:0] v6265_din;
@@ -121,13 +121,13 @@ tinytpu_isa_wld_7_5_Pipeline_VITIS_LOOP_5836_1 grp_wld_7_5_Pipeline_VITIS_LOOP_5
     .ap_idle(grp_wld_7_5_Pipeline_VITIS_LOOP_5836_1_fu_53_ap_idle),
     .ap_ready(grp_wld_7_5_Pipeline_VITIS_LOOP_5836_1_fu_53_ap_ready),
     .v6056_dout(v6056_dout),
-    .v6056_num_data_valid(4'd0),
-    .v6056_fifo_cap(4'd0),
+    .v6056_num_data_valid(5'd0),
+    .v6056_fifo_cap(5'd0),
     .v6056_empty_n(v6056_empty_n),
     .v6056_read(grp_wld_7_5_Pipeline_VITIS_LOOP_5836_1_fu_53_v6056_read),
     .v6057_din(grp_wld_7_5_Pipeline_VITIS_LOOP_5836_1_fu_53_v6057_din),
-    .v6057_num_data_valid(4'd0),
-    .v6057_fifo_cap(4'd0),
+    .v6057_num_data_valid(5'd0),
+    .v6057_fifo_cap(5'd0),
     .v6057_full_n(v6057_full_n),
     .v6057_write(grp_wld_7_5_Pipeline_VITIS_LOOP_5836_1_fu_53_v6057_write),
     .v6265_din(grp_wld_7_5_Pipeline_VITIS_LOOP_5836_1_fu_53_v6265_din),

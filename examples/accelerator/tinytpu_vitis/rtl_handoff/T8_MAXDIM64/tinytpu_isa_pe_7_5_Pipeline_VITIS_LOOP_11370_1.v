@@ -60,28 +60,28 @@ input  [2:0] v6265_fifo_cap;
 input   v6265_empty_n;
 output   v6265_read;
 input  [7:0] v6128_dout;
-input  [3:0] v6128_num_data_valid;
-input  [3:0] v6128_fifo_cap;
+input  [4:0] v6128_num_data_valid;
+input  [4:0] v6128_fifo_cap;
 input   v6128_empty_n;
 output   v6128_read;
 input  [31:0] v6185_dout;
-input  [3:0] v6185_num_data_valid;
-input  [3:0] v6185_fifo_cap;
+input  [4:0] v6185_num_data_valid;
+input  [4:0] v6185_fifo_cap;
 input   v6185_empty_n;
 output   v6185_read;
 input  [255:0] v6200_dout;
-input  [3:0] v6200_num_data_valid;
-input  [3:0] v6200_fifo_cap;
+input  [4:0] v6200_num_data_valid;
+input  [4:0] v6200_fifo_cap;
 input   v6200_empty_n;
 output   v6200_read;
 output  [255:0] v6201_din;
-input  [3:0] v6201_num_data_valid;
-input  [3:0] v6201_fifo_cap;
+input  [4:0] v6201_num_data_valid;
+input  [4:0] v6201_fifo_cap;
 input   v6201_full_n;
 output   v6201_write;
 output  [7:0] v6129_din;
-input  [3:0] v6129_num_data_valid;
-input  [3:0] v6129_fifo_cap;
+input  [4:0] v6129_num_data_valid;
+input  [4:0] v6129_fifo_cap;
 input   v6129_full_n;
 output   v6129_write;
 input  [15:0] empty;
@@ -135,7 +135,7 @@ wire   [31:0] v5206_fu_170_p2;
 wire    ap_loop_init;
 reg   [15:0] v5202_fu_74;
 wire   [15:0] v5202_2_fu_158_p2;
-reg  signed [7:0] w62_fu_78;
+reg  signed [7:0] weight62_fu_78;
 wire   [7:0] v5212_fu_197_p1;
 reg   [31:0] v5208_fu_82;
 wire   [31:0] zext_ln11392_fu_211_p1;
@@ -169,7 +169,7 @@ initial begin
 #0 ap_enable_reg_pp0_iter6 = 1'b0;
 #0 v5203_fu_70 = 32'd0;
 #0 v5202_fu_74 = 16'd0;
-#0 w62_fu_78 = 8'd0;
+#0 weight62_fu_78 = 8'd0;
 #0 v5208_fu_82 = 32'd0;
 #0 ap_done_reg = 1'b0;
 end
@@ -185,7 +185,7 @@ mac_muladd_8s_8s_32s_32_4_1_U1265(
     .clk(ap_clk),
     .reset(ap_rst),
     .din0(v6128_dout),
-    .din1(w62_fu_78),
+    .din1(weight62_fu_78),
     .din2(v5217_reg_302_pp0_iter4_reg),
     .ce(grp_fu_247_ce),
     .dout(grp_fu_247_p3)
@@ -336,9 +336,9 @@ end
 always @ (posedge ap_clk) begin
     if ((1'b0 == ap_block_pp0_stage0_11001)) begin
         if (((1'b1 == ap_CS_fsm_pp0_stage0) & (ap_loop_init == 1'b1))) begin
-            w62_fu_78 <= 8'd0;
+            weight62_fu_78 <= 8'd0;
         end else if (((v5209_reg_293 == 1'd0) & (ap_enable_reg_pp0_iter2 == 1'b1))) begin
-            w62_fu_78 <= v5212_fu_197_p1;
+            weight62_fu_78 <= v5212_fu_197_p1;
         end
     end
 end

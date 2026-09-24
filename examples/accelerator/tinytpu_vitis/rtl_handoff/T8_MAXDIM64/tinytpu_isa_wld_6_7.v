@@ -38,8 +38,8 @@ input   ap_continue;
 output   ap_idle;
 output   ap_ready;
 input  [63:0] v6050_dout;
-input  [3:0] v6050_num_data_valid;
-input  [3:0] v6050_fifo_cap;
+input  [4:0] v6050_num_data_valid;
+input  [4:0] v6050_fifo_cap;
 input   v6050_empty_n;
 output   v6050_read;
 output  [31:0] v6259_din;
@@ -96,8 +96,8 @@ tinytpu_isa_wld_6_7_Pipeline_VITIS_LOOP_5396_1 grp_wld_6_7_Pipeline_VITIS_LOOP_5
     .ap_idle(grp_wld_6_7_Pipeline_VITIS_LOOP_5396_1_fu_41_ap_idle),
     .ap_ready(grp_wld_6_7_Pipeline_VITIS_LOOP_5396_1_fu_41_ap_ready),
     .v6050_dout(v6050_dout),
-    .v6050_num_data_valid(4'd0),
-    .v6050_fifo_cap(4'd0),
+    .v6050_num_data_valid(5'd0),
+    .v6050_fifo_cap(5'd0),
     .v6050_empty_n(v6050_empty_n),
     .v6050_read(grp_wld_6_7_Pipeline_VITIS_LOOP_5396_1_fu_41_v6050_read),
     .v6259_din(grp_wld_6_7_Pipeline_VITIS_LOOP_5396_1_fu_41_v6259_din),

@@ -1,19 +1,54 @@
 {
   "aux_files": [
-    "tinytpu_isa_sequencer_0_1_iv_now_RAM_1WNR_AUTO_1R1W.dat"
+    "tinytpu_isa_sequencer_0_1_live_iv_RAM_1WNR_AUTO_1R1W.dat"
   ],
   "config": {
     "TPU_MAXDIM": "64",
     "TPU_T": "8"
   },
+  "cycles": {
+    "16x16x16": 490,
+    "16x16x8": 425,
+    "32x32x32": 1410,
+    "32x64x32": 2434,
+    "48x48x48": 3443,
+    "64x32x64": 4356,
+    "64x64x64": 6916,
+    "8x8x8": 286
+  },
   "files": 433,
   "layout": "flat",
+  "manifests": {
+    "full": "sv2v_manifest.f",
+    "logic_only": "sv2v_manifest_nomem.f",
+    "logic_only_alias": "sv2v_manifest_nomem_stubbed.f"
+  },
+  "memory_array_files": [
+    "tinytpu_isa_accu_0_Pipeline_VITIS_LOOP_11667_1_ar_RAM_AUTO_1R1W.v",
+    "tinytpu_isa_spm_0_Pipeline_VITIS_LOOP_1010_1_spad_RAM_AUTO_1R1W.v"
+  ],
+  "memory_bits": 100352,
+  "memory_stubs": {
+    "tinytpu_isa_accu_0_Pipeline_VITIS_LOOP_11667_1_ar_RAM_AUTO_1R1W.v": "tinytpu_isa_accu_0_Pipeline_VITIS_LOOP_11667_1_ar_RAM_AUTO_1R1W_stub.v",
+    "tinytpu_isa_spm_0_Pipeline_VITIS_LOOP_1010_1_spad_RAM_AUTO_1R1W.v": "tinytpu_isa_spm_0_Pipeline_VITIS_LOOP_1010_1_spad_RAM_AUTO_1R1W_stub.v"
+  },
+  "params": {
+    "DMA_WORDS": 1,
+    "IMEM_SIZE": 56,
+    "MAXDIM": 64,
+    "NAR": 136,
+    "NVR": 512,
+    "QD": 16,
+    "SPAD_ROWS": 512,
+    "T": 8,
+    "data type": "int8 x int8 -> int32, mvout clips to int8"
+  },
   "readmemh_users": [],
   "resources": {
     "BRAM": 62,
     "DSP": 58,
-    "FF": 43911,
-    "LUT": 70281,
+    "FF": 44303,
+    "LUT": 70471,
     "URAM": 0,
     "avail": {
       "BRAM": 4032,
@@ -27,6 +62,7 @@
     "target_ns": 3.33,
     "uncertainty_ns": 0.9
   },
+  "stress_isa": "STRESS OK: 630/630 runs exact",
   "top": "tinytpu_isa",
   "top_defined_in": "tinytpu_isa.v"
 }

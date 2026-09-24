@@ -8,12 +8,12 @@
 `timescale 1ns/1ps
 //RAW latency 1 
 
-module tinytpu_isa_fifo_w8_d8_S
+module tinytpu_isa_fifo_w8_d16_S
 #(parameter
     MEM_STYLE    = "shiftReg",
     DATA_WIDTH   = 8,
-    ADDR_WIDTH   = 3,
-    DEPTH        = 8)
+    ADDR_WIDTH   = 4,
+    DEPTH        = 16)
 (
     // system signal
     input  wire                  clk,
@@ -46,11 +46,11 @@ module tinytpu_isa_fifo_w8_d8_S
     // has num_data_valid? 
     reg  [ADDR_WIDTH:0]   num_data_valid; //yes 
 //------------------------Instantiation------------------
-    tinytpu_isa_fifo_w8_d8_S_ShiftReg 
+    tinytpu_isa_fifo_w8_d16_S_ShiftReg 
     #(  .DATA_WIDTH (DATA_WIDTH),
         .ADDR_WIDTH (ADDR_WIDTH),
         .DEPTH      (DEPTH))
-    U_tinytpu_isa_fifo_w8_d8_S_ShiftReg (
+    U_tinytpu_isa_fifo_w8_d16_S_ShiftReg (
         .clk        (clk),
         .we         (push),
         .addr       (addr),
@@ -127,11 +127,11 @@ module tinytpu_isa_fifo_w8_d8_S
 endmodule  
 
 
-module tinytpu_isa_fifo_w8_d8_S_ShiftReg
+module tinytpu_isa_fifo_w8_d16_S_ShiftReg
 #(parameter
     DATA_WIDTH  = 8,
-    ADDR_WIDTH  = 3,
-    DEPTH       = 8)
+    ADDR_WIDTH  = 4,
+    DEPTH       = 16)
 (
     input  wire                  clk,
     input  wire                  reset,
