@@ -35,8 +35,9 @@ Takeaways
 
 - **It works end to end on real tools.** Every accepted number is RTL cosim
   cycles plus csynth area and clock, bit-exact against a frozen reference
-  model. About **$85** spent on the CHIA2026 account so far; the harness is
-  also exercised with no model at all.
+  model. **$124.26** spent on the CHIA2026 account so far, of a $500 ceiling
+  (``spend.py report``, which recomputes it rather than quoting this page);
+  the harness is also exercised with no model at all.
 - **It finds real design changes, not yet novel ones.** Best so far: a DMA
   burst widening worth 55-61 % of the steady-state gap to Gemmini (not
   landed; its banked form synthesises with no cycle loss).

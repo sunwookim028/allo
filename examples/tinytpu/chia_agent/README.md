@@ -11,11 +11,278 @@ only; none of the old TinyTPU or Kai Shao's code) and retargeted. That
 branch searched a different, older design against a cost model. This one is
 scored by RTL cosim.
 
+## Quick start, assuming nothing
+
+If you have never run this before, read this section and nothing else. It is
+the whole procedure: what a run is, the $0 path, a paid run, how to watch one,
+what it cost, and what to do with one that was interrupted. The rest of this
+page is why the harness is built the way it is.
+
+### What a run is, and what it costs
+
+A **run** is `swarm.py`: K workers (2 by default, at most 3) each doing up to N
+iterations (3 by default) against the TinyTPU-isa design in
+`examples/tinytpu/`. One iteration is one model call -- which may run the full
+40-minute timeout -- then a gate and an RTL cosim of whatever the worker
+changed, about 2-3 minutes per candidate. Nothing is landed by a run; a run
+produces scored diffs and a verdict per diff.
+
+Measured, on the two runs of this shape that finished:
+
+| | run 1, 2026-09-19 | run 3, 2026-09-24 |
+| --- | --- | --- |
+| shape | 2 workers x 3 iterations | 2 workers x 3 iterations |
+| wall | 100 min | 167 min |
+| cost | **$28.54** | **$20.72** |
+| result | 1 win of 4 candidates, not landable as written | 1 win of 6, accepted on a clean checkout |
+
+**Money.** Cumulative CHIA spend on the CHIA2026 billing account is
+**$124.26** against a **$500** ceiling (`CHIA_TOTAL_CAP_USD`); `preflight.py`
+refuses to start a run whose cap does not fit under what is left. A
+worker-iteration has cost $3.45 to $4.76 on the two runs that finished; set
+`--budget-usd` with headroom above that, as runs 1 and 3 did ($30 and $60 caps
+for $28.54 and $20.72 of actual spend). The cumulative figure is never guessed
+-- ask for it:
+
+```bash
+python3 examples/tinytpu/chia_agent/spend.py report .
+```
+
+### Set the host up (once)
+
+```bash
+conda activate allo
+export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build
+cmake -G Ninja -S mlir -B mlir/build -DMLIR_DIR=$LLVM_BUILD_DIR/lib/cmake/mlir \
+  -DPython3_EXECUTABLE=$(which python) -DPython_EXECUTABLE=$(which python) \
+  -DMLIR_BINDINGS_PYTHON_NB_DOMAIN=allo
+ninja -C mlir/build                          # ~3 min from cold in a new worktree
+npm ci --prefix examples/tinytpu/chia_agent  # opencode, 725 MB, gitignored
+cp examples/tinytpu/chia_agent/chia.env.example chia.env   # repo root; gitignored
+examples/tinytpu/chia_agent/gcp_setup.sh     # auth, project, billing, APIs, $0
+```
+
+`chia.env` holds the account and project a run charges. It is gitignored;
+**never commit it and never paste its contents anywhere**. `chia.env.example`
+is the committed template and is complete -- for the $0 path it needs no
+edits; for a paid run it needs ADC
+(`gcloud auth application-default login`, once, which `gcp_setup.sh` checks).
+
+Each worktree needs its own `mlir/build` and its own `chia.env`; nothing here
+is shared between checkouts.
+
+### Start Ray -- the two things that cost the last operator real time
+
+```bash
+conda activate chia_env
+set -a; source chia.env; set +a          # BEFORE ray start, see below
+ray start --head --temp-dir=/tmp/ray-<track> \
+          --resources='{"opencode_creds": 2}' --include-dashboard=false
+export RAY_ADDRESS=<the address ray start printed>   # the node IP, port 6379
+```
+
+1. **Source `chia.env` in the shell that starts the head, not only in the one
+   that starts the run.** `loop.py` connects with
+   `runtime_env={"working_dir": ...}` and no `env_vars`, so Ray workers inherit
+   the *raylet's* environment, and `opencode` is on `PATH` only because
+   `chia.env` puts `OPENCODE_BIN` there. A head started without it produces no
+   error: workers cannot find `opencode`, and every model call silently
+   returns empty.
+2. **Use a private `--temp-dir` and export `RAY_ADDRESS`; never
+   `ray.init(address="auto")` on the shared default, and never `ray stop`.**
+   An orphaned head -- one whose working directory has been deleted, which a
+   removed worktree leaves behind -- accepts the connection and then cannot
+   spawn a worker, and the driver blocks in `ray.get` forever with no error.
+   `RAY_ADDRESS` overrides even an explicit `address="auto"` and leaves
+   `/tmp/ray/ray_current_cluster` alone for other tracks. Keep the temp-dir
+   path **short**: Ray puts a Unix socket under it and the path cannot exceed
+   107 bytes, so `/tmp/ray-chia` works and a path under a scratch directory
+   does not.
+
+`ray stop` matches Ray processes **by name across the whole host** and would
+kill other worktrees' raylets -- which is how run 2 lost both workers 10.8
+minutes in, at $1.69. Stop only your own cluster, which the private temp dir
+makes possible because every one of its processes carries that path in its
+command line:
+
+```bash
+RAY_TMP=/tmp/ray-<track>
+pgrep -f "$RAY_TMP/session_" | xargs -r kill          # then, for stragglers:
+pgrep -f "$RAY_TMP/session_" | xargs -r kill -9
+```
+
+Two details, both learned the hard way. Match on `$RAY_TMP/session_`, not on
+`$RAY_TMP` alone: the shorter pattern also matches **the shell you are typing
+in** whenever your command line contains that path, and `pkill -f
+/tmp/ray-<track>` will kill it out from under you. And `kill` alone left the
+raylet running here, so check and follow with `kill -9`.
+
+The tool servers bind fixed ports from 8000 up, so two `chia_agent` processes
+on one host collide. Serialise them.
+
+### The $0 path, which is also the test of everything above
+
+`test_harness.py` drives the real `swarm.py -> loop.py -> opencode` path with
+opencode pointed at a scripted local model, and clears every cloud credential
+first so it cannot reach Vertex. It is the only thing you should run before
+spending.
+
+```bash
+cd examples/tinytpu/chia_agent
+python test_harness.py --phases e,c            # the guards and one gate
+python test_harness.py --phases s,control,e,c,g   # 77 cases, 2.9 min measured
+python test_harness.py                         # everything, ~30-45 min
+```
+
+It writes `<repo>/chia_runs/harness-test-<stamp>/results.json` -- every case,
+expected against measured -- and exits non-zero if any case failed. **Read the
+output, not the exit code**, and keep the `results.json`. Piping it through
+`tee` or `tail` replaces its exit status with the pipe's: a run that reported
+`75/77 cases pass` still "exited with code 0".
+
+**Do not edit the checkout while the harness or a run is going.** The
+evaluator compares the checkout's tracked files after every gate and returns
+`tamper` if they moved. Measured 2026-09-24: editing three files in this
+directory during a harness run turned two `gate:param` cases into `tamper`
+failures; both passed on a clean tree.
+
+### Before you spend: pre-register, on `main`
+
+A pre-registration written after the result is not one, and a pre-registration
+that reaches `main` in the same merge as the result is barely one. Commit it
+and **push it to `main` before the first paid call**, as its own commit:
+
+```
+dev/records/tinytpu/chia-evidence/prereg-run<N>-<YYYYMMDD>.md
+```
+
+`prereg-run3-20260924.md` is the model to copy. It must name: the question in
+one sentence; the design and the control numbers it is measured against; the
+prediction, including what would falsify it; the negatives you would accept as
+an answer; the cap and what it buys; and anything already known that a win
+would be a rediscovery of. Then add the row to the index in
+`dev/records/tinytpu/chia-evidence/README.md` with the result column empty,
+and fill it in afterwards.
+
+`git log --oneline origin/main` must show that commit before you run
+`swarm.py`. The harness will not check this for you.
+
+### Start a paid run
+
+```bash
+cd examples/tinytpu/chia_agent
+RUN=../../../chia_runs/isa-run<N>-$(date +%Y%m%d)   # name it; the default is a stamp
+mkdir -p $RUN                           # so `tee` has somewhere to write
+python preflight.py --budget-usd 30     # $0: which account, how much is left
+python smoke.py                         # ~30 s, ~$0.02: one real Vertex call
+python swarm.py --workers 2 --iterations 3 --budget-usd 30 --run-dir $RUN \
+  2>&1 | tee $RUN/swarm.log
+```
+
+`--budget-usd` is required and there is no default: nothing starts without an
+explicit per-run cap, and `swarm.py` refuses a `--run-dir` that already holds
+a `run.json` (there is no resume; see below). A named run directory is what
+the evidence index will point at. **Pipe
+the output through `tee`**: `swarm.py`'s own stdout, including the `HARD CAP:`
+line, is the one thing a run does not persist by itself.
+
+`preflight.py` runs again inside `swarm.py`, before any worker; running it
+first only tells you sooner.
+
+### While it runs
+
+The run is legible from its own directory, with no memory of how it was
+started:
+
+```bash
+python swarm.py --status ../../../chia_runs/isa-run<N>-<date>
+```
+
+which prints which iteration each worker is on, every candidate and its
+verdict, whether the run is still alive, the spend so far from the database,
+and the question each worker was asked. It starts nothing and spends nothing.
+For the live detail between iterations -- a `variants.jsonl` line appears only
+when a whole iteration ends, which can be tens of minutes -- read the log:
+
+```bash
+tail -f ../../../chia_runs/isa-run<N>-<date>/*/worker.log
+```
+
+### What it cost
+
+**The `usage` field is not the cost.** A call that runs to the timeout reports
+no usage and is billed in full; in run 3 *all four* large calls did that, so
+the whole $20.72 run reads $0.00 on `usage`. Opencode's own database is the
+source of truth and is what every cap reads. `swarm.py` writes
+`<run>/spend.json` from it at the end, and you can ask for the same figure at
+any time from the run directory alone:
+
+```bash
+python3 spend.py run ../../../chia_runs/isa-run<N>-<date>   # this run
+python3 spend.py report ../../../                           # every run, and the cap
+```
+
+These are opencode's figures (tokens x its price table), not Google's invoice.
+The remaining **credit balance is only in the Cloud Console** (Billing ->
+CHIA2026 -> Credits); neither gcloud nor the Billing API exposes it.
+
+### Claiming a win
+
+A number from inside the loop is not a result. `accept.py` re-measures the
+diff on a clean checkout of `HEAD`, at all five shapes, against a control it
+measures in the same run:
+
+```bash
+python accept.py --out ../../../chia_runs/<run>/control              # once
+python accept.py --diff ../../../chia_runs/<run>/<worker>/best.diff \
+                 --out  ../../../chia_runs/<run>/accept-<worker> \
+                 --control ../../../chia_runs/<run>/control/accept.json
+```
+
+Then trim the evidence into `dev/records/tinytpu/chia-evidence/<run>/` and
+fill in the index row. Every accepted diff still gets read by a person.
+
+### If a run was interrupted
+
+**There is no resume.** No flag, no checkpoint: `loop.py` never reads
+`variants.jsonl` back. What a killed run leaves is a run directory with
+`run.json` and whatever iterations finished, and no `summary.json`.
+
+`swarm.py` **refuses** to re-use a run directory that already holds a
+`run.json`, because re-using one is worse than starting over: it overwrites
+`run.json` and with it the tag that attributes the old run's spend, truncates
+`worker.log`, appends a second run's iterations to `variants.jsonl`, and
+leaves the previous run's edited spec in place -- so the "baseline" the new run
+measures is that design rather than `HEAD`'s.
+
+To abandon one cleanly:
+
+```bash
+RUN=../../../chia_runs/isa-run<N>-<date>
+python swarm.py --status $RUN                # what it reached, and what it spent
+python3 spend.py run $RUN > $RUN/spend.json  # record the cost BEFORE anything else
+pkill -f examples/tinytpu/chia_agent/swarm.py
+pkill -f examples/tinytpu/chia_agent/loop.py
+pkill -f "$PWD/node_modules"                 # opencode, or it keeps spending
+pkill -f vitis_hls
+pgrep -f "/tmp/ray-<track>/session_" | xargs -r kill -9   # never `ray stop`
+ls -l /proc/*/cwd 2>/dev/null | grep .chia_scratch   # must be empty
+rm -rf ../../../.chia_scratch/isa-run<N>-<date>
+```
+
+Then keep the directory and give it a row in the evidence index saying what it
+reached and what it cost. The money is already spent and already counted: the
+cumulative cap sums every session on the account since the cutover, finished
+run or not, so an abandoned run still reduces what the next one may spend.
+Nothing is lost and nothing is forgiven.
+
+To start again, use a **new** `--run-dir`.
+
 ## Editable vs. frozen
 
 | | files | how it is enforced |
 | --- | --- | --- |
-| **editable** | `microarch_isa.py`, `isa_dsl.py` | The agent edits a private copy in `<run>/<worker>/spec/`, never the repository. |
+| **editable** | the 14 paths of `design.EDITABLE`: `microarch_isa.py`, `isa_dsl.py`, `ip/{isa,tinytpu,assembler,programs}.py` and the eight units under `ip/units/`. `read_spec()` with no argument lists them with line counts | The agent edits a private copy in `<run>/<worker>/spec/`, never the repository. |
 | **frozen** | main's `cosim.py` (testbench generator, `SHAPES`, numpy golden reference, every Vitis/TCL setting), `bench_isa.py`, `stress_isa.py` (the correctness gate), `isa_ref.py` (the ISA as numpy), `kpn_model.py`; and here `chia_agent/gate_runner.py`, `chia_agent/evaluate.py`, `chia_agent/spec_policy.py` | See below. |
 
 Mechanical enforcement, not instructions:
@@ -226,22 +493,29 @@ prints all of the above.
 `.rayignore` holds `node_modules/`. Without it Ray's `working_dir` package is
 over 1 GB against a 512 MB limit, and every worker dies silently.
 
-A search:
+A search, in full, is [Quick start](#quick-start-assuming-nothing) above --
+including the two things about the Ray head that are not optional (source
+`chia.env` before starting it, and give it a private `--temp-dir` rather than
+`ray stop`ping the host's). In outline:
 
 ```bash
 conda activate chia_env
 set -a; source chia.env; set +a
 # Tool servers bind loopback by default (09d7defa); a multi-host swarm opts in
 # with TINYTPU_TOOL_HOST=node and then needs its own auth or firewall.
-ray start --head --resources='{"opencode_creds": 2}' --include-dashboard=false
+ray start --head --temp-dir=/tmp/ray-<track> \
+          --resources='{"opencode_creds": 2}' --include-dashboard=false
+export RAY_ADDRESS=<what ray start printed>
 cd examples/tinytpu/chia_agent
-python test_harness.py                                  # ~25 min, $0 -- see below
+python test_harness.py                                  # ~30 min, $0 -- see below
 python preflight.py --budget-usd 15                     # the gate alone, $0
-python smoke.py                                         # ~30 s, ~$0.05 (Vertex)
+python smoke.py                                         # ~30 s, ~$0.02 (Vertex)
 python swarm.py --workers 2 --iterations 3 --budget-usd 15   # cap required
+python swarm.py --status ../../../chia_runs/<run>           # any time, $0
 python accept.py --diff ../../../chia_runs/<run>/<worker>/best.diff \
                  --out  ../../../chia_runs/<run>/accept-<worker>
-ray stop
+python3 spend.py run ../../../chia_runs/<run>           # what it cost, from the DB
+pgrep -f "/tmp/ray-<track>/session_" | xargs -r kill     # NOT `ray stop`
 ```
 
 The spend cap is global. It is read from opencode's own session DB

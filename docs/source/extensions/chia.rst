@@ -46,15 +46,31 @@ Environment (once): the ``allo`` env with this checkout's ``mlir/build``,
 
    examples/tinytpu/chia_agent/gcp_setup.sh  # auth, project, billing, APIs, spend report
    conda activate chia_env; set -a; source chia.env; set +a
-   ray start --head --resources='{"opencode_creds": 2}' --include-dashboard=false
+   # chia.env MUST be sourced in this shell, before the head: Ray workers
+   # inherit the raylet's environment (loop.py passes no env_vars), and
+   # opencode is on PATH only because chia.env puts OPENCODE_BIN there.
+   # A private --temp-dir, short enough for a Unix socket (107 bytes), plus
+   # RAY_ADDRESS: never address="auto" on the shared default, never `ray stop`.
+   ray start --head --temp-dir=/tmp/ray-chia \
+       --resources='{"opencode_creds": 2}' --include-dashboard=false
+   export RAY_ADDRESS=<what ray start printed>
    cd examples/tinytpu/chia_agent
-   python test_harness.py --phases e,c    # ~1 min, $0; full suite ~30 min, $0
+   python test_harness.py --phases e,c    # ~2 min, $0; full suite ~30 min, $0
    python preflight.py --budget-usd 30    # the gate alone, $0
-   python swarm.py --workers 2 --iterations 3 --budget-usd 30
+   python swarm.py --workers 2 --iterations 3 --budget-usd 30 --run-dir <run> \
+       2>&1 | tee <run>/swarm.log         # swarm's own stdout is not persisted
+   python swarm.py --status <run>         # any time, from any shell, $0
    python accept.py --out <run>/control                 # the run's control, once
    python accept.py --diff <run>/<worker>/best.diff --out <run>/accept-<worker> \
        --control <run>/control/accept.json              # or omit it and measure again
-   ray stop                               # and remove the Ray session directory
+   python3 spend.py run <run>             # what it cost, from opencode's DB
+   pgrep -f /tmp/ray-chia/session_ | xargs -r kill   # this cluster only;
+                                          # `ray stop` is host-wide
+
+The full procedure, written for someone who has never run this --- what a run
+is and costs, the $0 path, pre-registration, watching a run, reading the
+spend, and abandoning an interrupted one --- is the "Quick start, assuming
+nothing" section of ``examples/tinytpu/chia_agent/README.md``.
 
 ``test_harness.py`` and ``preflight.py`` cost nothing and need no model call,
 so run them first: ``--phases e,c`` takes about a minute and the full suite
@@ -542,6 +558,67 @@ in ``billing.json`` (opencode stores no GCP project with a session). These are
 opencode's figures from its price table, not the invoice; the remaining credit
 is only in the Cloud Console.
 
+A run in flight, and one that was interrupted
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A run is legible from its own directory, with no memory of how it was
+started::
+
+   python swarm.py --status <run>
+
+which prints which iteration each worker is on, every candidate with its
+verdict, whether the run is still alive, the spend so far from opencode's
+database, and the question each worker was asked. It starts nothing and
+spends nothing, and it works equally on a live run, a finished one and a
+committed evidence directory.
+
+What a run writes, and when, is worth knowing before an interruption rather
+than after:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - file
+     - written
+   * - ``<run>/run.json``
+     - once, after the pre-flight gate and before the first worker
+   * - ``<run>/<worker>/worker.log``
+     - continuously, unbuffered --- the only live signal inside an iteration
+   * - ``<run>/<worker>/variants.jsonl``
+     - appended once per finished iteration, which can be tens of minutes apart
+   * - ``<run>/<worker>/best.diff``, ``calls.json``
+     - only on a worker's normal exit
+   * - ``<run>/summary.json``, ``<run>/spend.json``
+     - only after every worker has exited
+   * - ``swarm.log``
+     - never, by itself --- pipe ``swarm.py`` through ``tee``, or the
+       ``HARD CAP:`` line is lost
+
+**There is no resume.** No flag, no checkpoint: ``loop.py`` never reads
+``variants.jsonl`` back. ``swarm.py`` refuses a ``--run-dir`` that already
+holds a ``run.json``, because re-using one is worse than starting over: it
+overwrites the tag that attributes the old run's spend, truncates
+``worker.log``, appends a second run's iterations to ``variants.jsonl``, and
+leaves the previous run's edited spec in place --- so the "baseline" the new
+run measures is that design rather than ``HEAD``'s. Start again with a new
+``--run-dir``.
+
+Abandoning one cleanly means recording its cost **before** anything else,
+then killing what a ``SIGTERM`` to the workers does not reach --- opencode is
+a grandchild outside the loops' process groups and keeps spending after its
+driver dies. The sequence is in
+``examples/tinytpu/chia_agent/README.md`` ("If a run was interrupted"). The
+money is already counted either way: the cumulative cap sums every session on
+the account since the cutover, finished run or not, so an abandoned run still
+reduces what the next one may spend.
+
+**Do not edit the checkout while a run or the harness is running.** The
+evaluator compares the checkout's tracked files after every gate and returns
+``tamper`` if they moved. Measured 2026-09-24: editing three ``chia_agent``
+files during a ``test_harness.py`` run turned two ``gate:param`` cases into
+``tamper`` failures; both passed on a clean tree.
+
 The $0 harness test
 ~~~~~~~~~~~~~~~~~~~
 
@@ -594,6 +671,13 @@ Limits and known failures
   gone stale the same way -- still 172 / 262 / 418 / 484 / 686 after the design
   shipped 175 / 265 / 421 / 482 / 674 -- and now reads ``reproduce.sh``'s
   ``EXPECTED``, the one row a gate checks on every run.
+- **A Ray head started without ``chia.env`` sourced fails silently.**
+  ``loop.py`` connects with ``runtime_env={"working_dir": ...}`` and no
+  ``env_vars``, so Ray workers inherit the *raylet's* environment --- and
+  ``opencode`` is on ``PATH`` only because ``chia.env`` exports
+  ``OPENCODE_BIN``. Start the head from a shell that has sourced it, not just
+  the shell that runs ``swarm.py``: otherwise workers cannot find the binary,
+  every model call returns empty, and nothing reports an error.
 - **``ray.init(address="auto")`` can hang forever on a dead head.** An orphaned
   Ray head whose raylet's working directory has been removed accepts the
   connection and then cannot spawn a single worker: every one dies in
@@ -602,7 +686,14 @@ Limits and known failures
   worktree. ``ray stop`` is not the fix (it is host-wide, see below); start a
   head with a private ``--temp-dir`` and set ``RAY_ADDRESS``, which overrides
   even an explicit ``address="auto"`` and leaves
-  ``/tmp/ray/ray_current_cluster`` alone for other tracks.
+  ``/tmp/ray/ray_current_cluster`` alone for other tracks. Two things about
+  that temp directory, measured here on 2026-09-24: the path must be **short**,
+  because Ray puts a Unix socket under it and ``AF_UNIX`` caps the path at 107
+  bytes (``/tmp/ray-chia`` is fine, a path under a session scratch directory is
+  not); and to stop only that cluster, match ``<temp-dir>/session_`` rather
+  than the temp directory alone --- the shorter pattern also matches the shell
+  you type it in, and ``pkill`` will kill it. ``kill`` alone left the raylet
+  running; follow it with ``kill -9``.
 - **The tool servers bind fixed ports from 8000 up**, so two ``chia_agent``
   processes on one host collide. Serialise them.
 
