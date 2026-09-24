@@ -213,6 +213,24 @@ Recorded because each cost real work today.
   what it does when committed snapshots disagree about the library -- for the
   good reason that there is no second library to test it with, and that is
   recorded rather than glossed.
+- **Some provenance cannot be recovered after the fact — capture it at run
+  time or not at all.** A content digest over an export's files identifies
+  which RTL a synthesis run actually read, where a file-list checksum does not
+  (two of our exports hash identically, because the manifest lists the same
+  filenames). But it can only be computed while the files the run read still
+  exist at the path it read them from. An attempt to recover it by matching
+  directory basenames would have stamped a 2026-09-22 area with RTL
+  re-emitted two days later — a plausible lie, written by a tool. The fallback
+  was deleted; the tool now reports the directory unreadable and computes
+  nothing.
+- **An instrument can fail by eating the evidence, not only by missing it.**
+  The first attempt at that re-capture **overwrote four good snapshots** with
+  "unresolved", because their directories had moved. Same shape as the other
+  fails-open findings, one step worse: the check did not merely fail to see
+  something, it destroyed what was there. Nothing was committed in that state.
+  A re-capture now **keeps** the earlier record, marks it `recaptured`, and
+  says so. Treat any tool that rewrites a record in place as a tool that can
+  lose one.
 - **A refactor can silently remove an agentic loop's reach, and nothing fails.**
   The CHIA loop's editable set was `("microarch_isa.py", "isa_dsl.py")`. The
   decomposition that made the design a composable library moved the hardware
