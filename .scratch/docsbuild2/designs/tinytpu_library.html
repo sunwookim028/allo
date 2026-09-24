@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>The Unit Library: Composing a Region from Units &#8212; Allo Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic_mod.css?v=9b2032db" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=db78e746"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/petite-vue.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="The IP Library’s Gaps, and the Adder Tree" href="ip_gaps.html" />
+    <link rel="prev" title="TinyTPU-isa: A Programmable GEMM Accelerator" href="tinytpu_isa.html" /> 
+  </head><body data-dark_mode_code_blocks="true">
+
+<div id="top_nav">
+    
+
+    <nav>
+        
+            
+        
+
+        <p id="toggle_sidebar">
+            <a href="#" title="Toggle sidebar">|||</a>
+        </p>
+        <h1><a href="../index.html" title="Go to homepage">Allo Documentation</a></h1>
+            <a id="source_link" href="https://github.com/sunwookim028/allo">
+    
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512">
+            <path fill="white" d="M 244.8,8 C 106.1,8 0,113.3 0,252 c 0,110.9 69.8,205.8 169.5,239.2 12.8,2.3 17.3,-5.6 17.3,-12.1 0,-6.2 -0.3,-40.4 -0.3,-61.4 0,0 -70,15 -84.7,-29.8 0,0 -11.4,-29.1 -27.8,-36.6 0,0 -22.9,-15.7 1.6,-15.4 0,0 24.9,2 38.6,25.8 21.9,38.6 58.6,27.5 72.9,20.9 2.3,-16 8.8,-27.1 16,-33.7 -55.9,-6.2 -112.3,-14.3 -112.3,-110.5 0,-27.5 7.6,-41.3 23.6,-58.9 -2.6,-6.5 -11.1,-33.3 2.6,-67.9 20.9,-6.5 69,27 69,27 20,-5.6 41.5,-8.5 62.8,-8.5 21.3,0 42.8,2.9 62.8,8.5 0,0 48.1,-33.6 69,-27 13.7,34.7 5.2,61.4 2.6,67.9 16,17.7 25.8,31.5 25.8,58.9 0,96.5 -58.9,104.2 -114.8,110.5 9.2,7.9 17,22.9 17,46.4 0,33.7 -0.3,75.4 -0.3,83.6 0,6.5 4.6,14.4 17.3,12.1 C 428.2,457.8 496,362.9 496,252 496,113.3 383.5,8 244.8,8 Z"/>
+        </svg>
+    
+</a>
+        
+
+        <a id="mode_toggle" href="#" @click.prevent="handleClick" :title="mode">
+    <template v-if="mode == 'light'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_light"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M67.48,18.073c1.913,-1.912 1.913,-5.018 0,-6.931c-1.912,-1.912 -5.018,-1.912 -6.931,0l-6.798,6.799c-1.912,1.912 -1.912,5.018 0,6.931c1.913,1.912 5.018,1.912 6.931,-0l6.798,-6.799Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.728,61.108c1.912,-1.913 1.912,-5.018 -0,-6.931c-1.913,-1.913 -5.019,-1.913 -6.931,-0l-6.799,6.798c-1.912,1.913 -1.912,5.019 0,6.931c1.913,1.913 5.019,1.913 6.931,0l6.799,-6.798Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.682,54.177c-1.913,-1.913 -5.018,-1.913 -6.931,-0c-1.912,1.913 -1.912,5.018 0,6.931l6.798,6.798c1.913,1.913 5.019,1.913 6.931,0c1.913,-1.912 1.913,-5.018 0,-6.931l-6.798,-6.798Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M4.901,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,-0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M18.929,11.142c-1.912,-1.912 -5.018,-1.912 -6.931,0c-1.912,1.913 -1.912,5.019 0,6.931l6.799,6.799c1.912,1.912 5.018,1.912 6.931,-0c1.912,-1.913 1.912,-5.019 -0,-6.931l-6.799,-6.799Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.108,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c-0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c-0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'dark'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_dark"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.901,2.196 -4.901,4.901c0,2.705 2.197,4.901 4.901,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.662,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.989,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.732,61.103c1.91,-1.91 1.91,-5.011 0,-6.921l-0.009,-0.01c-1.91,-1.91 -5.012,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.909,1.91 5.011,1.91 6.92,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.672,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.52,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l-0,-0.01c-0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.901,2.196 -4.901,4.901c0,2.704 2.197,4.9 4.901,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.73,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 -0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.098,34.623c-2.699,0 -4.891,2.192 -4.891,4.892l-0,0.019c-0,2.699 2.192,4.891 4.891,4.891c2.7,0 4.892,-2.192 4.892,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.892,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'darkest'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_darkest"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><path d="M39.315,23.791c8.684,-0 15.734,7.05 15.734,15.733c0,8.684 -7.05,15.734 -15.734,15.734c-8.683,0 -15.733,-7.05 -15.733,-15.734c-0,-8.683 7.05,-15.733 15.733,-15.733Zm0,4.737c6.069,0 10.997,4.927 10.997,10.996c-0,6.069 -4.928,10.996 -10.997,10.996c-6.068,0 -10.996,-4.927 -10.996,-10.996c0,-6.069 4.928,-10.996 10.996,-10.996Z" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.216,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.9,2.196 -4.9,4.901c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.666,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.99,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.737,61.103c1.909,-1.91 1.909,-5.011 -0,-6.921l-0.01,-0.01c-1.91,-1.91 -5.011,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.91,1.91 5.011,1.91 6.921,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.676,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.524,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l0,-0.01c0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.216,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901c-0,2.704 2.196,4.9 4.9,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.734,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.103,34.623c-2.7,0 -4.892,2.192 -4.892,4.892l-0,0.019c-0,2.699 2.192,4.891 4.892,4.891c2.699,0 4.891,-2.192 4.891,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.891,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+</a>
+
+<script>
+(function() {
+    const LOCAL_STORAGE_KEY = 'piccoloThemeMode'
+
+    var initialMode = localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (initialMode) {
+        // Make sure the value in local storage is valid
+        if (['light', 'dark', 'darkest'].indexOf(initialMode) == -1) {
+            initialMode = 'light'
+            localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+        }
+    } else {
+        // Check if the client prefers dark mode
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialMode = 'dark'
+        } else {
+            initialMode = 'light'
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+    }
+
+    document.documentElement.dataset.mode = initialMode
+
+    PetiteVue.createApp({
+        'mode': initialMode,
+        handleClick() {
+            let currentMode = this.mode
+
+            if (currentMode == 'light') {
+                this.mode = 'dark'
+            } else if (currentMode == 'dark') {
+                this.mode = 'darkest'
+            } else if (currentMode == 'darkest') {
+                this.mode = 'light'
+            }
+
+            document.documentElement.dataset.mode = this.mode
+            localStorage.setItem(LOCAL_STORAGE_KEY, this.mode)
+
+            console.log(this.mode)
+        }
+    }).mount('#mode_toggle')
+})()
+</script>
+            <p class="mobile_search_link">
+                <a href="../search.html" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65 64" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                        <path d="M14.873 40.009c-2.315-3.943-3.642-8.532-3.642-13.429C11.231 11.91 23.141 0 37.811 0s26.58 11.91 26.58 26.58-11.91 26.58-26.58 26.58a26.44 26.44 0 0 1-14.277-4.161L9.739 62.794a3.12 3.12 0 0 1-4.413 0L.913 58.382c-1.217-1.218-1.217-3.196 0-4.413l13.96-13.96zM37.811 8.054c10.225 0 18.526 8.301 18.526 18.526s-8.301 18.526-18.526 18.526-18.526-8.301-18.526-18.526S27.586 8.054 37.811 8.054z" fill="#fff" />
+                    </svg>
+                </a>
+            </p>
+        
+
+        <div class="searchbox_wrapper">
+            
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+    </nav>
+</div>
+
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Paper</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../paper.html">A Co-Design Compilation Flow as a Harness for Language Models to Improve It</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup/index.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_01_get_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_02_vhls.html">Vivado/Vitis HLS Backend</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Deep Dive</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dive/frontend_syntax.html">Frontend Syntax Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/dataflow.html">Dataflow Programming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_01_data_types.html">Data Types and Type Casting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_02_template.html">Template Kernels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_03_composition.html">Kernel Composition</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/ip.html">IP Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/pytorch.html">PyTorch Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_05_verifier.html">Equivalence Checking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_04_features.html">Other Features</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Backends</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="benchmarks.html">The Benchmark Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_history.html">TinyTPU-isa: Design History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="minitpu.html">MiniTPU: Reference Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Extensions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/extending_allo.html">Extending Allo’s Abstractions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/stream_ports.html">Stream Ports: a Unit with an Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">Schedule Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html#data-types">Data Types</a></li>
+</ul>
+
+        </div>
+      </div>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="the-unit-library-composing-a-region-from-units">
+<h1>The Unit Library: Composing a Region from Units<a class="headerlink" href="#the-unit-library-composing-a-region-from-units" title="Link to this heading"><span>¶</span></a></h1>
+<p>TinyTPU-isa is not written as a design any more. It is written as eight units
+in <code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/ip/units/</span></code>, one per module, and one
+<em>architecture</em> – <code class="docutils literal notranslate"><span class="pre">ip/tinytpu.py</span></code> – that names the channels wiring them, the
+parameters sizing them and the order they are declared in.
+<code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code> is what is left of the design file: the parameter set read
+from the environment, and the module-level names the harness imports.</p>
+<p>This page is about the decomposition. <a class="reference internal" href="tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a> remains the page about
+the architecture and the ISA, and <a class="reference internal" href="tinytpu_history.html"><span class="doc">TinyTPU-isa: Design History</span></a> about how the numbers
+were reached.</p>
+<section id="why-the-region-is-composed-rather-than-written">
+<h2>Why the region is composed rather than written<a class="headerlink" href="#why-the-region-is-composed-rather-than-written" title="Link to this heading"><span>¶</span></a></h2>
+<p>Allo’s dataflow front end does not let a unit be written outside the region
+that contains it. Two mechanisms, both in <code class="docutils literal notranslate"><span class="pre">allo/ir/infer.py</span></code> and
+<code class="docutils literal notranslate"><span class="pre">allo/ir/builder.py</span></code>:</p>
+<ul class="simple">
+<li><p>a <code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code> is recognised only as a <strong>nested</strong> <code class="docutils literal notranslate"><span class="pre">ast.FunctionDef</span></code>
+inside the <code class="docutils literal notranslate"><span class="pre">&#64;df.region()</span></code>’s own source (<code class="docutils literal notranslate"><span class="pre">TypeInferer.visit_FunctionDef</span></code>
+descends into the region’s body and looks for the decorator);</p></li>
+<li><p>the names in a kernel body – including every stream it touches – are
+resolved against the <strong>enclosing region’s scope</strong> (<code class="docutils literal notranslate"><span class="pre">ctx.scopes</span></code> is shared
+with the parent context), so a stream is reached by lexical name and never
+as a parameter.</p></li>
+</ul>
+<p>A <code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code> therefore has no interface. Its ports are whatever the region
+it was pasted into happens to have declared, under whatever names. This is the
+mechanism behind “the design is a monolith”: it is not that the units were
+tangled, it is that a unit had nothing to declare.</p>
+<p><code class="docutils literal notranslate"><span class="pre">ip/compose.py</span></code> works with that rather than against it: it composes the
+region’s <strong>source</strong>. A unit is an ordinary module-level function; an
+<code class="docutils literal notranslate"><span class="pre">Architecture</span></code> emits a <code class="docutils literal notranslate"><span class="pre">&#64;df.region()</span></code> that nests all of them, declares the
+channels above them, and binds every free name in their bodies from its own
+parameter namespace. The text is compiled with <code class="docutils literal notranslate"><span class="pre">exec</span></code> and registered in
+<code class="docutils literal notranslate"><span class="pre">linecache</span></code> under <code class="docutils literal notranslate"><span class="pre">&lt;composed</span> <span class="pre">tinytpu_isa&gt;</span></code>, because Allo reads a region
+back with <code class="docutils literal notranslate"><span class="pre">inspect.getsourcelines</span></code>. <code class="docutils literal notranslate"><span class="pre">ALLO_DUMP_COMPOSED=&lt;dir&gt;</span></code> writes the
+composed text out to read or diff.</p>
+<section id="what-this-buys-and-what-it-does-not">
+<h3>What this buys, and what it does not<a class="headerlink" href="#what-this-buys-and-what-it-does-not" title="Link to this heading"><span>¶</span></a></h3>
+<p>It buys everything that does not need the front end to change:</p>
+<ul class="simple">
+<li><p>a unit is a module of its own, importable and readable without the region;</p></li>
+<li><p>a unit closes over nothing – <code class="docutils literal notranslate"><span class="pre">T</span></code>, <code class="docutils literal notranslate"><span class="pre">VW</span></code>, <code class="docutils literal notranslate"><span class="pre">SPAD_ROWS</span></code>, the opcodes are
+supplied by the architecture, so the same unit text composes at <code class="docutils literal notranslate"><span class="pre">T=4</span></code> and
+at <code class="docutils literal notranslate"><span class="pre">T=8</span></code> in the same process;</p></li>
+<li><p>a unit’s Vitis directives travel with it, so the pragma that holds a unit at
+II=1 is next to the loop it applies to rather than in a <code class="docutils literal notranslate"><span class="pre">schedule()</span></code> that
+has to know every unit’s internals;</p></li>
+<li><p>the interface is <em>declared and checked</em>, below.</p></li>
+</ul>
+<p>It does not buy positional binding. A unit still names its channels
+(<code class="docutils literal notranslate"><span class="pre">c_spm</span></code>, <code class="docutils literal notranslate"><span class="pre">wcol</span></code>) rather than receiving them, so three things remain
+impossible:</p>
+<ul class="simple">
+<li><p>two architectures must agree on a channel’s <em>name</em>, not just its type and
+direction;</p></li>
+<li><p>one unit cannot be instantiated twice in one region against different
+channels (a second <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> on a second pair of operand ports, say);</p></li>
+<li><p>a unit cannot be built on its own. <code class="docutils literal notranslate"><span class="pre">df.build</span></code> takes a region, and a unit
+only exists once it has been composed into one, so a unit test is a test of
+a small architecture rather than of a unit.</p></li>
+</ul>
+</section>
+<section id="the-census-of-what-is-still-bound-by-name">
+<span id="tinytpu-library-capture-census"></span><h3>The census of what is still bound by name<a class="headerlink" href="#the-census-of-what-is-still-bound-by-name" title="Link to this heading"><span>¶</span></a></h3>
+<p>Every one of the eight units lifted to module level: <strong>no closure remains</strong>.
+What was measured as 29 closure capture edges over 16 stream declarations is
+now 29 <em>declarations</em>, each checked against the body it describes. The
+capture surface was, and is, exclusively streams – no shared array, no
+captured Python value, no captured region parameter – so this is the whole of
+what the missing port syntax would replace:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 14.0%" />
+<col style="width: 10.0%" />
+<col style="width: 76.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Unit</p></th>
+<th class="head"><p>Edges</p></th>
+<th class="head"><p>Channels bound by name</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">sequencer</span></code></p></td>
+<td><p>5</p></td>
+<td><p>out: <code class="docutils literal notranslate"><span class="pre">c_dld</span></code>, <code class="docutils literal notranslate"><span class="pre">c_spm</span></code>, <code class="docutils literal notranslate"><span class="pre">c_vru</span></code>, <code class="docutils literal notranslate"><span class="pre">c_acc</span></code>, <code class="docutils literal notranslate"><span class="pre">c_dst</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dma_ld</span></code></p></td>
+<td><p>3</p></td>
+<td><p>in: <code class="docutils literal notranslate"><span class="pre">c_dld</span></code>; out: <code class="docutils literal notranslate"><span class="pre">dma2sp</span></code>, <code class="docutils literal notranslate"><span class="pre">dma2vr</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code></p></td>
+<td><p>4</p></td>
+<td><p>in: <code class="docutils literal notranslate"><span class="pre">c_spm</span></code>, <code class="docutils literal notranslate"><span class="pre">dma2sp</span></code>; out: <code class="docutils literal notranslate"><span class="pre">sp2vr</span></code>, <code class="docutils literal notranslate"><span class="pre">wcol</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code></p></td>
+<td><p>4</p></td>
+<td><p>in: <code class="docutils literal notranslate"><span class="pre">c_vru</span></code>, <code class="docutils literal notranslate"><span class="pre">sp2vr</span></code>, <code class="docutils literal notranslate"><span class="pre">dma2vr</span></code>; out: <code class="docutils literal notranslate"><span class="pre">acol</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">wld</span></code></p></td>
+<td><p>3</p></td>
+<td><p>chain: <code class="docutils literal notranslate"><span class="pre">wcol</span></code>, <code class="docutils literal notranslate"><span class="pre">wrow</span></code>; out: <code class="docutils literal notranslate"><span class="pre">wq</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">pe</span></code></p></td>
+<td><p>5</p></td>
+<td><p>in: <code class="docutils literal notranslate"><span class="pre">wq</span></code>; chain: <code class="docutils literal notranslate"><span class="pre">acol</span></code>, <code class="docutils literal notranslate"><span class="pre">a_fwd</span></code>, <code class="docutils literal notranslate"><span class="pre">p_fwd</span></code>, <code class="docutils literal notranslate"><span class="pre">cw</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code></p></td>
+<td><p>3</p></td>
+<td><p>in: <code class="docutils literal notranslate"><span class="pre">c_acc</span></code>, <code class="docutils literal notranslate"><span class="pre">cw</span></code>; out: <code class="docutils literal notranslate"><span class="pre">ac2sp</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dma_st</span></code></p></td>
+<td><p>2</p></td>
+<td><p>in: <code class="docutils literal notranslate"><span class="pre">c_dst</span></code>, <code class="docutils literal notranslate"><span class="pre">ac2sp</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p><code class="docutils literal notranslate"><span class="pre">dma_st</span></code> is the cheapest unit to give ports to (2) and <code class="docutils literal notranslate"><span class="pre">sequencer</span></code> and
+<code class="docutils literal notranslate"><span class="pre">pe</span></code> the dearest (5). Nothing else stands in the way: the parameters and the
+ISA constants are already passed rather than captured, and the memories are
+already <code class="docutils literal notranslate"><span class="pre">args=[...]</span></code>.</p>
+<p>That is the front-end gap, it is <a class="reference external" href="https://github.com/sunwookim028/allo/issues/13">fork issue #13</a> territory, and it is being
+worked on separately: <code class="docutils literal notranslate"><span class="pre">Stream</span></code> has no <code class="docutils literal notranslate"><span class="pre">__class_getitem__</span></code>, so
+<code class="docutils literal notranslate"><span class="pre">Stream[int32,</span> <span class="pre">4]</span></code> in a signature raises <code class="docutils literal notranslate"><span class="pre">TypeError</span></code>, and behind that
+<code class="docutils literal notranslate"><span class="pre">ctx.get_symbol(new_name).clone(...)</span></code> at six sites in <code class="docutils literal notranslate"><span class="pre">allo/ir/builder.py</span></code>
+keys a stream op to a construct site rather than to a value. The composable
+form already exists one level down: <code class="docutils literal notranslate"><span class="pre">df.customize</span></code> emits each unit as a
+<code class="docutils literal notranslate"><span class="pre">func.func</span></code> taking <code class="docutils literal notranslate"><span class="pre">!allo.stream&lt;...&gt;</span></code> arguments with an <code class="docutils literal notranslate"><span class="pre">stypes</span></code>
+attribute giving port direction, and the region as a <code class="docutils literal notranslate"><span class="pre">func.func</span></code> that
+constructs the streams and wires them by <code class="docutils literal notranslate"><span class="pre">call</span></code>. What is missing is the
+source syntax to write that directly.</p>
+</section>
+</section>
+<section id="the-interface-is-checked-not-just-written">
+<h2>The interface is checked, not just written<a class="headerlink" href="#the-interface-is-checked-not-just-written" title="Link to this heading"><span>¶</span></a></h2>
+<p>Each unit carries its interface in the <code class="docutils literal notranslate"><span class="pre">&#64;unit(...)</span></code> decorator: the channels
+it <code class="docutils literal notranslate"><span class="pre">reads</span></code> and <code class="docutils literal notranslate"><span class="pre">writes</span></code>, the <code class="docutils literal notranslate"><span class="pre">memories</span></code> it addresses, the <code class="docutils literal notranslate"><span class="pre">parameters</span></code>
+it is sized by, the <code class="docutils literal notranslate"><span class="pre">isa</span></code> names it decodes. <code class="docutils literal notranslate"><span class="pre">Unit.check</span></code> recomputes the
+body’s free names from its AST and requires the two sets to be <strong>equal</strong>, so a
+declaration cannot drift from the body in either direction. Three rules that
+used to be prose are now enforced at composition time:</p>
+<ul class="simple">
+<li><p><strong>The array decodes nothing.</strong> <code class="docutils literal notranslate"><span class="pre">pe</span></code> and <code class="docutils literal notranslate"><span class="pre">wld</span></code> declare <code class="docutils literal notranslate"><span class="pre">isa=()</span></code>. That
+was a paragraph of the old module docstring; it is now a claim that fails
+loudly if anyone puts an opcode test in a PE.</p></li>
+<li><p><strong>One reader and one writer per stream.</strong> <code class="docutils literal notranslate"><span class="pre">Architecture._check</span></code> holds every
+scalar channel to one reading unit and one writing unit, and requires each to
+have both. The chains (the stream <em>arrays</em>) are exempt: their owner is per
+element – stage <em>i</em> reads <code class="docutils literal notranslate"><span class="pre">ch[i]</span></code> and writes <code class="docutils literal notranslate"><span class="pre">ch[i</span> <span class="pre">+</span> <span class="pre">1]</span></code> – and the index
+is a runtime value, so nothing static can check them.</p></li>
+<li><p><strong>One owner per off-chip memory.</strong> <code class="docutils literal notranslate"><span class="pre">imem</span></code> is the sequencer’s, <code class="docutils literal notranslate"><span class="pre">A</span></code>/<code class="docutils literal notranslate"><span class="pre">B</span></code>
+are <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code>’s, <code class="docutils literal notranslate"><span class="pre">C</span></code> is <code class="docutils literal notranslate"><span class="pre">dma_st</span></code>’s, and a second unit naming one is a
+composition error rather than a Vitis error later.</p></li>
+</ul>
+</section>
+<section id="what-the-split-made-worse-the-instruction-layout">
+<h2>What the split made worse: the instruction layout<a class="headerlink" href="#what-the-split-made-worse-the-instruction-layout" title="Link to this heading"><span>¶</span></a></h2>
+<p>One honest cost, and it is the only place where this decomposition is worse
+than the monolith. An instruction is taken apart in three places – the
+encoder, the assembler’s decoder and the sequencer’s bit slices – and in one
+file those shifts sat within a screen of each other. In three files they can
+drift, and <strong>nothing here would catch it</strong>: <code class="docutils literal notranslate"><span class="pre">Unit.check</span></code> answers <em>which
+names a unit may decode</em>, not <em>what the bits mean</em>, and the byte-identical
+MLIR check proves the region is unchanged, not that two hand-written decoders
+agree. A shift off by one in the assembler and not in the sequencer passes
+every gate on this page.</p>
+<p>Two of the three sites now read one definition. <code class="docutils literal notranslate"><span class="pre">ip/isa.py</span></code> names the layout
+– <code class="docutils literal notranslate"><span class="pre">OP_LO</span></code>/<code class="docutils literal notranslate"><span class="pre">OP_HI</span></code>, <code class="docutils literal notranslate"><span class="pre">F0_LO</span></code>..``F3_HI``, <code class="docutils literal notranslate"><span class="pre">NR_LO</span></code>/<code class="docutils literal notranslate"><span class="pre">NR_HI</span></code>,
+<code class="docutils literal notranslate"><span class="pre">AGU_TERM_BITS</span></code>, <code class="docutils literal notranslate"><span class="pre">AGU_TARGET_BITS</span></code>, <code class="docutils literal notranslate"><span class="pre">AGU_LEVEL_BITS</span></code> and the masks
+derived from them – <code class="docutils literal notranslate"><span class="pre">enc</span></code>/<code class="docutils literal notranslate"><span class="pre">enc_agu</span></code> build from it, and the assembler
+decodes through <code class="docutils literal notranslate"><span class="pre">opcode_of</span></code>, <code class="docutils literal notranslate"><span class="pre">rows_of</span></code>, <code class="docutils literal notranslate"><span class="pre">fields_of</span></code> and <code class="docutils literal notranslate"><span class="pre">agu_term</span></code>
+rather than through <code class="docutils literal notranslate"><span class="pre">&amp;</span> <span class="pre">0x3F</span></code>, <code class="docutils literal notranslate"><span class="pre">&gt;&gt;</span> <span class="pre">54</span></code> and <code class="docutils literal notranslate"><span class="pre">19</span> <span class="pre">*</span> <span class="pre">term</span></code>. The re-derived
+encoder was checked against the literal one over 6000 random instructions and
+address words: zero differences.</p>
+<section id="the-third-site-cannot-and-that-is-a-front-end-limitation">
+<span id="tinytpu-library-symbolic-slice"></span><h3>The third site cannot, and that is a front-end limitation<a class="headerlink" href="#the-third-site-cannot-and-that-is-a-front-end-limitation" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">sequencer</span></code> still spells its slices <code class="docutils literal notranslate"><span class="pre">control_word[0:6]</span></code>,
+<code class="docutils literal notranslate"><span class="pre">control_word[54:62]</span></code>. Writing them as <code class="docutils literal notranslate"><span class="pre">control_word[OP_LO:OP_HI]</span></code>
+parses, builds and gives the right answers, but Allo cannot infer the width of
+a slice whose bounds are names:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>allo/ir/infer.py:582: UserWarning: Cannot infer the bitwidth of the slice,
+use UInt(32) as default
+</pre></div>
+</div>
+<p>and the extract widens from <code class="docutils literal notranslate"><span class="pre">i6</span></code> to <code class="docutils literal notranslate"><span class="pre">i32</span></code>. Measured 2026-09-22: the
+normalized MLIR goes from identical to <strong>796 diff lines</strong> – every field
+extract in the sequencer becomes a 32-bit one, which is a different circuit,
+not a different spelling. So the bit layout of an instruction can be named
+once for software and must be written twice for hardware, until the front end
+can fold a constant into a slice bound.</p>
+<p>This is what the <code class="docutils literal notranslate"><span class="pre">isa-spec</span></code> track fixes properly: it generates the layout
+from a single <code class="docutils literal notranslate"><span class="pre">isa_spec.json</span></code> and checks the encoder, <code class="docutils literal notranslate"><span class="pre">expand</span></code>, the header
+and the <em>emitted HLS slices</em> against it, which is the guarantee naming alone
+cannot give – one definition stops the sites drifting, it does not prove any
+of them matches an ISA written down independently. Deliberately not
+hand-rolled here. On the CHIA axis that generator belongs in
+<code class="docutils literal notranslate"><span class="pre">FROZEN_DESIGN</span></code>: it judges a candidate rather than being one, and a
+candidate editing <code class="docutils literal notranslate"><span class="pre">ip/isa.py</span></code> is then checked against the ISA, which the
+loop has no way to do today.</p>
+</section>
+</section>
+<section id="where-the-boundaries-are-and-why">
+<h2>Where the boundaries are, and why<a class="headerlink" href="#where-the-boundaries-are-and-why" title="Link to this heading"><span>¶</span></a></h2>
+<p>The eight units the design already had, unchanged. They are the boundaries the
+memories impose: <code class="docutils literal notranslate"><span class="pre">spad</span></code> lives in <code class="docutils literal notranslate"><span class="pre">spm</span></code>, <code class="docutils literal notranslate"><span class="pre">vr</span></code> in <code class="docutils literal notranslate"><span class="pre">vru</span></code>, <code class="docutils literal notranslate"><span class="pre">ar</span></code> in
+<code class="docutils literal notranslate"><span class="pre">accu</span></code>, and Allo enforces one owner per memory, so those three units keep
+every opcode arm they had – a one-process-per-opcode split is not expressible
+and was not attempted (<a class="reference internal" href="tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>, “One owner per memory”). The
+library adds no hierarchy that a second architecture would not use.</p>
+<p>The split across modules, though, is by <em>role</em> rather than by kernel, and that
+is where the parametrization lands:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 26.0%" />
+<col style="width: 74.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Module</p></th>
+<th class="head"><p>What it owns</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ip/params.py</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">TpuParams</span></code>: <code class="docutils literal notranslate"><span class="pre">T</span></code>, <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code>, <code class="docutils literal notranslate"><span class="pre">SPAD_ROWS</span></code>, <code class="docutils literal notranslate"><span class="pre">NVR</span></code>, <code class="docutils literal notranslate"><span class="pre">NAR</span></code>,
+<code class="docutils literal notranslate"><span class="pre">QD</span></code>, <code class="docutils literal notranslate"><span class="pre">IMEM_SIZE</span></code>, and the derived <code class="docutils literal notranslate"><span class="pre">VW</span></code>, <code class="docutils literal notranslate"><span class="pre">AW</span></code>, <code class="docutils literal notranslate"><span class="pre">WPR</span></code>. Frozen,
+validated in <code class="docutils literal notranslate"><span class="pre">__post_init__</span></code>, and the only thing that decides a unit’s
+size. Reads no environment variable.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ip/isa.py</span></code></p></td>
+<td><p>The instruction encoding: opcodes, field layout, <code class="docutils literal notranslate"><span class="pre">enc</span></code>, <code class="docutils literal notranslate"><span class="pre">enc_agu</span></code>.
+<code class="docutils literal notranslate"><span class="pre">ISA_NAMESPACE</span></code> is what a unit’s <code class="docutils literal notranslate"><span class="pre">isa=</span></code> declaration draws from.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ip/compose.py</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Channel</span></code>, <code class="docutils literal notranslate"><span class="pre">Memory</span></code>, <code class="docutils literal notranslate"><span class="pre">Unit</span></code>, <code class="docutils literal notranslate"><span class="pre">Architecture</span></code>: the composition
+itself, with no knowledge of TinyTPU.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ip/units/*.py</span></code></p></td>
+<td><p>One unit each, closing over nothing.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ip/assembler.py</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Assembler</span></code>, bound to a parameter set: <code class="docutils literal notranslate"><span class="pre">expand</span></code>, <code class="docutils literal notranslate"><span class="pre">trace</span></code>,
+<code class="docutils literal notranslate"><span class="pre">check</span></code>, <code class="docutils literal notranslate"><span class="pre">assemble</span></code>, and <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ip/programs.py</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">MemoryMap</span></code> and <code class="docutils literal notranslate"><span class="pre">GemmPrograms</span></code>: the program ABI, which no unit
+knows.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ip/tinytpu.py</span></code></p></td>
+<td><p>The TinyTPU architecture: channels, memories, unit order, and
+<code class="docutils literal notranslate"><span class="pre">TinyTPU</span></code>, which ties a parameter set to its region, its directives,
+its assembler and its reference programs.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ip/reduce.py</span></code></p></td>
+<td><p>The <strong>second</strong> architecture, <code class="docutils literal notranslate"><span class="pre">DotTree</span></code>: an adder-tree reduction
+instead of the systolic chain, out of the same <code class="docutils literal notranslate"><span class="pre">Unit</span></code>, <code class="docutils literal notranslate"><span class="pre">Channel</span></code>,
+<code class="docutils literal notranslate"><span class="pre">Memory</span></code> and <code class="docutils literal notranslate"><span class="pre">Architecture</span></code>. <a class="reference internal" href="ip_gaps.html#ip-gaps-compose"><span class="std std-ref">What compose.py did not need</span></a> is what it
+tests – <code class="docutils literal notranslate"><span class="pre">compose.py</span></code> needed no change to admit a different reduction
+topology, because the topology is the pair (which units, which
+channels).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ip/placeholders.py</span></code></p></td>
+<td><p><strong>Nothing here is implemented.</strong> One declaration per unfilled row of
+<a class="reference internal" href="ip_gaps.html#ip-gaps-table"><span class="std std-ref">The gap table</span></a>, each raising <code class="docutils literal notranslate"><span class="pre">NotBuilt</span></code> with what would make it
+real.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="instantiating-it">
+<h2>Instantiating it<a class="headerlink" href="#instantiating-it" title="Link to this heading"><span>¶</span></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">examples.accelerator.tinytpu_vitis.ip</span><span class="w"> </span><span class="kn">import</span> <span class="n">TinyTPU</span><span class="p">,</span> <span class="n">TpuParams</span>
+
+<span class="n">wide</span> <span class="o">=</span> <span class="n">TinyTPU</span><span class="p">(</span><span class="n">TpuParams</span><span class="p">(</span><span class="n">T</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">MAXDIM</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">IMEM_SIZE</span><span class="o">=</span><span class="mi">56</span><span class="p">),</span> <span class="n">name</span><span class="o">=</span><span class="s2">"tinytpu_t8"</span><span class="p">)</span>
+<span class="n">module</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">wide</span><span class="o">.</span><span class="n">region</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="s2">"simulator"</span><span class="p">)</span>
+<span class="n">words</span> <span class="o">=</span> <span class="n">wide</span><span class="o">.</span><span class="n">assembler</span><span class="o">.</span><span class="n">assemble</span><span class="p">(</span><span class="n">wide</span><span class="o">.</span><span class="n">programs</span><span class="o">.</span><span class="n">looped</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="mi">16</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Two <code class="docutils literal notranslate"><span class="pre">TinyTPU</span></code> objects at different parameter sets coexist in one process,
+holding the <strong>same</strong> <code class="docutils literal notranslate"><span class="pre">Unit</span></code> objects – the reuse property, demonstrated
+(these figures are from before the merge, when the default was MAXDIM=16):</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>tpu_t4: T=4 MAXDIM=16 VW=32 WPR=4  457 source lines, region=tpu_t4
+   header of a 16x16x16 gemm: [13, 128, 144, 320, 16777232, 320, 64, 1048592]
+tpu_t8: T=8 MAXDIM=32 VW=64 WPR=4  457 source lines, region=tpu_t8
+   header of a 16x16x16 gemm: [13, 64, 68, 96, 4194308, 96, 32, 1048592]
+same pe unit object in both: True
+</pre></div>
+</div>
+<p>Nothing is read from a module global, so the two regions differ only in what
+the architecture bound. <code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code> is one such instantiation, with
+its parameters from <code class="docutils literal notranslate"><span class="pre">TPU_T</span></code> / <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM</span></code> / …, so the sweeps and the
+CHIA parametricity gate keep working unchanged;
+<code class="docutils literal notranslate"><span class="pre">chia_agent/param_check.py</span></code> at <code class="docutils literal notranslate"><span class="pre">T=8,</span> <span class="pre">MAXDIM=32</span></code> reports
+<code class="docutils literal notranslate"><span class="pre">PARAM</span> <span class="pre">OK:</span> <span class="pre">408/408</span> <span class="pre">runs</span> <span class="pre">exact</span></code>.</p>
+<p>The parameter set is also where the coupling main found lives: the memory
+sizes are derived from T and MAXDIM rather than typed in, because three
+independent literals were big enough at MAXDIM=16 and silently were not above
+it – the GEMM’s operand layout names <code class="docutils literal notranslate"><span class="pre">MAXDIM*MAXDIM/T</span></code> rows, which at
+MAXDIM=64 is 1024 against a 256-entry vreg file. <code class="docutils literal notranslate"><span class="pre">TpuParams</span></code> takes <code class="docutils literal notranslate"><span class="pre">None</span></code>
+to mean “derive” and an explicit value as an override, and its
+<code class="docutils literal notranslate"><span class="pre">__post_init__</span></code> carries the two encoding ceilings.</p>
+</section>
+<section id="the-refactor-moved-no-number-and-that-is-checked">
+<h2>The refactor moved no number, and that is checked<a class="headerlink" href="#the-refactor-moved-no-number-and-that-is-checked" title="Link to this heading"><span>¶</span></a></h2>
+<p>The decomposition was done in two steps so that each could be verified
+differently.</p>
+<p><strong>Step 1, the move.</strong> The composed region’s AST was compared against the
+region on the previous commit with <code class="docutils literal notranslate"><span class="pre">ast.dump</span></code>: the only difference was the
+eight kernel docstrings, which were removed. The MLIR <code class="docutils literal notranslate"><span class="pre">df.customize</span></code> emits
+was then dumped before and after – 4314 lines – and is <strong>byte-identical</strong>,
+both with the docstrings present and with them removed. A byte-identical
+module means identical HLS C++, so no cycle count can have moved.</p>
+<p><strong>Step 2, the naming.</strong> Renaming locals does change the MLIR: Allo attaches
+the source name to loads, stores, loops and buffers. Normalizing the
+<code class="docutils literal notranslate"><span class="pre">name</span></code> / <code class="docutils literal notranslate"><span class="pre">from</span></code> / <code class="docutils literal notranslate"><span class="pre">to</span></code> / <code class="docutils literal notranslate"><span class="pre">loop_name</span></code> / <code class="docutils literal notranslate"><span class="pre">variable</span></code> attributes and the
+SSA value names makes the two dumps <strong>identical again</strong>, so the emitted C++
+differs only in identifier spelling.</p>
+<p><strong>Step 3, the merge.</strong> <code class="docutils literal notranslate"><span class="pre">main</span></code> changed the design while the branch was held
+– MAXDIM to 64, the memory sizes derived rather than typed in, two
+encoding-ceiling assertions, a parametric operand-burst width, a <code class="docutils literal notranslate"><span class="pre">because=</span></code>
+obligation on the dependence claim – and the published row moved with it, to
+171 / 261 / 417 / 483 / 685 (it has moved once more since, to
+175 / 265 / 421 / 482 / 674, when <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> became the default on
+2026-09-24). The branch was merged and the design
+re-decomposed rather than the old shape reapplied, and the comparison that
+matters is now against <code class="docutils literal notranslate"><span class="pre">main</span></code>: the MLIR the composed region emits is
+<strong>identical to the MLIR main’s monolithic design emits</strong>, 4325 lines, under
+the same normalization. The obligation string is quoted verbatim from main so
+that even the attribute text matches.</p>
+<p>Where main’s three changes landed is the test of whether the boundaries were
+drawn in the right place: the derived sizing and the ceilings are the
+parameter set (<code class="docutils literal notranslate"><span class="pre">ip/params.py</span></code>), the burst width is one unit’s concern
+(<code class="docutils literal notranslate"><span class="pre">ip/units/dma_load.py</span></code>, with <code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code> a parameter that unit declares),
+and the obligation is the accumulator’s own claim
+(<code class="docutils literal notranslate"><span class="pre">accumulator_directives</span></code>). Nothing reached <code class="docutils literal notranslate"><span class="pre">compose.py</span></code>, <code class="docutils literal notranslate"><span class="pre">tinytpu.py</span></code>,
+the other seven units, the assembler or the ISA. A change to how the operand
+burst works reached exactly the unit that bursts.</p>
+<p>The measured gates, on this branch, after all three steps:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>bench_isa      generated == hand-written word-for-word at all 5 shapes
+               ALL EXACT
+stress_isa     STRESS OK: 640/640 runs exact (96 shapes)
+act_compile    ACT GATE OK: 12/12 problems, every encodable mapping verified
+mutate.py      MUTATE OK: all 33 mutants run were caught (--no-rtl),
+               and ar_claim_false caught by cosim
+param_check    PARAM OK: 408/408 runs exact at T=8 MAXDIM=32
+</pre></div>
+</div>
+<section id="mutate-py-shadows-the-design-tree">
+<h3><code class="docutils literal notranslate"><span class="pre">mutate.py</span></code> shadows the design tree<a class="headerlink" href="#mutate-py-shadows-the-design-tree" title="Link to this heading"><span>¶</span></a></h3>
+<p>The mutation harness used to copy one file. It now writes its copy of every
+design file (<code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code> plus the <code class="docutils literal notranslate"><span class="pre">ip</span></code> tree, <code class="docutils literal notranslate"><span class="pre">DESIGN</span></code>) into
+<code class="docutils literal notranslate"><span class="pre">.mutants/&lt;name&gt;/</span></code> and puts that directory in front of the real one on the
+package’s <code class="docutils literal notranslate"><span class="pre">__path__</span></code>, so every design import resolves to the mutated copy
+while the harness scripts still come from the checkout. A mutant names no
+file: its anchor must occur <strong>exactly once across the whole design</strong>, which is
+a stronger uniqueness claim than before and is what locates the mutation.</p>
+</section>
+</section>
+<section id="what-the-prose-deletion-was">
+<h2>What the prose deletion was<a class="headerlink" href="#what-the-prose-deletion-was" title="Link to this heading"><span>¶</span></a></h2>
+<p>The design file is 1691 lines on <code class="docutils literal notranslate"><span class="pre">main</span></code>, 904 of them comment or docstring
+(53%), including a 264-line module docstring and a 30-to-60-line docstring on
+each unit. The library is 1787 lines with 449 of prose (25%): <strong>455 lines of
+prose deleted</strong>, and the hardware bodies themselves are the same size as
+before.</p>
+<p>Almost none of it was lost. The module docstring was a second copy of
+<a class="reference internal" href="tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a> and <a class="reference internal" href="tinytpu_history.html"><span class="doc">TinyTPU-isa: Design History</span></a> – chains rather than fan-out,
+hazards from being in-order, one owner per memory, the data type, the
+row-flattening story, the <code class="docutils literal notranslate"><span class="pre">wrap_io</span></code> measurement table, <code class="docutils literal notranslate"><span class="pre">align_value</span></code>, the
+write-behind rotation that was reverted – and in one place it had gone stale,
+which <a class="reference internal" href="tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a> already flagged (“the module docstring still states
+the requirement this way”). What replaced the rest is naming:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 34.0%" />
+<col style="width: 36.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Unit</p></th>
+<th class="head"><p>Was</p></th>
+<th class="head"><p>Is</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">sequencer</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ib</span></code>, <code class="docutils literal notranslate"><span class="pre">lp_iv</span></code>, <code class="docutils literal notranslate"><span class="pre">sp</span></code>, <code class="docutils literal notranslate"><span class="pre">w0</span></code>/<code class="docutils literal notranslate"><span class="pre">w1</span></code>, <code class="docutils literal notranslate"><span class="pre">tw</span></code>/<code class="docutils literal notranslate"><span class="pre">lw</span></code>/<code class="docutils literal notranslate"><span class="pre">sw</span></code>/<code class="docutils literal notranslate"><span class="pre">d</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rw</span></code>, <code class="docutils literal notranslate"><span class="pre">ws</span></code>, <code class="docutils literal notranslate"><span class="pre">wv</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">program</span></code>, <code class="docutils literal notranslate"><span class="pre">loop_iter</span></code>, <code class="docutils literal notranslate"><span class="pre">loop_sp</span></code>, <code class="docutils literal notranslate"><span class="pre">control_word</span></code>/<code class="docutils literal notranslate"><span class="pre">agu_word</span></code>,
+<code class="docutils literal notranslate"><span class="pre">target</span></code>/<code class="docutils literal notranslate"><span class="pre">level</span></code>/<code class="docutils literal notranslate"><span class="pre">stride</span></code>/<code class="docutils literal notranslate"><span class="pre">offset</span></code>, <code class="docutils literal notranslate"><span class="pre">resolved</span></code>,
+<code class="docutils literal notranslate"><span class="pre">spm_copy</span></code>, <code class="docutils literal notranslate"><span class="pre">accu_copy</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dma_ld</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">f0</span></code>, <code class="docutils literal notranslate"><span class="pre">f1</span></code>, <code class="docutils literal notranslate"><span class="pre">f2</span></code>, <code class="docutils literal notranslate"><span class="pre">rbA</span></code>/<code class="docutils literal notranslate"><span class="pre">rbB</span></code>, <code class="docutils literal notranslate"><span class="pre">pw</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">route</span></code>, <code class="docutils literal notranslate"><span class="pre">dram_row0</span></code>, <code class="docutils literal notranslate"><span class="pre">col_block</span></code>, <code class="docutils literal notranslate"><span class="pre">a_onchip</span></code>/<code class="docutils literal notranslate"><span class="pre">b_onchip</span></code>,
+<code class="docutils literal notranslate"><span class="pre">packed</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">r</span></code>, <code class="docutils literal notranslate"><span class="pre">rr</span></code>, <code class="docutils literal notranslate"><span class="pre">ph</span></code>, <code class="docutils literal notranslate"><span class="pre">ra</span></code>/<code class="docutils literal notranslate"><span class="pre">wa</span></code>, <code class="docutils literal notranslate"><span class="pre">rv</span></code>/<code class="docutils literal notranslate"><span class="pre">z</span></code>, <code class="docutils literal notranslate"><span class="pre">dw</span></code>, <code class="docutils literal notranslate"><span class="pre">xr</span></code>,
+<code class="docutils literal notranslate"><span class="pre">e</span></code>/<code class="docutils literal notranslate"><span class="pre">e2</span></code>/<code class="docutils literal notranslate"><span class="pre">e3</span></code>/<code class="docutils literal notranslate"><span class="pre">e4</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">step</span></code>, <code class="docutils literal notranslate"><span class="pre">row</span></code>, <code class="docutils literal notranslate"><span class="pre">phase</span></code>, <code class="docutils literal notranslate"><span class="pre">read_row</span></code>/<code class="docutils literal notranslate"><span class="pre">write_row</span></code>,
+<code class="docutils literal notranslate"><span class="pre">read_word</span></code>/<code class="docutils literal notranslate"><span class="pre">write_word</span></code>, <code class="docutils literal notranslate"><span class="pre">do_write</span></code>, <code class="docutils literal notranslate"><span class="pre">vadd_first</span></code>,
+<code class="docutils literal notranslate"><span class="pre">lane</span></code>/<code class="docutils literal notranslate"><span class="pre">add_lane</span></code>/<code class="docutils literal notranslate"><span class="pre">relu_lane</span></code>/<code class="docutils literal notranslate"><span class="pre">clip_lane</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">pe</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">a</span></code>, <code class="docutils literal notranslate"><span class="pre">aw</span></code>, <code class="docutils literal notranslate"><span class="pre">p</span></code>, <code class="docutils literal notranslate"><span class="pre">av</span></code>/<code class="docutils literal notranslate"><span class="pre">wv</span></code>, <code class="docutils literal notranslate"><span class="pre">o</span></code>, <code class="docutils literal notranslate"><span class="pre">cv</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">activation</span></code>, <code class="docutils literal notranslate"><span class="pre">activation_word</span></code>, <code class="docutils literal notranslate"><span class="pre">psum_north</span></code>,
+<code class="docutils literal notranslate"><span class="pre">activation16</span></code>/<code class="docutils literal notranslate"><span class="pre">weight16</span></code>, <code class="docutils literal notranslate"><span class="pre">psum</span></code>, <code class="docutils literal notranslate"><span class="pre">result_word</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p><code class="docutils literal notranslate"><span class="pre">accu</span></code>’s pair is the clearest case: a paragraph explaining that <code class="docutils literal notranslate"><span class="pre">vadd</span></code>
+takes “two iterations per row, first source on the even one” is replaced by
+calling the loop counter <code class="docutils literal notranslate"><span class="pre">step</span></code> and the derived index <code class="docutils literal notranslate"><span class="pre">row</span></code>.</p>
+<p>Two things were deliberately <strong>not</strong> renamed. The unit names
+(<code class="docutils literal notranslate"><span class="pre">spm</span></code>, <code class="docutils literal notranslate"><span class="pre">vru</span></code>, <code class="docutils literal notranslate"><span class="pre">accu</span></code>, <code class="docutils literal notranslate"><span class="pre">wld</span></code>) stay as they are, because three long
+documentation pages and the Gemmini comparison refer to them; the spelling-out
+happens in the module names (<code class="docutils literal notranslate"><span class="pre">scratchpad.py</span></code>, <code class="docutils literal notranslate"><span class="pre">vector_regs.py</span></code>,
+<code class="docutils literal notranslate"><span class="pre">accumulator.py</span></code>, <code class="docutils literal notranslate"><span class="pre">weight_loader.py</span></code>). And the ISA field names <code class="docutils literal notranslate"><span class="pre">f0</span></code>
+through <code class="docutils literal notranslate"><span class="pre">f3</span></code> stay wherever a unit really is working on the raw encoding –
+in <code class="docutils literal notranslate"><span class="pre">sequencer</span></code>, which resolves fields without knowing the opcode, and in the
+arms of <code class="docutils literal notranslate"><span class="pre">spm</span></code>, <code class="docutils literal notranslate"><span class="pre">vru</span></code> and <code class="docutils literal notranslate"><span class="pre">accu</span></code> where one field means different things
+to different opcodes. Where a field has one meaning in a unit, it is named
+after that meaning, and the per-opcode meanings are one-line comments on the
+declaration.</p>
+</section>
+<section id="what-this-breaks-the-chia-harness">
+<h2>What this breaks: the CHIA harness<a class="headerlink" href="#what-this-breaks-the-chia-harness" title="Link to this heading"><span>¶</span></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">chia_agent/</span></code> is built on the premise that the design is two files: both
+<code class="docutils literal notranslate"><span class="pre">allo_tool.EDITABLE</span></code> and <code class="docutils literal notranslate"><span class="pre">evaluate.EDITABLE</span></code> are
+<code class="docutils literal notranslate"><span class="pre">(&quot;microarch_isa.py&quot;,</span> <span class="pre">&quot;isa_dsl.py&quot;)</span></code>, <code class="docutils literal notranslate"><span class="pre">accept.py</span></code> refuses a candidate diff
+touching anything else, the spec directory is flat, and the agent’s own
+instructions in <code class="docutils literal notranslate"><span class="pre">loop.py</span></code> name those two files. After this refactor a CHIA
+agent can still edit <code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code>, but the hardware is not in it, so it
+cannot change the design at all.</p>
+<p>This is <strong>not repaired here</strong>, deliberately: the fix is a change to the spec
+interface of a harness that spends money, and it needs its own change with its
+own review (see <a class="reference internal" href="../extensions/chia.html"><span class="doc">CHIA Agentic Co-Design</span></a>). The adaptation is written –
+<code class="docutils literal notranslate"><span class="pre">design-modular</span></code>’s commit <code class="docutils literal notranslate"><span class="pre">4682046a</span></code> adds <code class="docutils literal notranslate"><span class="pre">chia_agent/design.py</span></code> as the
+one definition of <code class="docutils literal notranslate"><span class="pre">EDITABLE</span></code> and <code class="docutils literal notranslate"><span class="pre">FROZEN_DESIGN</span></code> – and it was landed with
+the design <em>without</em> its <code class="docutils literal notranslate"><span class="pre">chia_agent/</span></code> half, which is the harness owner’s to
+merge onto its own rewrite of <code class="docutils literal notranslate"><span class="pre">accept.py</span></code>. It is gated rather than silent –
+<code class="docutils literal notranslate"><span class="pre">chia_agent/test_harness.py</span></code> is the documented $0 preflight for any paid run
+and it fails, because all four of its mutant specs and its <code class="docutils literal notranslate"><span class="pre">ANCHOR</span></code> point at
+text that has moved. What has to change:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">EDITABLE</span></code> in <code class="docutils literal notranslate"><span class="pre">allo_tool.py</span></code> and <code class="docutils literal notranslate"><span class="pre">evaluate.py</span></code>, to the design tree
+rather than two names;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">AlloSpecTool</span></code>’s flat <code class="docutils literal notranslate"><span class="pre">self.sources</span></code> mapping, <code class="docutils literal notranslate"><span class="pre">evaluate.compose</span></code> and
+<code class="docutils literal notranslate"><span class="pre">loop.seed_spec</span></code>, to carry nested paths;</p></li>
+<li><p>the allowed-file set in <code class="docutils literal notranslate"><span class="pre">accept.py</span></code>, and its pinned control blobs;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">test_harness.py</span></code>’s <code class="docutils literal notranslate"><span class="pre">MUTANTS</span></code> and <code class="docutils literal notranslate"><span class="pre">ANCHOR</span></code>;</p></li>
+<li><p>the file list in the agent prompt in <code class="docutils literal notranslate"><span class="pre">loop.py</span></code>.</p></li>
+</ol>
+<p><code class="docutils literal notranslate"><span class="pre">chia_agent/param_check.py</span></code> and <code class="docutils literal notranslate"><span class="pre">gate_runner.py</span></code> need no change: they work
+through <code class="docutils literal notranslate"><span class="pre">microarch_isa</span></code>’s module attributes, which are unchanged.</p>
+<p><code class="docutils literal notranslate"><span class="pre">impact/make_variants.py</span></code> was textually coupled the same way – it built the
+historical ablation variants by patching <code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code> – and went stale
+the same way, so it has been deleted. Its measurements are recorded on
+<a class="reference internal" href="tinytpu_history.html"><span class="doc">TinyTPU-isa: Design History</span></a>; regenerating them would want the variants expressed as
+alternative <em>architectures</em> over the same units, which is the first thing the
+library makes possible.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+    
+        <div id="show_right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&lt;</span><span>Page contents</span></a></p>
+        </div>
+
+        <div id="right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
+            <div class="page_toc">
+                <ul>
+<li><a class="reference internal" href="#">The Unit Library: Composing a Region from Units</a><ul>
+<li><a class="reference internal" href="#why-the-region-is-composed-rather-than-written">Why the region is composed rather than written</a><ul>
+<li><a class="reference internal" href="#what-this-buys-and-what-it-does-not">What this buys, and what it does not</a></li>
+<li><a class="reference internal" href="#the-census-of-what-is-still-bound-by-name">The census of what is still bound by name</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#the-interface-is-checked-not-just-written">The interface is checked, not just written</a></li>
+<li><a class="reference internal" href="#what-the-split-made-worse-the-instruction-layout">What the split made worse: the instruction layout</a><ul>
+<li><a class="reference internal" href="#the-third-site-cannot-and-that-is-a-front-end-limitation">The third site cannot, and that is a front-end limitation</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#where-the-boundaries-are-and-why">Where the boundaries are, and why</a></li>
+<li><a class="reference internal" href="#instantiating-it">Instantiating it</a></li>
+<li><a class="reference internal" href="#the-refactor-moved-no-number-and-that-is-checked">The refactor moved no number, and that is checked</a><ul>
+<li><a class="reference internal" href="#mutate-py-shadows-the-design-tree"><code class="docutils literal notranslate"><span class="pre">mutate.py</span></code> shadows the design tree</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#what-the-prose-deletion-was">What the prose deletion was</a></li>
+<li><a class="reference internal" href="#what-this-breaks-the-chia-harness">What this breaks: the CHIA harness</a></li>
+</ul>
+</li>
+</ul>
+
+            </div>
+        </div>
+    
+
+      <div class="clearer"></div>
+    </div>
+    <div class="button_nav_wrapper">
+        <div class="button_nav">
+            <div class="left">
+                
+                <a href="tinytpu_isa.html">
+                    <span class="icon">&lt;</span><span>TinyTPU-isa: A Programmable GEMM Accelerator</span></a>
+                
+            </div>
+
+            <div class="right">
+                
+                    <a href="ip_gaps.html"><span>The IP Library’s Gaps, and the Adder Tree</span><span class="icon">&gt;</span></a>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Allo Authors.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+
+<p id="theme_credit">Styled using the <a href="https://github.com/piccolo-orm/piccolo_theme">Piccolo Theme</a></p>
+  </body>
+</html>

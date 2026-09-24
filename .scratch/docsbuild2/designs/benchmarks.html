@@ -1,0 +1,2676 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>The Benchmark Set &#8212; Allo Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic_mod.css?v=9b2032db" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=db78e746"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/petite-vue.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="The Workload Suite: PyTorch MLPs on TinyTPU" href="workload_suite.html" />
+    <link rel="prev" title="TinyTPU-isa vs Gemmini: A Matched Comparison" href="gemmini_comparison.html" /> 
+  </head><body data-dark_mode_code_blocks="true">
+
+<div id="top_nav">
+    
+
+    <nav>
+        
+            
+        
+
+        <p id="toggle_sidebar">
+            <a href="#" title="Toggle sidebar">|||</a>
+        </p>
+        <h1><a href="../index.html" title="Go to homepage">Allo Documentation</a></h1>
+            <a id="source_link" href="https://github.com/sunwookim028/allo">
+    
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512">
+            <path fill="white" d="M 244.8,8 C 106.1,8 0,113.3 0,252 c 0,110.9 69.8,205.8 169.5,239.2 12.8,2.3 17.3,-5.6 17.3,-12.1 0,-6.2 -0.3,-40.4 -0.3,-61.4 0,0 -70,15 -84.7,-29.8 0,0 -11.4,-29.1 -27.8,-36.6 0,0 -22.9,-15.7 1.6,-15.4 0,0 24.9,2 38.6,25.8 21.9,38.6 58.6,27.5 72.9,20.9 2.3,-16 8.8,-27.1 16,-33.7 -55.9,-6.2 -112.3,-14.3 -112.3,-110.5 0,-27.5 7.6,-41.3 23.6,-58.9 -2.6,-6.5 -11.1,-33.3 2.6,-67.9 20.9,-6.5 69,27 69,27 20,-5.6 41.5,-8.5 62.8,-8.5 21.3,0 42.8,2.9 62.8,8.5 0,0 48.1,-33.6 69,-27 13.7,34.7 5.2,61.4 2.6,67.9 16,17.7 25.8,31.5 25.8,58.9 0,96.5 -58.9,104.2 -114.8,110.5 9.2,7.9 17,22.9 17,46.4 0,33.7 -0.3,75.4 -0.3,83.6 0,6.5 4.6,14.4 17.3,12.1 C 428.2,457.8 496,362.9 496,252 496,113.3 383.5,8 244.8,8 Z"/>
+        </svg>
+    
+</a>
+        
+
+        <a id="mode_toggle" href="#" @click.prevent="handleClick" :title="mode">
+    <template v-if="mode == 'light'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_light"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M67.48,18.073c1.913,-1.912 1.913,-5.018 0,-6.931c-1.912,-1.912 -5.018,-1.912 -6.931,0l-6.798,6.799c-1.912,1.912 -1.912,5.018 0,6.931c1.913,1.912 5.018,1.912 6.931,-0l6.798,-6.799Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.728,61.108c1.912,-1.913 1.912,-5.018 -0,-6.931c-1.913,-1.913 -5.019,-1.913 -6.931,-0l-6.799,6.798c-1.912,1.913 -1.912,5.019 0,6.931c1.913,1.913 5.019,1.913 6.931,0l6.799,-6.798Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.682,54.177c-1.913,-1.913 -5.018,-1.913 -6.931,-0c-1.912,1.913 -1.912,5.018 0,6.931l6.798,6.798c1.913,1.913 5.019,1.913 6.931,0c1.913,-1.912 1.913,-5.018 0,-6.931l-6.798,-6.798Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M4.901,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,-0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M18.929,11.142c-1.912,-1.912 -5.018,-1.912 -6.931,0c-1.912,1.913 -1.912,5.019 0,6.931l6.799,6.799c1.912,1.912 5.018,1.912 6.931,-0c1.912,-1.913 1.912,-5.019 -0,-6.931l-6.799,-6.799Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.108,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c-0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c-0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'dark'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_dark"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.901,2.196 -4.901,4.901c0,2.705 2.197,4.901 4.901,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.662,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.989,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.732,61.103c1.91,-1.91 1.91,-5.011 0,-6.921l-0.009,-0.01c-1.91,-1.91 -5.012,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.909,1.91 5.011,1.91 6.92,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.672,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.52,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l-0,-0.01c-0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.901,2.196 -4.901,4.901c0,2.704 2.197,4.9 4.901,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.73,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 -0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.098,34.623c-2.699,0 -4.891,2.192 -4.891,4.892l-0,0.019c-0,2.699 2.192,4.891 4.891,4.891c2.7,0 4.892,-2.192 4.892,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.892,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'darkest'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_darkest"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><path d="M39.315,23.791c8.684,-0 15.734,7.05 15.734,15.733c0,8.684 -7.05,15.734 -15.734,15.734c-8.683,0 -15.733,-7.05 -15.733,-15.734c-0,-8.683 7.05,-15.733 15.733,-15.733Zm0,4.737c6.069,0 10.997,4.927 10.997,10.996c-0,6.069 -4.928,10.996 -10.997,10.996c-6.068,0 -10.996,-4.927 -10.996,-10.996c0,-6.069 4.928,-10.996 10.996,-10.996Z" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.216,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.9,2.196 -4.9,4.901c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.666,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.99,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.737,61.103c1.909,-1.91 1.909,-5.011 -0,-6.921l-0.01,-0.01c-1.91,-1.91 -5.011,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.91,1.91 5.011,1.91 6.921,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.676,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.524,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l0,-0.01c0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.216,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901c-0,2.704 2.196,4.9 4.9,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.734,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.103,34.623c-2.7,0 -4.892,2.192 -4.892,4.892l-0,0.019c-0,2.699 2.192,4.891 4.892,4.891c2.699,0 4.891,-2.192 4.891,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.891,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+</a>
+
+<script>
+(function() {
+    const LOCAL_STORAGE_KEY = 'piccoloThemeMode'
+
+    var initialMode = localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (initialMode) {
+        // Make sure the value in local storage is valid
+        if (['light', 'dark', 'darkest'].indexOf(initialMode) == -1) {
+            initialMode = 'light'
+            localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+        }
+    } else {
+        // Check if the client prefers dark mode
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialMode = 'dark'
+        } else {
+            initialMode = 'light'
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+    }
+
+    document.documentElement.dataset.mode = initialMode
+
+    PetiteVue.createApp({
+        'mode': initialMode,
+        handleClick() {
+            let currentMode = this.mode
+
+            if (currentMode == 'light') {
+                this.mode = 'dark'
+            } else if (currentMode == 'dark') {
+                this.mode = 'darkest'
+            } else if (currentMode == 'darkest') {
+                this.mode = 'light'
+            }
+
+            document.documentElement.dataset.mode = this.mode
+            localStorage.setItem(LOCAL_STORAGE_KEY, this.mode)
+
+            console.log(this.mode)
+        }
+    }).mount('#mode_toggle')
+})()
+</script>
+            <p class="mobile_search_link">
+                <a href="../search.html" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65 64" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                        <path d="M14.873 40.009c-2.315-3.943-3.642-8.532-3.642-13.429C11.231 11.91 23.141 0 37.811 0s26.58 11.91 26.58 26.58-11.91 26.58-26.58 26.58a26.44 26.44 0 0 1-14.277-4.161L9.739 62.794a3.12 3.12 0 0 1-4.413 0L.913 58.382c-1.217-1.218-1.217-3.196 0-4.413l13.96-13.96zM37.811 8.054c10.225 0 18.526 8.301 18.526 18.526s-8.301 18.526-18.526 18.526-18.526-8.301-18.526-18.526S27.586 8.054 37.811 8.054z" fill="#fff" />
+                    </svg>
+                </a>
+            </p>
+        
+
+        <div class="searchbox_wrapper">
+            
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+    </nav>
+</div>
+
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Paper</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../paper.html">A Co-Design Compilation Flow as a Harness for Language Models to Improve It</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup/index.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_01_get_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_02_vhls.html">Vivado/Vitis HLS Backend</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Deep Dive</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dive/frontend_syntax.html">Frontend Syntax Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/dataflow.html">Dataflow Programming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_01_data_types.html">Data Types and Type Casting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_02_template.html">Template Kernels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_03_composition.html">Kernel Composition</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/ip.html">IP Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/pytorch.html">PyTorch Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_05_verifier.html">Equivalence Checking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_04_features.html">Other Features</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Backends</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">The Benchmark Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_history.html">TinyTPU-isa: Design History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="minitpu.html">MiniTPU: Reference Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Extensions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/extending_allo.html">Extending Allo’s Abstractions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/stream_ports.html">Stream Ports: a Unit with an Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">Schedule Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html#data-types">Data Types</a></li>
+</ul>
+
+        </div>
+      </div>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="the-benchmark-set">
+<h1>The Benchmark Set<a class="headerlink" href="#the-benchmark-set" title="Link to this heading"><span>¶</span></a></h1>
+<p>Three sets, answering three different questions. They are never blended into
+one verdict, because the questions are not the same question.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 14.0%" />
+<col style="width: 30.0%" />
+<col style="width: 56.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>set</p></th>
+<th class="head"><p>what it measures</p></th>
+<th class="head"><p>what it cannot say</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>latency</strong></p></td>
+<td><p>time to first result: 4x4x4 .. 16x16x16, where the fixed pipeline term
+dominates</p></td>
+<td><p>nothing about throughput. The same shape is not the same work on two
+different array sizes.</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>steady state</strong></p></td>
+<td><p>MACs/cycle as a fraction of the array’s own peak: 16, 32, 48, 64 cubed
+plus two non-cubic shapes</p></td>
+<td><p>nothing about latency, and nothing about a real layer’s memory traffic</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>workload</strong></p></td>
+<td><p>one GPT-2 projection, stated exactly</p></td>
+<td><p>nothing yet: it is a <strong>placeholder</strong>. No build runs it (below).</p></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p><strong>Which question a number answers, per the framing agreed with MiniTPU’s
+owner.</strong></p>
+<ul class="simple">
+<li><p><strong>TinyTPU-isa vs Gemmini is well posed</strong>: matched 4x4 array, matched
+int8/int32, matched near-zero memory latency, matched measurement window.
+It is measured on both sets below.</p></li>
+<li><p><strong>MiniTPU vs either is NOT well posed at these shapes</strong>: a 16x16 BF16
+array has 16x the MAC/cycle peak and a different window, so a cycle
+ratio against it is a statement about array size. It becomes well posed
+only through fraction-of-peak, or through an equal-array-size build.
+Every MiniTPU figure carried elsewhere in these docs is <strong>dated, not
+permanent</strong> — its board throughput moved on unchanged silicon within a
+day of being recorded, so the 79.16 / 129.70 tok/s pair is superseded and
+must not be quoted. <strong>No figure on this page depends on it</strong>; nothing
+here quotes a MiniTPU throughput at all. Its board clock is 187.5 MHz
+while its bitstream closes timing at 200 MHz, so a cycles-to-seconds
+conversion uses 187.5 and a timing-closure claim uses 200.</p></li>
+</ul>
+<p>A single blended verdict across the three machines is the one thing not to
+produce, because it will be quoted without its caveat.</p>
+</div>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p><strong>Every figure names its window, and no figure counts a host.</strong> A cycle
+count without its window is not a measurement, so:</p>
+<ul class="simple">
+<li><p><strong>Ours</strong> is Vitis <code class="docutils literal notranslate"><span class="pre">cosim</span></code> (xsim), <code class="docutils literal notranslate"><span class="pre">ap_start</span></code> to <code class="docutils literal notranslate"><span class="pre">ap_done</span></code>, with the
+program already in DRAM. There is <strong>no host driver at all</strong> — not
+excluded, absent.</p></li>
+<li><p><strong>Gemmini’s</strong> is <code class="docutils literal notranslate"><span class="pre">rdcycle</span></code> -&gt; 5 <code class="docutils literal notranslate"><span class="pre">config</span></code>s -&gt; one hardware
+<code class="docutils literal notranslate"><span class="pre">loop_ws</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">fence</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">rdcycle</span></code>, which <strong>excludes</strong> its ~395-cycle
+Rocket driver.</p></li>
+<li><p><strong>MiniTPU’s</strong> testbench figures likewise exclude their per-launch cost
+outside the fabric, about 143 us. Corrected 2026-09-23 by its own side:
+this is <strong>not</strong> one thing – roughly 30 us on the register path
+(measured against a no-bus control: 0.4 us of it is the bus, the rest is
+CPython) plus the device reloading its own instruction memory. Not
+comparable to a software driver figure, and not removed by a die.</p></li>
+</ul>
+<p>So: <strong>no machine’s host is counted anywhere on this page</strong>, which is the
+consistent choice, and it is stated rather than assumed. What that
+accounting turned up on MiniTPU’s side is in <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and
+corrections</a>.</p>
+<p><strong>Both sides are idealised memory, and ours is a knob rather than a
+model.</strong> Every cycle figure here is at <code class="docutils literal notranslate"><span class="pre">TPU_AXI_LATENCY=0</span></code> unless the row
+says otherwise; Vitis cosim has no DRAM model, so 0 is a value we chose.
+Gemmini’s harness uses <code class="docutils literal notranslate"><span class="pre">WithBlackBoxSimMem(additionalLatency=0)</span></code>, roughly
+1-2 cycle AXI. <strong>Neither column contains a memory system.</strong> What that costs
+us is measured in <a class="reference internal" href="#benchmarks-latency-grid"><span class="std std-ref">Does the ranking survive the memory-latency range?</span></a>.</p>
+</div>
+<section id="why-the-latency-set-is-not-a-throughput-comparison">
+<span id="benchmarks-why-latency-is-not-throughput"></span><h2>Why the latency set is not a throughput comparison<a class="headerlink" href="#why-the-latency-set-is-not-a-throughput-comparison" title="Link to this heading"><span>¶</span></a></h2>
+<p>The five shapes top out at 16x16x16. On a 4x4 array that is
+<span class="math notranslate nohighlight">\((16/4) \times (16/4) = 16\)</span> weight loads and 16x16 = 256 wavefront rows;
+on a 16x16 array it is <strong>one</strong> weight load and one pass. The per-machine work
+accounting, for 16x16x16:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>machine</p></th>
+<th class="head"><p>array</p></th>
+<th class="head"><p>tile-matmuls</p></th>
+<th class="head"><p>wavefront rows</p></th>
+<th class="head"><p>peak MAC/cycle</p></th>
+<th class="head"><p>ideal cycles</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>TinyTPU-isa, T=4</p></td>
+<td><p>4x4</p></td>
+<td><p>16</p></td>
+<td><p>256</p></td>
+<td><p>16</p></td>
+<td><p>256</p></td>
+</tr>
+<tr class="row-odd"><td><p>TinyTPU-isa, T=8</p></td>
+<td><p>8x8</p></td>
+<td><p>4</p></td>
+<td><p>32</p></td>
+<td><p>64</p></td>
+<td><p>64</p></td>
+</tr>
+<tr class="row-even"><td><p>Gemmini, DIM=4</p></td>
+<td><p>4x4</p></td>
+<td><p>16</p></td>
+<td><p>256</p></td>
+<td><p>16</p></td>
+<td><p>256</p></td>
+</tr>
+<tr class="row-odd"><td><p>MiniTPU, 16x16</p></td>
+<td><p>16x16</p></td>
+<td><p>1</p></td>
+<td><p>16</p></td>
+<td><p>256</p></td>
+<td><p>16</p></td>
+</tr>
+</tbody>
+</table>
+<p>“Ideal cycles” is <span class="math notranslate nohighlight">\((N/T)(K/T)M\)</span>, one wavefront row per cycle at T*T
+MACs. A machine with a 16x deeper array needs 16x fewer cycles for the <em>same
+shape</em> before any design difference is involved, so the shortest pipeline wins
+this set by construction. That is why these five are labelled a <strong>latency</strong>
+benchmark and why the steady-state set exists.</p>
+</section>
+<section id="the-steady-state-set">
+<span id="benchmarks-steady"></span><h2>The steady-state set<a class="headerlink" href="#the-steady-state-set" title="Link to this heading"><span>¶</span></a></h2>
+<p>Cubic 16, 32, 48, 64 plus <strong>64x32x64</strong> and <strong>32x64x32</strong>. The two non-cubic
+shapes are not decoration: the cost model is
+<span class="math notranslate nohighlight">\(\text{fixed} + (N/T)(K/T) \cdot M\)</span>, so a shape that holds M and N and
+halves K separates the wavefront-row term from the tile-count term, and
+swapping M and K distinguishes the two.</p>
+<p>64 is the largest cubic shape the build runs, and what bounds it is the
+<strong>instruction encoding</strong>, not the datapath — see
+<a class="reference internal" href="#benchmarks-raising-maxdim"><span class="std std-ref">Raising the build: what a bigger MAXDIM costs</span></a>.</p>
+<section id="tinytpu-isa-t-4-maxdim-64">
+<h3>TinyTPU-isa, T=4, MAXDIM=64<a class="headerlink" href="#tinytpu-isa-t-4-maxdim-64" title="Link to this heading"><span>¶</span></a></h3>
+<p>Vitis <code class="docutils literal notranslate"><span class="pre">cosim</span></code> (xsim), <code class="docutils literal notranslate"><span class="pre">ap_start</span></code> to <code class="docutils literal notranslate"><span class="pre">ap_done</span></code>, one <code class="docutils literal notranslate"><span class="pre">csynth</span></code> and one RTL
+build for the whole sweep, shapes swept as instruction data. Every shape
+<strong>bit-exact</strong> (<code class="docutils literal notranslate"><span class="pre">mismatches</span> <span class="pre">=</span> <span class="pre">0</span></code>). Peak is <span class="math notranslate nohighlight">\(T^2 = 16\)</span> MAC/cycle.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 16.3%" />
+<col style="width: 11.6%" />
+<col style="width: 14.0%" />
+<col style="width: 14.0%" />
+<col style="width: 14.0%" />
+<col style="width: 16.3%" />
+<col style="width: 14.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>shape</p></th>
+<th class="head"><p>set</p></th>
+<th class="head"><p>MACs</p></th>
+<th class="head"><p>cycles</p></th>
+<th class="head"><p>MAC/cycle</p></th>
+<th class="head"><p><strong>% of peak</strong></p></th>
+<th class="head"><p>ideal cycles</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>4x4x4</p></td>
+<td><p>latency</p></td>
+<td><p>64</p></td>
+<td><p>218</p></td>
+<td><p>0.29</p></td>
+<td><p>1.8%</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>8x8x8</p></td>
+<td><p>latency</p></td>
+<td><p>512</p></td>
+<td><p>357</p></td>
+<td><p>1.43</p></td>
+<td><p>9.0%</p></td>
+<td><p>32</p></td>
+</tr>
+<tr class="row-even"><td><p>12x12x12</p></td>
+<td><p>latency</p></td>
+<td><p>1 728</p></td>
+<td><p>563</p></td>
+<td><p>3.07</p></td>
+<td><p>19.2%</p></td>
+<td><p>108</p></td>
+</tr>
+<tr class="row-odd"><td><p>16x16x8</p></td>
+<td><p>latency</p></td>
+<td><p>2 048</p></td>
+<td><p>677</p></td>
+<td><p>3.02</p></td>
+<td><p>18.9%</p></td>
+<td><p>128</p></td>
+</tr>
+<tr class="row-even"><td><p>16x16x16</p></td>
+<td><p>both</p></td>
+<td><p>4 096</p></td>
+<td><p>879</p></td>
+<td><p>4.66</p></td>
+<td><p>29.1%</p></td>
+<td><p>256</p></td>
+</tr>
+<tr class="row-odd"><td><p>32x32x32</p></td>
+<td><p>steady</p></td>
+<td><p>32 768</p></td>
+<td><p>3 752</p></td>
+<td><p>8.73</p></td>
+<td><p>54.6%</p></td>
+<td><p>2 048</p></td>
+</tr>
+<tr class="row-even"><td><p>48x48x48</p></td>
+<td><p>steady</p></td>
+<td><p>110 592</p></td>
+<td><p>10 289</p></td>
+<td><p>10.75</p></td>
+<td><p>67.2%</p></td>
+<td><p>6 912</p></td>
+</tr>
+<tr class="row-odd"><td><p>64x64x64</p></td>
+<td><p>steady</p></td>
+<td><p>262 144</p></td>
+<td><p>22 123</p></td>
+<td><p>11.85</p></td>
+<td><p><strong>74.1%</strong></p></td>
+<td><p>16 384</p></td>
+</tr>
+<tr class="row-even"><td><p>64x32x64</p></td>
+<td><p>steady</p></td>
+<td><p>131 072</p></td>
+<td><p>12 907</p></td>
+<td><p>10.16</p></td>
+<td><p>63.5%</p></td>
+<td><p>8 192</p></td>
+</tr>
+<tr class="row-odd"><td><p>32x64x32</p></td>
+<td><p>steady</p></td>
+<td><p>65 536</p></td>
+<td><p>6 824</p></td>
+<td><p>9.60</p></td>
+<td><p>60.0%</p></td>
+<td><p>4 096</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>This is the number that characterises the design, and it had never been
+measured.</strong> Utilisation rises monotonically with problem size and reaches
+<strong>74.1% of the array’s peak at 64x64x64</strong>, still climbing. The latency set
+sits at 1.8-29% of peak, which is the quantitative statement of why it is not
+a throughput benchmark.</p>
+</section>
+<section id="tinytpu-isa-t-8-maxdim-64">
+<h3>TinyTPU-isa, T=8, MAXDIM=64<a class="headerlink" href="#tinytpu-isa-t-8-maxdim-64" title="Link to this heading"><span>¶</span></a></h3>
+<p>The same RTL flow at the second array size. Peak is <span class="math notranslate nohighlight">\(T^2 = 64\)</span>
+MAC/cycle, so <strong>the fractions are against a four-times-larger peak and the
+raw cycles are not comparable with the T=4 column</strong> — which is exactly why
+the fraction is the column to read.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 14.3%" />
+<col style="width: 12.2%" />
+<col style="width: 12.2%" />
+<col style="width: 14.3%" />
+<col style="width: 16.3%" />
+<col style="width: 14.3%" />
+<col style="width: 16.3%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>shape</p></th>
+<th class="head"><p>MACs</p></th>
+<th class="head"><p>cycles</p></th>
+<th class="head"><p>MAC/cycle</p></th>
+<th class="head"><p><strong>% of peak (64)</strong></p></th>
+<th class="head"><p>ideal cycles</p></th>
+<th class="head"><p>T=4 cycles / T=8</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>8x8x8</p></td>
+<td><p>512</p></td>
+<td><p>285</p></td>
+<td><p>1.80</p></td>
+<td><p>2.8%</p></td>
+<td><p>8</p></td>
+<td><p>1.25x</p></td>
+</tr>
+<tr class="row-odd"><td><p>16x16x8</p></td>
+<td><p>2 048</p></td>
+<td><p>424</p></td>
+<td><p>4.83</p></td>
+<td><p>7.5%</p></td>
+<td><p>32</p></td>
+<td><p>1.60x</p></td>
+</tr>
+<tr class="row-even"><td><p>16x16x16</p></td>
+<td><p>4 096</p></td>
+<td><p>493</p></td>
+<td><p>8.31</p></td>
+<td><p>13.0%</p></td>
+<td><p>64</p></td>
+<td><p>1.78x</p></td>
+</tr>
+<tr class="row-odd"><td><p>32x32x32</p></td>
+<td><p>32 768</p></td>
+<td><p>1 484</p></td>
+<td><p>22.08</p></td>
+<td><p>34.5%</p></td>
+<td><p>512</p></td>
+<td><p>2.53x</p></td>
+</tr>
+<tr class="row-even"><td><p>48x48x48</p></td>
+<td><p>110 592</p></td>
+<td><p>3 537</p></td>
+<td><p>31.27</p></td>
+<td><p>48.9%</p></td>
+<td><p>1 728</p></td>
+<td><p>2.91x</p></td>
+</tr>
+<tr class="row-odd"><td><p>64x64x64</p></td>
+<td><p>262 144</p></td>
+<td><p>7 083</p></td>
+<td><p>37.01</p></td>
+<td><p><strong>57.8%</strong></p></td>
+<td><p>4 096</p></td>
+<td><p><strong>3.12x</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>64x32x64</p></td>
+<td><p>131 072</p></td>
+<td><p>4 523</p></td>
+<td><p>28.98</p></td>
+<td><p>45.3%</p></td>
+<td><p>2 048</p></td>
+<td><p>2.85x</p></td>
+</tr>
+</tbody>
+</table>
+<p>Two things to read off this, and they pull in opposite directions:</p>
+<ul class="simple">
+<li><p><strong>The array scales</strong>: quadrupling the array gives 3.12x at 64x64x64, i.e.
+78% scaling efficiency, and the ratio is still rising with problem size.
+The design’s T parameter works.</p></li>
+<li><p><strong>A bigger array needs a bigger problem.</strong> T=8 reaches only 57.8% of <em>its</em>
+peak at 64x64x64 where T=4 reaches 74.1% of <em>its</em> peak, because 64x64x64 is
+a smaller problem relative to an 8x8 array. So 64 is a steady-state shape
+for T=4 and is still in the ramp for T=8 — which is the same observation
+that makes the five small shapes a latency benchmark, one level up. A T=8
+steady-state set would need to start where this one ends.</p></li>
+</ul>
+</section>
+</section>
+<section id="does-utilisation-move-with-m-yes-we-amortise">
+<span id="benchmarks-msweep"></span><h2>Does utilisation move with M? Yes — we amortise<a class="headerlink" href="#does-utilisation-move-with-m-yes-we-amortise" title="Link to this heading"><span>¶</span></a></h2>
+<p>An M-sweep at fixed K=N=64, everything else held, run at both array sizes.
+This answers a question <strong>neither</strong> project had measured, and it was asked
+because MiniTPU’s own M-sweep came out <strong>flat</strong>.</p>
+<table class="docutils align-default" id="id3">
+<caption><span class="caption-text">M-sweep, K=N=64, one <code class="docutils literal notranslate"><span class="pre">csynth</span></code> per T, every shape bit-exact</span><a class="headerlink" href="#id3" title="Link to this table"><span>¶</span></a></caption>
+<colgroup>
+<col style="width: 9.5%" />
+<col style="width: 11.9%" />
+<col style="width: 14.3%" />
+<col style="width: 14.3%" />
+<col style="width: 14.3%" />
+<col style="width: 16.7%" />
+<col style="width: 19.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>M</p></th>
+<th class="head"><p>joint?</p></th>
+<th class="head"><p>T=4 cycles</p></th>
+<th class="head"><p><strong>% of 16</strong></p></th>
+<th class="head"><p>T=8 cycles</p></th>
+<th class="head"><p><strong>% of 64</strong></p></th>
+<th class="head"><p>MACs</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>16</p></td>
+<td><p>ours alone</p></td>
+<td><p>6 891</p></td>
+<td><p><strong>59.4%</strong></p></td>
+<td><p>2 539</p></td>
+<td><p><strong>40.3%</strong></p></td>
+<td><p>65 536</p></td>
+</tr>
+<tr class="row-odd"><td><p>32</p></td>
+<td><p><strong>joint</strong></p></td>
+<td><p>11 952</p></td>
+<td><p><strong>68.5%</strong></p></td>
+<td><p>4 048</p></td>
+<td><p><strong>50.6%</strong></p></td>
+<td><p>131 072</p></td>
+</tr>
+<tr class="row-even"><td><p>64</p></td>
+<td><p><strong>joint</strong></p></td>
+<td><p>22 123</p></td>
+<td><p><strong>74.1%</strong></p></td>
+<td><p>7 083</p></td>
+<td><p><strong>57.8%</strong></p></td>
+<td><p>262 144</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Utilisation rises monotonically with M at both array sizes.</strong> We amortise.</p>
+<p><strong>The mechanism, and it is the predicted one.</strong> The numbers are a straight
+line in M with a single fixed intercept:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"></th>
+<th class="head"><p>fixed term</p></th>
+<th class="head"><p>marginal, cycles per M row</p></th>
+<th class="head"><p>fixed as % at M=16</p></th>
+<th class="head"><p>at M=64</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>T=4</p></td>
+<td><p><strong>1 782</strong></p></td>
+<td><p>317.8</p></td>
+<td><p>25.9%</p></td>
+<td><p>8.1%</p></td>
+</tr>
+<tr class="row-odd"><td><p>T=8</p></td>
+<td><p><strong>1 014</strong></p></td>
+<td><p>94.8</p></td>
+<td><p>39.9%</p></td>
+<td><p>14.3%</p></td>
+</tr>
+</tbody>
+</table>
+<p>Fitted on M=32 and M=64, the model predicts M=16 to within 24 cycles (T=4)
+and 8 cycles (T=8) — so the fixed term is paid <strong>once per call</strong>, not once
+per row block, which is exactly what “one program per call with M as an
+internal loop bound” predicts. Tripling M does not triple the fixed cost; it
+divides it.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p><strong>What this licenses, and what it does not.</strong> MiniTPU is flat at 33.6%
+across M=32, 64 and 128, with an identified cause: an emitter issuing one
+launch per 32 rows, each re-paying the whole fixed term. We are not flat.
+<strong>So flatness is not a property of how these machines re-enter a launch —
+it is specific to that emitter</strong>, and carrying the row-block loop inside
+the launch would make their structure ours.</p>
+<p>But the comparison is of an <strong>axis, not of shapes</strong>: our sweep is at
+K=N=64 and theirs at K=N=128, because 128 is past our ceiling
+(<a class="reference internal" href="#benchmarks-workload"><span class="std std-ref">The workload set: a GPT-2 projection (placeholder)</span></a>) and M=16 is below their 32-row floor. “Does
+utilisation move with M” is answerable on each machine independently and
+that is what makes the finding joint; the <em>numbers</em> are not comparable
+across the two columns. Only M ∈ {32, 64} exists on both machines at all,
+and even there the fixed K and N differ.</p>
+<p>For orientation and not as a comparison, Gemmini over its own M range goes
+80.7 -&gt; 86.1 -&gt; 95.1% at DIM=4 and 47.3 -&gt; 58.3 -&gt; 79.0% at DIM=16 — it
+amortises too, and harder than we do.</p>
+</div>
+</section>
+<section id="raising-the-build-what-a-bigger-maxdim-costs">
+<span id="benchmarks-raising-maxdim"></span><h2>Raising the build: what a bigger MAXDIM costs<a class="headerlink" href="#raising-the-build-what-a-bigger-maxdim-costs" title="Link to this heading"><span>¶</span></a></h2>
+<p>The design was built at MAXDIM=16 with a 512-row scratchpad, 256 operand
+vector registers and 128 accumulator registers. Those were three typed-in
+literals that happened to be big enough for MAXDIM=16, and <strong>only</strong> for
+MAXDIM=16: the shipped GEMM lays A out at <code class="docutils literal notranslate"><span class="pre">A_VR</span> <span class="pre">+</span> <span class="pre">kb*MAXDIM</span> <span class="pre">+</span> <span class="pre">m</span></code>, so the
+highest operand row it names is</p>
+<div class="math notranslate nohighlight">
+\[(\text{MAXDIM}/T - 1)\,\text{MAXDIM} + \text{MAXDIM}
+\;=\; \text{MAXDIM}^2 / T\]</div>
+<p>which at MAXDIM=64 is 1024 rows against a 256-entry file. Raising MAXDIM alone
+produced a build that assembled and gave wrong answers. The sizes are now
+<strong>that expression</strong> (<code class="docutils literal notranslate"><span class="pre">microarch_isa.OPERAND_ROWS</span></code>), with the <code class="docutils literal notranslate"><span class="pre">TPU_SPAD</span></code> /
+<code class="docutils literal notranslate"><span class="pre">TPU_NVR</span></code> / <code class="docutils literal notranslate"><span class="pre">TPU_NAR</span></code> environment overrides kept only for probing a
+deliberately undersized build. MAXDIM itself defaults to <strong>64</strong>.</p>
+<section id="two-independent-ceilings-both-in-the-encoding">
+<h3>Two independent ceilings, both in the encoding<a class="headerlink" href="#two-independent-ceilings-both-in-the-encoding" title="Link to this heading"><span>¶</span></a></h3>
+<p>Found by raising MAXDIM until each fired:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 26.0%" />
+<col style="width: 30.0%" />
+<col style="width: 20.0%" />
+<col style="width: 24.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>limit</p></th>
+<th class="head"><p>condition</p></th>
+<th class="head"><p>ceiling at T=4</p></th>
+<th class="head"><p>how it fails</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>address field, 11 usable bits</p></td>
+<td><p><span class="math notranslate nohighlight">\((\text{MAXDIM}//T)\cdot\text{MAXDIM} \le 2048\)</span>
+(a row <em>count</em>; the highest address is 2047)</p></td>
+<td><p>MAXDIM &lt;= 88 (90.5 unrounded; MAXDIM is a multiple of T)</p></td>
+<td><p>MAXDIM=96: <code class="docutils literal notranslate"><span class="pre">check_program</span></code>, “AGU-resolved f3=2112 is outside the
+0..2047 range”</p></td>
+</tr>
+<tr class="row-odd"><td><p>header count, 15-bit slice</p></td>
+<td><p><span class="math notranslate nohighlight">\(\text{MAXDIM}^3/T^2 + \text{MAXDIM}^2/T \le 32767\)</span>
+(<code class="docutils literal notranslate"><span class="pre">accu</span></code>’s iteration count)</p></td>
+<td><p>MAXDIM &lt;= 76 for a cubic shape</p></td>
+<td><p>MAXDIM=80: <code class="docutils literal notranslate"><span class="pre">assemble</span></code>, “header count 33600 does not fit 15 bits”</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>MAXDIM=64 is the largest round value inside both</strong>, and it is asserted at
+import so an out-of-range configuration fails immediately rather than
+silently. Neither ceiling is architectural — widening the fields or the
+header slices moves them — but the field widths are load-bearing for a
+different reason: a synthesis tool bounds a runtime-bounded loop by the <em>range
+of the index</em>, which is why <code class="docutils literal notranslate"><span class="pre">nr</span></code> is 8 bits (see <code class="docutils literal notranslate"><span class="pre">microarch_isa</span></code>’s encoding
+note). Widening means re-measuring every loop bound Vitis derives.</p>
+<p>At T=8 the same two expressions separate: the address field allows <strong>128</strong> —
+the layout names exactly 2048 rows, so its highest address is 2047 — and the
+cubic header allows 120. Both are computed by <code class="docutils literal notranslate"><span class="pre">isa_encoding.maxdim_ceiling</span></code>
+from <code class="docutils literal notranslate"><span class="pre">isa_spec.json</span></code> and confirmed against the design by
+<code class="docutils literal notranslate"><span class="pre">gen_isa.py</span> <span class="pre">--check</span></code>, which is what caught 120 being written for the address
+field: that is the count-versus-highest-address off-by-one, right at T=4 by
+luck and wrong at T=8.</p>
+</section>
+<section id="the-instruction-memory-does-not-need-to-grow">
+<h3>The instruction memory does <strong>not</strong> need to grow<a class="headerlink" href="#the-instruction-memory-does-not-need-to-grow" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">IMEM_SIZE</span></code> stays at <strong>56 words</strong> at every shape up to 64x64x64, because
+<code class="docutils literal notranslate"><span class="pre">isa_dsl</span></code>’s loop-nest generator already emits the tiled GEMM as
+<span class="math notranslate nohighlight">\(O(\text{nesting})\)</span> rather than <span class="math notranslate nohighlight">\(O(\text{tiles})\)</span>:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>shape</p></th>
+<th class="head"><p>looped (shipped)</p></th>
+<th class="head"><p>unrolled reference</p></th>
+<th class="head"><p>dynamic instructions</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>16x16x16</p></td>
+<td><p>14 static / 36 words</p></td>
+<td><p>32 static / 72 words</p></td>
+<td><p>32</p></td>
+</tr>
+<tr class="row-odd"><td><p>32x32x32</p></td>
+<td><p>14 static / 36 words</p></td>
+<td><p>96 static / 200 words</p></td>
+<td><p>96</p></td>
+</tr>
+<tr class="row-even"><td><p>64x64x64</p></td>
+<td><p>14 static / 36 words</p></td>
+<td><p>320 static / 648 words</p></td>
+<td><p>320</p></td>
+</tr>
+</tbody>
+</table>
+<p>So the answer to “must imem grow, or must the program loop harder” is: the
+program already loops, <code class="docutils literal notranslate"><span class="pre">isa_dsl</span></code> already handles it, and imem is untouched.
+The unrolled form outgrows imem from 16x16x16 on, which is the point of having
+control flow; <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code> runs it where it fits and covers the rest with a
+static equivalence check that the two forms issue the identical dynamic
+instruction stream.</p>
+</section>
+<section id="maxdim-resources">
+<h3>MAXDIM -&gt; resources<a class="headerlink" href="#maxdim-resources" title="Link to this heading"><span>¶</span></a></h3>
+<p>One <code class="docutils literal notranslate"><span class="pre">csynth_design</span></code> per configuration, <code class="docutils literal notranslate"><span class="pre">xcu280-fsvh2892-2L-e</span></code>, 3.33 ns
+target (<code class="docutils literal notranslate"><span class="pre">csynth_sweep.py</span></code>; reports kept under
+<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/csynth_reports/</span></code>).</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 8.9%" />
+<col style="width: 11.1%" />
+<col style="width: 11.1%" />
+<col style="width: 11.1%" />
+<col style="width: 11.1%" />
+<col style="width: 11.1%" />
+<col style="width: 11.1%" />
+<col style="width: 11.1%" />
+<col style="width: 13.3%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>T</p></th>
+<th class="head"><p>MAXDIM</p></th>
+<th class="head"><p>spad</p></th>
+<th class="head"><p>nvr</p></th>
+<th class="head"><p>FF</p></th>
+<th class="head"><p>LUT</p></th>
+<th class="head"><p>BRAM</p></th>
+<th class="head"><p>DSP</p></th>
+<th class="head"><p>est. clock</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>4</p></td>
+<td><p>16</p></td>
+<td><p>64</p></td>
+<td><p>64</p></td>
+<td><p>17 074</p></td>
+<td><p>26 493</p></td>
+<td><p>40</p></td>
+<td><p>14</p></td>
+<td><p>2.431 ns (411 MHz)</p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>32</p></td>
+<td><p>256</p></td>
+<td><p>256</p></td>
+<td><p>17 455</p></td>
+<td><p>26 529</p></td>
+<td><p>44</p></td>
+<td><p>14</p></td>
+<td><p>2.431 ns (411 MHz)</p></td>
+</tr>
+<tr class="row-even"><td><p>4</p></td>
+<td><p>48</p></td>
+<td><p>576</p></td>
+<td><p>576</p></td>
+<td><p>17 467</p></td>
+<td><p>26 651</p></td>
+<td><p>48</p></td>
+<td><p>14</p></td>
+<td><p>2.431 ns (411 MHz)</p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>64</p></td>
+<td><p>1 024</p></td>
+<td><p>1 024</p></td>
+<td><p>17 487</p></td>
+<td><p>26 552</p></td>
+<td><p>48</p></td>
+<td><p>14</p></td>
+<td><p>2.431 ns (411 MHz)</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>8</strong></p></td>
+<td><p>64</p></td>
+<td><p>512</p></td>
+<td><p>512</p></td>
+<td><p>43 911</p></td>
+<td><p>70 281</p></td>
+<td><p>62</p></td>
+<td><p>58</p></td>
+<td><p>2.431 ns (411 MHz)</p></td>
+</tr>
+</tbody>
+</table>
+<p>Read the two parameters as separate columns, because they cost completely
+different things:</p>
+<ul class="simple">
+<li><p><strong>MAXDIM resizes memories only.</strong> 16 -&gt; 64 is +413 FF (+2.4%), +59 LUT
+(+0.2%), +8 BRAM, no clock change.</p></li>
+<li><p><strong>T changes the shape of the region</strong> — T*T PE instances, T and T*T stream
+arrays. T=4 -&gt; T=8 at MAXDIM=64 is <strong>2.51x the FF, 2.65x the LUT and 4.1x
+the DSP</strong>, for 4x the peak and a measured <strong>3.12x</strong> at 64x64x64. The
+estimated clock does not move, so the array scales at close to constant
+frequency and the trade is favourable: 2.5-2.65x the logic for 3.12x the
+throughput. (Note T=8’s <em>memories</em> are smaller than T=4’s at the same
+MAXDIM, since <code class="docutils literal notranslate"><span class="pre">OPERAND_ROWS</span></code> = MAXDIM^2/T — a wider array packs more
+lanes into each row.)</p></li>
+</ul>
+<p><strong>Raising MAXDIM from 16 to 64 costs +413 FF (+2.4%), +59 LUT (+0.2%) and
++8 BRAM (+20%), and does not move the estimated clock.</strong> That is the whole
+price of being able to run a shape that reaches steady state, and it is the
+reason the shipped default moved to 64 rather than staying at 16 with an
+override. Note the MAXDIM=16 row is itself <em>cheaper</em> than the design as
+previously shipped, because the derived sizes replace the literal
+512/256 scratchpad and vreg files with the 64/64 that MAXDIM=16 actually
+needs.</p>
+</section>
+<section id="verification-per-configuration">
+<h3>Verification per configuration<a class="headerlink" href="#verification-per-configuration" title="Link to this heading"><span>¶</span></a></h3>
+<p>Every configuration below is exact on all four gates: <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code>
+(<code class="docutils literal notranslate"><span class="pre">ALL</span> <span class="pre">EXACT</span></code>), <code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code> (<code class="docutils literal notranslate"><span class="pre">STRESS</span> <span class="pre">OK</span></code>, which includes the program
+validator’s controls — crafted illegal programs rejected, every generated
+one accepted), and RTL cosim bit-exact at every shape reported.</p>
+<p><strong>Re-run in full after the rebase onto main</strong>, which brought the ACT rebuild,
+the <code class="docutils literal notranslate"><span class="pre">Encoding</span></code> primitive and the <code class="docutils literal notranslate"><span class="pre">shapes.py</span></code> deduplication under this
+work. Verbatim:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>bench_isa TPU_MAXDIM=16       ALL EXACT
+bench_isa (default, 64)       ALL EXACT
+bench_isa TPU_SET=all         ALL EXACT
+stress_isa TPU_MAXDIM=16      STRESS OK: 492/492 runs exact ... GEMM at 64 shapes
+stress_isa (default, 64)      STRESS OK: 640/640 runs exact ... GEMM at 96 shapes
+stress_isa T=8 MAXDIM=64      STRESS OK: 630/630 runs exact ... GEMM at 96 shapes
+param_check TPU_MAXDIM=8      PARAM OK: 69/69 runs exact  (3 seeds ungeneratable)
+param_check TPU_MAXDIM=12     PARAM OK: 186/186 runs exact
+param_check T=8 MAXDIM=32     PARAM OK: 408/408 runs exact
+mutate.py --no-rtl            MUTATE OK: all 33 mutants run were caught
+                              (1 RTL-only not run: ar_claim_false)
+isa_dsl.py                    generated == hand-written, word for word
+kpn_model.py                  KPN OK
+pytest tests/act/             98 passed, 4 skipped
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>The first ASIC number.</strong> It described the design as shipped when it was
+taken, and now describes the design at <code class="docutils literal notranslate"><span class="pre">QD=8</span></code>: the run predates
+<code class="docutils literal notranslate"><span class="pre">QD=16</span></code>, and the depth change adds sequential cells that a DC run has not
+yet priced (<a class="reference internal" href="../developer/limitations.html#limitation-24-price"><span class="std std-ref">What QD=16 costs the shipped design</span></a>). DC on
+FreePDK-45nm, memories as flip-flops, synthesis only: the shipped baseline
+(T=4, MAXDIM=16) comes out at <strong>1,136,598</strong> standard-cell area, timing MET
+at +0.21 ns with zero violating and zero hold paths. That <strong>replaces</strong>
+1,271,692 from an earlier export of a superseded netlist — <strong>-10.6%</strong> —
+and the reason is the same memory-sizing change that took BRAM 42 -&gt; 40 and
+one cycle off the fixed term (<a class="reference internal" href="#benchmarks-one-cycle"><span class="std std-ref">The published row moved by one cycle, and why</span></a>). The design got
+smaller <em>and</em> slightly faster, and area and cycles now describe the same
+design, which they did not before.</p>
+<p>Read it only against our own variants synthesised identically. A 45 nm
+cell area has no relationship to a BRAM count, and with memories as
+registers it says as much about the memory treatment as about the datapath.</p>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">mutate.py</span></code> is the one that matters most here, because <code class="docutils literal notranslate"><span class="pre">bench_isa</span></code> and
+<code class="docutils literal notranslate"><span class="pre">stress_isa</span></code> both cite it as the evidence that they catch a broken design,
+and both were edited by this work: <strong>all 33 mutants still caught.</strong> The
+RTL-only mutant (<code class="docutils literal notranslate"><span class="pre">ar_claim_false</span></code>, a false <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span></code>
+claim, which no simulator can see) needs a cosim of its own and was not run.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 10.0%" />
+<col style="width: 12.0%" />
+<col style="width: 14.0%" />
+<col style="width: 20.0%" />
+<col style="width: 26.0%" />
+<col style="width: 18.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>T</p></th>
+<th class="head"><p>MAXDIM</p></th>
+<th class="head"><p>peak MAC/cyc</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">bench_isa</span></code></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">stress_isa</span></code></p></th>
+<th class="head"><p>cosim</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>4</p></td>
+<td><p>16</p></td>
+<td><p>16</p></td>
+<td><p>ALL EXACT (5 shapes)</p></td>
+<td><p>STRESS OK 492/492, 64 shapes, 18 bad programs rejected</p></td>
+<td><p>published 175/265/421/482/674</p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>64</p></td>
+<td><p>16</p></td>
+<td><p>ALL EXACT (11 shapes)</p></td>
+<td><p>STRESS OK 640/640, 96 shapes, 18 bad programs rejected</p></td>
+<td><p>bit-exact, 10 shapes (table above)</p></td>
+</tr>
+<tr class="row-even"><td><p>8</p></td>
+<td><p>32</p></td>
+<td><p>64</p></td>
+<td><p>ALL EXACT</p></td>
+<td><p>STRESS OK 486/486, 64 shapes</p></td>
+<td><p>not run (64 is the reported T=8 build)</p></td>
+</tr>
+<tr class="row-odd"><td><p>8</p></td>
+<td><p>64</p></td>
+<td><p>64</p></td>
+<td><p>ALL EXACT (8 shapes)</p></td>
+<td><p>STRESS OK 630/630, 96 shapes</p></td>
+<td><p>bit-exact, 8 shapes (T=8 table)</p></td>
+</tr>
+</tbody>
+</table>
+<p>The published MAXDIM=16 row was 172/262/418/484/686 before this work, and
+171/261/417/483/685 from then until <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> became the default on
+2026-09-24; see <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a> for both moves.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>Every cycle number on this page other than that one cell was measured at
+the previous channel depth, ``QD=8``.</strong> That includes the MAXDIM=64 sweep,
+the steady-state table, the T=8 columns and every Gemmini comparison. The
+<code class="docutils literal notranslate"><span class="pre">QD=16</span></code> default (<code class="docutils literal notranslate"><span class="pre">63ee6ec7</span></code>) moves the five-shape row by
++4 / +4 / +4 / -1 / -11 and moves the MAXDIM=64 five the same way, but the
+sweep has <strong>not</strong> been re-run, so <strong>no deficit or ratio on this page should
+be restated until it is</strong>. See <a class="reference internal" href="#benchmarks-qd16"><span class="std std-ref">2026-09-24: the channel depth moved the row, and not uniformly</span></a>.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>The sampled shape set is a WEAKENING of the stress gate at large MAXDIM,
+and that should be stated plainly rather than defended.</strong>
+<code class="docutils literal notranslate"><span class="pre">stress_isa</span></code>’s exhaustive set is <span class="math notranslate nohighlight">\((\text{MAXDIM}/T)^3\)</span> — 64
+shapes at MAXDIM=16 but <strong>4096</strong> at MAXDIM=64 — so above
+<code class="docutils literal notranslate"><span class="pre">TPU_STRESS_SHAPES</span></code> (default 96) it becomes a stratified sample. The
+sample is deterministic and seeded, so a failure reproduces, and it always
+keeps the scored shapes and every extreme (each dimension at its smallest
+and largest). <strong>It is still a sample</strong>, and a bug that lives only at, say,
+36x52x20 would now be missed at MAXDIM=64 where it would not have been at
+MAXDIM=16.</p>
+<p>What makes the trade acceptable is the second half: <strong>at MAXDIM=16 the set
+remains exhaustive at 64 shapes, so the shipped configuration’s gate is
+unchanged</strong> (<code class="docutils literal notranslate"><span class="pre">STRESS</span> <span class="pre">OK</span> <span class="pre">492/492</span></code>). <code class="docutils literal notranslate"><span class="pre">TPU_STRESS_SHAPES=0</span></code> restores the
+exhaustive set at any MAXDIM for anyone willing to pay for it.</p>
+</div>
+<p><strong>The memories carry a floor, not just the GEMM’s footprint.</strong> Sizing them
+purely to <span class="math notranslate nohighlight">\(\text{MAXDIM}^2/T\)</span> was wrong and the CHIA parametricity gate
+caught it: <code class="docutils literal notranslate"><span class="pre">PARAM_CONFIGS</span></code> runs the design at MAXDIM=8 and 12, where that
+expression gives 16 and 36 rows, and <code class="docutils literal notranslate"><span class="pre">stress_isa.random_program</span></code> addresses a
+fixed <strong>64-row window</strong> in each memory regardless of MAXDIM. Every GEMM shape
+stayed bit-exact while <code class="docutils literal notranslate"><span class="pre">param_check</span></code> went to “only 0 of 24 random programs
+could be generated” — a failure that reads as a harness complaint rather
+than a design change, which is what makes it worth recording. The memories are
+now <code class="docutils literal notranslate"><span class="pre">max(TEST_WINDOW,</span> <span class="pre">OPERAND_ROWS)</span></code>, and the resource table above is
+unaffected because the operand term dominates from MAXDIM=16 up.</p>
+<p>Two harness limitations were found and fixed rather than worked around, both
+of them hard-coded constants masquerading as design limits:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">isa_dsl.vector_program</span></code> addressed accumulator and scratchpad rows by the
+literals 40 / 80 / 100, which fit only because the memories were themselves
+literals. Its regions are now derived from <code class="docutils literal notranslate"><span class="pre">SPAD_ROWS</span></code> / <code class="docutils literal notranslate"><span class="pre">NVR</span></code> / <code class="docutils literal notranslate"><span class="pre">NAR</span></code>
+— they only ever had to be distinct, non-zero and in range — and it now
+states its three real requirements as asserts: <code class="docutils literal notranslate"><span class="pre">M</span> <span class="pre">&gt;=</span> <span class="pre">T</span></code> (its third <code class="docutils literal notranslate"><span class="pre">mm</span></code>
+reads T weight rows out of an M-row region), <code class="docutils literal notranslate"><span class="pre">MAXDIM</span> <span class="pre">//</span> <span class="pre">T</span> <span class="pre">&gt;=</span> <span class="pre">4</span></code> (it names
+column block 3), and room for its DRAM rows. <strong>This, not the design, is what
+“T=4 only” was.</strong></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">bench_isa</span></code>’s shape list was unfiltered, so at T=8 it asked for 4x4x4.
+Both sets now pass through <code class="docutils literal notranslate"><span class="pre">runnable()</span></code>.</p></li>
+<li><p>The set a run sweeps is <code class="docutils literal notranslate"><span class="pre">bench_isa.SWEEP</span></code>, <strong>not</strong> <code class="docutils literal notranslate"><span class="pre">bench_isa.SHAPES</span></code>.
+<code class="docutils literal notranslate"><span class="pre">SHAPES</span></code> is re-exported from <code class="docutils literal notranslate"><span class="pre">shapes.py</span></code> (the one definition) and is
+read <em>positionally</em> by <code class="docutils literal notranslate"><span class="pre">act_compile</span></code>, <code class="docutils literal notranslate"><span class="pre">kpn_model</span></code>, <code class="docutils literal notranslate"><span class="pre">isa_dsl</span></code>,
+<code class="docutils literal notranslate"><span class="pre">tests/act/test_tinytpu.py</span></code> and — through <code class="docutils literal notranslate"><span class="pre">accept.BASELINES</span></code> against
+<code class="docutils literal notranslate"><span class="pre">shapes.NAMES</span></code> — the CHIA harness. <a class="footnote-reference brackets" href="#sweepknobs" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a></p></li>
+</ul>
+</section>
+</section>
+<section id="matched-against-gemmini">
+<span id="benchmarks-matched"></span><h2>Matched against Gemmini<a class="headerlink" href="#matched-against-gemmini" title="Link to this heading"><span>¶</span></a></h2>
+<section id="what-is-matched-and-what-is-not">
+<h3>What is matched, and what is not<a class="headerlink" href="#what-is-matched-and-what-is-not" title="Link to this heading"><span>¶</span></a></h3>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 38.0%" />
+<col style="width: 42.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>axis</p></th>
+<th class="head"><p>matched?</p></th>
+<th class="head"><p>how</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>array size</p></td>
+<td><p><strong>yes, at two sizes</strong></p></td>
+<td><p>T=4 vs <code class="docutils literal notranslate"><span class="pre">Int8Dim4GemminiRocketConfig</span></code>; T=8 vs
+<code class="docutils literal notranslate"><span class="pre">Int8Dim8GemminiRocketConfig</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>data type</p></td>
+<td><p><strong>yes</strong></p></td>
+<td><p>int8 x int8 -&gt; int32 on both, Gemmini’s own default type</p></td>
+</tr>
+<tr class="row-even"><td><p>operand distribution</p></td>
+<td><p><strong>yes</strong></p></td>
+<td><p>[-4, 4], the distribution <code class="docutils literal notranslate"><span class="pre">allo_cmp.c</span></code> fills</p></td>
+</tr>
+<tr class="row-odd"><td><p>DRAM row stride</p></td>
+<td><p><strong>yes</strong>, and this is new</p></td>
+<td><p>both sides run at MAXDIM=64 (below)</p></td>
+</tr>
+<tr class="row-even"><td><p>measurement window</p></td>
+<td><p><strong>yes, by construction</strong></p></td>
+<td><p>see the window table</p></td>
+</tr>
+<tr class="row-odd"><td><p>memory latency</p></td>
+<td><p>both idealised, not identical</p></td>
+<td><p>ours <code class="docutils literal notranslate"><span class="pre">-m_axi_latency</span> <span class="pre">0</span></code>; Gemmini’s Rocket SoC with
+<code class="docutils literal notranslate"><span class="pre">additionalLatency=0</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>on-chip capacity</p></td>
+<td><p><strong>no</strong> — disclosed, not corrected</p></td>
+<td><p>Gemmini 256 KiB scratchpad + 64 KiB accumulator against our 4 + 4 +
+2.1 KiB. At every shape in either set <strong>both machines hold the entire
+working set on chip</strong> (64x64 int8 is 4 KiB), and Gemmini’s tiling
+search returns one <code class="docutils literal notranslate"><span class="pre">loop_ws</span></code> at every capacity from 256 KiB down to
+4 KiB for 4x4x4 .. 16x16x16. So it is an area and power asymmetry, not
+a cycle one, at these shapes. It would become a cycle asymmetry above
+32x32x32 if Gemmini’s memory were shrunk to ours, where the driver
+would split 64x64x64 into 32 calls.</p></td>
+</tr>
+<tr class="row-odd"><td><p>dispatch software</p></td>
+<td><p><strong>no</strong> — excluded from both</p></td>
+<td><p>Gemmini’s window excludes its ~395-cycle Rocket driver; ours has no
+host driver at all</p></td>
+</tr>
+</tbody>
+</table>
+<p>Gemmini’s config delta from its own published <code class="docutils literal notranslate"><span class="pre">defaultConfig</span></code> is <strong>two
+fields, and both of them are the array size</strong> (plus
+<code class="docutils literal notranslate"><span class="pre">has_training_convs</span> <span class="pre">=</span> <span class="pre">false</span></code>, conv hardware neither benchmark touches and
+which does not appear in the generated header). Everything else —
+<code class="docutils literal notranslate"><span class="pre">spad_read_delay</span></code> = 4, <code class="docutils literal notranslate"><span class="pre">tile_latency</span></code> = 0, <code class="docutils literal notranslate"><span class="pre">mesh_output_delay</span></code> = 1,
+<code class="docutils literal notranslate"><span class="pre">dataflow</span></code> = <code class="docutils literal notranslate"><span class="pre">BOTH</span></code>, both capacities — is left at Gemmini’s default and
+is named here as <strong>unexercised</strong>, because tuning any of them is tuning the
+opponent. <code class="docutils literal notranslate"><span class="pre">dataflow</span> <span class="pre">=</span> <span class="pre">BOTH</span></code> means Gemmini carries an output-stationary
+datapath neither benchmark uses, which favours us if it favours anyone.</p>
+</section>
+<section id="the-gemmini-builds-in-terms-another-team-can-reproduce">
+<h3>The Gemmini builds, in terms another team can reproduce<a class="headerlink" href="#the-gemmini-builds-in-terms-another-team-can-reproduce" title="Link to this heading"><span>¶</span></a></h3>
+<p>Stated exhaustively because <strong>neither side’s Gemmini figure has ever been
+reproduced by anyone</strong>, and two independent builds of the same nominal
+configuration are the only cross-check available. If ours and someone else’s
+disagree, that is chased rather than resolved by picking the prettier number.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 26.0%" />
+<col style="width: 37.0%" />
+<col style="width: 37.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"></th>
+<th class="head"><p>DIM=4 point</p></th>
+<th class="head"><p>DIM=8 point</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>chipyard config class</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Int8Dim4GemminiRocketConfig</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Int8Dim8GemminiRocketConfig</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Gemmini config object</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">GemminiCustomConfigs.int8Dim4Config</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">GemminiCustomConfigs.int8Dim8Config</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>derived from</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">GemminiConfigs.defaultConfig</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">GemminiConfigs.defaultConfig</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>delta from it</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">meshRows</span></code> = <code class="docutils literal notranslate"><span class="pre">meshColumns</span></code> = 4, <code class="docutils literal notranslate"><span class="pre">tileRows</span></code> = <code class="docutils literal notranslate"><span class="pre">tileColumns</span></code> = 1,
+<code class="docutils literal notranslate"><span class="pre">has_training_convs</span></code> = false</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">meshRows</span></code> = <code class="docutils literal notranslate"><span class="pre">meshColumns</span></code> = 8, <code class="docutils literal notranslate"><span class="pre">tileRows</span></code> = <code class="docutils literal notranslate"><span class="pre">tileColumns</span></code> = 1,
+<code class="docutils literal notranslate"><span class="pre">has_training_convs</span></code> = false</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">inputType</span></code> / <code class="docutils literal notranslate"><span class="pre">accType</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">SInt(8.W)</span></code> / <code class="docutils literal notranslate"><span class="pre">SInt(32.W)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">SInt(8.W)</span></code> / <code class="docutils literal notranslate"><span class="pre">SInt(32.W)</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">spatialArrayOutputType</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">SInt(20.W)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">SInt(20.W)</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>scratchpad</p></td>
+<td><p>256 KiB, 4 banks, <code class="docutils literal notranslate"><span class="pre">BANK_ROWS</span></code> 16 384</p></td>
+<td><p>256 KiB, 4 banks, <code class="docutils literal notranslate"><span class="pre">BANK_ROWS</span></code> 8 192</p></td>
+</tr>
+<tr class="row-odd"><td><p>accumulator</p></td>
+<td><p>64 KiB, <code class="docutils literal notranslate"><span class="pre">ACC_ROWS</span></code> 4 096</p></td>
+<td><p>64 KiB, <code class="docutils literal notranslate"><span class="pre">ACC_ROWS</span></code> 2 048</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dataflow</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Dataflow.BOTH</span></code> (benchmarks pass <code class="docutils literal notranslate"><span class="pre">WS</span></code>)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Dataflow.BOTH</span></code> (benchmarks pass <code class="docutils literal notranslate"><span class="pre">WS</span></code>)</p></td>
+</tr>
+<tr class="row-odd"><td><p>pipeline depths</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">spad_read_delay</span></code> 4, <code class="docutils literal notranslate"><span class="pre">tile_latency</span></code> 0, <code class="docutils literal notranslate"><span class="pre">mesh_output_delay</span></code> 1,
+<code class="docutils literal notranslate"><span class="pre">acc_latency</span></code> 2 — <strong>all at Gemmini’s defaults, unexercised</strong></p></td>
+<td><p>same</p></td>
+</tr>
+<tr class="row-even"><td><p>SoC</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">WithNHugeCores(1)</span></code>, <code class="docutils literal notranslate"><span class="pre">WithSystemBusWidth(128)</span></code>,
+<code class="docutils literal notranslate"><span class="pre">AbstractConfig</span></code>; 32 KiB L1 D$</p></td>
+<td><p>same</p></td>
+</tr>
+<tr class="row-odd"><td><p>memory model</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">WithBlackBoxSimMem(additionalLatency</span> <span class="pre">=</span> <span class="pre">0)</span></code></p></td>
+<td><p>same</p></td>
+</tr>
+<tr class="row-even"><td><p>simulator</p></td>
+<td><p>Verilator 5.051, <code class="docutils literal notranslate"><span class="pre">simulator-chipyard.harness-&lt;config&gt;</span></code></p></td>
+<td><p>same</p></td>
+</tr>
+<tr class="row-odd"><td><p>harness program</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">gemmini/allo_bare_steady.c</span></code>, <code class="docutils literal notranslate"><span class="pre">-DMAXDIM=64</span></code></p></td>
+<td><p>same source, <code class="docutils literal notranslate"><span class="pre">DIM</span></code>-guarded shape set</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">loop_ws</span></code> calls per window</p></td>
+<td><p><strong>1</strong>, printed at runtime for every shape</p></td>
+<td><p><strong>1</strong>, printed at runtime for every shape</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Pins</strong>: chipyard <code class="docutils literal notranslate"><span class="pre">e0207441</span></code>, <code class="docutils literal notranslate"><span class="pre">generators/gemmini</span></code> <code class="docutils literal notranslate"><span class="pre">25809f7</span></code>,
+<code class="docutils literal notranslate"><span class="pre">gemmini-rocc-tests</span></code> <code class="docutils literal notranslate"><span class="pre">1a1a1c6</span></code>. <code class="docutils literal notranslate"><span class="pre">has_training_convs</span></code> is read in exactly
+one place in the whole generator (<code class="docutils literal notranslate"><span class="pre">LoopConv.scala:1358-1363</span></code>) and appears
+nowhere in <code class="docutils literal notranslate"><span class="pre">LoopMatmul.scala</span></code>, the mesh, the scratchpad or
+<code class="docutils literal notranslate"><span class="pre">generateHeader</span></code>, so a GEMM provably cannot observe it. The complete
+field-by-field delta — all 5 written fields including the 2 that are no-ops,
+all 55 inherited with where each is set, and all <strong>28 derived</strong> values, which
+is where two builds can agree on the written config and still differ in
+hardware — is committed at <code class="docutils literal notranslate"><span class="pre">gemmini/CONFIG_DELTA.txt</span></code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>Elaboration rewrites</strong> <code class="docutils literal notranslate"><span class="pre">gemmini-rocc-tests/include/gemmini_params.h</span></code>
+<strong>in place</strong> (<code class="docutils literal notranslate"><span class="pre">Controller.scala:30</span></code>), so building any config destroys the
+previous one’s header and every C binary built afterwards silently targets
+the wrong hardware. Both headers are therefore committed here as
+<code class="docutils literal notranslate"><span class="pre">gemmini/gemmini_params.dim4.h</span></code> and <code class="docutils literal notranslate"><span class="pre">gemmini_params.dim8.h</span></code>, the DIM=4
+one is restored as the tree’s baseline after any DIM=8 run, and every run
+log is checked for the <code class="docutils literal notranslate"><span class="pre">GEMMINI</span> <span class="pre">DIM=</span></code> boot banner. One trap found this
+way: a stale DIM=4 binary run against the DIM=8 simulator hit Gemmini’s own
+<code class="docutils literal notranslate"><span class="pre">&quot;A</span> <span class="pre">single</span> <span class="pre">mvin</span> <span class="pre">instruction</span> <span class="pre">must</span> <span class="pre">load</span> <span class="pre">more</span> <span class="pre">than</span> <span class="pre">0</span> <span class="pre">bytes&quot;</span></code> assert, which is
+the only reason it did not pass silently.</p>
+<p>A second trap for anyone building DIM=16: <code class="docutils literal notranslate"><span class="pre">gemmini-rocc-tests</span></code> HEAD ships
+a committed header with <code class="docutils literal notranslate"><span class="pre">DIM</span></code> 16 / <code class="docutils literal notranslate"><span class="pre">BANK_ROWS</span></code> 4096 / <code class="docutils literal notranslate"><span class="pre">ACC_ROWS</span></code> 1024
+but <strong>no</strong> <code class="docutils literal notranslate"><span class="pre">ACC_READ_FULL_WIDTH</span></code>, while <code class="docutils literal notranslate"><span class="pre">defaultConfig</span></code> sets
+<code class="docutils literal notranslate"><span class="pre">acc_read_full_width</span> <span class="pre">=</span> <span class="pre">true</span></code> and <code class="docutils literal notranslate"><span class="pre">generateHeader</span></code> emits that macro. That
+committed header was generated by some leaner config. A DIM=16 build that
+reuses it instead of regenerating will disagree with a regenerated one for a
+reason that is invisible in the Scala.</p>
+</div>
+</section>
+<section id="why-both-sides-run-at-maxdim-64">
+<h3>Why both sides run at MAXDIM=64<a class="headerlink" href="#why-both-sides-run-at-maxdim-64" title="Link to this heading"><span>¶</span></a></h3>
+<p>MAXDIM is the DRAM row stride of every operand <strong>on both machines</strong>:
+<code class="docutils literal notranslate"><span class="pre">allo_bare5.c</span></code> passes it as the <code class="docutils literal notranslate"><span class="pre">loop_ws</span></code> stride and TinyTPU-isa’s
+<code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> addresses <code class="docutils literal notranslate"><span class="pre">A[row</span> <span class="pre">*</span> <span class="pre">MAXDIM</span> <span class="pre">+</span> <span class="pre">col]</span></code>. So the same logical shape costs
+differently on a build with a bigger MAXDIM, and a comparison is matched only
+if the two sides use the same one. Both columns below are MAXDIM=64. The
+effect is real and it is larger for us: at 16x16x16, Gemmini goes 593 -&gt; 685
+(+15.5%) and we go 686 -&gt; 879 (+28%) — diagnosed in
+<a class="reference internal" href="#benchmarks-diagnosis"><span class="std std-ref">Where the remaining cycles go</span></a>.</p>
+</section>
+<section id="the-exact-program-each-machine-runs">
+<h3>The exact program each machine runs<a class="headerlink" href="#the-exact-program-each-machine-runs" title="Link to this heading"><span>¶</span></a></h3>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 16.0%" />
+<col style="width: 42.0%" />
+<col style="width: 42.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"></th>
+<th class="head"><p>TinyTPU-isa</p></th>
+<th class="head"><p>Gemmini</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>program</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">isa_dsl.gemm_program(M,</span> <span class="pre">K,</span> <span class="pre">N)</span></code>: a 13-instruction looped GEMM in the
+accelerator’s own ISA, assembled into <code class="docutils literal notranslate"><span class="pre">imem</span></code> in DRAM. One RTL build
+runs every shape; the shape is instruction data.</p></td>
+<td><p>5 <code class="docutils literal notranslate"><span class="pre">config</span></code> RoCC instructions, then <strong>one</strong> hardware <code class="docutils literal notranslate"><span class="pre">gemmini_loop_ws</span></code>
+covering the whole shape, then <code class="docutils literal notranslate"><span class="pre">fence</span></code>
+(<code class="docutils literal notranslate"><span class="pre">gemmini/allo_bare_steady.c</span></code>). One elaboration runs every shape.</p></td>
+</tr>
+<tr class="row-odd"><td><p>window opens</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ap_start</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">rdcycle</span></code>, after the CPU has refilled A and B</p></td>
+</tr>
+<tr class="row-even"><td><p>window closes</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ap_done</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">rdcycle</span></code>, after <code class="docutils literal notranslate"><span class="pre">gemmini_fence()</span></code> retires</p></td>
+</tr>
+<tr class="row-odd"><td><p>inside</p></td>
+<td><p>the whole program: the imem burst, both operand bursts, every
+<code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> / <code class="docutils literal notranslate"><span class="pre">mm</span></code> / <code class="docutils literal notranslate"><span class="pre">mvout</span></code>, the write-back of C</p></td>
+<td><p>the 5 configs, the <code class="docutils literal notranslate"><span class="pre">loop_ws</span></code> expansion into mvin/preload/compute/mvout,
+the fence, and L1 coherence for the operands the CPU just dirtied</p></td>
+</tr>
+<tr class="row-even"><td><p>outside</p></td>
+<td><p>nothing — there is no host driver</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">tiled_matmul_auto</span></code>’s tile search, padding arithmetic, argument
+marshalling: the <strong>~395 cycles</strong> of Rocket software, measured flat
+across a 16x range of work</p></td>
+</tr>
+<tr class="row-odd"><td><p>tiles per call</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(N/T)(K/T)</span></code> <code class="docutils literal notranslate"><span class="pre">mm</span></code> instructions from one program</p></td>
+<td><p><strong>one</strong> <code class="docutils literal notranslate"><span class="pre">loop_ws</span></code>, proven at runtime by replicating the driver’s own
+tiling search and printing <code class="docutils literal notranslate"><span class="pre">loop_ws_calls=1</span></code> for every shape</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="the-asymmetries-stated-once">
+<h3>The asymmetries, stated once<a class="headerlink" href="#the-asymmetries-stated-once" title="Link to this heading"><span>¶</span></a></h3>
+<ol class="arabic simple">
+<li><p><strong>Our window has no host driver</strong>; Gemmini’s excludes its ~395-cycle one.
+The doc-level consequence is that Gemmini’s column is a <strong>lower bound</strong> on
+its dispatch cost, since the real driver computes the <code class="docutils literal notranslate"><span class="pre">loop_ws</span></code> operands
+at runtime and that cost sits in the excluded 395. Conservative against us.</p></li>
+<li><p><strong>Both harnesses have near-zero memory latency.</strong> Neither number is a
+statement about a real memory system.</p></li>
+<li><p><strong>Gemmini’s on-chip memory is 64x ours</strong> and, at these shapes, provably
+cycle-neutral (above).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ex_accumulate</span></code>: <code class="docutils literal notranslate"><span class="pre">allo_bare5.c</span></code> hardcoded <code class="docutils literal notranslate"><span class="pre">true</span></code> where the driver
+computes <code class="docutils literal notranslate"><span class="pre">false</span></code> for a no-bias single-tile matmul. Both were measured at
+every shape (<code class="docutils literal notranslate"><span class="pre">BARE</span></code> / <code class="docutils literal notranslate"><span class="pre">BAREF</span></code> in <code class="docutils literal notranslate"><span class="pre">allo_bare_steady.c</span></code>). The
+difference is <strong>within trial-to-trial noise</strong> — at 64x64x64, 20375/20377
+against 20384/20350 — so the published numbers stand. Recorded because it
+sat inside all five of them and had not been checked.</p></li>
+</ol>
+</section>
+<section id="t-4-vs-gemmini-dim-4-both-at-maxdim-64">
+<h3>T=4 vs Gemmini DIM=4, both at MAXDIM=64<a class="headerlink" href="#t-4-vs-gemmini-dim-4-both-at-maxdim-64" title="Link to this heading"><span>¶</span></a></h3>
+<p>Ours: Vitis cosim, bit-exact at every shape, deterministic (one run suffices,
+verified). Gemmini: Verilator, <strong>median of five trials</strong>, every shape one
+<code class="docutils literal notranslate"><span class="pre">loop_ws</span></code> proven at runtime. Peak is 16 MAC/cycle on both.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 13.3%" />
+<col style="width: 8.9%" />
+<col style="width: 11.1%" />
+<col style="width: 15.6%" />
+<col style="width: 11.1%" />
+<col style="width: 11.1%" />
+<col style="width: 14.4%" />
+<col style="width: 14.4%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>shape</p></th>
+<th class="head"><p>set</p></th>
+<th class="head"><p>ours</p></th>
+<th class="head"><p>Gemmini (median)</p></th>
+<th class="head"><p>ours % peak</p></th>
+<th class="head"><p>Gem % peak</p></th>
+<th class="head"><p><strong>ours / Gem</strong></p></th>
+<th class="head"><p>clears spread?</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>4x4x4</p></td>
+<td><p>latency</p></td>
+<td><p>218</p></td>
+<td><p>208 +/- 25</p></td>
+<td><p>1.8%</p></td>
+<td><p>1.9%</p></td>
+<td><p>1.05x</p></td>
+<td><p><strong>no (0.4x)</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>8x8x8</p></td>
+<td><p>latency</p></td>
+<td><p>357</p></td>
+<td><p>324 +/- 36</p></td>
+<td><p>9.0%</p></td>
+<td><p>9.9%</p></td>
+<td><p>1.10x</p></td>
+<td><p><strong>no (0.9x)</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>12x12x12</p></td>
+<td><p>latency</p></td>
+<td><p>563</p></td>
+<td><p>458 +/- 17</p></td>
+<td><p>19.2%</p></td>
+<td><p>23.6%</p></td>
+<td><p>1.23x</p></td>
+<td><p>yes (6.2x)</p></td>
+</tr>
+<tr class="row-odd"><td><p>16x16x8</p></td>
+<td><p>latency</p></td>
+<td><p>677</p></td>
+<td><p>527 +/- 44</p></td>
+<td><p>18.9%</p></td>
+<td><p>24.3%</p></td>
+<td><p>1.28x</p></td>
+<td><p>yes (3.4x)</p></td>
+</tr>
+<tr class="row-even"><td><p>16x16x16</p></td>
+<td><p>both</p></td>
+<td><p>879</p></td>
+<td><p>691 +/- 44</p></td>
+<td><p>29.1%</p></td>
+<td><p>37.0%</p></td>
+<td><p>1.27x</p></td>
+<td><p>yes (4.3x)</p></td>
+</tr>
+<tr class="row-odd"><td><p>32x32x32</p></td>
+<td><p>steady</p></td>
+<td><p>3 752</p></td>
+<td><p>2 977 +/- 34</p></td>
+<td><p>54.6%</p></td>
+<td><p>68.8%</p></td>
+<td><p>1.26x</p></td>
+<td><p>yes (23x)</p></td>
+</tr>
+<tr class="row-even"><td><p>48x48x48</p></td>
+<td><p>steady</p></td>
+<td><p>10 289</p></td>
+<td><p>9 100 +/- 35</p></td>
+<td><p>67.2%</p></td>
+<td><p>75.9%</p></td>
+<td><p>1.13x</p></td>
+<td><p>yes (34x)</p></td>
+</tr>
+<tr class="row-odd"><td><p>64x64x64</p></td>
+<td><p>steady</p></td>
+<td><p>22 123</p></td>
+<td><p>20 287 +/- 34</p></td>
+<td><p>74.1%</p></td>
+<td><p>80.8%</p></td>
+<td><p><strong>1.09x</strong></p></td>
+<td><p>yes (54x)</p></td>
+</tr>
+<tr class="row-even"><td><p>64x32x64</p></td>
+<td><p>steady</p></td>
+<td><p>12 907</p></td>
+<td><p>11 175 +/- 18</p></td>
+<td><p>63.5%</p></td>
+<td><p>73.3%</p></td>
+<td><p>1.16x</p></td>
+<td><p>yes (96x)</p></td>
+</tr>
+<tr class="row-odd"><td><p>32x64x32</p></td>
+<td><p>steady</p></td>
+<td><p>6 824</p></td>
+<td><p>5 570 +/- 147</p></td>
+<td><p>60.0%</p></td>
+<td><p>73.5%</p></td>
+<td><p>1.23x</p></td>
+<td><p>yes (8.5x)</p></td>
+</tr>
+</tbody>
+</table>
+<p>(<code class="docutils literal notranslate"><span class="pre">+/-</span></code> is the full min-max spread over five trials, not a standard error.)</p>
+<p><strong>Answer at this array size: we do not beat Gemmini at any shape, but the
+deficit converges rather than persisting.</strong> On the cubic sweep it goes 1.27x
+(16) -&gt; 1.26x (32) -&gt; 1.13x (48) -&gt; <strong>1.09x (64)</strong>, and in fraction-of-peak
+terms the gap closes from 7.9 points at 16x16x16 to 6.7 at 64x64x64. It does
+not invert.</p>
+<p>That answers the honest open question directly: the 1.07-1.24x measured at the
+five small shapes was <strong>a statement about pipeline depth and issue overhead,
+not about steady-state efficiency</strong>, and at steady state the deficit shrinks
+to about 9% without disappearing. Two caveats that belong with it: the two
+smallest shapes do not clear the measurement noise at all, and the answer is
+<strong>different at the other matched array size</strong> (next section).</p>
+</section>
+<section id="t-8-vs-gemmini-dim-8-both-at-maxdim-64">
+<h3>T=8 vs Gemmini DIM=8, both at MAXDIM=64<a class="headerlink" href="#t-8-vs-gemmini-dim-8-both-at-maxdim-64" title="Link to this heading"><span>¶</span></a></h3>
+<p>The second matched point, and <strong>it does not agree with the first</strong>, which is
+the whole reason for having two. Peak is 64 MAC/cycle on both sides.
+<code class="docutils literal notranslate"><span class="pre">gemmini/allo_bare_steady.c</span></code> at <code class="docutils literal notranslate"><span class="pre">DIM=8</span></code>, Gemmini as <strong>median of five
+trials</strong>, which drops 4x4x4 and 12x12x12 because they are not multiples of 8
+— the same <code class="docutils literal notranslate"><span class="pre">runnable()</span></code> rule our own side applies on T, so <strong>both machines
+drop the same shapes</strong>. Our cycle column was re-measured on current <code class="docutils literal notranslate"><span class="pre">main</span></code>
+after the parametric <code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code> refactor and is unchanged; see <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier
+measurements and corrections</a>.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 13.3%" />
+<col style="width: 8.9%" />
+<col style="width: 10.0%" />
+<col style="width: 14.4%" />
+<col style="width: 11.1%" />
+<col style="width: 11.1%" />
+<col style="width: 13.3%" />
+<col style="width: 17.8%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>shape</p></th>
+<th class="head"><p>set</p></th>
+<th class="head"><p>ours</p></th>
+<th class="head"><p>Gemmini (median)</p></th>
+<th class="head"><p>ours % peak</p></th>
+<th class="head"><p>Gem % peak</p></th>
+<th class="head"><p><strong>ours / Gem</strong></p></th>
+<th class="head"><p>clears spread?</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>8x8x8</p></td>
+<td><p>latency</p></td>
+<td><p>285</p></td>
+<td><p>305 +/- 17</p></td>
+<td><p>2.8%</p></td>
+<td><p>2.6%</p></td>
+<td><p>0.93x (ours faster)</p></td>
+<td><p>no (1.2x)</p></td>
+</tr>
+<tr class="row-odd"><td><p>16x16x8</p></td>
+<td><p>latency</p></td>
+<td><p>424</p></td>
+<td><p>500 +/- 16</p></td>
+<td><p>7.5%</p></td>
+<td><p>6.4%</p></td>
+<td><p><strong>0.85x (ours faster)</strong></p></td>
+<td><p><strong>yes (4.8x)</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>16x16x16</p></td>
+<td><p>both</p></td>
+<td><p>493</p></td>
+<td><p>535 +/- 45</p></td>
+<td><p>13.0%</p></td>
+<td><p>12.0%</p></td>
+<td><p>0.92x (ours faster)</p></td>
+<td><p>no (0.9x)</p></td>
+</tr>
+<tr class="row-odd"><td><p>32x32x32</p></td>
+<td><p>steady</p></td>
+<td><p>1 484</p></td>
+<td><p>1 280 +/- 18</p></td>
+<td><p>34.5%</p></td>
+<td><p>40.0%</p></td>
+<td><p>1.16x</p></td>
+<td><p>yes (11x)</p></td>
+</tr>
+<tr class="row-even"><td><p>48x48x48</p></td>
+<td><p>steady</p></td>
+<td><p>3 537</p></td>
+<td><p>3 028 +/- 35</p></td>
+<td><p>48.9%</p></td>
+<td><p>57.1%</p></td>
+<td><p>1.17x</p></td>
+<td><p>yes (15x)</p></td>
+</tr>
+<tr class="row-odd"><td><p>64x64x64</p></td>
+<td><p>steady</p></td>
+<td><p>7 083</p></td>
+<td><p>6 033 +/- 35</p></td>
+<td><p>57.8%</p></td>
+<td><p>67.9%</p></td>
+<td><p><strong>1.17x</strong></p></td>
+<td><p>yes (30x)</p></td>
+</tr>
+<tr class="row-even"><td><p>64x32x64</p></td>
+<td><p>steady</p></td>
+<td><p>4 523</p></td>
+<td><p>3 897 +/- 35</p></td>
+<td><p>45.3%</p></td>
+<td><p>52.6%</p></td>
+<td><p>1.16x</p></td>
+<td><p>yes (18x)</p></td>
+</tr>
+<tr class="row-odd"><td><p>32x64x32</p></td>
+<td><p>steady</p></td>
+<td><p>2 508</p></td>
+<td><p>1 866 +/- 36</p></td>
+<td><p>40.8%</p></td>
+<td><p>54.8%</p></td>
+<td><p>1.34x</p></td>
+<td><p>yes (18x)</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>We beat Gemmini at one shape, supportably: 16x16x8, by 1.18x, clearing the
+spread 4.8x.</strong> At 8x8x8 and 16x16x16 the sign is also ours but the margins
+(20 and 42 cycles) do not clear their spreads (17 and 45), so those two are
+<strong>level, not wins</strong> — and the earlier best-of-two reading of them as wins is
+withdrawn. That is the first supportable win this design has over Gemmini at
+any shape.</p>
+<p>At steady state the deficit is a <strong>flat 1.16-1.17x</strong> with no convergence,
+except 32x64x32 at 1.34x — the one shape where a shallow K (32, four k-tiles
+at T=8) leaves the weight chain least amortised.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Settled at five trials.</strong> The DIM=8 column above is the median of five,
+with the full min-max spread; the per-shape spread is 16-45 cycles, the
+same roughly-constant band measured at DIM=4. <strong>One win is supportable,
+two are level.</strong> <a class="footnote-reference brackets" href="#bestoftwo" id="id2" role="doc-noteref"><span class="fn-bracket">[</span>2<span class="fn-bracket">]</span></a></p>
+</div>
+<p>The reason we are ahead there rather than behind is the reason the latency set
+exists: at T=8, 16x16x16 is only four tile-matmuls, so the machine with the
+shorter pipeline is not penalised, and ours is shorter. 16x16x8 is the
+clearest case because it is the shallowest of the three (two n-tiles), which
+is why it is the one whose margin clears the noise.</p>
+<p>At steady state the deficit is a <strong>flat 1.17-1.18x</strong> and does not converge,
+where at T=4 it converged to 1.086x. Two matched points, two different
+behaviours:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"></th>
+<th class="head"><p>latency shapes</p></th>
+<th class="head"><p>32^3</p></th>
+<th class="head"><p>48^3</p></th>
+<th class="head"><p>64^3</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>T=4 / DIM=4</p></td>
+<td><p>1.06-1.30x slower</p></td>
+<td><p>1.25x</p></td>
+<td><p>1.13x</p></td>
+<td><p><strong>1.086x</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>T=8 / DIM=8</p></td>
+<td><p><strong>0.85x at 16x16x8</strong> (a win); level at the other two</p></td>
+<td><p>1.16x</p></td>
+<td><p>1.17x</p></td>
+<td><p><strong>1.17x</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>This is what a single matched point could not have told us</strong>, and it is the
+answer to “is the deficit a property of the design or of one configuration”:
+it is a property of <em>where the shape sits relative to the array</em>. At T=4,
+64x64x64 is a steady-state shape (74.1% of peak) and we close to within 9%. At
+T=8 the same shape is still in the ramp (57.8%) and we sit 18% behind, because
+Gemmini’s much deeper buffering fills an 8x8 array better than our 4 KiB
+operand file does at this problem size. A T=8 steady-state set would have to
+start around 128 on a side — which is past the encoding ceiling, and is
+therefore the concrete argument for widening the fields.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>The uncertainty on every difference above is Gemmini’s, not ours.</strong>
+Gemmini is a whole SoC — Rocket, an L1 cache, a scratchpad still holding
+the previous call’s state — so the same binary on the same hardware does
+not give the same count twice: over five trials the spread is <strong>16-45
+cycles</strong>, roughly constant in absolute terms, which is up to 12% of the
+total at the smallest shapes and under 0.2% at 64x64x64. Our side is a
+deterministic simulation of a fixed design on fixed inputs and reproduces
+to the cycle across independent runs.</p>
+<p>So <strong>a claimed difference smaller than Gemmini’s spread is unsupportable.</strong>
+At T=4 that rules out 4x4x4 and 8x8x8; at T=8 it rules out 8x8x8 and
+16x16x16. In each case the <strong>sign</strong> is still informative — it is the same
+across all ten shapes at T=4, and the same across all three latency shapes
+at T=8 — but the magnitude at an individual sub-spread shape is not.
+Median and spread per shape are in <a class="reference internal" href="#benchmarks-spread"><span class="std std-ref">Median and spread: which side carries the uncertainty</span></a>.</p>
+<p>The two Gemmini benchmark files are also <strong>not interchangeable</strong>:
+<code class="docutils literal notranslate"><span class="pre">allo_bare_steady.c</span></code> reads 2-14 cycles below <code class="docutils literal notranslate"><span class="pre">allo_bare5.c</span></code> at the same
+shapes on the same hardware, because each measurement is sensitive to the
+preceding call’s cache and scratchpad state and the two files have
+different call sequences. Every figure on this page names its file.</p>
+</div>
+</section>
+</section>
+<section id="does-the-ranking-survive-the-memory-latency-range">
+<span id="benchmarks-latency-grid"></span><h2>Does the ranking survive the memory-latency range?<a class="headerlink" href="#does-the-ranking-survive-the-memory-latency-range" title="Link to this heading"><span>¶</span></a></h2>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p><strong>The point of this grid is not which variant is faster. It is whether the
+knob chose the answer.</strong> Every cycle count on this page is at
+<code class="docutils literal notranslate"><span class="pre">TPU_AXI_LATENCY=0</span></code>, and Vitis cosim has no DRAM model, so 0 is a value
+we <em>chose</em>. A variant whose whole benefit is wider DMA bursts is exactly
+the kind whose advantage can grow or vanish with memory latency, so a win
+measured at 0 is a win at one arbitrary point of a knob.</p>
+<p>This is not hypothetical. MiniTPU’s simulator ranked GEMM templates
+<strong>backwards</strong> against a board A/B at its inferred 92-cycle value — a 45%
+simulated cut measured 3.6% on hardware — and backwards again at 0. Two
+wrong values, two wrong rankings, and the simulator was internally
+consistent and confident both times. They found it only by running the A/B
+on two boards.</p>
+<p><strong>At zero latency the burst-widened candidate really is faster.</strong> The
+measurement is sound. It is the inference from it to “this design is
+better” that the grid tests, and that is a much slipperier failure than a
+bad measurement.</p>
+</div>
+<p>The variant under test is a <strong>parametric</strong> burst width,
+<code class="docutils literal notranslate"><span class="pre">microarch_isa.DMA_WORDS</span></code> (<code class="docutils literal notranslate"><span class="pre">TPU_DMA_WIDEN=1</span></code>), not a patch: at 1 it is the
+shipped loop, one packed word per iteration; at 16 each iteration reads a whole
+64-byte beat, which is what <code class="docutils literal notranslate"><span class="pre">align_value(64)</span></code> lets Vitis widen the port to.
+It is bit-exact on <code class="docutils literal notranslate"><span class="pre">bench_isa</span></code> and <code class="docutils literal notranslate"><span class="pre">stress_isa</span></code> (640/640) at both settings,
+and <strong>the parametric refactor is cycle-neutral at DMA_WORDS=1</strong>: the shipped
+path reproduces 10 289 and 22 123 exactly.</p>
+<p>Latency in <strong>ns as well as cycles</strong>, because cycles say which simulator
+settings a variant is good for and seconds say which real <em>memory systems</em> it
+is good for. MiniTPU’s inversion sat between 213 and 490 ns, and it was the
+nanosecond figure that let them place their board inside that window. Our own
+clock is not fixed either — variants have estimated 2.431 and 3.782 ns —
+so a cycle-valued threshold moves when the frequency does and a time-valued
+one does not. Both builds here estimate <strong>2.431 ns</strong>, so at least the two
+columns share a clock.</p>
+<p>For reference, MiniTPU’s own fitted figure is <strong>213 ns</strong> (about 40 cycles at
+187.5 MHz), which is <strong>88 cycles at 2.431 ns</strong> — that is where the 88 comes
+from, and it is carried as a time rather than as their cycle count so their
+clock is not imported with it.</p>
+<table class="docutils align-default" id="id4">
+<caption><span class="caption-text">48x48x48 and 64x64x64, one csynth per grid point</span><a class="headerlink" href="#id4" title="Link to this table"><span>¶</span></a></caption>
+<colgroup>
+<col style="width: 12.4%" />
+<col style="width: 11.2%" />
+<col style="width: 13.5%" />
+<col style="width: 13.5%" />
+<col style="width: 11.2%" />
+<col style="width: 13.5%" />
+<col style="width: 13.5%" />
+<col style="width: 11.2%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p><code class="docutils literal notranslate"><span class="pre">m_axi_latency</span></code></p></th>
+<th class="head"><p>= ns &#64; 2.431</p></th>
+<th class="head"><p>shipped 48^3</p></th>
+<th class="head"><p>widened 48^3</p></th>
+<th class="head"><p><strong>delta</strong></p></th>
+<th class="head"><p>shipped 64^3</p></th>
+<th class="head"><p>widened 64^3</p></th>
+<th class="head"><p><strong>delta</strong></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>0</p></td>
+<td><p>10 289</p></td>
+<td><p>9 569</p></td>
+<td><p><strong>-720</strong></p></td>
+<td><p>22 123</p></td>
+<td><p>21 163</p></td>
+<td><p><strong>-960</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>16</p></td>
+<td><p>39</p></td>
+<td><p>9 823</p></td>
+<td><p>9 103</p></td>
+<td><p><strong>-720</strong></p></td>
+<td><p>21 175</p></td>
+<td><p>20 215</p></td>
+<td><p><strong>-960</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>64</p></td>
+<td><p>156</p></td>
+<td><p>10 430</p></td>
+<td><p>9 710</p></td>
+<td><p><strong>-720</strong></p></td>
+<td><p>22 666</p></td>
+<td><p>21 706</p></td>
+<td><p><strong>-960</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>88</p></td>
+<td><p>214</p></td>
+<td><p>10 838</p></td>
+<td><p>10 118</p></td>
+<td><p><strong>-720</strong></p></td>
+<td><p>23 554</p></td>
+<td><p>22 594</p></td>
+<td><p><strong>-960</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>100</p></td>
+<td><p>243</p></td>
+<td><p>11 042</p></td>
+<td><p>10 322</p></td>
+<td><p><strong>-720</strong></p></td>
+<td><p>23 998</p></td>
+<td><p>23 038</p></td>
+<td><p><strong>-960</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outcome 1, and more strongly than the question anticipated: the ranking does
+not merely hold across the whole 0 to 243 ns range — the advantage is
+EXACTLY constant.</strong> -720 cycles at 48x48x48 and -960 at 64x64x64 at <strong>all
+five</strong> latency points, not approximately: the last two points were <em>predicted</em>
+from the first three and came back to the cycle. <strong>There is no inversion anywhere in the range, and no
+sensitivity at all.</strong> So the knob did not choose this design decision, and
+what is left is purely the BRAM cost.</p>
+<p>The invariance is not luck, and it has a mechanism, which is worth having
+because an unexplained constant would be more suspicious than a varying one.
+The widening removes loop <em>iterations</em> from the burst: at 48x48x48 the two
+operands span 48 x WPR = 768 packed words each, so 1 536 iterations at
+<code class="docutils literal notranslate"><span class="pre">DMA_WORDS=1</span></code> become 96 at 16, a saving of 1 440; at 64x64x64, 2 048 become
+128, a saving of 1 920. <strong>The measured saving is exactly half of each</strong>
+(720 and 960), i.e. the A and B bursts overlap each other so precisely one of
+the two is ever on the critical path. That is a fixed structural saving in the
+burst prologue, which is why no amount of modelled latency moves it — the
+latency shifts <em>when</em> the prologue runs, not how many iterations it has.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>The knob is NON-MONOTONIC, and that is the grid’s other finding.</strong>
+Latency 16 is <em>faster</em> than latency 0 — 9 823 against 10 289 at
+48x48x48, and 21 175 against 22 123 at 64x64x64 — for <strong>both</strong> variants.
+Cycles then rise monotonically from 16 through 100.</p>
+<p>A real memory system cannot get faster by being slower, so this is direct
+evidence that <code class="docutils literal notranslate"><span class="pre">config_interface</span> <span class="pre">-m_axi_latency</span></code> is a <strong>scheduling
+directive, not a latency model</strong>: telling Vitis to expect 16 cycles makes
+it schedule the burst more aggressively, and cosim’s actual memory still
+answers immediately, so the design gets faster. It follows that <strong>no row of
+this grid may be read as “what happens with a memory of that latency”</strong>.
+What the grid legitimately shows is that the <em>ranking</em> of the two variants
+is invariant to the directive across its whole useful range — which is
+the question it was built for, and all it answers.</p>
+</div>
+<p>What the widening costs, at every latency (it does not vary with the knob):</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>variant</p></th>
+<th class="head"><p>FF</p></th>
+<th class="head"><p>LUT</p></th>
+<th class="head"><p>BRAM</p></th>
+<th class="head"><p>DSP</p></th>
+<th class="head"><p>estimated clock</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>shipped</p></td>
+<td><p>17 488</p></td>
+<td><p>26 554</p></td>
+<td><p>52</p></td>
+<td><p>14</p></td>
+<td><p>2.431 ns</p></td>
+</tr>
+<tr class="row-odd"><td><p>burst-widened</p></td>
+<td><p>24 001</p></td>
+<td><p>31 396</p></td>
+<td><p><strong>116</strong></p></td>
+<td><p>14</p></td>
+<td><p>2.431 ns (dual-ported form; see the warning below — the shipped
+variant of this experiment is banked)</p></td>
+</tr>
+<tr class="row-even"><td><p>delta</p></td>
+<td><p>+6 513 (+37%)</p></td>
+<td><p>+4 842 (+18%)</p></td>
+<td><p><strong>+64 (+123%)</strong></p></td>
+<td><p>0</p></td>
+<td><p><strong>unchanged</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p>The clock not moving is worth stating: widening the DMA datapath <strong>does not
+lengthen the critical path</strong>, so the comparison is a pure cycles-for-area
+trade and the two columns can be compared in cycles without converting. The
+BRAM more than doubles, which is the real price.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>The +123% BRAM and an ASIC elaboration failure are the same fact seen
+from two substrates, and that changes what the decision is.</strong></p>
+<p>The widened variant does not synthesise to standard cells. DC rejects it in
+two minutes — <code class="docutils literal notranslate"><span class="pre">ELAB-366:</span> <span class="pre">Net</span> <span class="pre">'ram[0][31]'</span> <span class="pre">...</span> <span class="pre">driven</span> <span class="pre">by</span> <span class="pre">more</span> <span class="pre">than</span> <span class="pre">one</span>
+<span class="pre">source</span></code>, across all 32 bits — because Vitis satisfies the widened loop’s
+<code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code> writes per iteration by emitting <code class="docutils literal notranslate"><span class="pre">rbA</span></code> as a <strong>true
+dual-write-port RAM</strong>: two <code class="docutils literal notranslate"><span class="pre">always</span> <span class="pre">&#64;(posedge</span> <span class="pre">clk)</span></code> blocks driving one
+array, while still naming the module <code class="docutils literal notranslate"><span class="pre">_1R1W</span></code>. Every RAM in all four
+exported variants was checked and <strong>it is the only two-write-port memory
+anywhere; it exists only in the widened build.</strong></p>
+<p>An FPGA block RAM has two independent write ports, so filling both per
+cycle is free. <strong>Standard cells have no such primitive</strong>, and with memories
+mapped to registers two unconditioned writers of one array is a genuine
+multi-driver. DC is right to refuse it, and the synthesis side is right to
+report it as not synthesisable rather than bodging a flip-flop dual port:
+that would be a number describing hardware nobody would build.</p>
+<p>So landing the widening is <strong>not</strong> “spend BRAM to buy cycles”. It is
+“<strong>commit to a dual-write-port memory</strong>”, which is a different commitment
+with different consequences for anyone carrying this design to another
+substrate. The BRAM number alone does not say that, which is why it is
+written here beside it.</p>
+<p><strong>Measured, and the widening survives without the primitive.</strong> The buffers
+are now <strong>cyclically banked by</strong> <code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code>, so write <code class="docutils literal notranslate"><span class="pre">w</span></code> always lands
+in bank <code class="docutils literal notranslate"><span class="pre">w</span></code> and every bank has exactly one writer — the same widening
+expressed in a way both substrates can build. The result is the strongest
+of the three possible outcomes:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>build</p></th>
+<th class="head"><p>48^3</p></th>
+<th class="head"><p>64^3</p></th>
+<th class="head"><p>rbA write ports</p></th>
+<th class="head"><p>FF</p></th>
+<th class="head"><p>LUT</p></th>
+<th class="head"><p>BRAM</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>shipped (<code class="docutils literal notranslate"><span class="pre">DMA_WORDS=1</span></code>)</p></td>
+<td><p>10 289</p></td>
+<td><p>22 123</p></td>
+<td><p>1</p></td>
+<td><p>17 488</p></td>
+<td><p>26 554</p></td>
+<td><p>52</p></td>
+</tr>
+<tr class="row-odd"><td><p>widened, dual-ported</p></td>
+<td><p>9 569</p></td>
+<td><p>21 163</p></td>
+<td><p><strong>2 (DC rejects)</strong></p></td>
+<td><p>24 001</p></td>
+<td><p>31 396</p></td>
+<td><p>116</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>widened, banked</strong></p></td>
+<td><p><strong>9 569</strong></p></td>
+<td><p><strong>21 163</strong></p></td>
+<td><p><strong>1</strong></p></td>
+<td><p>25 026</p></td>
+<td><p>33 799</p></td>
+<td><p><strong>100</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Identical cycles, to the cycle.</strong> Banking keeps the entire -720 / -960,
+so <strong>the gain was the widening and not the second write port</strong> — the
+optimisation is real and it is portable. Audited across every RAM module in
+the build: all seven have one write port, where the rejected export’s
+<code class="docutils literal notranslate"><span class="pre">rbA</span></code> had two. The <code class="docutils literal notranslate"><span class="pre">ELAB-366</span></code> cause is removed rather than worked
+around.</p>
+<p>It also costs <em>less</em> block RAM than the dual-ported form (+92% over the
+shipped control rather than +123%), trading that for +43% FF and +27% LUT.
+So the decision is back on the table on its merits, and what it now reads
+as is: <strong>-720 / -960 cycles for +43% FF, +27% LUT, +92% BRAM, at an
+unchanged clock, on a design that synthesises to standard cells.</strong></p>
+</div>
+<p>(The shipped row reads 52 BRAM here against 48 in the MAXDIM table. The
+parametric burst buffers carry <code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code> words of rounding headroom in
+<strong>both</strong> variants, so the two differ only in the loop and not in the memory
+they address — which is what makes the cycle columns comparable. The price
+is 4 BRAM on the shipped path against the pre-parametric build, at <strong>zero
+cycles</strong>: 10 289 and 22 123 are the same numbers the pre-refactor build
+produced.)</p>
+</section>
+<section id="median-and-spread-which-side-carries-the-uncertainty">
+<span id="benchmarks-spread"></span><h2>Median and spread: which side carries the uncertainty<a class="headerlink" href="#median-and-spread-which-side-carries-the-uncertainty" title="Link to this heading"><span>¶</span></a></h2>
+<p><strong>Only one side has any.</strong> This is not symmetric and it should not be reported
+as if it were.</p>
+<ul>
+<li><p><strong>Ours is deterministic, and each new configuration was checked once.</strong>
+Vitis cosim is a simulation of a fixed design on fixed inputs. The check is
+not a sample: a non-deterministic cosim would invalidate every comparison
+drawn from it, so it is worth finding now rather than in a disagreement with
+someone else’s table later. <strong>If a pair ever disagrees the right response is
+to stop and report it, not to average or re-run.</strong> None did:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>configuration</p></th>
+<th class="head"><p>run 1</p></th>
+<th class="head"><p>run 2</p></th>
+<th class="head"><p>agree?</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>T=4 MAXDIM=64 shipped (48^3 / 64^3)</p></td>
+<td><p>10 289 / 22 123</p></td>
+<td><p>10 289 / 22 123</p></td>
+<td><p><strong>to the cycle</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>burst-widened, latency 0 (48^3 / 64^3)</p></td>
+<td><p>9 569 / 21 163</p></td>
+<td><p>9 569 / 21 163</p></td>
+<td><p><strong>to the cycle</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>T=8 MAXDIM=64 (16^3 / 64^3)</p></td>
+<td><p>493 / 7 083</p></td>
+<td><p>493 / 7 083</p></td>
+<td><p><strong>to the cycle</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p>Each pair is two separate processes, two separate <code class="docutils literal notranslate"><span class="pre">csynth_design</span></code>
+invocations and two separate project directories — not a re-read of one
+report.</p>
+</li>
+<li><p><strong>Gemmini’s is not.</strong> It is a full SoC: a Rocket core, a 32 KiB L1 D-cache,
+and a scratchpad still holding the previous call’s state. The same binary on
+the same hardware gives different counts, and the measured spread reaches
+<strong>20 cycles at 16x16x8</strong> against a ~520-cycle total.</p></li>
+</ul>
+<p>Gemmini DIM=4 at MAXDIM=64, <strong>five trials per shape</strong>
+(<code class="docutils literal notranslate"><span class="pre">allo_bare_steady.c</span></code>, <code class="docutils literal notranslate"><span class="pre">BARE</span></code>):</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 15.1%" />
+<col style="width: 10.5%" />
+<col style="width: 10.5%" />
+<col style="width: 10.5%" />
+<col style="width: 10.5%" />
+<col style="width: 12.8%" />
+<col style="width: 12.8%" />
+<col style="width: 17.4%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>shape</p></th>
+<th class="head"><p>n</p></th>
+<th class="head"><p>median</p></th>
+<th class="head"><p>min</p></th>
+<th class="head"><p>max</p></th>
+<th class="head"><p><strong>spread</strong></p></th>
+<th class="head"><p>% of total</p></th>
+<th class="head"><p>deficit / spread</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>4x4x4</p></td>
+<td><p>5</p></td>
+<td><p>208</p></td>
+<td><p>208</p></td>
+<td><p>233</p></td>
+<td><p><strong>25</strong></p></td>
+<td><p><strong>12.0%</strong></p></td>
+<td><p>10 / 25 = <strong>0.4x</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>8x8x8</p></td>
+<td><p>5</p></td>
+<td><p>324</p></td>
+<td><p>324</p></td>
+<td><p>360</p></td>
+<td><p><strong>36</strong></p></td>
+<td><p><strong>11.1%</strong></p></td>
+<td><p>33 / 36 = <strong>0.9x</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>12x12x12</p></td>
+<td><p>5</p></td>
+<td><p>458</p></td>
+<td><p>458</p></td>
+<td><p>475</p></td>
+<td><p>17</p></td>
+<td><p>3.7%</p></td>
+<td><p>105 / 17 = 6.2x</p></td>
+</tr>
+<tr class="row-odd"><td><p>16x16x8</p></td>
+<td><p>5</p></td>
+<td><p>527</p></td>
+<td><p>517</p></td>
+<td><p>561</p></td>
+<td><p>44</p></td>
+<td><p>8.3%</p></td>
+<td><p>150 / 44 = 3.4x</p></td>
+</tr>
+<tr class="row-even"><td><p>16x16x16</p></td>
+<td><p>5</p></td>
+<td><p>691</p></td>
+<td><p>681</p></td>
+<td><p>725</p></td>
+<td><p>44</p></td>
+<td><p>6.4%</p></td>
+<td><p>188 / 44 = 4.3x</p></td>
+</tr>
+<tr class="row-odd"><td><p>32x32x32</p></td>
+<td><p>5</p></td>
+<td><p>2 977</p></td>
+<td><p>2 977</p></td>
+<td><p>3 011</p></td>
+<td><p>34</p></td>
+<td><p>1.1%</p></td>
+<td><p>775 / 34 = 23x</p></td>
+</tr>
+<tr class="row-even"><td><p>48x48x48</p></td>
+<td><p>5</p></td>
+<td><p>9 100</p></td>
+<td><p>9 100</p></td>
+<td><p>9 135</p></td>
+<td><p>35</p></td>
+<td><p>0.4%</p></td>
+<td><p>1 189 / 35 = 34x</p></td>
+</tr>
+<tr class="row-odd"><td><p>64x64x64</p></td>
+<td><p>5</p></td>
+<td><p>20 287</p></td>
+<td><p>20 287</p></td>
+<td><p>20 321</p></td>
+<td><p>34</p></td>
+<td><p>0.17%</p></td>
+<td><p>1 836 / 34 = <strong>54x</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>64x32x64</p></td>
+<td><p>5</p></td>
+<td><p>11 175</p></td>
+<td><p>11 165</p></td>
+<td><p>11 183</p></td>
+<td><p>18</p></td>
+<td><p>0.16%</p></td>
+<td><p>1 732 / 18 = 96x</p></td>
+</tr>
+<tr class="row-odd"><td><p>32x64x32</p></td>
+<td><p>5</p></td>
+<td><p>5 570</p></td>
+<td><p>5 474</p></td>
+<td><p>5 621</p></td>
+<td><p><strong>147</strong></p></td>
+<td><p>2.6%</p></td>
+<td><p>1 254 / 147 = 8.5x</p></td>
+</tr>
+</tbody>
+</table>
+<p>The spread is mostly <strong>constant in absolute terms</strong> (17-44 cycles) rather than
+proportional, which is what a fixed-size cache and coherence effect looks like
+— so it matters enormously at 4x4x4 and not at all at 64x64x64. <strong>32x64x32
+is the exception at 147 cycles</strong>, and it is the only steady-state shape whose
+spread is not small; it still clears its own deficit by 8.5x, but a future
+comparison at that shape should carry more than five trials.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>Two shapes are inside the noise and must not be quoted as differences.</strong>
+At 4x4x4 the deficit is 10 cycles against a 25-cycle spread (0.4x) and at
+8x8x8 it is 33 against 36 (0.9x). Five trials were needed to see this: the
+two-trial estimates understated the spread at 8x8x8 by 12x (3 against 36).
+<strong>No single-trial number at 4x4x4 or 8x8x8 should be quoted again by
+either side.</strong></p>
+<p>Everything from 12x12x12 up clears the bar, and every steady-state
+conclusion clears it by one to two orders of magnitude: the 1 836-cycle
+deficit at 64x64x64 is <strong>54x</strong> its spread, and the -960-cycle burst saving
+is 28x it.</p>
+</div>
+<p>Consequence, stated once and applied everywhere: <strong>the uncertainty on a
+cross-machine difference is Gemmini’s alone</strong>, and a claimed difference
+smaller than it is unsupportable. The earlier reading of that same bar is kept
+in <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>And the trap on the other side, which matters more for how all of this
+should be read: <strong>a number can be perfectly deterministic and still wrong
+about the hardware.</strong> Our cosim contains no memory system at all and
+<code class="docutils literal notranslate"><span class="pre">TPU_AXI_LATENCY</span></code> is a value we pick; MiniTPU’s simulator contains a
+<em>fitted</em> one, and the 92-cycle version of that fit ranked GEMM templates
+backwards against the board — a 45% simulated improvement that measured
+3.6% on silicon. Reproducibility is a property of the measurement.
+Agreement with hardware is a separate claim needing separate evidence.
+<strong>We have the first and not the second</strong>, on either side of this
+comparison.</p>
+</div>
+</section>
+<section id="where-the-remaining-cycles-go">
+<span id="benchmarks-diagnosis"></span><h2>Where the remaining cycles go<a class="headerlink" href="#where-the-remaining-cycles-go" title="Link to this heading"><span>¶</span></a></h2>
+<p>Three terms, in order of size at 64x64x64.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p><strong>The largest term is now measured, not estimated, and it accounts for most
+of the remaining deficit at T=4.</strong> The burst-widened variant
+(<a class="reference internal" href="#benchmarks-latency-grid"><span class="std std-ref">Does the ranking survive the memory-latency range?</span></a>) is a bit-exact build that differs from the
+shipped one <em>only</em> in the burst loop, so the difference between them prices
+the burst prologue exactly:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>shape</p></th>
+<th class="head"><p>shipped</p></th>
+<th class="head"><p>Gemmini DIM=4</p></th>
+<th class="head"><p>deficit</p></th>
+<th class="head"><p>burst saves</p></th>
+<th class="head"><p><strong>% of deficit</strong></p></th>
+<th class="head"><p>widened vs Gemmini</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>48x48x48</p></td>
+<td><p>10 289</p></td>
+<td><p>9 102</p></td>
+<td><p>1 187</p></td>
+<td><p><strong>720</strong></p></td>
+<td><p><strong>61%</strong></p></td>
+<td><p>9 569 -&gt; <strong>1.051x</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>64x64x64</p></td>
+<td><p>22 123</p></td>
+<td><p>20 375</p></td>
+<td><p>1 748</p></td>
+<td><p><strong>960</strong></p></td>
+<td><p><strong>55%</strong></p></td>
+<td><p>21 163 -&gt; <strong>1.039x</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p>So <strong>landing the burst widening would take the T=4 steady-state deficit
+from 1.086x to 1.039x at 64x64x64</strong>, and it does so at every modelled
+latency. That is the single highest-value change available, it is already
+parametric and verified, and its price is +123% BRAM. The remaining
+~790 cycles at 64x64x64 are terms 2 and 3 below.</p>
+</div>
+<p><strong>1. The operand burst reads whole DRAM rows (the MAXDIM-stride term).</strong>
+<code class="docutils literal notranslate"><span class="pre">dma_ld</span></code>’s burst loop runs <code class="docutils literal notranslate"><span class="pre">na</span> <span class="pre">*</span> <span class="pre">WPR</span></code> words, where <code class="docutils literal notranslate"><span class="pre">WPR</span> <span class="pre">=</span> <span class="pre">MAXDIM</span> <span class="pre">/</span> <span class="pre">T</span></code> is
+the packed words in one DRAM row — so it reads the <strong>full MAXDIM-wide row</strong>
+whichever columns the program names. At MAXDIM=64 a 4x4x4 GEMM bursts
+4 x 16 = 64 words to use 4, a 16x waste, and this is the whole of the
+16x16x16 regression from 686 (MAXDIM=16) to 879 (MAXDIM=64): 193 cycles, against
+Gemmini’s 92 for the same stride change. At 64x64x64 the waste is zero,
+because the full row <em>is</em> what the program needs — which is why the deficit
+converges. Fixing it means giving <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> a column extent so the burst
+covers the named blocks only; it is the single largest item and it is worth
+more at small shapes than large ones.</p>
+<p><strong>2. The residual steady-state gap, ~5 700 cycles at 64x64x64</strong> (22 123 against
+an ideal 16 384; Gemmini is at 20 375 against the same ideal, so ~4 000 of it
+is not ours specifically). Per the timeline attribution in
+<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/impact-results/</span></code> and
+<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/chia-evidence/</span></code>, the three components are
+operand staging ahead of the first MAC, the serial DMA before the first
+weight, and the drain. None has been built. The method is
+<code class="docutils literal notranslate"><span class="pre">impact/profile.sh</span></code>: re-run cosim with <code class="docutils literal notranslate"><span class="pre">-enable_dataflow_profiling</span></code>, re-run
+the xsim snapshot so the monitor’s CSVs survive, then <code class="docutils literal notranslate"><span class="pre">impact/analyze_df.py</span></code>
+for per-process timelines. At 64x64x64 this is the measurement to make next,
+because every previous timeline was taken at 16x16x16, where term 1 dominates
+and term 2 is invisible.</p>
+<p><strong>3. Issue overhead, ~20 cycles per dynamic instruction</strong> (fixed 557,
+marginal 20.1, measured at MAXDIM=16). At 64x64x64 the program issues 320
+dynamic instructions, so this is ~6 400 cycles of the 22 123 — and it is the
+term the loop nest already minimises: the <em>static</em> program is 14 instructions
+at every shape, so nothing here is program size. It is the per-instruction
+dispatch through the sequencer.</p>
+<p>What would have to change, in order of <strong>measured</strong> value:</p>
+<ol class="arabic simple">
+<li><p><strong>Land the burst widening</strong> (<code class="docutils literal notranslate"><span class="pre">TPU_DMA_WIDEN=1</span></code>, already parametric,
+bit-exact, latency-invariant). Worth 720 and 960 cycles at 48^3 and 64^3,
+i.e. 55-61% of the whole T=4 steady-state deficit, for +123% BRAM. This is
+the decision the owner has in front of them and the grid says the memory
+knob does not affect it.</p></li>
+<li><p><strong>Give</strong> <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> <strong>a column extent</strong> so the burst covers the named column
+blocks instead of the whole DRAM row. This is the <em>other</em> half of term 1 and
+it attacks it from the opposite side: widening makes the wasted reads
+cheaper, an extent stops reading them. It is worth most at the small
+shapes, where the waste is 16x, and nothing at 64^3, where the full row is
+what the program needs.</p></li>
+<li><p><strong>Profile at 64x64x64 before touching term 2.</strong> Every existing timeline was
+taken at 16x16x16, where term 1 dominates and term 2 is invisible, so the
+operand-staging/DMA/drain split in <code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/impact-results/</span></code> is an estimate made
+in the wrong regime.</p></li>
+<li><p><strong>For T=8, widen the encoding fields.</strong> T=8’s deficit does not converge
+because 64x64x64 is still in its ramp (57.8% of peak); reaching steady
+state needs ~128 on a side, which is past both ceilings in
+<a class="reference internal" href="#benchmarks-raising-maxdim"><span class="std std-ref">Raising the build: what a bigger MAXDIM costs</span></a>. This is the first time a <em>measurement</em>
+has argued for widening them rather than a hypothetical.</p></li>
+</ol>
+</section>
+<section id="the-workload-set-a-gpt-2-projection-placeholder">
+<span id="benchmarks-workload"></span><h2>The workload set: a GPT-2 projection (placeholder)<a class="headerlink" href="#the-workload-set-a-gpt-2-projection-placeholder" title="Link to this heading"><span>¶</span></a></h2>
+<p><strong>Nothing here is measured.</strong> The entry exists so that the shape and its cost
+are written down rather than estimated in conversation.</p>
+<p><strong>The shape.</strong> GPT-2 small has <span class="math notranslate nohighlight">\(d_\text{model} = 768\)</span>. The attention
+<strong>output projection</strong> at sequence length 128 is</p>
+<div class="math notranslate nohighlight">
+\[[128, 768] \times [768, 768] \;\longrightarrow\; [128, 768],
+\qquad 75\,497\,472 \text{ MACs}\]</div>
+<p>i.e. <strong>M=128, K=768, N=768</strong>. (The fused QKV projection is the same M and K
+with N=2304, three times the work; the MLP is 768-&gt;3072-&gt;768. The output
+projection is chosen because it is the smallest square one.)</p>
+<p><strong>Which dimension binds first, and at what value.</strong> “We cannot run
+128x768x768” is true and useless; what a reader needs is the binding dimension
+and its number, because that is what says which field to widen. Derived from
+the encoding rules, not estimated:</p>
+<table class="docutils align-default" id="id5">
+<caption><span class="caption-text">Ceilings, largest legal value (MAXDIM must be a multiple of T)</span><a class="headerlink" href="#id5" title="Link to this table"><span>¶</span></a></caption>
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 22.0%" />
+<col style="width: 16.0%" />
+<col style="width: 16.0%" />
+<col style="width: 16.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>limit</p></th>
+<th class="head"><p>what it bounds</p></th>
+<th class="head"><p>T=4</p></th>
+<th class="head"><p>T=8</p></th>
+<th class="head"><p>T=16</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>address field, 11 usable bits
+(<span class="math notranslate nohighlight">\((\text{MAXDIM}//T)\cdot\text{MAXDIM} \le 2048\)</span>)</p></td>
+<td><p><strong>MAXDIM</strong>, hence M, K and N together</p></td>
+<td><p><strong>88</strong></p></td>
+<td><p><strong>128</strong></p></td>
+<td><p><strong>176</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nr</span></code>, 7 usable bits (<code class="docutils literal notranslate"><span class="pre">MAXROWS</span></code>)</p></td>
+<td><p>any single instruction’s row count, so M and K</p></td>
+<td><p>127</p></td>
+<td><p>127</p></td>
+<td><p>127</p></td>
+</tr>
+<tr class="row-even"><td><p>header count, 15 usable bits</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code> iterations,
+<span class="math notranslate nohighlight">\((N/T)(K/T)M + (N/T)M\)</span></p></td>
+<td><p>shape-dependent</p></td>
+<td><p>shape-dependent</p></td>
+<td><p>shape-dependent</p></td>
+</tr>
+</tbody>
+</table>
+<p>So <strong>the address field binds first at T=4, through MAXDIM, at 88</strong> — and
+<code class="docutils literal notranslate"><span class="pre">nr</span></code>’s 127 is <em>not</em> a function of T, so it becomes the wall as soon as the
+array is wide enough to push MAXDIM past it. That is already the case at
+<strong>T=8</strong>, where the address field admits 128 and <code class="docutils literal notranslate"><span class="pre">nr</span></code> refuses any dimension
+above 127: measured at <code class="docutils literal notranslate"><span class="pre">TPU_T=8</span> <span class="pre">TPU_MAXDIM=128</span></code>, a 32x128x128 GEMM is
+refused by <code class="docutils literal notranslate"><span class="pre">isa_dsl</span></code>’s <code class="docutils literal notranslate"><span class="pre">M</span> <span class="pre">&lt;=</span> <span class="pre">MAXROWS</span> <span class="pre">and</span> <span class="pre">K</span> <span class="pre">&lt;=</span> <span class="pre">MAXROWS</span></code>, while 32x120x128
+assembles.</p>
+<p>Against the shapes another team proposed, this is precise rather than
+approximate:</p>
+<ul class="simple">
+<li><p><strong>32 x 512 x 128</strong> (their recommended single shape). K=512 needs
+MAXDIM &gt;= 512: we are short <strong>5.8x</strong> at T=4 and <strong>4.0x</strong> at T=8 on the
+address field, <strong>4.0x</strong> on <code class="docutils literal notranslate"><span class="pre">nr</span></code>, and 4.0x / 1.0x on the header count.</p></li>
+<li><p><strong>K-sweep at M=32, N=128.</strong> Raising MAXDIM to match K, the first failure is
+at <strong>K=92</strong> (T=4, the address field, which refuses the build at import) and
+at <strong>K=128</strong> (T=8, <code class="docutils literal notranslate"><span class="pre">nr</span></code>, which refuses the program); last good K is 88
+and 120.</p></li>
+<li><p><strong>Tall sweep at K=N=128.</strong> Blocked at T=4 for <em>every</em> M, because N=128
+alone is past the 88 ceiling. At T=8 the address field admits 128 exactly,
+so what blocks it is <code class="docutils literal notranslate"><span class="pre">nr</span></code>: K=128 and M=128 each exceed it by <strong>one</strong> (127
+against 128).</p></li>
+</ul>
+<p>Those last two are worth stating as margins rather than as failures: at T=8 we
+miss their tall sweep by one row, in two dimensions, on a field with two spare
+bits in the instruction word.</p>
+<p><strong>What our build would need to run the GPT-2 shape.</strong> Not simply a bigger
+MAXDIM — 768 is past the address ceiling by 8.7x at T=4. The deeper blocker
+is that the region’s operands are declared <code class="docutils literal notranslate"><span class="pre">int8[MAXDIM</span> <span class="pre">*</span> <span class="pre">MAXDIM]</span></code> and
+addressed <code class="docutils literal notranslate"><span class="pre">row</span> <span class="pre">*</span> <span class="pre">MAXDIM</span> <span class="pre">+</span> <span class="pre">col</span></code>, so the machine cannot <em>address</em> a 128x768
+matrix at all, whatever its on-chip capacity. Three changes, in dependency
+order:</p>
+<ol class="arabic simple">
+<li><p><strong>A runtime base and row stride on</strong> <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> <strong>and</strong> <code class="docutils literal notranslate"><span class="pre">mvout</span></code>, so a
+MAXDIM=64 on-chip tile is a <em>window</em> into a larger DRAM matrix rather than
+the whole of it. Today both are MAXDIM-relative. This is the change that
+actually unblocks the entry.</p></li>
+<li><p><strong>A deeper loop stack.</strong> The GEMM already uses 2 levels; an outer tile nest
+over DRAM tiles (m, n, k) needs 3 more, so <code class="docutils literal notranslate"><span class="pre">LOOP_DEPTH</span></code> must grow from 4
+to at least 5 — or the outer tiling must be issued by a host as repeated
+region invocations, which would put a driver inside our measurement window
+for the first time and change what the window means.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">AGU_TERMS</span></code> <strong>may need to grow from 3</strong>: a weight address already spends
+two terms (<code class="docutils literal notranslate"><span class="pre">B_SP</span> <span class="pre">+</span> <span class="pre">nb*MAXDIM</span> <span class="pre">+</span> <span class="pre">kb*T</span></code>), and an outer k-tile would want a
+third on the same field.</p></li>
+</ol>
+<p><strong>What it would cost if it ran.</strong> Projected from each build’s <em>own</em> measured
+fraction of peak at 64x64x64, which is the largest shape either can run:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>build</p></th>
+<th class="head"><p>peak MAC/cyc</p></th>
+<th class="head"><p>measured % of peak at 64^3</p></th>
+<th class="head"><p>projected cycles</p></th>
+<th class="head"><p>at 411 MHz</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>T=4, MAXDIM=64</p></td>
+<td><p>16</p></td>
+<td><p>74.1%</p></td>
+<td><p>6.37 M</p></td>
+<td><p>15.5 ms</p></td>
+</tr>
+<tr class="row-odd"><td><p>T=8, MAXDIM=64</p></td>
+<td><p>64</p></td>
+<td><p>57.8%</p></td>
+<td><p>2.04 M</p></td>
+<td><p>5.0 ms</p></td>
+</tr>
+</tbody>
+</table>
+<p>Both are <strong>projections from one point</strong>, and they assume the windowed DMA that
+does not exist yet would cost nothing — which is exactly the assumption this
+entry exists to stop us making. The T=8 figure is the weaker of the two, since
+57.8% is a ramp point rather than a steady-state one.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p><strong>The asymmetry this entry exposes is the largest one on the page, and it
+is not in our favour: Gemmini can run this workload today and we cannot.</strong>
+<code class="docutils literal notranslate"><span class="pre">tiled_matmul_auto</span></code> takes arbitrary M, K, N with runtime strides and
+splits them across as many <code class="docutils literal notranslate"><span class="pre">loop_ws</span></code> calls as its scratchpad needs — at
+128x768x768 its own tiling search would use multiple calls, and that is
+ordinary operation for it, not an extension. Our machine cannot address the
+matrix.</p>
+<p>That is a real capability gap and no cycle count offsets it. It is also the
+reason this set is a placeholder rather than a measurement: a benchmark set
+that only contains shapes we can run is a set chosen to flatter us, and
+writing the gap down is the alternative to quietly omitting it.</p>
+</div>
+</section>
+<section id="reproducing">
+<span id="benchmarks-reproduce"></span><h2>Reproducing<a class="headerlink" href="#reproducing" title="Link to this heading"><span>¶</span></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">source</span><span class="w"> </span><span class="k">$(</span>conda<span class="w"> </span>info<span class="w"> </span>--base<span class="k">)</span>/etc/profile.d/conda.sh<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>conda<span class="w"> </span>activate<span class="w"> </span>allo
+<span class="nb">export</span><span class="w"> </span><span class="nv">LLVM_BUILD_DIR</span><span class="o">=</span>/home/sk3463/llvm-allo-6b09f739/build<span class="w"> </span><span class="nv">OMP_NUM_THREADS</span><span class="o">=</span><span class="m">8</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">PYTHONPATH</span><span class="o">=</span><span class="nv">$PWD</span>
+<span class="nb">cd</span><span class="w"> </span>examples/accelerator/tinytpu_vitis
+
+<span class="c1"># functional, seconds -- the gates every configuration must pass</span>
+<span class="nv">TPU_SET</span><span class="o">=</span>all<span class="w"> </span>python<span class="w"> </span>bench_isa.py<span class="w">                 </span><span class="c1"># ALL EXACT</span>
+python<span class="w"> </span>stress_isa.py<span class="w">                            </span><span class="c1"># STRESS OK</span>
+<span class="nv">TPU_T</span><span class="o">=</span><span class="m">8</span><span class="w"> </span><span class="nv">TPU_MAXDIM</span><span class="o">=</span><span class="m">64</span><span class="w"> </span>python<span class="w"> </span>stress_isa.py<span class="w">      </span><span class="c1"># the second array size</span>
+
+<span class="c1"># resources: one csynth per configuration, project deleted, report kept</span>
+python<span class="w"> </span>csynth_sweep.py<span class="w"> </span><span class="m">4</span>:16<span class="w"> </span><span class="m">4</span>:32<span class="w"> </span><span class="m">4</span>:48<span class="w"> </span><span class="m">4</span>:64
+python<span class="w"> </span>csynth_sweep.py<span class="w"> </span>--reparse<span class="w">                </span><span class="c1"># re-read, no Vitis</span>
+
+<span class="c1"># cycles: one csynth, one cosim per shape, on one RTL build</span>
+<span class="nv">TPU_MAXDIM</span><span class="o">=</span><span class="m">64</span><span class="w"> </span><span class="nv">TPU_PRJ</span><span class="o">=</span><span class="nv">$PWD</span>/cosim_T4_64.prj<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">TPU_SHAPES</span><span class="o">=</span>4x4x4,8x8x8,12x12x12,16x16x8,16x16x16,32x32x32,48x48x48,64x64x64,64x32x64,32x64x32<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>python<span class="w"> </span>cosim.py
+<span class="c1"># the second array size</span>
+<span class="nv">TPU_T</span><span class="o">=</span><span class="m">8</span><span class="w"> </span><span class="nv">TPU_MAXDIM</span><span class="o">=</span><span class="m">64</span><span class="w"> </span><span class="nv">TPU_PRJ</span><span class="o">=</span><span class="nv">$PWD</span>/cosim_T8_64.prj<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">TPU_SHAPES</span><span class="o">=</span>8x8x8,16x16x8,16x16x16,32x32x32,48x48x48,64x64x64,64x32x64,32x64x32<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>python<span class="w"> </span>cosim.py
+
+<span class="c1"># the memory-latency grid (one csynth per point; ~30 min each)</span>
+python<span class="w"> </span>latency_grid.py<span class="w">                    </span><span class="c1"># shipped, 0/16/64/88/100</span>
+python<span class="w"> </span>latency_grid.py<span class="w"> </span>--widen<span class="w">            </span><span class="c1"># the burst candidate</span>
+
+<span class="c1"># RTL for the ASIC synthesis handoff, into rtl_handoff/&lt;config&gt;/</span>
+python<span class="w"> </span>export_rtl.py
+</pre></div>
+</div>
+<p><strong>Every project is created inside this worktree via</strong> <code class="docutils literal notranslate"><span class="pre">TPU_PRJ</span></code> <strong>and deleted
+as soon as its numbers are read.</strong> <code class="docutils literal notranslate"><span class="pre">csynth_sweep.py</span></code> and <code class="docutils literal notranslate"><span class="pre">latency_grid.py</span></code>
+do this themselves and copy the report out first, so a parsing bug costs a
+re-parse rather than a re-synthesis; <code class="docutils literal notranslate"><span class="pre">latency_grid.py</span></code> also refuses a point
+outright if <code class="docutils literal notranslate"><span class="pre">/home</span></code> has less than 12 GB free rather than risking a full
+filesystem shared with several other agents.</p>
+<p>Gemmini, in a <strong>separate shell</strong> (<code class="docutils literal notranslate"><span class="pre">env.sh</span></code> replaces the <code class="docutils literal notranslate"><span class="pre">allo</span></code> conda env):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">R</span><span class="o">=</span>/home/sk3463/chipyard/generators/gemmini/software/gemmini-rocc-tests
+cp<span class="w"> </span>examples/accelerator/tinytpu_vitis/gemmini/allo_bare_steady.c<span class="w"> </span><span class="nv">$R</span>/bareMetalC/
+<span class="nb">cd</span><span class="w"> </span>/home/sk3463/chipyard<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">source</span><span class="w"> </span>env.sh
+make<span class="w"> </span>-C<span class="w"> </span><span class="nv">$R</span>/build/bareMetalC<span class="w"> </span>-f<span class="w"> </span><span class="nv">$R</span>/bareMetalC/Makefile<span class="w"> </span><span class="se">\</span>
+<span class="w">     </span><span class="nv">abs_top_srcdir</span><span class="o">=</span><span class="nv">$R</span><span class="w"> </span><span class="nv">XLEN</span><span class="o">=</span><span class="m">64</span><span class="w"> </span><span class="nv">src_dir</span><span class="o">=</span><span class="nv">$R</span>/bareMetalC<span class="w"> </span>allo_bare_steady-baremetal
+<span class="nb">cd</span><span class="w"> </span>sims/verilator
+./simulator-chipyard.harness-Int8Dim4GemminiRocketConfig<span class="w"> </span>+permissive<span class="w"> </span>+permissive-off<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">$R</span>/build/bareMetalC/allo_bare_steady-baremetal
+</pre></div>
+</div>
+<p>A shape change is C-only. A <strong>config</strong> change (DIM, dtype, capacity) needs
+<code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">CONFIG=&lt;X&gt;</span> <span class="pre">-j16</span></code> in <code class="docutils literal notranslate"><span class="pre">sims/verilator</span></code>, and that <strong>rewrites</strong>
+<code class="docutils literal notranslate"><span class="pre">gemmini-rocc-tests/include/gemmini_params.h</span></code> in place as a side effect of
+elaboration, so the DIM=4 header must be snapshotted first and the C rebuilt
+immediately afterwards. Check the boot banner says the DIM you expect. The
+config patches for both matched points are committed at
+<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/gemmini/</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>The published 175/265/421/482/674 are a MAXDIM=16 measurement</strong>, and the
+shipped default is now 64, so <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code> pins <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=16</span></code>
+explicitly — it exists to reproduce those numbers and would otherwise
+measure 222/361/567/676/868 and report a difference that is the stride
+change, not a regression.</p>
+<p><strong>That row has moved twice.</strong> It went from 172/262/418/484/686 to
+171/261/417/483/685 when this work landed, uniformly at all five shapes
+(<a class="reference internal" href="#benchmarks-one-cycle"><span class="std std-ref">The published row moved by one cycle, and why</span></a>), and from there to the current row when
+<code class="docutils literal notranslate"><span class="pre">QD=16</span></code> became the default on 2026-09-24, by +4/+4/+4/-1/-11
+(<a class="reference internal" href="#benchmarks-qd16"><span class="std std-ref">2026-09-24: the channel depth moved the row, and not uniformly</span></a>). The MAXDIM=64 figures throughout this page are
+the <code class="docutils literal notranslate"><span class="pre">QD=8</span></code> sweep and have not been re-run. Both sets are on this page and
+neither supersedes the other: the MAXDIM=16 five are the latency
+benchmark’s provenance, the MAXDIM=64 sweep is the matched comparison.</p>
+</div>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<p><a class="reference internal" href="tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a> for the design, <a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a> for the
+latency-set comparison at MAXDIM=16 and the gap attribution,
+<a class="reference internal" href="minitpu.html"><span class="doc">MiniTPU: Reference Architecture</span></a> for MiniTPU.</p>
+</div>
+</section>
+<section id="earlier-measurements-and-corrections">
+<h2>Earlier measurements and corrections<a class="headerlink" href="#earlier-measurements-and-corrections" title="Link to this heading"><span>¶</span></a></h2>
+<p>Moved out of the sections above: superseded figures, readings that were
+withdrawn, and the accounts of how particular numbers moved.</p>
+<section id="the-channel-depth-moved-the-row-and-not-uniformly">
+<span id="benchmarks-qd16"></span><h3>2026-09-24: the channel depth moved the row, and not uniformly<a class="headerlink" href="#the-channel-depth-moved-the-row-and-not-uniformly" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">63ee6ec7</span></code> made <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> the default channel depth. The reason is
+correctness, not speed: three legal tiled programs never complete in cosim at
+depth 8, and all ten of that family complete bit-exact at 16
+(<a class="reference internal" href="../developer/limitations.html#limitation-24-qd"><span class="std std-ref">The diagnosis: it is a channel-depth threshold, and TPU_QD=16 clears it</span></a>). Measured at <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=16</span></code> with everything else
+unset, cosim <code class="docutils literal notranslate"><span class="pre">COSIM</span> <span class="pre">OK</span></code>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>was: 4x4x4=171  8x8x8=261  12x12x12=417  16x16x8=483  16x16x16=685
+now: 4x4x4=175  8x8x8=265  12x12x12=421  16x16x8=482  16x16x16=674
+d:        +4         +4           +4           -1            -11
+</pre></div>
+</div>
+<p><strong>The lumpiness is the result, not noise.</strong> The one-cycle move recorded below
+was uniform across shapes, which is what identified it as a fixed-cost change.
+This one is not uniform, so it is not a fixed cost: the three smallest shapes
+pay the pipeline skew of deeper FIFOs, and the two largest <strong>get faster</strong>,
+because a deeper queue lets the sequencer run further ahead of the units it
+dispatches to. Depth buys completion and throughput where the queues bind, and
+charges four cycles where they do not.</p>
+<p>The same deltas reproduce independently at <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=64</span></code> —
+218/357/563/677/879 becomes 222/361/567/676/868, +4/+4/+4/-1/-11 again — so
+the effect belongs to the depth and not to one stride. <code class="docutils literal notranslate"><span class="pre">stress_isa</span></code> is
+640/640 exact at the new default.</p>
+<p><strong>Two prices, and neither should be absorbed into the cycle row.</strong> On FPGA it
+costs <strong>+9.3 % flip-flops</strong> at the shipped <code class="docutils literal notranslate"><span class="pre">T=4</span></code>/<code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code> (+9.5 % at
+the <code class="docutils literal notranslate"><span class="pre">MAXDIM=16</span></code> the five shapes are measured on), with BRAM, DSP and the
+2.431 ns estimated period unchanged. <strong>The ASIC price is unmeasured</strong> — what
+exists is a count from the RTL priced at this design’s own measured area per
+sequential cell, not a DC run. Both are accounted for in
+<a class="reference internal" href="../developer/limitations.html#limitation-24-price"><span class="std std-ref">What QD=16 costs the shipped design</span></a>.</p>
+<p><strong>What this invalidates until it is re-measured.</strong> The Gemmini parity sweep on
+this page and on <a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a> was measured at <code class="docutils literal notranslate"><span class="pre">QD=8</span></code>. The
+deltas above move two of the five shapes in our favour and three against, and
+the MAXDIM=64 five move the same way, but the sweep has not been re-run, so
+<strong>every deficit and ratio stated against Gemmini describes the previous
+default</strong>. They are left in place as the last measured comparison and must not
+be restated for the shipped design until the sweep is re-run at <code class="docutils literal notranslate"><span class="pre">QD=16</span></code>.</p>
+</section>
+<section id="why-naming-the-window-mattered">
+<h3>Why naming the window mattered<a class="headerlink" href="#why-naming-the-window-mattered" title="Link to this heading"><span>¶</span></a></h3>
+<p>That accounting turned out to be worth more than fairness. MiniTPU’s
+per-launch cost was volunteered by its own side so the comparison would be
+honest, and putting it beside Gemmini’s ~395 of driver is what made the number
+look absurd rather than normal — both of the subsequent wins that doubled
+their board throughput came out of it. (The same side later corrected what the
+cost <em>is</em>: mostly on-device instruction reload, not host software. Naming the
+window found the optimisation; decomposing it found the mechanism.) <strong>Naming the window is not
+only a reporting discipline; it is where the optimisations were hiding.</strong></p>
+</section>
+<section id="the-published-row-moved-by-one-cycle-and-why">
+<span id="benchmarks-one-cycle"></span><h3>The published row moved by one cycle, and why<a class="headerlink" href="#the-published-row-moved-by-one-cycle-and-why" title="Link to this heading"><span>¶</span></a></h3>
+<p>When this work landed, <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code> printed <code class="docutils literal notranslate"><span class="pre">DIFFERS</span></code>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>expected: 4x4x4=172  8x8x8=262  12x12x12=418  16x16x8=484  16x16x16=686
+got:      4x4x4=171  8x8x8=261  12x12x12=417  16x16x8=483  16x16x16=685
+</pre></div>
+</div>
+<p><strong>Exactly one cycle faster at every shape</strong>, every testbench bit-exact, and
+reproduced independently by two separate runs. A delta that does not scale
+with the work is a <strong>fixed-cost</strong> change, so it cannot be the burst loop’s
+per-iteration behaviour.</p>
+<p><strong>The cause, measured rather than inferred, and isolated to one variable.</strong>
+Rebuilding on current <code class="docutils literal notranslate"><span class="pre">main</span></code> with the memory sizes the design used to carry
+— <code class="docutils literal notranslate"><span class="pre">TPU_SPAD=512</span> <span class="pre">TPU_NVR=256</span> <span class="pre">TPU_NAR=128</span></code> and <em>nothing else changed</em>, so
+the derived-size expression, the two ceiling assertions, the test-window floor
+and the parametric burst loop are all still present — returns <strong>every one of
+the five published numbers exactly</strong>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>TPU_MAXDIM=16 TPU_SPAD=512 TPU_NVR=256 TPU_NAR=128
+  4x4x4 172   8x8x8 262   12x12x12 418   16x16x8 484   16x16x16 686
+</pre></div>
+</div>
+<p>So <strong>the memory sizing accounts for the entire shift and nothing else in that
+work changed cycles at all</strong> — in particular the parametric burst loop is
+cycle-neutral at <code class="docutils literal notranslate"><span class="pre">DMA_WORDS=1</span></code>, which is the same thing it was shown to be
+at MAXDIM=64 (10 289 and 22 123, unchanged). Specifically:</p>
+<blockquote>
+<div><p>the scratchpad and vreg files are now <strong>derived</strong> as
+<span class="math notranslate nohighlight">\(\text{MAXDIM}^2/T\)</span>, which is 64 rows each at MAXDIM=16 against the
+literal 512 and 256 they replaced; a 64-row file is not implemented the
+way a 512-row one is (BRAM 42 -&gt; 40 says two memories left block RAM), and
+the shorter operand read path takes one cycle out of the <strong>fixed</strong> term.</p>
+</div></blockquote>
+<p>That is why the delta is uniform: it is one cycle of pipeline depth in the
+operand path, paid once per run rather than once per work item.</p>
+<p>It is a (very small) <strong>improvement</strong>, not a regression, and it changes no
+conclusion on this page — one cycle is 0.6% at 4x4x4 and 0.005% at
+64x64x64, and both of the shapes where it is largest were already inside
+Gemmini’s measurement spread. Every comparison here was measured <em>after</em> the
+change, so only the historical row needed restating.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>The gate is what caught it.</strong> <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code> carries the published
+numbers as expectations and refused to pass, minutes after the merge, on a
+one-cycle shift in a refactor whose functional gates were all green. That
+is the whole argument for wiring published numbers into a check rather than
+into prose: correctness is not cycles, and the resource counts moving
+(BRAM 42 -&gt; 40, FF 17 481 -&gt; 17 075, LUT 26 583 -&gt; 26 558 at an unchanged
+2.431 ns) proved the netlist had changed without saying by how much.</p>
+</div>
+</section>
+<section id="the-t-8-column-re-measured">
+<h3>The T=8 column, re-measured<a class="headerlink" href="#the-t-8-column-re-measured" title="Link to this heading"><span>¶</span></a></h3>
+<p><strong>The T=8 cycle column was re-measured on current ``main`` and is
+unchanged.</strong> It had been taken before the parametric <code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code> refactor,
+which is the exposure that moved the published MAXDIM=16 row by one cycle
+(<a class="reference internal" href="#benchmarks-one-cycle"><span class="std std-ref">The published row moved by one cycle, and why</span></a>). Re-run from a fresh <code class="docutils literal notranslate"><span class="pre">csynth</span></code>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>8x8x8     285   (was 285)      16x16x16   493   (was 493)
+16x16x8   424   (was 424)      64x64x64  7083   (was 7083)
+</pre></div>
+</div>
+<p>every one bit-exact and identical. That is consistent with the mechanism
+rather than merely reassuring: at T=8/MAXDIM=64 the memory <em>sizes</em> do not
+change (<code class="docutils literal notranslate"><span class="pre">OPERAND_ROWS</span></code> is 512 either way), only <code class="docutils literal notranslate"><span class="pre">rbA</span></code>/<code class="docutils literal notranslate"><span class="pre">rbB</span></code> grew by one
+word — which is what took BRAM 58 -&gt; 62 and nothing else. <strong>The burst loop
+is now shown cycle-neutral at ``DMA_WORDS=1`` in three independent
+configurations</strong>: T=4/MAXDIM=16, T=4/MAXDIM=64 and T=8/MAXDIM=64. That is
+what licenses the widening being a pure opt-in.</p>
+<p>The entry most exposed was <strong>16x16x8</strong>, the only shape where this design beats
+Gemmini on a supportable margin, and it returned 424 exactly.</p>
+</section>
+<section id="an-earlier-reading-of-the-same-bar">
+<h3>An earlier reading of the same bar<a class="headerlink" href="#an-earlier-reading-of-the-same-bar" title="Link to this heading"><span>¶</span></a></h3>
+<p><strong>Every steady-state conclusion on this page clears that bar by two to three
+orders of magnitude.</strong> The 1 748-cycle deficit at 64x64x64 is 874x the
+2-cycle spread there; the -960-cycle burst saving is 480x it. <strong>The one number
+that does not clear it is 4x4x4</strong>, where a 13-cycle deficit sits inside a
+10-cycle spread — so <em>the 1.06x at 4x4x4 is not a supportable claim of a
+difference</em> and is reported only as part of a sign that is consistent across
+all ten shapes. 16x16x8 has the largest absolute spread (20 cycles) but a
+155-cycle deficit, so it survives.</p>
+<p class="rubric">Footnotes</p>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="sweepknobs" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>An earlier revision of this work put the
+<code class="docutils literal notranslate"><span class="pre">TPU_SET</span></code>/<code class="docutils literal notranslate"><span class="pre">TPU_SHAPES</span></code> knobs on <code class="docutils literal notranslate"><span class="pre">SHAPES</span></code> itself, which would have
+silently changed what all of those measured.</p>
+</aside>
+<aside class="footnote brackets" id="bestoftwo" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id2">2</a><span class="fn-bracket">]</span></span>
+<p>An earlier revision of this page read three shapes as wins
+from best-of-two and then downgraded all three to “level” as a precaution;
+the five-trial measurement shows the precaution was one shape too strong.</p>
+</aside>
+</aside>
+</section>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+    
+        <div id="show_right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&lt;</span><span>Page contents</span></a></p>
+        </div>
+
+        <div id="right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
+            <div class="page_toc">
+                <ul>
+<li><a class="reference internal" href="#">The Benchmark Set</a><ul>
+<li><a class="reference internal" href="#why-the-latency-set-is-not-a-throughput-comparison">Why the latency set is not a throughput comparison</a></li>
+<li><a class="reference internal" href="#the-steady-state-set">The steady-state set</a><ul>
+<li><a class="reference internal" href="#tinytpu-isa-t-4-maxdim-64">TinyTPU-isa, T=4, MAXDIM=64</a></li>
+<li><a class="reference internal" href="#tinytpu-isa-t-8-maxdim-64">TinyTPU-isa, T=8, MAXDIM=64</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#does-utilisation-move-with-m-yes-we-amortise">Does utilisation move with M? Yes — we amortise</a></li>
+<li><a class="reference internal" href="#raising-the-build-what-a-bigger-maxdim-costs">Raising the build: what a bigger MAXDIM costs</a><ul>
+<li><a class="reference internal" href="#two-independent-ceilings-both-in-the-encoding">Two independent ceilings, both in the encoding</a></li>
+<li><a class="reference internal" href="#the-instruction-memory-does-not-need-to-grow">The instruction memory does <strong>not</strong> need to grow</a></li>
+<li><a class="reference internal" href="#maxdim-resources">MAXDIM -&gt; resources</a></li>
+<li><a class="reference internal" href="#verification-per-configuration">Verification per configuration</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#matched-against-gemmini">Matched against Gemmini</a><ul>
+<li><a class="reference internal" href="#what-is-matched-and-what-is-not">What is matched, and what is not</a></li>
+<li><a class="reference internal" href="#the-gemmini-builds-in-terms-another-team-can-reproduce">The Gemmini builds, in terms another team can reproduce</a></li>
+<li><a class="reference internal" href="#why-both-sides-run-at-maxdim-64">Why both sides run at MAXDIM=64</a></li>
+<li><a class="reference internal" href="#the-exact-program-each-machine-runs">The exact program each machine runs</a></li>
+<li><a class="reference internal" href="#the-asymmetries-stated-once">The asymmetries, stated once</a></li>
+<li><a class="reference internal" href="#t-4-vs-gemmini-dim-4-both-at-maxdim-64">T=4 vs Gemmini DIM=4, both at MAXDIM=64</a></li>
+<li><a class="reference internal" href="#t-8-vs-gemmini-dim-8-both-at-maxdim-64">T=8 vs Gemmini DIM=8, both at MAXDIM=64</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#does-the-ranking-survive-the-memory-latency-range">Does the ranking survive the memory-latency range?</a></li>
+<li><a class="reference internal" href="#median-and-spread-which-side-carries-the-uncertainty">Median and spread: which side carries the uncertainty</a></li>
+<li><a class="reference internal" href="#where-the-remaining-cycles-go">Where the remaining cycles go</a></li>
+<li><a class="reference internal" href="#the-workload-set-a-gpt-2-projection-placeholder">The workload set: a GPT-2 projection (placeholder)</a></li>
+<li><a class="reference internal" href="#reproducing">Reproducing</a></li>
+<li><a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a><ul>
+<li><a class="reference internal" href="#the-channel-depth-moved-the-row-and-not-uniformly">2026-09-24: the channel depth moved the row, and not uniformly</a></li>
+<li><a class="reference internal" href="#why-naming-the-window-mattered">Why naming the window mattered</a></li>
+<li><a class="reference internal" href="#the-published-row-moved-by-one-cycle-and-why">The published row moved by one cycle, and why</a></li>
+<li><a class="reference internal" href="#the-t-8-column-re-measured">The T=8 column, re-measured</a></li>
+<li><a class="reference internal" href="#an-earlier-reading-of-the-same-bar">An earlier reading of the same bar</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            </div>
+        </div>
+    
+
+      <div class="clearer"></div>
+    </div>
+    <div class="button_nav_wrapper">
+        <div class="button_nav">
+            <div class="left">
+                
+                <a href="gemmini_comparison.html">
+                    <span class="icon">&lt;</span><span>TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>
+                
+            </div>
+
+            <div class="right">
+                
+                    <a href="workload_suite.html"><span>The Workload Suite: PyTorch MLPs on TinyTPU</span><span class="icon">&gt;</span></a>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Allo Authors.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+
+<p id="theme_credit">Styled using the <a href="https://github.com/piccolo-orm/piccolo_theme">Piccolo Theme</a></p>
+  </body>
+</html>

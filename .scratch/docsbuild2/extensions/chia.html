@@ -1,0 +1,1598 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>CHIA Agentic Co-Design &#8212; Allo Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic_mod.css?v=9b2032db" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=db78e746"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/petite-vue.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Agentic Experiments: What We Ran and What It Shows" href="agentic_experiments.html" />
+    <link rel="prev" title="Catapult SystemC Flow and the Wire" href="catapult_systemc.html" /> 
+  </head><body data-dark_mode_code_blocks="true">
+
+<div id="top_nav">
+    
+
+    <nav>
+        
+            
+        
+
+        <p id="toggle_sidebar">
+            <a href="#" title="Toggle sidebar">|||</a>
+        </p>
+        <h1><a href="../index.html" title="Go to homepage">Allo Documentation</a></h1>
+            <a id="source_link" href="https://github.com/sunwookim028/allo">
+    
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512">
+            <path fill="white" d="M 244.8,8 C 106.1,8 0,113.3 0,252 c 0,110.9 69.8,205.8 169.5,239.2 12.8,2.3 17.3,-5.6 17.3,-12.1 0,-6.2 -0.3,-40.4 -0.3,-61.4 0,0 -70,15 -84.7,-29.8 0,0 -11.4,-29.1 -27.8,-36.6 0,0 -22.9,-15.7 1.6,-15.4 0,0 24.9,2 38.6,25.8 21.9,38.6 58.6,27.5 72.9,20.9 2.3,-16 8.8,-27.1 16,-33.7 -55.9,-6.2 -112.3,-14.3 -112.3,-110.5 0,-27.5 7.6,-41.3 23.6,-58.9 -2.6,-6.5 -11.1,-33.3 2.6,-67.9 20.9,-6.5 69,27 69,27 20,-5.6 41.5,-8.5 62.8,-8.5 21.3,0 42.8,2.9 62.8,8.5 0,0 48.1,-33.6 69,-27 13.7,34.7 5.2,61.4 2.6,67.9 16,17.7 25.8,31.5 25.8,58.9 0,96.5 -58.9,104.2 -114.8,110.5 9.2,7.9 17,22.9 17,46.4 0,33.7 -0.3,75.4 -0.3,83.6 0,6.5 4.6,14.4 17.3,12.1 C 428.2,457.8 496,362.9 496,252 496,113.3 383.5,8 244.8,8 Z"/>
+        </svg>
+    
+</a>
+        
+
+        <a id="mode_toggle" href="#" @click.prevent="handleClick" :title="mode">
+    <template v-if="mode == 'light'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_light"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M67.48,18.073c1.913,-1.912 1.913,-5.018 0,-6.931c-1.912,-1.912 -5.018,-1.912 -6.931,0l-6.798,6.799c-1.912,1.912 -1.912,5.018 0,6.931c1.913,1.912 5.018,1.912 6.931,-0l6.798,-6.799Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.728,61.108c1.912,-1.913 1.912,-5.018 -0,-6.931c-1.913,-1.913 -5.019,-1.913 -6.931,-0l-6.799,6.798c-1.912,1.913 -1.912,5.019 0,6.931c1.913,1.913 5.019,1.913 6.931,0l6.799,-6.798Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.682,54.177c-1.913,-1.913 -5.018,-1.913 -6.931,-0c-1.912,1.913 -1.912,5.018 0,6.931l6.798,6.798c1.913,1.913 5.019,1.913 6.931,0c1.913,-1.912 1.913,-5.018 0,-6.931l-6.798,-6.798Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M4.901,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,-0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M18.929,11.142c-1.912,-1.912 -5.018,-1.912 -6.931,0c-1.912,1.913 -1.912,5.019 0,6.931l6.799,6.799c1.912,1.912 5.018,1.912 6.931,-0c1.912,-1.913 1.912,-5.019 -0,-6.931l-6.799,-6.799Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.108,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c-0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c-0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'dark'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_dark"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.901,2.196 -4.901,4.901c0,2.705 2.197,4.901 4.901,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.662,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.989,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.732,61.103c1.91,-1.91 1.91,-5.011 0,-6.921l-0.009,-0.01c-1.91,-1.91 -5.012,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.909,1.91 5.011,1.91 6.92,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.672,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.52,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l-0,-0.01c-0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.901,2.196 -4.901,4.901c0,2.704 2.197,4.9 4.901,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.73,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 -0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.098,34.623c-2.699,0 -4.891,2.192 -4.891,4.892l-0,0.019c-0,2.699 2.192,4.891 4.891,4.891c2.7,0 4.892,-2.192 4.892,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.892,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'darkest'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_darkest"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><path d="M39.315,23.791c8.684,-0 15.734,7.05 15.734,15.733c0,8.684 -7.05,15.734 -15.734,15.734c-8.683,0 -15.733,-7.05 -15.733,-15.734c-0,-8.683 7.05,-15.733 15.733,-15.733Zm0,4.737c6.069,0 10.997,4.927 10.997,10.996c-0,6.069 -4.928,10.996 -10.997,10.996c-6.068,0 -10.996,-4.927 -10.996,-10.996c0,-6.069 4.928,-10.996 10.996,-10.996Z" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.216,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.9,2.196 -4.9,4.901c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.666,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.99,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.737,61.103c1.909,-1.91 1.909,-5.011 -0,-6.921l-0.01,-0.01c-1.91,-1.91 -5.011,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.91,1.91 5.011,1.91 6.921,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.676,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.524,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l0,-0.01c0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.216,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901c-0,2.704 2.196,4.9 4.9,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.734,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.103,34.623c-2.7,0 -4.892,2.192 -4.892,4.892l-0,0.019c-0,2.699 2.192,4.891 4.892,4.891c2.699,0 4.891,-2.192 4.891,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.891,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+</a>
+
+<script>
+(function() {
+    const LOCAL_STORAGE_KEY = 'piccoloThemeMode'
+
+    var initialMode = localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (initialMode) {
+        // Make sure the value in local storage is valid
+        if (['light', 'dark', 'darkest'].indexOf(initialMode) == -1) {
+            initialMode = 'light'
+            localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+        }
+    } else {
+        // Check if the client prefers dark mode
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialMode = 'dark'
+        } else {
+            initialMode = 'light'
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+    }
+
+    document.documentElement.dataset.mode = initialMode
+
+    PetiteVue.createApp({
+        'mode': initialMode,
+        handleClick() {
+            let currentMode = this.mode
+
+            if (currentMode == 'light') {
+                this.mode = 'dark'
+            } else if (currentMode == 'dark') {
+                this.mode = 'darkest'
+            } else if (currentMode == 'darkest') {
+                this.mode = 'light'
+            }
+
+            document.documentElement.dataset.mode = this.mode
+            localStorage.setItem(LOCAL_STORAGE_KEY, this.mode)
+
+            console.log(this.mode)
+        }
+    }).mount('#mode_toggle')
+})()
+</script>
+            <p class="mobile_search_link">
+                <a href="../search.html" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65 64" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                        <path d="M14.873 40.009c-2.315-3.943-3.642-8.532-3.642-13.429C11.231 11.91 23.141 0 37.811 0s26.58 11.91 26.58 26.58-11.91 26.58-26.58 26.58a26.44 26.44 0 0 1-14.277-4.161L9.739 62.794a3.12 3.12 0 0 1-4.413 0L.913 58.382c-1.217-1.218-1.217-3.196 0-4.413l13.96-13.96zM37.811 8.054c10.225 0 18.526 8.301 18.526 18.526s-8.301 18.526-18.526 18.526-18.526-8.301-18.526-18.526S27.586 8.054 37.811 8.054z" fill="#fff" />
+                    </svg>
+                </a>
+            </p>
+        
+
+        <div class="searchbox_wrapper">
+            
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+    </nav>
+</div>
+
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Paper</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../paper.html">A Co-Design Compilation Flow as a Harness for Language Models to Improve It</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup/index.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_01_get_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_02_vhls.html">Vivado/Vitis HLS Backend</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Deep Dive</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dive/frontend_syntax.html">Frontend Syntax Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/dataflow.html">Dataflow Programming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_01_data_types.html">Data Types and Type Casting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_02_template.html">Template Kernels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_03_composition.html">Kernel Composition</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/ip.html">IP Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/pytorch.html">PyTorch Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_05_verifier.html">Equivalence Checking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_04_features.html">Other Features</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Backends</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/minitpu.html">MiniTPU: Reference Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Extensions</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/extending_allo.html">Extending Allo’s Abstractions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/stream_ports.html">Stream Ports: a Unit with an Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">Schedule Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html#data-types">Data Types</a></li>
+</ul>
+
+        </div>
+      </div>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="chia-agentic-co-design">
+<h1>CHIA Agentic Co-Design<a class="headerlink" href="#chia-agentic-co-design" title="Link to this heading"><span>¶</span></a></h1>
+<p>An LLM-agent loop that co-designs a TPU’s <strong>instruction set and
+microarchitecture together</strong>, where a proposal counts only if a real tool –
+RTL co-simulation and synthesis – measures it. Agents are driven by
+<a class="reference external" href="https://github.com/ucb-bar/chia">CHIA</a> (<code class="docutils literal notranslate"><span class="pre">ucb-bar/chia</span></code> at <code class="docutils literal notranslate"><span class="pre">16c35e9</span></code>)
+through the <code class="docutils literal notranslate"><span class="pre">opencode</span></code> CLI.</p>
+<section id="the-principle">
+<h2>The principle<a class="headerlink" href="#the-principle" title="Link to this heading"><span>¶</span></a></h2>
+<p>An agent can make an informed co-design decision only after it has measured how
+a software function performs – in <strong>timing and power</strong> – across <strong>an array of
+hardware architectures</strong>. Measured against that, today’s loop has the first
+half of each:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 22.0%" />
+<col style="width: 38.0%" />
+<col style="width: 40.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"></th>
+<th class="head"><p>have</p></th>
+<th class="head"><p>missing</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>timing</strong></p></td>
+<td><p>RTL cosim cycles, bit-exact, deterministic</p></td>
+<td><p>–</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>power</strong></p></td>
+<td><p>DC estimate, default toggle rates, <em>indicative only</em></p></td>
+<td><p>activity-based power (switching from cosim into synthesis)</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>architectures</strong></p></td>
+<td><p>one design family (TinyTPU-isa, T=4/T=8), two substrates (FPGA,
+45 nm), two references (Gemmini, MiniTPU)</p></td>
+<td><p>the parametrized IP library that would supply a real array</p></td>
+</tr>
+</tbody>
+</table>
+<p>Why the array matters is already measured: a DMA widening that is free on an
+FPGA emits a dual-write-port memory that standard cells cannot build, and only
+the second substrate said so.</p>
+</section>
+<section id="takeaways">
+<h2>Takeaways<a class="headerlink" href="#takeaways" title="Link to this heading"><span>¶</span></a></h2>
+<ul class="simple">
+<li><p><strong>It works end to end on real tools.</strong> Every accepted number is RTL cosim
+cycles plus csynth area and clock, bit-exact against a frozen reference
+model. About <strong>$85</strong> spent on the CHIA2026 account so far; the harness is
+also exercised with no model at all.</p></li>
+<li><p><strong>It finds real design changes, not yet novel ones.</strong> Best so far: a DMA
+burst widening worth 55-61 % of the steady-state gap to Gemmini (not
+landed; its banked form synthesises with no cycle loss).</p></li>
+<li><p><strong>An agent proposed an architectural legality rule that passed its
+discriminating test and is nonetheless unsound in both directions.</strong>
+<code class="docutils literal notranslate"><span class="pre">s.memory_ports</span></code> refused a design needing two write ports and accepted the
+bit-exact banked one; it also accepts a block-partitioned design that needs
+two, and refuses a sequential one that needs one. The property was <strong>seeded</strong>
+(the arm was told where to look, never what to build).</p></li>
+<li><p><strong>A *rate* of discovery is still not shown:</strong> every search is n=1 per arm.</p></li>
+<li><p><strong>The recurring hazard is instruments that fail open.</strong> Four in one night
+reported success after failing. A negative result counts only if the
+instrument can be shown to have run.</p></li>
+</ul>
+</section>
+<section id="contributions">
+<h2>Contributions<a class="headerlink" href="#contributions" title="Link to this heading"><span>¶</span></a></h2>
+<ul class="simple">
+<li><p><strong>A judge agents cannot fool.</strong> Nine mechanical guards – most added after an
+agent found the hole each closes – mean a win is accepted only when real
+RTL measures it, which is why a worker’s false win claim re-scored as
+exactly baseline.</p></li>
+<li><p><strong>A pre-registered search result.</strong> The unguided <code class="docutils literal notranslate"><span class="pre">open</span></code> arm, told only to
+choose its own target from the numbers, independently reached the same
+address-generator widening that directed analysis had found, with the
+refusal bottleneck migrating and cycles flat exactly as predicted in
+advance.</p></li>
+<li><p><strong>Why agent-built compiler extensions are hard to evaluate.</strong> A new
+primitive has no callers, so an agent-implemented one scored neutral <em>and</em>
+passed 291 tests while aborting the compiler on first use – any gate ladder
+that exercises a compiler only through existing designs cannot see a new
+capability in either direction.</p></li>
+<li><p><strong>A resource predicate is the wrong shape for a port claim.</strong> Counting
+occupants against capacity discards <em>which</em> element is touched in <em>which</em>
+cycle, and both measured failure directions recover exactly that discarded
+information. The sound form is a calendar – the index map composed with the
+initiation interval, both of which the IR already carries. MiniTPU’s
+assembler (theirs, not ours) does not have the bug because its <code class="docutils literal notranslate"><span class="pre">write_port</span></code>
+is a <strong>set of cycles</strong> rather than a count; they note their register file has
+one write port and no banking, so they avoided the bug by not yet having the
+structure that creates it, which makes this predictive rather than a
+comparison of care.</p></li>
+</ul>
+</section>
+<section id="how-the-loop-is-built">
+<h2>How the loop is built<a class="headerlink" href="#how-the-loop-is-built" title="Link to this heading"><span>¶</span></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>workload spec + measured baseline
+              |
+              v
++------------ swarm.py / loop.py, orchestrated on Ray ------------+
+|  worker "open"            worker "acc-follows-k"          ...    |
+|  opencode + Gemini        opencode + Gemini                      |
++--------------------------------+---------------------------------+
+                                 |  MCP tools only -- loopback, one
+                                 |  port per worker; opencode's own
+                                 |  file and shell tools are denied
+                                 v
+     read_spec    replace_text    apply_spec_patch    evaluate
+                                 |
+   EDITABLE  the design           |   FROZEN  reference model, gates,
+                                 |           evaluator, acceptance
+                                 v  candidate diff
++------ evaluate.py: a fresh tree from git for every candidate ----+
+|  policy  --&gt;  sandbox  --&gt;  gates  --&gt;  csynth  --&gt;  RTL cosim   |
+|  static       bwrap         bench, stress, param                  |
++--------------------------------+---------------------------------+
+                                 |  nonce-vouched verdict:
+                                 |  cycles + area + clock
+                                 v
+      accept.py: against a control measured in the same run
+                 win  |  not-better  |  rejected
+                                 |
+                                 v
+      evidence/     spend read from opencode's database,
+                    capped per run and in total
+</pre></div>
+</div>
+<p>Two dispositions share this shape. <strong>Using</strong> edits the design with Allo’s
+abstractions as they stand (<code class="docutils literal notranslate"><span class="pre">chia_agent/</span></code>, on <code class="docutils literal notranslate"><span class="pre">main</span></code>). <strong>Maintaining</strong>
+edits Allo itself – the compiler – and adds a rung that exercises a new
+primitive through a harness-authored call site (<code class="docutils literal notranslate"><span class="pre">chia_abstraction/</span></code>, on
+branch <code class="docutils literal notranslate"><span class="pre">chia-abstraction</span></code>).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Attribution.</strong> The agent search is Sunwoo Kim’s. Most of the retired
+<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> branch is <strong>not</strong>: it imports Kai Shao’s CIRCT RTL
+generator, ACT compiler flow and <code class="docutils literal notranslate"><span class="pre">allov2</span></code> core from
+<a class="reference external" href="https://github.com/kkkaishao/allo">https://github.com/kkkaishao/allo</a> (503 of its 539 commits not on <code class="docutils literal notranslate"><span class="pre">main</span></code>;
+see that branch’s <code class="docutils literal notranslate"><span class="pre">ATTRIBUTION.md</span></code> and <a class="reference internal" href="act.html"><span class="doc">ACT, and Why We Cite It</span></a>). The loop on
+<code class="docutils literal notranslate"><span class="pre">main</span></code> carries none of Kai Shao’s code. The terms under which it was
+imported are unrecorded, which <code class="docutils literal notranslate"><span class="pre">ATTRIBUTION.md</span></code> says must be settled before
+that work is published or landed.</p>
+</div>
+<p>The rest of this page is the comprehensive record: where the code lives, the
+evaluator and every guard with the exploit that bought it, how to run it, each
+paid run, and the planned experiments. Superseded figures and withdrawn claims
+are at the foot of the page.</p>
+</section>
+<section id="where-the-code-lives">
+<h2>Where the Code Lives<a class="headerlink" href="#where-the-code-lives" title="Link to this heading"><span>¶</span></a></h2>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 18.0%" />
+<col style="width: 82.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Branch</p></th>
+<th class="head"><p>Contents</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">main</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/chia_agent/</span></code>: the loop for
+TinyTPU-isa, landed from <code class="docutils literal notranslate"><span class="pre">chia-isa</span></code> on 2026-09-19, with trimmed
+evidence in <code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/chia-evidence/</span></code>. The <code class="docutils literal notranslate"><span class="pre">chia-isa</span></code> branch is
+deleted; its history and raw run output are on the tag
+<code class="docutils literal notranslate"><span class="pre">chia-isa-run1-evidence</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code></p></td>
+<td><p>A <strong>separate codebase</strong>, not a feature branch. It descends from Kai
+Shao’s ACT fork and shares only a March 2026 ancestor (<code class="docutils literal notranslate"><span class="pre">76130c63</span></code>)
+with <code class="docutils literal notranslate"><span class="pre">main</span></code>; the two are maintained separately and are not expected
+to converge (see <code class="docutils literal notranslate"><span class="pre">dev/fork_maintenance.rst</span></code>). Carries
+<code class="docutils literal notranslate"><span class="pre">CODESIGN.md</span></code> (the claim register), <code class="docutils literal notranslate"><span class="pre">notes/CHIA_CHECKPOINT.md</span></code>
+(version pins), <code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu/</span></code> and <code class="docutils literal notranslate"><span class="pre">chia_runs/</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Neither <code class="docutils literal notranslate"><span class="pre">CODESIGN.md</span></code> nor <code class="docutils literal notranslate"><span class="pre">CHIA_CHECKPOINT.md</span></code> exists on <code class="docutils literal notranslate"><span class="pre">main</span></code>; read them
+with <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">show</span> <span class="pre">origin/chia-codesign:CODESIGN.md</span></code>.</p>
+</section>
+<section id="the-chia-loop-for-tinytpu-isa">
+<span id="chia-isa-loop"></span><h2>The CHIA Loop for TinyTPU-isa<a class="headerlink" href="#the-chia-loop-for-tinytpu-isa" title="Link to this heading"><span>¶</span></a></h2>
+<p>The search runs over the <strong>current</strong> TinyTPU design in
+<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/</span></code>: int8/int32, 4x4 weight-stationary
+array, PC + 4-deep loop stack + 3-term AGU, GEMM programs generated by
+<code class="docutils literal notranslate"><span class="pre">isa_dsl.py</span></code>, shipping at <strong>175 / 265 / 421 / 482 / 674</strong> cosim cycles
+(<a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>; the run recorded below was scored against the
+then-shipping 172 / 262 / 418 / 484 / 686). Workers propose edits, the harness gates and
+cosims each one itself, and the best survives. The <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> loop
+searched a different, older design against a cost model; this one is scored
+by RTL cosim.</p>
+<p><strong>Where it lives.</strong> <code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/chia_agent/</span></code> on
+<code class="docutils literal notranslate"><span class="pre">main</span></code> (landed 2026-09-19 from branch <code class="docutils literal notranslate"><span class="pre">chia-isa</span></code>, now deleted). Its
+<code class="docutils literal notranslate"><span class="pre">README.md</span></code> is the operator’s manual; <code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/chia-evidence/</span></code> holds the
+trimmed evidence behind every number below. The branch’s full history and the
+raw run output (worker logs, cosim logs, csynth XMLs) are on the tag
+<code class="docutils literal notranslate"><span class="pre">chia-isa-run1-evidence</span></code>, at <code class="docutils literal notranslate"><span class="pre">chia_runs/&lt;run&gt;/</span></code>.</p>
+<section id="editable-vs-frozen">
+<h3>Editable vs. frozen<a class="headerlink" href="#editable-vs-frozen" title="Link to this heading"><span>¶</span></a></h3>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 12.0%" />
+<col style="width: 50.0%" />
+<col style="width: 38.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"></th>
+<th class="head"><p>files</p></th>
+<th class="head"><p>how it is enforced</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>editable</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code>, <code class="docutils literal notranslate"><span class="pre">isa_dsl.py</span></code></p></td>
+<td><p>The agent edits a private copy in <code class="docutils literal notranslate"><span class="pre">&lt;run&gt;/&lt;worker&gt;/spec/</span></code>, never the
+repository.</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>frozen</strong></p></td>
+<td><p>main’s <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code> (testbench, <code class="docutils literal notranslate"><span class="pre">SHAPES</span></code>, golden reference, every
+Vitis/TCL setting), <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code>, <code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code>,
+<code class="docutils literal notranslate"><span class="pre">isa_ref.py</span></code>, <code class="docutils literal notranslate"><span class="pre">kpn_model.py</span></code>; and <code class="docutils literal notranslate"><span class="pre">chia_agent/</span></code>’s
+<code class="docutils literal notranslate"><span class="pre">evaluate.py</span></code>, <code class="docutils literal notranslate"><span class="pre">gate_runner.py</span></code>, <code class="docutils literal notranslate"><span class="pre">param_check.py</span></code>,
+<code class="docutils literal notranslate"><span class="pre">spec_policy.py</span></code></p></td>
+<td><p>Read from git, never from disk; main’s five files must also be
+byte-identical to <code class="docutils literal notranslate"><span class="pre">MAIN_BASE</span></code> (<code class="docutils literal notranslate"><span class="pre">476a70d8</span></code>) in <code class="docutils literal notranslate"><span class="pre">evaluate.py</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Because <code class="docutils literal notranslate"><span class="pre">isa_ref.py</span></code> is frozen and <code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code> checks programs against
+it, <strong>what each instruction means is part of the contract</strong>: the agent may
+change how the hardware executes the ISA and which instructions the generator
+emits, not an instruction’s semantics.</p>
+</section>
+<section id="the-evaluator">
+<h3>The evaluator<a class="headerlink" href="#the-evaluator" title="Link to this heading"><span>¶</span></a></h3>
+<ul class="simple">
+<li><p><strong>gate</strong> (functional, Allo simulator, ~30 s): <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code> (the published
+[-4, 4] setup), main’s <code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code> (492 runs: full-range, corner and
+boundary int8 at all 64 shapes, <code class="docutils literal notranslate"><span class="pre">C</span></code> prefilled and compared in full, vector
+and random programs against <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code>, many calls on one build), and
+<code class="docutils literal notranslate"><span class="pre">param_check.py</span></code> at <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=8</span></code>, <code class="docutils literal notranslate"><span class="pre">12</span></code> and <code class="docutils literal notranslate"><span class="pre">TPU_T=8</span>
+<span class="pre">TPU_MAXDIM=32</span></code> (below). Negative control:
+an int16 partial sum passes <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code> and every cosim testbench, and
+<code class="docutils literal notranslate"><span class="pre">stress_isa</span></code> rejects it (251/492 exact).</p></li>
+<li><p><strong>score</strong>: the sum of RTL cosim cycles (Vitis HLS 2023.2 csynth + xsim) at
+4x4x4 and 16x16x16, each testbench bit-exact, the 3.33 ns clock met. About
+2-3 min per candidate. Area is recorded, not scored.</p></li>
+<li><p><strong>acceptance</strong>: <code class="docutils literal notranslate"><span class="pre">accept.py</span></code> is the only way a win is claimed. On a clean
+<code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">worktree</span></code> with its own <code class="docutils literal notranslate"><span class="pre">mlir/</span></code> build it runs <code class="docutils literal notranslate"><span class="pre">bench_isa</span></code>,
+<code class="docutils literal notranslate"><span class="pre">stress_isa</span></code>, <code class="docutils literal notranslate"><span class="pre">param_check</span></code>, cosim at all five shapes, and the
+<code class="docutils literal notranslate"><span class="pre">TPU_TB=stress</span></code> RTL testbench (several calls on one RTL instance, whole
+<code class="docutils literal notranslate"><span class="pre">C</span></code> compared – what sees an RTL-only failure such as a dependence pragma
+that is false at a short read-after-write distance). <code class="docutils literal notranslate"><span class="pre">claim</span></code> is <code class="docutils literal notranslate"><span class="pre">win</span></code>
+only against a control <code class="docutils literal notranslate"><span class="pre">accept.py</span></code> measured itself, in the same run and
+off the same build (guard 10); the row published when run 1 was scored,
+172 / 262 / 418 / 484 / 686 (<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/chia-evidence/accept-control-476a70d8/</span></code>), is what
+that measurement was cross-checked against. Measuring the control per run is
+exactly why the published row having moved twice since – most recently to
+175 / 265 / 421 / 482 / 674 – does not invalidate the run.</p></li>
+</ul>
+</section>
+<section id="guards">
+<h3>Guards<a class="headerlink" href="#guards" title="Link to this heading"><span>¶</span></a></h3>
+<p>Mechanical enforcement, not instructions:</p>
+<ol class="arabic">
+<li><p><strong>Tool surface.</strong> opencode’s own file and shell tools are denied; the MCP
+edit tools accept only the two bare file names.</p></li>
+<li><p><strong>Frozen files from git</strong>, a fresh evaluation tree per candidate, anything
+else in the spec directory ignored; <code class="docutils literal notranslate"><span class="pre">loop.py</span></code> refuses to start on a dirty
+frozen path.</p></li>
+<li><p><strong>Static policy</strong> (<code class="docutils literal notranslate"><span class="pre">spec_policy.py</span></code>, executed from git, at edit time and
+again at evaluation): no file I/O or numpy file readers/writers, process
+spawning, <code class="docutils literal notranslate"><span class="pre">exec</span></code>/<code class="docutils literal notranslate"><span class="pre">eval</span></code>, <code class="docutils literal notranslate"><span class="pre">sys.modules</span></code>, dunder or frame walking,
+<code class="docutils literal notranslate"><span class="pre">SystemExit</span></code>/<code class="docutils literal notranslate"><span class="pre">exit</span></code>, or assignment to an attribute of an imported module
+or an alias of one.</p></li>
+<li><p><strong>Sandbox.</strong> Every process that imports the candidate runs under <code class="docutils literal notranslate"><span class="pre">bwrap</span></code>:
+read-only filesystem and tree, only the work directory writable, own PID
+namespace. The tree and the checkout’s tracked files are compared byte for
+byte after each stage (<code class="docutils literal notranslate"><span class="pre">tamper</span></code>). A <code class="docutils literal notranslate"><span class="pre">tamper</span></code> verdict on a run that
+should have been clean is, in practice, usually a <strong>person or another agent
+editing the checkout while a measurement was in flight</strong> – suspect that
+before the candidate. <code class="docutils literal notranslate"><span class="pre">accept.py</span></code> is immune by construction: it measures
+in its own <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">worktree</span></code> at <code class="docutils literal notranslate"><span class="pre">--ref</span></code>, so an edit elsewhere in the
+checkout cannot reach it.</p></li>
+<li><p><strong>Vouched verdicts.</strong> A printed <code class="docutils literal notranslate"><span class="pre">STRESS</span> <span class="pre">OK</span></code> proves nothing when the
+candidate runs in the same process: on the branch, a candidate that printed
+it and raised <code class="docutils literal notranslate"><span class="pre">SystemExit(0)</span></code> at import passed the old gate with an int16
+datapath. Each check now runs under <code class="docutils literal notranslate"><span class="pre">gate_runner.py</span></code>: the evaluator hands it
+a fresh nonce on stdin before the candidate is imported, the verdict is the
+check’s <em>return value</em>, and <code class="docutils literal notranslate"><span class="pre">numpy</span></code>/<code class="docutils literal notranslate"><span class="pre">allo</span></code> are frozen against
+monkeypatching for the duration; only then is <code class="docutils literal notranslate"><span class="pre">CHIA-GATE</span> <span class="pre">&lt;check&gt;</span> <span class="pre">OK</span>
+<span class="pre">&lt;nonce&gt;</span></code> printed, and the evaluator requires that line.</p></li>
+<li><p><strong>Parametricity.</strong> The scored configuration is T=4, MAXDIM=16, so a design
+specialised to it would pass everything. <code class="docutils literal notranslate"><span class="pre">param_check.py</span></code> rebuilds the
+candidate at <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=8</span></code>, <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=12</span></code> and
+<code class="docutils literal notranslate"><span class="pre">TPU_T=8</span> <span class="pre">TPU_MAXDIM=32</span></code>, requires the build to report that configuration,
+and requires every GEMM shape of it (full-range, corner and boundary
+operands, <code class="docutils literal notranslate"><span class="pre">C</span></code> compared in full) and random programs to be exact
+(<code class="docutils literal notranslate"><span class="pre">gate:param</span></code>). The policy requires <code class="docutils literal notranslate"><span class="pre">T</span></code> and <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code> to stay
+<code class="docutils literal notranslate"><span class="pre">int(os.environ.get(...))</span></code> parameters.</p>
+<p><code class="docutils literal notranslate"><span class="pre">T</span></code> is varied too. Measured on main,
+<code class="docutils literal notranslate"><span class="pre">TPU_T=8</span> <span class="pre">TPU_MAXDIM=32</span> <span class="pre">param_check.py</span></code> gives <code class="docutils literal notranslate"><span class="pre">PARAM</span> <span class="pre">OK:</span> <span class="pre">408/408</span> <span class="pre">runs</span>
+<span class="pre">exact</span></code> and <code class="docutils literal notranslate"><span class="pre">TPU_T=8</span> <span class="pre">TPU_MAXDIM=32</span> <span class="pre">bench_isa.py</span> <span class="pre">32</span> <span class="pre">32</span> <span class="pre">32</span></code> gives
+<code class="docutils literal notranslate"><span class="pre">ALL</span> <span class="pre">EXACT</span></code>. What is limited is the <strong>harness</strong>, and the limit is
+<code class="docutils literal notranslate"><span class="pre">MAXDIM/T</span> <span class="pre">&gt;=</span> <span class="pre">3</span></code>, not <code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">==</span> <span class="pre">4</span></code>: three test-program generators address
+column block 2, which exists only at that ratio, so at T=8 with MAXDIM=16
+(ratio 2) nine of 24 random seeds cannot be generated and <code class="docutils literal notranslate"><span class="pre">param_check</span></code>
+refuses for want of programs rather than for a wrong answer. An earlier
+revision of this page concluded otherwise; the withdrawal is recorded in
+<a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
+</li>
+<li><p><strong>Documentation.</strong> A candidate may not remove, net, more than 15 lines of
+comments and docstrings against the frozen file; rewording is free.</p></li>
+<li><p><strong>Memory model and premises.</strong> Every <code class="docutils literal notranslate"><span class="pre">TPU_*</span></code> variable but the project path
+is scrubbed before cosim (<code class="docutils literal notranslate"><span class="pre">m_axi_latency</span></code> 0, as Gemmini’s harness), T == 4,
+MAXDIM == 16, the 3.33 ns target, and each shape’s own cosim log and
+simulated time must agree with the reported cycles.</p></li>
+<li><p><strong>Loopback.</strong> The MCP tool servers bind 127.0.0.1 by default; a multi-host
+swarm must opt in with <code class="docutils literal notranslate"><span class="pre">TINYTPU_TOOL_HOST=node</span></code> and bring its own
+authentication.</p></li>
+<li><p><strong>A measured control</strong> (<code class="docutils literal notranslate"><span class="pre">control.py</span></code>). A win is “fewer cycles than the
+unmodified design”, so both numbers have to come from one machine, one
+Vitis install and one build. <code class="docutils literal notranslate"><span class="pre">accept.py</span></code> measures the control itself:
+<code class="docutils literal notranslate"><span class="pre">cosim.py</span></code> on the <em>committed</em> design, all five shapes, in the same
+<code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">worktree</span></code> and off the same <code class="docutils literal notranslate"><span class="pre">mlir/</span></code> build, <strong>before</strong> the
+candidate’s diff is applied – the checkout is asserted pristine
+immediately before and after. Nothing a candidate does can reach that
+number: not a byte of it exists on disk when the cycles are taken, its
+processes are sandboxed to their work directory (guard 4) and so cannot
+write a control record either, and the control’s cosim verdict is
+nonce-vouched (guard 5) like every other. <code class="docutils literal notranslate"><span class="pre">accept.json</span></code> records it as
+<code class="docutils literal notranslate"><span class="pre">control</span></code> – cycles, the two editable files’ blob ids, the ref, the
+estimated clock, the wall time, when it was measured – so an accepted
+result can be re-derived against the same control.
+<code class="docutils literal notranslate"><span class="pre">--control</span> <span class="pre">&lt;control-run&gt;/accept.json</span></code> reuses one control for the rest of
+a run’s candidates; a record for another design, not vouched, not measured
+on a pristine checkout, short of a shape or missing the clock is refused
+(<code class="docutils literal notranslate"><span class="pre">claim:</span> <span class="pre">no-control</span></code>), never silently used. A cosim that flakes at one
+shape lands in the same place – <code class="docutils literal notranslate"><span class="pre">no-control</span></code>, before the candidate is
+measured at all, and the run is repeated rather than compared against
+something else. Cost: one five-shape cosim, ~4.5 min, once per run. The search’s own baseline (<code class="docutils literal notranslate"><span class="pre">loop.py</span></code>, iteration
+0) was already a self-measurement; it now records the design’s blobs and
+cross-checks itself too.</p>
+<p>The control and the candidate are measured by the <strong>same driver</strong> –
+<code class="docutils literal notranslate"><span class="pre">accept.py</span></code>’s one <code class="docutils literal notranslate"><span class="pre">DRIVER</span></code>, threaded into both passes, recorded in the
+record, and refused by <code class="docutils literal notranslate"><span class="pre">control.unusable</span></code> if a reused record names
+another. A second driver (the co-design mode’s mapper-driven
+<code class="docutils literal notranslate"><span class="pre">codesign_cosim</span></code>) describes the same hardware with a different program,
+so a control measured by one and a candidate by the other shows the
+driver’s difference as the candidate’s win: at 4x4x4 the mapper’s program
+is 24 instruction words against the hand-written 28, same four dynamic
+issues, bit-exact – a free -3 cycles for every candidate in that mode.</p>
+<p><code class="docutils literal notranslate"><span class="pre">control.RECORDED</span></code> is therefore keyed <code class="docutils literal notranslate"><span class="pre">(driver,</span> <span class="pre">the</span> <span class="pre">two</span> <span class="pre">blobs)</span></code> and
+<code class="docutils literal notranslate"><span class="pre">control.PUBLISHED</span></code> by driver: a driver with nothing recorded is
+<code class="docutils literal notranslate"><span class="pre">UNRECORDED</span></code> and exits 3 with its measured numbers printed, to be
+recorded, rather than quietly checked against the other driver’s.</p>
+<p><code class="docutils literal notranslate"><span class="pre">control.RECORDED</span></code> and the published numbers are a <strong>cross-check</strong>, not
+the control. They used to <em>be</em> the control, keyed by the blob ids of the
+two editable files – and a prose-only edit to <code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code>
+(docstring corrections, two dead constants) moved the key, so acceptance
+reported <code class="docutils literal notranslate"><span class="pre">no-baseline</span></code> and could accept nothing. Failing closed was
+right; keying a control on a file’s bytes was not. As a cross-check the
+same table cannot block and cannot go quiet: a design whose blobs are not
+recorded is compared against the published five-shape numbers instead, and
+a disagreement prints a banner and exits 3, because it means either the
+toolchain moved or the design changed behaviour and no result of that run
+can be trusted until a person says which. A design whose cycles
+deliberately move gets its entry in <code class="docutils literal notranslate"><span class="pre">control.RECORDED</span></code> in the same
+commit.</p>
+<p>The comparison is exact – no tolerance – because <em>this</em> side is
+deterministic: the five shapes reproduce to the cycle, run to run and
+across independent re-measurements, so two measurements of one
+configuration that differ are a finding, never noise to average. (The
+Gemmini column of the comparison is the noisy one, up to 20 cycles of
+trial-to-trial spread; the two sides’ tolerances are not the same and this
+check applies only to ours.) And a published number differing from an
+in-run one is not automatically an error in either: the co-design mode’s
+control measures 169 at 4x4x4 against the published 172 because its mapper
+emits a 24-word program where the hand-written one has 28, bit-exact and
+fully accounted for. That is the case for measuring the control per run
+rather than publishing one – a control has to come from the same run as
+the thing it controls.</p>
+</li>
+</ol>
+<p>Every accepted diff is still read by a person.</p>
+</section>
+<section id="running-two-tracks-on-one-host-ray-stop-is-global">
+<h3>Running two tracks on one host: <code class="docutils literal notranslate"><span class="pre">ray</span> <span class="pre">stop</span></code> is global<a class="headerlink" href="#running-two-tracks-on-one-host-ray-stop-is-global" title="Link to this heading"><span>¶</span></a></h3>
+<p><strong>``ray stop`` matches Ray processes by name across the entire host</strong>, so it
+kills raylets belonging to every worktree rather than only the one it is run
+from. A track that ends a run or a swarm with it takes down whatever else is
+mid-flight.</p>
+<p>Observed on 2026-09-22: a paid two-worker search lost both workers 10.8 minutes
+in, at $1.69, during their first model call, with <code class="docutils literal notranslate"><span class="pre">raylet.out</span></code> showing
+<code class="docutils literal notranslate"><span class="pre">received</span> <span class="pre">SIGTERM</span></code> and <code class="docutils literal notranslate"><span class="pre">Raylet</span> <span class="pre">graceful</span> <span class="pre">shutdown</span> <span class="pre">triggered</span> <span class="pre">...</span> <span class="pre">reason:</span>
+<span class="pre">EXPECTED_TERMINATION</span></code>. Not memory — 757 GB was free. The GCS survived; the
+raylet did not.</p>
+<p>There is <strong>no per-worktree isolation</strong> for this. Matching is on process name, so
+a private temporary directory or a distinct port does not help. Two options, and
+the choice is operational rather than technical: serialise Ray use across
+tracks, or treat a raylet <code class="docutils literal notranslate"><span class="pre">SIGTERM</span></code> as transient and retry, accepting the
+wasted spend.</p>
+<p>The failure direction is at least safe: workers die rather than producing an
+unscored candidate. And a harness that calls <code class="docutils literal notranslate"><span class="pre">ray</span> <span class="pre">stop</span></code> unconditionally on
+teardown makes concurrent tracks impossible on one host — prefer stopping only
+your own cluster by address, or simply letting the process exit.</p>
+</section>
+<section id="running-it">
+<h3>Running it<a class="headerlink" href="#running-it" title="Link to this heading"><span>¶</span></a></h3>
+<p>Environment (once): the <code class="docutils literal notranslate"><span class="pre">allo</span></code> env with this checkout’s <code class="docutils literal notranslate"><span class="pre">mlir/build</span></code>,
+<code class="docutils literal notranslate"><span class="pre">chia_env</span></code> (py3.10, <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code>), opencode via
+<code class="docutils literal notranslate"><span class="pre">npm</span> <span class="pre">ci</span> <span class="pre">--prefix</span> <span class="pre">examples/accelerator/tinytpu_vitis/chia_agent</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">chia.env</span></code> copied from <code class="docutils literal notranslate"><span class="pre">chia.env.example</span></code> at the repository root.
+<code class="docutils literal notranslate"><span class="pre">chia.env</span></code> is gitignored and must never be committed. Then:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>examples/accelerator/tinytpu_vitis/chia_agent/gcp_setup.sh<span class="w">  </span><span class="c1"># auth, project, billing, APIs, spend report</span>
+conda<span class="w"> </span>activate<span class="w"> </span>chia_env<span class="p">;</span><span class="w"> </span><span class="nb">set</span><span class="w"> </span>-a<span class="p">;</span><span class="w"> </span><span class="nb">source</span><span class="w"> </span>chia.env<span class="p">;</span><span class="w"> </span><span class="nb">set</span><span class="w"> </span>+a
+ray<span class="w"> </span>start<span class="w"> </span>--head<span class="w"> </span>--resources<span class="o">=</span><span class="s1">'{"opencode_creds": 2}'</span><span class="w"> </span>--include-dashboard<span class="o">=</span><span class="nb">false</span>
+<span class="nb">cd</span><span class="w"> </span>examples/accelerator/tinytpu_vitis/chia_agent
+python<span class="w"> </span>test_harness.py<span class="w"> </span>--phases<span class="w"> </span>e,c<span class="w">    </span><span class="c1"># ~1 min, $0; full suite ~30 min, $0</span>
+python<span class="w"> </span>preflight.py<span class="w"> </span>--budget-usd<span class="w"> </span><span class="m">30</span><span class="w">    </span><span class="c1"># the gate alone, $0</span>
+python<span class="w"> </span>swarm.py<span class="w"> </span>--workers<span class="w"> </span><span class="m">2</span><span class="w"> </span>--iterations<span class="w"> </span><span class="m">3</span><span class="w"> </span>--budget-usd<span class="w"> </span><span class="m">30</span>
+python<span class="w"> </span>accept.py<span class="w"> </span>--out<span class="w"> </span>&lt;run&gt;/control<span class="w">                 </span><span class="c1"># the run's control, once</span>
+python<span class="w"> </span>accept.py<span class="w"> </span>--diff<span class="w"> </span>&lt;run&gt;/&lt;worker&gt;/best.diff<span class="w"> </span>--out<span class="w"> </span>&lt;run&gt;/accept-&lt;worker&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--control<span class="w"> </span>&lt;run&gt;/control/accept.json<span class="w">              </span><span class="c1"># or omit it and measure again</span>
+ray<span class="w"> </span>stop<span class="w">                               </span><span class="c1"># and remove the Ray session directory</span>
+</pre></div>
+</div>
+<p><strong>Billing.</strong> CHIA runs on the dedicated project <code class="docutils literal notranslate"><span class="pre">chia2026-tinytpu</span></code>, billed to
+the CHIA2026 account; everything is scoped per process, and the host’s global
+gcloud config and ADC quota project are never changed. opencode’s
+<code class="docutils literal notranslate"><span class="pre">google-vertex</span></code> provider takes the project from the provider options
+<code class="docutils literal notranslate"><span class="pre">loop.py</span></code> sets (then <code class="docutils literal notranslate"><span class="pre">GOOGLE_VERTEX_PROJECT</span></code>, <code class="docutils literal notranslate"><span class="pre">GOOGLE_CLOUD_PROJECT</span></code>)
+and bills the project in the request URL. <code class="docutils literal notranslate"><span class="pre">preflight.py</span></code> runs before any
+worker or model call in <code class="docutils literal notranslate"><span class="pre">swarm.py</span></code>, <code class="docutils literal notranslate"><span class="pre">loop.py</span></code> and <code class="docutils literal notranslate"><span class="pre">smoke.py</span></code>, and refuses
+unless the project bills <code class="docutils literal notranslate"><span class="pre">CHIA_BILLING_ACCOUNT</span></code>, Vertex AI is enabled,
+<code class="docutils literal notranslate"><span class="pre">--budget-usd</span></code> is given, and CHIA’s cumulative spend so far plus this run’s cap
+fits <strong>``CHIA_TOTAL_CAP_USD`` ($100 in chia.env)</strong>; it prints the account,
+project, spend so far, remaining and the run’s cap. Cumulative spend is
+opencode’s own database, attributed to CHIA2026 by the cutover time recorded
+in <code class="docutils literal notranslate"><span class="pre">billing.json</span></code> (opencode stores no GCP project with a session). These are
+opencode’s figures from its price table, not the invoice; the remaining credit
+is only in the Cloud Console.</p>
+<p><code class="docutils literal notranslate"><span class="pre">test_harness.py</span></code> runs the whole harness with no LLM (a scripted
+OpenAI-compatible model on localhost; every cloud credential variable is
+cleared): <strong>control</strong> the control record a claim may rest on and its
+cross-check; <strong>e</strong> frozen-file and import-time attacks, forged verdicts,
+sandbox, and that a candidate can neither write nor fake a control record;
+<strong>c</strong> an int16 partial sum rejected by stress; <strong>g</strong> the
+parametricity and documentation guards; <strong>d</strong> a deadlock killed at 240 s;
+<strong>abf</strong> no-op and a slower design scored concurrently; <strong>loop</strong> the real
+<code class="docutils literal notranslate"><span class="pre">swarm</span> <span class="pre">-&gt;</span> <span class="pre">loop</span> <span class="pre">-&gt;</span> <span class="pre">opencode</span> <span class="pre">-&gt;</span> <span class="pre">MCP</span></code> path; <strong>accept</strong> <code class="docutils literal notranslate"><span class="pre">accept.py</span></code> on a
+correct-but-slower diff, against a control measured in that same run. 57/57
+at landing (<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/chia-evidence/harness-test-20260919-190240/</span></code>).</p>
+</section>
+<section id="first-paid-run-2026-09-19">
+<h3>First paid run, 2026-09-19<a class="headerlink" href="#first-paid-run-2026-09-19" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/chia-evidence/isa-run1-20260919/</span></code>: 2 workers x at most 3 iterations, $30 cap,
+<code class="docutils literal notranslate"><span class="pre">gemini-3.1-pro-preview</span></code> on <code class="docutils literal notranslate"><span class="pre">chia2026-tinytpu</span></code>, seeded with measured facts
+from the shipped design’s 16x16x16 timeline
+(<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/chia-evidence/timeline-476a70d8-16x16x16/</span></code>: 211 cycles of <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> and no MAC
+before cycle 285; the drain after the last PE). The pre-flight gate passed
+before any worker started.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 13.0%" />
+<col style="width: 8.0%" />
+<col style="width: 45.0%" />
+<col style="width: 22.0%" />
+<col style="width: 12.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>worker</p></th>
+<th class="head"><p>iter</p></th>
+<th class="head"><p>what it tried</p></th>
+<th class="head"><p>verdict</p></th>
+<th class="head"><p>cost (DB)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>front-end</p></td>
+<td><p>1</p></td>
+<td><p>widen <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code>’s operand bursts to 4 rows per iteration</p></td>
+<td><p>172 / 627, bit-exact, stress 492/492; accepted (-59)</p></td>
+<td><p>$5.17</p></td>
+</tr>
+<tr class="row-odd"><td><p>front-end</p></td>
+<td><p>2</p></td>
+<td><p>rewrite of the GEMM program generator</p></td>
+<td><p>deadlock, gate timeout at 240 s</p></td>
+<td><p>$8.78</p></td>
+</tr>
+<tr class="row-even"><td><p>tail</p></td>
+<td><p>1</p></td>
+<td><p>contiguous <code class="docutils literal notranslate"><span class="pre">dma_st</span></code> write-back (session timed out); debug session
+removed the leftovers</p></td>
+<td><p>exactly baseline, 172 / 686 (+0)</p></td>
+<td><p>$4.36 + $1.20</p></td>
+</tr>
+<tr class="row-odd"><td><p>tail</p></td>
+<td><p>2</p></td>
+<td><p>relay kernels between <code class="docutils literal notranslate"><span class="pre">accu</span></code> and <code class="docutils literal notranslate"><span class="pre">dma_st</span></code></p></td>
+<td><p>176 / 686 (+4), rejected</p></td>
+<td><p>$9.03</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>$28.54</strong> over five sessions (all counted against CHIA2026’s $100 cap), 100
+min wall; both workers stopped on the soft cap before iteration 3.</p>
+<p><strong>The finding, verified independently.</strong> <code class="docutils literal notranslate"><span class="pre">accept.py</span></code> on front-end iteration
+1, on a clean checkout: <strong>172 / 262 / 376 / 425 / 627</strong> (0 / 0 / -42 / -59 /
+-59, <strong>-160</strong> over the five shapes), bit-exact, <code class="docutils literal notranslate"><span class="pre">stress_isa</span></code> 492/492, RTL
+stress 0 mismatches at every shape, 2.431 ns. It costs <strong>2.3x the block RAM</strong>
+(BRAM18K 42 -&gt; 98), +20% LUT and +40% FF: -59 cycles (8.6%) at 16x16x16. Read
+by hand, the only functional change is <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code>’s burst loops; rows read past
+a program’s span stay inside the operand and land in buffer words the program
+never names. The diff as written also <strong>deleted the 260-line design
+docstring</strong> and hard-coded <code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">=</span> <span class="pre">4</span></code> – both invisible to the gate at the time,
+and the reason for guards 6 and 7. Re-expressed parametrically with the
+docstring intact (<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/chia-evidence/isa-run1-20260919/param_burst.diff</span></code>, no model
+call) it gives identical cycles and area, passes the same acceptance, and is
+exact at MAXDIM 8 and 12. <strong>It is not landed</strong>: whether the burst widening is
+worth its block RAM is a separate decision.</p>
+<p>Two observations worth keeping:</p>
+<ul class="simple">
+<li><p><strong>A worker reported a false improvement.</strong> The tail worker’s debug session
+claimed “172 cycles (down from 680)” and “686 (down from 1457)”; its final
+diff was one added <code class="docutils literal notranslate"><span class="pre">pass</span></code> and the harness scored it exactly at the
+baseline. The loop never takes an agent’s number, and this is why.</p></li>
+<li><p><strong>Timed-out sessions are billed but reported as $0.</strong> Three of the five
+sessions hit opencode’s 40-minute timeout. The loop’s per-worker figures
+(from opencode’s export of each call) record them as $0.00 – $5.17 and
+$1.20 in the workers’ logs – while opencode’s database charges them in full,
+<strong>$22.17</strong> here. Every cap therefore reads the database (<code class="docutils literal notranslate"><span class="pre">spend.py</span></code>), never
+the per-call usage.</p></li>
+</ul>
+<p>A capped smoke run on the earlier design is recorded in
+<a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
+</section>
+</section>
+<section id="what-is-and-is-not-demonstrated">
+<h2>What Is and Is Not Demonstrated<a class="headerlink" href="#what-is-and-is-not-demonstrated" title="Link to this heading"><span>¶</span></a></h2>
+<p>The evidence behind the takeaways at the top of this page, one line per claim.</p>
+<p><strong>Demonstrated</strong></p>
+<ul class="simple">
+<li><p><strong>An agent proposed an architectural legality rule, and the harness proved it
+discriminates.</strong> Pilot B (2026-09-22, <code class="docutils literal notranslate"><span class="pre">chia-abstraction</span></code>):
+<code class="docutils literal notranslate"><span class="pre">s.memory_ports(target,</span> <span class="pre">write_ports)</span></code> refuses when
+<code class="docutils literal notranslate"><span class="pre">stores</span> <span class="pre">&gt;</span> <span class="pre">write_ports</span> <span class="pre">x</span> <span class="pre">banks</span></code>, <em>before</em> touching the IR. At a
+harness-owned call site on a frozen design it <strong>refused</strong> the dual-write
+probe (one RAM, two write statements) and <strong>accepted</strong> the cyclically banked
+one (two instances, one write each), which was then bit-exact under csim.
+Every other gate clean: 294/294 tests, <code class="docutils literal notranslate"><span class="pre">stress_isa</span></code> 492/492, all design
+cases bit-exact, 20 limits verdicts unchanged, resources flat, +0 cycles. It
+named its own unchecked premise unprompted. <strong>The property was seeded</strong>; the
+abstraction was not. Its diagnosis was half wrong – it claimed the language
+could not <em>state</em> port counts, which is false on its own tree, so the gap was
+enforcement only.</p></li>
+<li><p><strong>The same rule is unsound in both directions</strong>, measured by applying it:
+<code class="docutils literal notranslate"><span class="pre">Partition.Block</span></code> factor 2 is <strong>accepted</strong> although both stores land in
+bank 0 and that RTL emits two writes per bank; an unpipelined two-store loop
+is <strong>refused</strong> although sequential stores need one port. Published here in
+the same breath as the success, because a page reporting the primitive and
+not its holes would repeat the failure this project keeps finding in its own
+instruments.</p></li>
+<li><p><strong>The loop runs end to end on real tools</strong> (<code class="docutils literal notranslate"><span class="pre">chia_agent/</span></code> on <code class="docutils literal notranslate"><span class="pre">main</span></code>).
+Every accepted figure is RTL cosim cycles plus csynth area and clock,
+bit-exact against a frozen reference model.</p></li>
+<li><p><strong>It catches a false claim.</strong> Run 1 (2026-09-19): a worker reported an
+improvement that re-scored as exactly baseline.</p></li>
+<li><p><strong>It finds a real change.</strong> Run 1: a DMA burst widening, -160 cycles over five
+shapes, bit-exact, stress and RTL-stress clean, at 2.3x block RAM. Not
+landed; the dual-ported form does not synthesise to standard cells and the
+banked form does, with identical cycles (<a class="reference internal" href="../designs/benchmarks.html"><span class="doc">The Benchmark Set</span></a>).</p></li>
+<li><p><strong>A pre-registered prediction held.</strong> Run 2 (2026-09-22, two arms): both arms
+passed every gate and raised the encodable count – 3 to 8 for the directed
+arm, 3 to 7 for the unguided <code class="docutils literal notranslate"><span class="pre">open</span></code> arm – while the chosen nest, and
+therefore the cycles, did not move and area rose. The <code class="docutils literal notranslate"><span class="pre">open</span></code> arm’s first
+attempt made 16 nests encodable that computed the <strong>wrong answer</strong>, and the
+reference-model sweep caught all 16.</p></li>
+<li><p><strong>The retired ``chia-codesign`` claims C1-C8</strong> replay deterministically,
+including the two agent-found variants (4.07x and 1.98x) at exact numerics.</p></li>
+</ul>
+<p><strong>Not demonstrated</strong></p>
+<ul class="simple">
+<li><p><strong>A rate of discovery.</strong> Every search is n=1 per arm. A rate does not need a
+seed – it is a property of the sampling process – so replication (E1 below)
+is the next paid run.</p></li>
+<li><p><strong>That such a rule is sound.</strong> <code class="docutils literal notranslate"><span class="pre">s.memory_ports</span></code> is a heuristic and errs
+both ways (above). The correct rule needs the layout map and the initiation
+interval; neither is consulted.</p></li>
+<li><p><strong>That an agent can *find* an architectural gap unaided.</strong> The open arm,
+given measurements only, landed in <strong>both</strong> of its runs on <code class="docutils literal notranslate"><span class="pre">bind_storage</span></code>
+– a surface Allo already has as <code class="docutils literal notranslate"><span class="pre">Memory(resource=,</span> <span class="pre">storage_type=)</span></code>, which
+both HLS emitters already emit. Its spelling was new; its capability was not.
+It also chose the property its most concrete seeded measurement pointed at,
+which was pre-registered in advance as weak evidence of identification.</p></li>
+<li><p><strong>Novelty.</strong> The burst widening is a sensible engineering change, not a
+discovery.</p></li>
+</ul>
+<p><strong>Known defects, being repaired.</strong> Run 2 was stopped after 2 of 5 iterations by
+a per-run cap that summed the whole account rather than its own sessions. The
+$0 guard suite, 57 cases at landing, does not currently pass (one stale
+assertion, one crash in the loop phase).</p>
+</section>
+<section id="the-planned-experiments">
+<h2>The Planned Experiments<a class="headerlink" href="#the-planned-experiments" title="Link to this heading"><span>¶</span></a></h2>
+<p>Written 2026-09-22, before the runs, so that the design of each experiment can
+be read against its result rather than after it. <strong>$300 is authorised for the
+overnight runs and about $500 remains for the experiments below.</strong> The split of
+the overnight money is recorded in <code class="docutils literal notranslate"><span class="pre">chia_agent/allocation.json</span></code>: the
+abstraction-maintaining track is weighted 2:1 over the design-point search,
+because the search’s pipeline is proven while the abstraction work is the open
+question. Cumulative spend was $28.54 when the split was made.</p>
+<p>The gate enforces <code class="docutils literal notranslate"><span class="pre">CHIA_TOTAL_CAP_USD</span></code> as a <em>cumulative</em> ceiling on
+<code class="docutils literal notranslate"><span class="pre">chia2026_spend()</span></code> and cannot tell two concurrent tracks apart, so a track’s
+share is honoured by that track setting its own ceiling. Two tracks drawing on
+one account means a track that sees spend climbing faster than its own runs
+explain is seeing the other track, not an accounting bug.</p>
+<section id="the-one-thing-every-experiment-below-is-designed-to-fix">
+<h3>The one thing every experiment below is designed to fix<a class="headerlink" href="#the-one-thing-every-experiment-below-is-designed-to-fix" title="Link to this heading"><span>¶</span></a></h3>
+<p>Every claim this page makes about the TinyTPU-isa search is <strong>n=1</strong>. One paid
+run found one improvement. That is enough to show the loop works and not enough
+to say anything about how well it works, and no amount of further single runs
+will change that. So the planned experiments buy <em>replication and rate</em> before
+they buy anything else, and each one states in advance what result would count
+as a negative.</p>
+</section>
+<section id="e1-rate-of-discovery-replicated">
+<h3>E1. Rate of discovery, replicated<a class="headerlink" href="#e1-rate-of-discovery-replicated" title="Link to this heading"><span>¶</span></a></h3>
+<p>Run the design-point search from the same baseline <strong>at least three times</strong>
+with different seeds, and report the distribution rather than the best run:
+how many candidates were proposed, how many passed the static gates, how many
+passed acceptance, and what each accepted candidate bought. The deliverable is
+an accept rate with an interval around it.</p>
+<p>A negative result here is publishable and should be reported as such: if two
+of three runs find nothing, the honest claim is that the loop finds an
+improvement <em>sometimes</em>, and the paper says so.</p>
+<p>Prerequisite, and it is not optional: <strong>seed the search</strong>. Outstanding item 2
+below has blocked this since 2026-09-07. Without a seed a run is re-runnable
+but not repeatable, and a distribution over unrepeatable runs cannot be
+attributed to the search rather than to sampling.</p>
+</section>
+<section id="e2-does-the-refusal-bound-the-search">
+<h3>E2. Does the refusal bound the search?<a class="headerlink" href="#e2-does-the-refusal-bound-the-search" title="Link to this heading"><span>¶</span></a></h3>
+<p>Of 1,226 candidate loop nests, <strong>1,150 are refused at ``acc``</strong>, and <em>why</em> went
+through two wrong diagnoses before the right one, which is itself worth
+recording. It is not that <code class="docutils literal notranslate"><span class="pre">acc</span></code> is a static instruction field with no
+predicate on an induction variable — this page said that, and it is false.
+<code class="docutils literal notranslate"><span class="pre">acc</span></code> is <code class="docutils literal notranslate"><span class="pre">mm</span></code>’s <code class="docutils literal notranslate"><span class="pre">f2</span></code>, <code class="docutils literal notranslate"><span class="pre">f2</span></code> is a legal AGU target, and driving it from
+the reduce loop assembles for exactly two k-tiles before rejecting at Kt≥3. <strong>The
+obstacle is additive monotonicity in the address term</strong>, not staticness (see
+<a class="reference internal" href="act.html"><span class="doc">ACT, and Why We Cite It</span></a>).</p>
+<p>That correction matters because it changes what the fix costs: making a static
+field dynamic is a different and more expensive change than saturating a term
+or predicating it on <code class="docutils literal notranslate"><span class="pre">iv_now[level]</span> <span class="pre">==</span> <span class="pre">0</span></code>, and a search framed on the wrong
+diagnosis would have priced the wrong hardware.</p>
+<p>A second correction, to the arithmetic rather than the mechanism: a <strong>first-cause
+census hides overlap.</strong> By first cause it is 1,150 <code class="docutils literal notranslate"><span class="pre">acc</span></code> / 55 <code class="docutils literal notranslate"><span class="pre">ar-distance</span></code> /
+13 <code class="docutils literal notranslate"><span class="pre">AGU_TERMS</span></code> / 3 <code class="docutils literal notranslate"><span class="pre">LOOP_DEPTH</span></code>, but <strong>930 of those nests also violate the
+accumulator RAW-distance contract</strong>, so relieving <code class="docutils literal notranslate"><span class="pre">acc</span></code> alone does not free
+1,150 nests. Sorted by the express/refuse distinction it is <strong>1,166 express
+against 55 refuse</strong>: Allo can <em>build</em> nearly all of these, and our machine
+cannot <em>encode</em> most of them.</p>
+<p>The experiment: run the search unchanged, then against a design that relieves
+the monotonicity constraint, and compare what each finds. If the second finds
+strictly better design points, the refusal is a real bound and the ISA is the
+thing to fix. If it finds nothing better, the reachable nests already contain
+the good designs — also a result, and a cheaper one to act on.</p>
+<p>There is already evidence for the second outcome, which should be stated before
+the experiment rather than after: widening <code class="docutils literal notranslate"><span class="pre">AGU_TERMS</span></code> from 3 to 4 raises the
+encodable count and <strong>does not change the chosen nest</strong>, so the RTL runs the
+same stream, the cycles do not move, and the area rises. A cost with no benefit.
+If relieving <code class="docutils literal notranslate"><span class="pre">acc</span></code> unlocks 1,150 nests and the pick <em>still</em> does not move,
+then the mapping space was never the binding constraint on this machine — a
+stronger and more surprising claim than a cycle win, and the one this experiment
+is now most likely to produce.</p>
+</section>
+<section id="e3-can-an-agent-maintain-the-abstractions-and-at-what-rate">
+<h3>E3. Can an agent maintain the abstractions, and at what rate?<a class="headerlink" href="#e3-can-an-agent-maintain-the-abstractions-and-at-what-rate" title="Link to this heading"><span>¶</span></a></h3>
+<p>The track this project most wants to measure, and the one expected to fail most
+often. An agent is asked to extend Allo itself – a dialect operation, a type, a
+schedule primitive or a pass – rather than to edit a design. Success means the
+extension arrives the way <code class="docutils literal notranslate"><span class="pre">s.dependence(...)</span></code> did: with its analyses, its
+legality rule, tests, and the golden dataflow tests still passing.</p>
+<p>Bounded attempts with a hard pass/fail gate, not one long run, because the
+result wanted is the <em>shape of the success rate</em> and its failure modes, not one
+expensive lucky sample. Keep every transcript: when an agent cannot extend a
+compiler abstraction, <em>why</em> it could not is the evidence.</p>
+<p>The stated hypothesis, from the CAKE result (a typed IR reaching 1.144x where
+raw generation reached 0.928x at equal budget): an agent given a typed
+abstraction with construction-time checking succeeds more often than one given
+free rein over the emitter. Testing that needs both arms, so run both.</p>
+</section>
+<section id="e4-co-design-both-sides-moving">
+<h3>E4. Co-design, both sides moving<a class="headerlink" href="#e4-co-design-both-sides-moving" title="Link to this heading"><span>¶</span></a></h3>
+<p>Everything above moves one side at a time. The claim the paper wants is
+co-design: a search that changes the instruction set and the microarchitecture
+together, where neither change is worth anything alone. The evidence for it is
+a design point plus the demonstration that ablating either half loses the gain.
+That ablation is the experiment, and it is cheap once a candidate exists –
+it is two extra evaluations, no model calls.</p>
+</section>
+<section id="what-will-not-be-spent-on">
+<h3>What will not be spent on<a class="headerlink" href="#what-will-not-be-spent-on" title="Link to this heading"><span>¶</span></a></h3>
+<ul class="simple">
+<li><p><strong>Breadth for its own sake.</strong> A fourth hypothesis at n=1 is worth less than a
+second run of an existing one.</p></li>
+<li><p><strong>Re-deriving numbers that are already recorded.</strong> The evidence directories
+hold every accepted diff with its reports; replay is free.</p></li>
+<li><p><strong>The semantics-alignment variant.</strong> Stopped; see
+<a class="reference internal" href="../designs/minitpu.html"><span class="doc">MiniTPU: Reference Architecture</span></a>.</p></li>
+</ul>
+</section>
+<section id="e5-held-out-rediscovery">
+<h3>E5. Held-out rediscovery<a class="headerlink" href="#e5-held-out-rediscovery" title="Link to this heading"><span>¶</span></a></h3>
+<p>An extension does not have to be novel to be evidence. If an agent reaches an
+abstraction the fork already has, <strong>without being told it exists</strong>, that is a
+measurable result and a much cheaper one to grade than novelty, because the
+right answer is already in the tree with its tests.</p>
+<p>The design: take a fork-local primitive whose history is known – the worked
+example is <code class="docutils literal notranslate"><span class="pre">s.dependence(...)</span></code>, which exists because a real defect could not
+be expressed any other way – remove it from the agent’s view along with the
+documentation that names it, and give the agent only the symptom that motivated
+it. Grade on whether the agent arrives at an abstraction with the same power,
+and on what it proposes instead when it does not.</p>
+<p>This is the one experiment in this list with a known correct answer, which makes
+it the right place to calibrate how much guidance an agent needs before the
+open-ended attempts in E3 are worth paying for.</p>
+</section>
+<section id="why-the-design-driver-s-end-state-matters-to-all-of-this">
+<h3>Why the design driver’s end state matters to all of this<a class="headerlink" href="#why-the-design-driver-s-end-state-matters-to-all-of-this" title="Link to this heading"><span>¶</span></a></h3>
+<p>The target is not one accelerator. It is <strong>a library of parametrized, modular
+TPU IPs that compose into different architectural choices</strong> – the named class
+being Groq’s LPU, OpenAI’s Jalapeno, Meta’s MTIA and AMD’s XDNA – with TinyTPU
+as something such a library <em>instantiates</em> rather than something to extend.</p>
+<p>That is what “generalizable across design cases” has to mean here, and it is
+the standard a proposed extension should be judged against: an abstraction that
+makes a second architecture expressible is worth more than one that makes the
+current design faster. It also tells E3 and E5 what to reward. An agent that
+parametrizes an IP block so it can be composed differently has done the thing
+the project wants, even if the immediate design gets no faster.</p>
+</section>
+</section>
+<section id="earlier-measurements-and-corrections">
+<h2>Earlier measurements and corrections<a class="headerlink" href="#earlier-measurements-and-corrections" title="Link to this heading"><span>¶</span></a></h2>
+<p>A superseded run, a withdrawn claim, and the earlier co-design effort that
+this one replaced. The current state is in the sections above.</p>
+<section id="earlier-capped-smoke-run-2026-09-19-old-design-old-project">
+<h3>Earlier: capped smoke run, 2026-09-19, old design, old project<a class="headerlink" href="#earlier-capped-smoke-run-2026-09-19-old-design-old-project" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/chia-evidence/isa-smoke-20260919-035443/</span></code>: 2 workers against the design shipped
+until <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code> (252 / 383 / 591 / 667 / 919), $15 hard cap, billed to the
+general project <code class="docutils literal notranslate"><span class="pre">test-adrs</span></code>. <strong>$15.15</strong>, 56 min, <strong>no candidate completed</strong>:
+opencode timed MCP calls out at 60 s while a cosim takes minutes, a hung
+evaluator blocked the tool server so the next session saw no tools, a
+deadlocked candidate held the gate for 900 s, CHIA silently retried a
+40-minute prompt, and unified diffs were the agents’ main failure mode. All
+five were fixed before run 1 (40-minute MCP timeout, async tools, 240 s gate
+timeout with process-group kill, <code class="docutils literal notranslate"><span class="pre">retries=1</span></code>, <code class="docutils literal notranslate"><span class="pre">replace_text</span></code>).</p>
+</section>
+<section id="withdrawn-t-is-not-varied">
+<h3>Withdrawn: “T is not varied”<a class="headerlink" href="#withdrawn-t-is-not-varied" title="Link to this heading"><span>¶</span></a></h3>
+<p>An earlier revision of this page said “T is not varied: the shipped design
+supports T=4 only”, in guard 6 of <a class="reference internal" href="#the-chia-loop-for-tinytpu-isa">The CHIA Loop for TinyTPU-isa</a>.
+<strong>That was wrong.</strong> The measurement that refutes it is in that guard.
+<code class="docutils literal notranslate"><span class="pre">param_check.py</span></code>’s own docstring described the column-block-2 problem
+correctly all along; the conclusion drawn from it was the error.</p>
+</section>
+<section id="the-original-co-design-effort-chia-codesign">
+<span id="chia-codesign"></span><h3>The Original Co-Design Effort (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)<a class="headerlink" href="#the-original-co-design-effort-chia-codesign" title="Link to this heading"><span>¶</span></a></h3>
+<p>“Agentic discovery of a domain-specific computing stack”: an AI agent proposes
+changes to a TPU-style accelerator’s instruction set and microarchitecture at
+once, and every proposal is scored by running a real commercial synthesis tool.
+One specification generates the simulator, the hardware, and the compiler
+backend, so a single agent edit moves all three together. The design searched
+here is the fp32 <code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu/</span></code> on <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> – a
+different machine from TinyTPU-isa, sharing no code with it (see
+<a class="reference internal" href="act.html"><span class="doc">ACT, and Why We Cite It</span></a>, “What ACT Is”).</p>
+<p>Headline figures, as stated by <code class="docutils literal notranslate"><span class="pre">CODESIGN.md</span></code>:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 40.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p>Best agent result</p></td>
+<td><p><strong>4.07x</strong> fewer cycles (126,432 -&gt; 31,056), numerics exact</p></td>
+</tr>
+<tr class="row-even"><td><p>Second, independent</p></td>
+<td><p><strong>1.98x</strong> at <strong>zero</strong> extra BRAM</p></td>
+</tr>
+<tr class="row-odd"><td><p>Cost model correction</p></td>
+<td><p>prior hand-written model was <strong>5.7x optimistic</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>One evaluation</p></td>
+<td><p><strong>41 s</strong>, $0 – synthesis runs locally</p></td>
+</tr>
+<tr class="row-odd"><td><p>One agent candidate</p></td>
+<td><p>~8-15 min, ~$2-3</p></td>
+</tr>
+<tr class="row-even"><td><p>Verify both results</p></td>
+<td><p><strong>~85 s</strong>, two commands</p></td>
+</tr>
+</tbody>
+</table>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>./scripts/claims.sh<span class="w"> </span>--fast<span class="w">     </span><span class="c1"># 13s, no synthesis, no API</span>
+./scripts/claims.sh<span class="w">            </span><span class="c1"># 133s, adds Vitis HLS</span>
+./scripts/claims.sh<span class="w"> </span>--full<span class="w">     </span><span class="c1"># 196s, adds backends + one $0.03 agent round-trip</span>
+</pre></div>
+</div>
+<section id="the-five-ideas">
+<h4>The five ideas<a class="headerlink" href="#the-five-ideas" title="Link to this heading"><span>¶</span></a></h4>
+<ol class="arabic simple">
+<li><p><strong>One specification, three artifacts.</strong> The spec generates simulator,
+microarchitecture, and compiler backend. The agent edits one file and all
+three move – which is how a single candidate changed the ISA, the compiler’s
+lowering, and the datapath together.</p></li>
+<li><p><strong>The verifier must be the real tool.</strong> The pre-existing hand-written cost
+model was optimistic by 5.7x: <code class="docutils literal notranslate"><span class="pre">mxu</span></code> costs 72 cycles, not 36 (it synthesizes
+as two sequential passes, II=2), and each DRAM access pays the real 75-cycle
+<code class="docutils literal notranslate"><span class="pre">m_axi</span></code> latency, not an assumed 8. Every decision taken against that model
+was taken against a fiction. Cheap proxies do not merely add noise – they
+point the wrong way.</p></li>
+<li><p><strong>A cycles-only objective ranks designs backwards.</strong> The 4.07x variant costs
+<strong>4.7x the BRAM</strong>, so per BRAM it is <em>worse</em> than the design it replaced. The
+1.98x variant costs none. Scored on cycles alone, the loop prefers the one
+that consumes the machine.</p></li>
+<li><p><strong>Breadth beats depth.</strong> Yield across hypotheses spanned ~100x (4.07x vs
+3.2%). Another hypothesis is worth far more than another iteration on the
+incumbent – but see <a class="reference internal" href="#not-yet-reproducible">Not yet reproducible</a> before treating this as
+measured.</p></li>
+<li><p><strong>Evaluation is cheap relative to proposal.</strong> 41 s and $0 to evaluate; 8-60
+min and $2-3 to propose. That inverts the usual design-space-exploration cost
+model, where simulation dominates and effort goes into surrogates and caches.
+Here, caching evaluation would be optimizing the 1% side.</p></li>
+</ol>
+</section>
+<section id="claims-what-is-demonstrated-and-what-is-not">
+<h4>Claims: what is demonstrated and what is not<a class="headerlink" href="#claims-what-is-demonstrated-and-what-is-not" title="Link to this heading"><span>¶</span></a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">CODESIGN.md</span></code> is the canonical claim register and splits its claims into two
+tiers, because they are not equally strong.</p>
+<p><strong>Deterministic – demonstrated.</strong> Reproduced by replay and re-synthesis;
+identical numbers every run.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 6.0%" />
+<col style="width: 50.0%" />
+<col style="width: 34.0%" />
+<col style="width: 10.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Claim</p></th>
+<th class="head"><p>Command</p></th>
+<th class="head"><p>Time</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>C1</p></td>
+<td><p>One schedule lowers to CPU, Vitis HLS, and CIRCT RTL</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">-C</span> <span class="pre">examples/accelerator/tinytpu</span> <span class="pre">oracle</span> <span class="pre">compiler</span> <span class="pre">cpu</span> <span class="pre">hls</span> <span class="pre">rtl</span></code></p></td>
+<td><p>29 s</p></td>
+</tr>
+<tr class="row-odd"><td><p>C2</p></td>
+<td><p>Frozen cost model scores 22,160 cycles; synthesis-grounded scores
+126,432 (<strong>5.7x</strong>)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">./scripts/claims.sh</span> <span class="pre">--fast</span></code></p></td>
+<td><p>7 s</p></td>
+</tr>
+<tr class="row-even"><td><p>C3</p></td>
+<td><p>Synthesis measures <code class="docutils literal notranslate"><span class="pre">mxu</span></code> = 72 cyc at II=2; <code class="docutils literal notranslate"><span class="pre">dma_load</span></code> depth = 75</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">examples.accelerator.tinytpu.synth</span></code></p></td>
+<td><p>35 s</p></td>
+</tr>
+<tr class="row-odd"><td><p>C4</p></td>
+<td><p>Derived <code class="docutils literal notranslate"><span class="pre">(ii,</span> <span class="pre">depth)</span></code> reproduces the tool’s measured latency exactly</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">tests/dsa/test_tinytpu_synth.py</span></code></p></td>
+<td><p>4 s</p></td>
+</tr>
+<tr class="row-even"><td><p>C5</p></td>
+<td><p>A self-modifying spec is refused; the shipped spec passes the same
+policy</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">tests/dsa/test_tinytpu_agent_policy.py</span></code></p></td>
+<td><p>3 s</p></td>
+</tr>
+<tr class="row-odd"><td><p>C6</p></td>
+<td><p>The <strong>4.07x</strong> variant replays to 31,056 cycles, numerics exact</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">verify_variant.py</span> <span class="pre">--run</span> <span class="pre">&lt;run&gt;</span> <span class="pre">--worker</span> <span class="pre">dram</span></code></p></td>
+<td><p>42 s</p></td>
+</tr>
+<tr class="row-even"><td><p>C7</p></td>
+<td><p>The <strong>1.98x</strong> variant replays to 63,864 cycles at baseline BRAM</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">verify_variant.py</span> <span class="pre">--run</span> <span class="pre">&lt;run&gt;</span> <span class="pre">--worker</span> <span class="pre">granularity-retry</span></code></p></td>
+<td><p>43 s</p></td>
+</tr>
+<tr class="row-odd"><td><p>C8</p></td>
+<td><p>Agent path is live end to end (ADC -&gt; Vertex -&gt; opencode -&gt; CHIA -&gt;
+MCP -&gt; allo)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">chia_agent/smoke.py</span></code></p></td>
+<td><p>32 s, $0.03</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Stochastic – not demonstrated.</strong> An agent search is not deterministic.
+Re-running it will not necessarily rediscover the same design. What C6 and C7
+establish is that the designs the search <em>did</em> find are real and re-derivable
+from the recorded trace. What is <strong>not</strong> yet established is the rate at which a
+search finds them.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 6.0%" />
+<col style="width: 54.0%" />
+<col style="width: 40.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Claim</p></th>
+<th class="head"><p>Status</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>S1</p></td>
+<td><p>A 4-worker x 5-iteration search finds &gt;=2x with probability <em>p</em></p></td>
+<td><p><strong>n=1.</strong> Needs &gt;=3 seeds per hypothesis.</p></td>
+</tr>
+<tr class="row-odd"><td><p>S2</p></td>
+<td><p>Yield varies ~100x across hypotheses (idea 4)</p></td>
+<td><p><strong>n=1 per angle.</strong> Suggestive, not measured.</p></td>
+</tr>
+<tr class="row-even"><td><p>S3</p></td>
+<td><p>Accept rate, and cycles-vs-iteration trajectory</p></td>
+<td><p><strong>Not yet analysed.</strong> Raw logs in <code class="docutils literal notranslate"><span class="pre">chia_runs/</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Observations, not claims</strong> (<code class="docutils literal notranslate"><span class="pre">CHIA_CHECKPOINT.md</span></code> section 2): things
+observed once, which nothing reproduces on demand.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 6.0%" />
+<col style="width: 47.0%" />
+<col style="width: 47.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Observation</p></th>
+<th class="head"><p>Why it is not a claim</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>O1</p></td>
+<td><p>A live agent wrote self-modifying code into the spec, which the
+evaluator then imported and executed</p></td>
+<td><p>Real, and now guarded – but the original artifact was reverted by
+<code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">checkout</span></code> and never captured. Demonstrating it again would mean
+re-eliciting it.</p></td>
+</tr>
+<tr class="row-odd"><td><p>O2</p></td>
+<td><p>CHIA serializes every LLM call on <code class="docutils literal notranslate"><span class="pre">opencode_creds</span></code>; one unit caps the
+whole cluster</p></td>
+<td><p>Verified by observation (<code class="docutils literal notranslate"><span class="pre">4.0/4.0</span></code> after raising it). No test asserts
+it.</p></td>
+</tr>
+<tr class="row-even"><td><p>O3</p></td>
+<td><p>Vertex preview-model quota, not the harness, is the parallelism ceiling
+– 3 of 4 workers died on <code class="docutils literal notranslate"><span class="pre">RateLimitError</span></code> before proposing anything</p></td>
+<td><p>Seen in worker logs. The quota API does not expose the effective preview
+limit, so it cannot be confirmed independently.</p></td>
+</tr>
+</tbody>
+</table>
+<section id="not-yet-reproducible">
+<h5>Not yet reproducible<a class="headerlink" href="#not-yet-reproducible" title="Link to this heading"><span>¶</span></a></h5>
+<ul class="simple">
+<li><p><strong>S1-S3 need replication.</strong> Every hypothesis has n=1. Idea 4 is the project’s
+most interesting claim and currently its least evidenced.</p></li>
+<li><p><strong>The search is not seeded.</strong> Re-running produces a different trajectory.
+Only the replay path (C6, C7) is deterministic.</p></li>
+<li><p><strong>No permanent archive.</strong> For an <em>Artifacts Available</em> badge this needs a DOI
+(Zenodo), not just a git branch.</p></li>
+<li><p><strong>Agent runs need external services.</strong> Vertex AI and a billing account; C1-C7
+need none of that, which is why the claim tiers are split the way they are.</p></li>
+</ul>
+</section>
+</section>
+<section id="setup-from-zero">
+<h4>Setup from zero<a class="headerlink" href="#setup-from-zero" title="Link to this heading"><span>¶</span></a></h4>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># 1. system packages (Ubuntu 24.04)</span>
+sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>build-essential<span class="w"> </span>cmake<span class="w"> </span>ninja-build<span class="w"> </span>gcc<span class="w"> </span>g++<span class="w"> </span>lld<span class="w"> </span>nodejs<span class="w"> </span>npm
+mkdir<span class="w"> </span>-p<span class="w"> </span>~/.local/allo-bin<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>ln<span class="w"> </span>-sf<span class="w"> </span>/usr/lib/llvm-18/bin/ld.lld<span class="w"> </span>~/.local/allo-bin/
+<span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span>~/.local/allo-bin:<span class="nv">$PATH</span><span class="w">        </span><span class="c1"># cmake wants `ld.lld`; Ubuntu ships `ld.lld-18`</span>
+
+<span class="c1"># 2. Vitis HLS 2023.2 at /opt/xilinx/Vitis_HLS/2023.2 (C-synthesis needs no licence)</span>
+
+<span class="c1"># 3. source and build  (~40 min on 144 cores, ~35 GB)</span>
+git<span class="w"> </span>clone<span class="w"> </span>git@github.com:sunwookim028/allo.git<span class="w"> </span>~/allo
+<span class="nb">cd</span><span class="w"> </span>~/allo<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>git<span class="w"> </span>checkout<span class="w"> </span>chia-codesign<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w"> </span>--init<span class="w"> </span>--recursive
+conda<span class="w"> </span>create<span class="w"> </span>-y<span class="w"> </span>-n<span class="w"> </span>allo<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.12<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>conda<span class="w"> </span>activate<span class="w"> </span>allo
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nanobind&gt;=2.10,&lt;3"</span><span class="w"> </span><span class="s2">"PyYAML&lt;=6.0.1"</span><span class="w"> </span>typing_extensions<span class="w"> </span><span class="se">\</span>
+<span class="w">            </span><span class="s2">"scikit-build-core&gt;=0.10"</span><span class="w"> </span><span class="s2">"setuptools_scm&gt;=8"</span><span class="w"> </span>pytest<span class="w"> </span>numpy<span class="w"> </span>ml_dtypes<span class="w"> </span>rich<span class="w"> </span>sympy
+<span class="nb">export</span><span class="w"> </span><span class="nv">CMAKE_POLICY_VERSION_MINIMUM</span><span class="o">=</span><span class="m">3</span>.5<span class="w">    </span><span class="c1"># cmake 4 rejects OR-Tools 9.5's fetched deps</span>
+bash<span class="w"> </span>scripts/build-mlir.sh<span class="w">  </span>externals/llvm-project<span class="w"> </span>Release<span class="w"> </span>gcc<span class="w"> </span>g++
+bash<span class="w"> </span>scripts/build-circt.sh<span class="w"> </span>externals/circt<span class="w"> </span>externals/llvm-project/build<span class="w"> </span>Release<span class="w"> </span>gcc<span class="w"> </span>g++
+<span class="nv">SKBUILD_CMAKE_DEFINE</span><span class="o">=</span><span class="s2">"CMAKE_C_COMPILER=gcc;CMAKE_CXX_COMPILER=g++"</span><span class="w"> </span><span class="se">\</span>
+<span class="nv">CMAKE_ARGS</span><span class="o">=</span><span class="s2">"-DCMAKE_PREFIX_PATH=</span><span class="nv">$PWD</span><span class="s2">/externals/circt/ext"</span><span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-v<span class="w"> </span>-e<span class="w"> </span>.
+
+<span class="c1"># 4. CHIA host (only needed to *run* agents; not needed to verify claims)</span>
+<span class="c1">#    Both dependencies are pinned by manifests tracked in the branch.</span>
+conda<span class="w"> </span>create<span class="w"> </span>-y<span class="w"> </span>-n<span class="w"> </span>chia_env<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.10.19
+conda<span class="w"> </span>run<span class="w"> </span>-n<span class="w"> </span>chia_env<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>examples/accelerator/tinytpu/chia_agent/requirements.txt
+npm<span class="w"> </span>ci<span class="w"> </span>--prefix<span class="w"> </span>examples/accelerator/tinytpu/chia_agent
+
+<span class="c1"># 5. Google Cloud (only needed to run agents)</span>
+gcloud<span class="w"> </span>auth<span class="w"> </span>login<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>gcloud<span class="w"> </span>config<span class="w"> </span><span class="nb">set</span><span class="w"> </span>project<span class="w"> </span>&lt;PROJECT_ID&gt;
+gcloud<span class="w"> </span>services<span class="w"> </span><span class="nb">enable</span><span class="w"> </span>aiplatform.googleapis.com
+gcloud<span class="w"> </span>beta<span class="w"> </span>billing<span class="w"> </span>projects<span class="w"> </span>link<span class="w"> </span>&lt;PROJECT_ID&gt;<span class="w"> </span>--billing-account<span class="o">=</span>&lt;XXXXXX-XXXXXX-XXXXXX&gt;
+gcloud<span class="w"> </span>auth<span class="w"> </span>application-default<span class="w"> </span>login
+gcloud<span class="w"> </span>auth<span class="w"> </span>application-default<span class="w"> </span>set-quota-project<span class="w"> </span>&lt;PROJECT_ID&gt;
+
+<span class="c1"># 6. environment, in one file</span>
+cp<span class="w"> </span>scripts/chia.env.example<span class="w"> </span>chia.env<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nv">$EDITOR</span><span class="w"> </span>chia.env
+<span class="c1">#    set GOOGLE_CLOUD_PROJECT, and TINYTPU_ENV if you named the conda env</span>
+<span class="c1">#    something other than `allo`</span>
+
+<span class="c1"># 7. check</span>
+./scripts/claims.sh<span class="w"> </span>--fast
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">claims.sh</span></code> refuses to run if the conda environment imports <code class="docutils literal notranslate"><span class="pre">allo</span></code> from a
+different checkout than the one you are standing in. An editable install
+resolves through a meta-path finder that outranks <code class="docutils literal notranslate"><span class="pre">PYTHONPATH</span></code>, so without
+that check every claim passes while exercising someone else’s tree – a failure
+that looks green. Set <code class="docutils literal notranslate"><span class="pre">TINYTPU_ENV</span></code> to the environment you built <em>this</em>
+checkout into.</p>
+<p>The three non-obvious bootstrap fixes (committed in <code class="docutils literal notranslate"><span class="pre">1f746005</span></code>; these are the
+parts that break a naive rebuild):</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">lld</span></code> must be reachable as <code class="docutils literal notranslate"><span class="pre">ld.lld</span></code> (Ubuntu ships <code class="docutils literal notranslate"><span class="pre">ld.lld-18</span></code>) – the
+<code class="docutils literal notranslate"><span class="pre">~/.local/allo-bin</span></code> shim above.</p></li>
+<li><p>cmake 4 refuses OR-Tools 9.5’s fetched deps; <code class="docutils literal notranslate"><span class="pre">build-circt.sh</span></code> exports the
+shim <code class="docutils literal notranslate"><span class="pre">CMAKE_POLICY_VERSION_MINIMUM=3.5</span></code>.</p></li>
+<li><p><strong>Build Allo with gcc, not clang.</strong> Under clang, the <code class="docutils literal notranslate"><span class="pre">enable_if</span></code> attribute
+on <code class="docutils literal notranslate"><span class="pre">llvm::StringLiteral</span></code> makes it non-convertible for <code class="docutils literal notranslate"><span class="pre">std::optional</span></code>’s
+converting constructor, so the HLS emitters fail to compile.
+<code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code> selects gcc.</p></li>
+</ol>
+<p>Wall time on a 144-core host: LLVM ~12 min, CIRCT ~15 min, OR-Tools ~10 min,
+Allo ~2 min.</p>
+</section>
+<section id="budgets">
+<h4>Budgets<a class="headerlink" href="#budgets" title="Link to this heading"><span>¶</span></a></h4>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 40.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p>Build from scratch</p></td>
+<td><p>11-40 min, mostly LLVM; varies with machine load</p></td>
+</tr>
+<tr class="row-even"><td><p>Disk, built tree</p></td>
+<td><p><strong>9.2 GB</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>Disk, peak during build</p></td>
+<td><p>~19 GB (a fresh clone before <code class="docutils literal notranslate"><span class="pre">ninja</span></code> prunes intermediates)</p></td>
+</tr>
+<tr class="row-even"><td><p>Disk, conda envs</p></td>
+<td><p>1.5 GB (<code class="docutils literal notranslate"><span class="pre">allo</span></code>) + 0.6 GB (<code class="docutils literal notranslate"><span class="pre">chia_env</span></code>); opencode adds 0.7 GB in-tree</p></td>
+</tr>
+<tr class="row-odd"><td><p>Verify all deterministic claims</p></td>
+<td><p>196 s, $0.03</p></td>
+</tr>
+<tr class="row-even"><td><p>One agent candidate</p></td>
+<td><p>~8-15 min, ~$2-3</p></td>
+</tr>
+<tr class="row-odd"><td><p>One 4-worker x 5-iteration search</p></td>
+<td><p>~3 h, ~$100-190</p></td>
+</tr>
+<tr class="row-even"><td><p>Rate</p></td>
+<td><p><strong>$19 / agent-hour</strong> (Vertex, <code class="docutils literal notranslate"><span class="pre">gemini-3.1-pro-preview</span></code>)</p></td>
+</tr>
+</tbody>
+</table>
+<p>Everything except <code class="docutils literal notranslate"><span class="pre">chia_runs</span></code> (85 MB) is reproducible from the repository, so
+a machine short on space can delete the build trees and rebuild in ~40 minutes.
+<code class="docutils literal notranslate"><span class="pre">chia_runs</span></code> is the one directory that cannot be regenerated: it holds each
+candidate’s diff, synthesis report, and cost telemetry, and it is what
+<code class="docutils literal notranslate"><span class="pre">verify_variant.py</span></code> replays.</p>
+<p>Preview-model <strong>quota</strong>, not credit, is the concurrency ceiling: an early
+4-worker run lost 3 workers to <code class="docutils literal notranslate"><span class="pre">RateLimitError</span></code> before any proposed a
+candidate.</p>
+</section>
+<section id="repository-map">
+<h4>Repository map<a class="headerlink" href="#repository-map" title="Link to this heading"><span>¶</span></a></h4>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 45.0%" />
+<col style="width: 55.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Path</p></th>
+<th class="head"><p>What it is</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu/isa.py</span></code></p></td>
+<td><p>ISA semantics – memories, instruction access/compute.
+<strong>Agent-writable.</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu/microarch.py</span></code></p></td>
+<td><p>Synthesizable units + fetch-decode-dispatch top + schedules.
+<strong>Agent-writable.</strong></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu/synth.py</span></code></p></td>
+<td><p>Runs Vitis C-synthesis; rebuilds the per-unit latency table from the
+report</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu/ppa.py</span></code></p></td>
+<td><p>The objective: synthesize, re-measure, score cycles</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu/verify_variant.py</span></code></p></td>
+<td><p>Replays a recorded variant and re-derives its score</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu/chia_agent/</span></code></p></td>
+<td><p>The search: <code class="docutils literal notranslate"><span class="pre">loop.py</span></code> (one search), <code class="docutils literal notranslate"><span class="pre">swarm.py</span></code> (many),
+<code class="docutils literal notranslate"><span class="pre">spec_policy.py</span></code> (containment), <code class="docutils literal notranslate"><span class="pre">smoke.py</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">chia_runs/</span></code></p></td>
+<td><p>Every candidate ever scored, with diff, synthesis report, and cost
+telemetry</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">scripts/claims.sh</span></code></p></td>
+<td><p>Runs the claims above</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">notes/CHIA_CHECKPOINT.md</span></code></p></td>
+<td><p>Version pins for every component behind these numbers</p></td>
+</tr>
+</tbody>
+</table>
+<p>The agent may edit <strong>only</strong> <code class="docutils literal notranslate"><span class="pre">isa.py</span></code> and <code class="docutils literal notranslate"><span class="pre">microarch.py</span></code>. It cannot reach the
+compiler, the runtime, the benchmarks, or the evaluator – and because those two
+files are <em>imported</em> by the evaluator, <code class="docutils literal notranslate"><span class="pre">spec_policy.py</span></code> refuses edits that
+would execute at import. That is a policy check, not a sandbox; real isolation
+means a container.</p>
+</section>
+<section id="component-inventory-checkpoint-of-2026-09-07">
+<h4>Component inventory (checkpoint of 2026-09-07)<a class="headerlink" href="#component-inventory-checkpoint-of-2026-09-07" title="Link to this heading"><span>¶</span></a></h4>
+<p>From <code class="docutils literal notranslate"><span class="pre">notes/CHIA_CHECKPOINT.md</span></code> on <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>, which pins what version
+of everything produced the results above.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Component</p></th>
+<th class="head"><p>Version / pin</p></th>
+<th class="head"><p>Remote</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Allo fork (integration HEAD at the time)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">e78bf9b5</span></code> on <code class="docutils literal notranslate"><span class="pre">main</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sunwookim028/allo</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Allo + ACT (Kai Shao)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0b5fef7</span></code> – reachable from <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> and on
+<code class="docutils literal notranslate"><span class="pre">origin/chia-tinytpu-rtlgen</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">kkkaishao/allo</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Allo + ACT + RTLGen + CHIA</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sunwookim028/allo</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>commit it forks from</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">882f7dd6</span></code>, tag <code class="docutils literal notranslate"><span class="pre">tinytpu-rtlgen-base</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sunwookim028/allo</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>CHIA framework</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">16c35e9</span></code>, pinned in <code class="docutils literal notranslate"><span class="pre">chia_agent/requirements.txt</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ucb-bar/chia</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>opencode CLI</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">opencode-ai&#64;1.18.25</span></code>, pinned in <code class="docutils literal notranslate"><span class="pre">chia_agent/package-lock.json</span></code></p></td>
+<td><p>npm</p></td>
+</tr>
+</tbody>
+</table>
+<p>Submodule pins (<code class="docutils literal notranslate"><span class="pre">externals/</span></code>), all built:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Submodule</p></th>
+<th class="head"><p>Commit</p></th>
+<th class="head"><p>Build artifact</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>llvm-project</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">040a641988f6</span></code> (LLVM 23.0.0)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">build/bin/mlir-opt</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>circt</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">af5369d7ea19</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">build/bin/circt-opt</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>marl</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">b8406ab0a825</span></code></p></td>
+<td><p>–</p></td>
+</tr>
+<tr class="row-odd"><td><p>past-python-bindings</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">65f989b86750</span></code></p></td>
+<td><p>–</p></td>
+</tr>
+<tr class="row-even"><td><p>OR-Tools 9.5 (fetched by CIRCT)</p></td>
+<td><p>v9.5 tarball</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">circt/ext/lib/cmake/ortools</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>Toolchain:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Item</p></th>
+<th class="head"><p>Version</p></th>
+<th class="head"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Vitis HLS / Vitis / Vivado</p></td>
+<td><p>2023.2</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">/opt/xilinx/*/2023.2</span></code>; <code class="docutils literal notranslate"><span class="pre">settings64.sh</span></code> must be sourced</p></td>
+</tr>
+<tr class="row-odd"><td><p>Target part</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">xcu55c-fsvh2892-2L-e</span></code></p></td>
+<td><p>Alveo U55C, 300 MHz target</p></td>
+</tr>
+<tr class="row-even"><td><p>gcc / clang</p></td>
+<td><p>13.3.0 / 18.1.3</p></td>
+<td><p><strong>build with gcc</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>cmake / ninja</p></td>
+<td><p>4.2.1 / 1.11.1</p></td>
+<td><p>cmake 4 needs the OR-Tools policy shim</p></td>
+</tr>
+<tr class="row-even"><td><p>lld</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ld.lld-18</span></code></p></td>
+<td><p>shimmed to <code class="docutils literal notranslate"><span class="pre">ld.lld</span></code> in <code class="docutils literal notranslate"><span class="pre">~/.local/allo-bin</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>conda env <code class="docutils literal notranslate"><span class="pre">allo</span></code></p></td>
+<td><p>Python 3.12.13</p></td>
+<td><p>editable install</p></td>
+</tr>
+<tr class="row-even"><td><p>conda env <code class="docutils literal notranslate"><span class="pre">chia_env</span></code></p></td>
+<td><p>Python 3.10.19, ray 2.54.0</p></td>
+<td><p>CHIA host</p></td>
+</tr>
+</tbody>
+</table>
+<p>Cloud: model <code class="docutils literal notranslate"><span class="pre">google-vertex/gemini-3.1-pro-preview</span></code>, location <code class="docutils literal notranslate"><span class="pre">global</span></code>,
+authenticated with user Application Default Credentials; spend to date at the
+checkpoint was $186.44. User ADC expires, so unattended runs should move to a
+service account. Project and billing identifiers are deliberately not recorded
+here.</p>
+</section>
+<section id="outstanding-work-in-priority-order">
+<h4>Outstanding work, in priority order<a class="headerlink" href="#outstanding-work-in-priority-order" title="Link to this heading"><span>¶</span></a></h4>
+<p>From the checkpoint (2026-09-07):</p>
+<ol class="arabic simple">
+<li><p><strong>Replicate each hypothesis &gt;=3x.</strong> Every angle is n=1, which makes idea 4 –
+the project’s most interesting claim – its least evidenced. This is the
+single highest-value use of further budget (~$300-600).</p></li>
+<li><p><strong>Seed the search</strong>, so a run is repeatable rather than merely re-runnable.
+Until then only the replay path is deterministic.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">scripts/bootstrap_chia.sh</span></code> doing the bootstrap end to end, plus
+<code class="docutils literal notranslate"><span class="pre">environment-*.yml</span></code> exports so the two conda environments are captured
+rather than tribal.</p></li>
+<li><p>Deposit an archive with a DOI (Zenodo) for <em>Artifacts Available</em>.</p></li>
+<li><p>Switch to a service account for unattended runs; user ADC expires.</p></li>
+</ol>
+</section>
+</section>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+    
+        <div id="show_right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&lt;</span><span>Page contents</span></a></p>
+        </div>
+
+        <div id="right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
+            <div class="page_toc">
+                <ul>
+<li><a class="reference internal" href="#">CHIA Agentic Co-Design</a><ul>
+<li><a class="reference internal" href="#the-principle">The principle</a></li>
+<li><a class="reference internal" href="#takeaways">Takeaways</a></li>
+<li><a class="reference internal" href="#contributions">Contributions</a></li>
+<li><a class="reference internal" href="#how-the-loop-is-built">How the loop is built</a></li>
+<li><a class="reference internal" href="#where-the-code-lives">Where the Code Lives</a></li>
+<li><a class="reference internal" href="#the-chia-loop-for-tinytpu-isa">The CHIA Loop for TinyTPU-isa</a><ul>
+<li><a class="reference internal" href="#editable-vs-frozen">Editable vs. frozen</a></li>
+<li><a class="reference internal" href="#the-evaluator">The evaluator</a></li>
+<li><a class="reference internal" href="#guards">Guards</a></li>
+<li><a class="reference internal" href="#running-two-tracks-on-one-host-ray-stop-is-global">Running two tracks on one host: <code class="docutils literal notranslate"><span class="pre">ray</span> <span class="pre">stop</span></code> is global</a></li>
+<li><a class="reference internal" href="#running-it">Running it</a></li>
+<li><a class="reference internal" href="#first-paid-run-2026-09-19">First paid run, 2026-09-19</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#what-is-and-is-not-demonstrated">What Is and Is Not Demonstrated</a></li>
+<li><a class="reference internal" href="#the-planned-experiments">The Planned Experiments</a><ul>
+<li><a class="reference internal" href="#the-one-thing-every-experiment-below-is-designed-to-fix">The one thing every experiment below is designed to fix</a></li>
+<li><a class="reference internal" href="#e1-rate-of-discovery-replicated">E1. Rate of discovery, replicated</a></li>
+<li><a class="reference internal" href="#e2-does-the-refusal-bound-the-search">E2. Does the refusal bound the search?</a></li>
+<li><a class="reference internal" href="#e3-can-an-agent-maintain-the-abstractions-and-at-what-rate">E3. Can an agent maintain the abstractions, and at what rate?</a></li>
+<li><a class="reference internal" href="#e4-co-design-both-sides-moving">E4. Co-design, both sides moving</a></li>
+<li><a class="reference internal" href="#what-will-not-be-spent-on">What will not be spent on</a></li>
+<li><a class="reference internal" href="#e5-held-out-rediscovery">E5. Held-out rediscovery</a></li>
+<li><a class="reference internal" href="#why-the-design-driver-s-end-state-matters-to-all-of-this">Why the design driver’s end state matters to all of this</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a><ul>
+<li><a class="reference internal" href="#earlier-capped-smoke-run-2026-09-19-old-design-old-project">Earlier: capped smoke run, 2026-09-19, old design, old project</a></li>
+<li><a class="reference internal" href="#withdrawn-t-is-not-varied">Withdrawn: “T is not varied”</a></li>
+<li><a class="reference internal" href="#the-original-co-design-effort-chia-codesign">The Original Co-Design Effort (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</a><ul>
+<li><a class="reference internal" href="#the-five-ideas">The five ideas</a></li>
+<li><a class="reference internal" href="#claims-what-is-demonstrated-and-what-is-not">Claims: what is demonstrated and what is not</a><ul>
+<li><a class="reference internal" href="#not-yet-reproducible">Not yet reproducible</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#setup-from-zero">Setup from zero</a></li>
+<li><a class="reference internal" href="#budgets">Budgets</a></li>
+<li><a class="reference internal" href="#repository-map">Repository map</a></li>
+<li><a class="reference internal" href="#component-inventory-checkpoint-of-2026-09-07">Component inventory (checkpoint of 2026-09-07)</a></li>
+<li><a class="reference internal" href="#outstanding-work-in-priority-order">Outstanding work, in priority order</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            </div>
+        </div>
+    
+
+      <div class="clearer"></div>
+    </div>
+    <div class="button_nav_wrapper">
+        <div class="button_nav">
+            <div class="left">
+                
+                <a href="catapult_systemc.html">
+                    <span class="icon">&lt;</span><span>Catapult SystemC Flow and the Wire</span></a>
+                
+            </div>
+
+            <div class="right">
+                
+                    <a href="agentic_experiments.html"><span>Agentic Experiments: What We Ran and What It Shows</span><span class="icon">&gt;</span></a>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Allo Authors.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+
+<p id="theme_credit">Styled using the <a href="https://github.com/piccolo-orm/piccolo_theme">Piccolo Theme</a></p>
+  </body>
+</html>

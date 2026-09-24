@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>The Workload Suite: PyTorch MLPs on TinyTPU &#8212; Allo Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic_mod.css?v=9b2032db" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=db78e746"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/petite-vue.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="TinyTPU-isa: Design History" href="tinytpu_history.html" />
+    <link rel="prev" title="The Benchmark Set" href="benchmarks.html" /> 
+  </head><body data-dark_mode_code_blocks="true">
+
+<div id="top_nav">
+    
+
+    <nav>
+        
+            
+        
+
+        <p id="toggle_sidebar">
+            <a href="#" title="Toggle sidebar">|||</a>
+        </p>
+        <h1><a href="../index.html" title="Go to homepage">Allo Documentation</a></h1>
+            <a id="source_link" href="https://github.com/sunwookim028/allo">
+    
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512">
+            <path fill="white" d="M 244.8,8 C 106.1,8 0,113.3 0,252 c 0,110.9 69.8,205.8 169.5,239.2 12.8,2.3 17.3,-5.6 17.3,-12.1 0,-6.2 -0.3,-40.4 -0.3,-61.4 0,0 -70,15 -84.7,-29.8 0,0 -11.4,-29.1 -27.8,-36.6 0,0 -22.9,-15.7 1.6,-15.4 0,0 24.9,2 38.6,25.8 21.9,38.6 58.6,27.5 72.9,20.9 2.3,-16 8.8,-27.1 16,-33.7 -55.9,-6.2 -112.3,-14.3 -112.3,-110.5 0,-27.5 7.6,-41.3 23.6,-58.9 -2.6,-6.5 -11.1,-33.3 2.6,-67.9 20.9,-6.5 69,27 69,27 20,-5.6 41.5,-8.5 62.8,-8.5 21.3,0 42.8,2.9 62.8,8.5 0,0 48.1,-33.6 69,-27 13.7,34.7 5.2,61.4 2.6,67.9 16,17.7 25.8,31.5 25.8,58.9 0,96.5 -58.9,104.2 -114.8,110.5 9.2,7.9 17,22.9 17,46.4 0,33.7 -0.3,75.4 -0.3,83.6 0,6.5 4.6,14.4 17.3,12.1 C 428.2,457.8 496,362.9 496,252 496,113.3 383.5,8 244.8,8 Z"/>
+        </svg>
+    
+</a>
+        
+
+        <a id="mode_toggle" href="#" @click.prevent="handleClick" :title="mode">
+    <template v-if="mode == 'light'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_light"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M67.48,18.073c1.913,-1.912 1.913,-5.018 0,-6.931c-1.912,-1.912 -5.018,-1.912 -6.931,0l-6.798,6.799c-1.912,1.912 -1.912,5.018 0,6.931c1.913,1.912 5.018,1.912 6.931,-0l6.798,-6.799Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.728,61.108c1.912,-1.913 1.912,-5.018 -0,-6.931c-1.913,-1.913 -5.019,-1.913 -6.931,-0l-6.799,6.798c-1.912,1.913 -1.912,5.019 0,6.931c1.913,1.913 5.019,1.913 6.931,0l6.799,-6.798Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.682,54.177c-1.913,-1.913 -5.018,-1.913 -6.931,-0c-1.912,1.913 -1.912,5.018 0,6.931l6.798,6.798c1.913,1.913 5.019,1.913 6.931,0c1.913,-1.912 1.913,-5.018 0,-6.931l-6.798,-6.798Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M4.901,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,-0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M18.929,11.142c-1.912,-1.912 -5.018,-1.912 -6.931,0c-1.912,1.913 -1.912,5.019 0,6.931l6.799,6.799c1.912,1.912 5.018,1.912 6.931,-0c1.912,-1.913 1.912,-5.019 -0,-6.931l-6.799,-6.799Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.108,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c-0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c-0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'dark'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_dark"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.901,2.196 -4.901,4.901c0,2.705 2.197,4.901 4.901,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.662,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.989,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.732,61.103c1.91,-1.91 1.91,-5.011 0,-6.921l-0.009,-0.01c-1.91,-1.91 -5.012,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.909,1.91 5.011,1.91 6.92,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.672,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.52,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l-0,-0.01c-0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.901,2.196 -4.901,4.901c0,2.704 2.197,4.9 4.901,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.73,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 -0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.098,34.623c-2.699,0 -4.891,2.192 -4.891,4.892l-0,0.019c-0,2.699 2.192,4.891 4.891,4.891c2.7,0 4.892,-2.192 4.892,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.892,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'darkest'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_darkest"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><path d="M39.315,23.791c8.684,-0 15.734,7.05 15.734,15.733c0,8.684 -7.05,15.734 -15.734,15.734c-8.683,0 -15.733,-7.05 -15.733,-15.734c-0,-8.683 7.05,-15.733 15.733,-15.733Zm0,4.737c6.069,0 10.997,4.927 10.997,10.996c-0,6.069 -4.928,10.996 -10.997,10.996c-6.068,0 -10.996,-4.927 -10.996,-10.996c0,-6.069 4.928,-10.996 10.996,-10.996Z" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.216,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.9,2.196 -4.9,4.901c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.666,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.99,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.737,61.103c1.909,-1.91 1.909,-5.011 -0,-6.921l-0.01,-0.01c-1.91,-1.91 -5.011,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.91,1.91 5.011,1.91 6.921,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.676,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.524,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l0,-0.01c0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.216,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901c-0,2.704 2.196,4.9 4.9,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.734,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.103,34.623c-2.7,0 -4.892,2.192 -4.892,4.892l-0,0.019c-0,2.699 2.192,4.891 4.892,4.891c2.699,0 4.891,-2.192 4.891,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.891,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+</a>
+
+<script>
+(function() {
+    const LOCAL_STORAGE_KEY = 'piccoloThemeMode'
+
+    var initialMode = localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (initialMode) {
+        // Make sure the value in local storage is valid
+        if (['light', 'dark', 'darkest'].indexOf(initialMode) == -1) {
+            initialMode = 'light'
+            localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+        }
+    } else {
+        // Check if the client prefers dark mode
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialMode = 'dark'
+        } else {
+            initialMode = 'light'
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+    }
+
+    document.documentElement.dataset.mode = initialMode
+
+    PetiteVue.createApp({
+        'mode': initialMode,
+        handleClick() {
+            let currentMode = this.mode
+
+            if (currentMode == 'light') {
+                this.mode = 'dark'
+            } else if (currentMode == 'dark') {
+                this.mode = 'darkest'
+            } else if (currentMode == 'darkest') {
+                this.mode = 'light'
+            }
+
+            document.documentElement.dataset.mode = this.mode
+            localStorage.setItem(LOCAL_STORAGE_KEY, this.mode)
+
+            console.log(this.mode)
+        }
+    }).mount('#mode_toggle')
+})()
+</script>
+            <p class="mobile_search_link">
+                <a href="../search.html" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65 64" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                        <path d="M14.873 40.009c-2.315-3.943-3.642-8.532-3.642-13.429C11.231 11.91 23.141 0 37.811 0s26.58 11.91 26.58 26.58-11.91 26.58-26.58 26.58a26.44 26.44 0 0 1-14.277-4.161L9.739 62.794a3.12 3.12 0 0 1-4.413 0L.913 58.382c-1.217-1.218-1.217-3.196 0-4.413l13.96-13.96zM37.811 8.054c10.225 0 18.526 8.301 18.526 18.526s-8.301 18.526-18.526 18.526-18.526-8.301-18.526-18.526S27.586 8.054 37.811 8.054z" fill="#fff" />
+                    </svg>
+                </a>
+            </p>
+        
+
+        <div class="searchbox_wrapper">
+            
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+    </nav>
+</div>
+
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Paper</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../paper.html">A Co-Design Compilation Flow as a Harness for Language Models to Improve It</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup/index.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_01_get_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_02_vhls.html">Vivado/Vitis HLS Backend</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Deep Dive</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dive/frontend_syntax.html">Frontend Syntax Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/dataflow.html">Dataflow Programming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_01_data_types.html">Data Types and Type Casting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_02_template.html">Template Kernels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_03_composition.html">Kernel Composition</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/ip.html">IP Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/pytorch.html">PyTorch Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_05_verifier.html">Equivalence Checking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_04_features.html">Other Features</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Backends</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="benchmarks.html">The Benchmark Set</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_history.html">TinyTPU-isa: Design History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="minitpu.html">MiniTPU: Reference Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Extensions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/extending_allo.html">Extending Allo’s Abstractions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/stream_ports.html">Stream Ports: a Unit with an Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">Schedule Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html#data-types">Data Types</a></li>
+</ul>
+
+        </div>
+      </div>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="the-workload-suite-pytorch-mlps-on-tinytpu">
+<h1>The Workload Suite: PyTorch MLPs on TinyTPU<a class="headerlink" href="#the-workload-suite-pytorch-mlps-on-tinytpu" title="Link to this heading"><span>¶</span></a></h1>
+<p>Every number this project had before this page was a bare GEMM at a shape
+somebody chose. That is enough to rank two datapaths and not enough to rank
+two <em>designs</em>, because a design decision is worth whatever it does to the
+mixture of shapes a real program actually issues. This page is about the
+smallest thing that fixes that: four PyTorch MLPs, extracted layer by layer
+into the workload specs <code class="docutils literal notranslate"><span class="pre">act/corpus/</span></code> already uses, mapped onto the fixed
+TinyTPU by the ACT flow, verified bit-exact, and measured.</p>
+<p>It is deliberately small. Four models that run are worth more than twelve that
+are described, and the point of the suite is not coverage — it is that a
+<em>workload</em> is now the unit of evaluation.</p>
+<section id="the-sentence-to-take-away-first">
+<span id="workload-suite-two-directions"></span><h2>The sentence to take away first<a class="headerlink" href="#the-sentence-to-take-away-first" title="Link to this heading"><span>¶</span></a></h2>
+<p><strong>Allo’s PyTorch path synthesises a machine for a model. ACT’s flow maps a
+model onto a machine. The co-design loop needs the second.</strong></p>
+<p><code class="docutils literal notranslate"><span class="pre">allo/frontend/pytorch.py</span></code>’s <code class="docutils literal notranslate"><span class="pre">from_pytorch</span></code> is a real, working PyTorch
+front end, and it is not the one this suite uses. Its front half traces the
+module; its back half hands the traced graph to <code class="docutils literal notranslate"><span class="pre">TorchBuilder</span></code>, which emits
+<strong>Allo DSL source for that model</strong>, runs it through <code class="docutils literal notranslate"><span class="pre">customize</span></code>, composes
+kernels out of <code class="docutils literal notranslate"><span class="pre">allo/library/nn.py</span></code> and calls <code class="docutils literal notranslate"><span class="pre">s.build(target=...)</span></code>. The
+artefact is a bespoke accelerator <em>for</em> the MLP. That is a legitimate and
+interesting thing to build, and it is the opposite of what an evaluation
+needs, because a machine that changes with every model cannot tell you what
+changing the machine is worth.</p>
+<p>So the suite uses the front half only:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>PyTorch nn.Module
+  -&gt; AlloTracer + torch.fx ShapeProp      shapes and op types, nothing more
+  -&gt; per-layer workload specs             act/corpus/'s JSON convention
+  -&gt; the ACT mapper (act_compile)         onto the FIXED TinyTPU
+  -&gt; a TinyTPU program                    verified against isa_ref
+  -&gt; cycles                               estimated, then measured
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">AlloTracer</span></code> (<code class="docutils literal notranslate"><span class="pre">allo/frontend/tracer.py</span></code>) is an <code class="docutils literal notranslate"><span class="pre">fx.Tracer</span></code> subclass and
+nothing more; <code class="docutils literal notranslate"><span class="pre">ShapeProp</span></code> is stock <code class="docutils literal notranslate"><span class="pre">torch.fx</span></code>. Neither <code class="docutils literal notranslate"><span class="pre">TorchBuilder</span></code>
+nor <code class="docutils literal notranslate"><span class="pre">customize</span></code> nor <code class="docutils literal notranslate"><span class="pre">allo/library/nn.py</span></code> is imported by anything under
+<code class="docutils literal notranslate"><span class="pre">workloads/</span></code>.</p>
+<section id="why-not-tosa">
+<h3>Why not TOSA<a class="headerlink" href="#why-not-tosa" title="Link to this heading"><span>¶</span></a></h3>
+<p>The recollection that ACT consumed TOSA extracted from PyTorch is worth
+answering directly, because the answer is a scoping decision rather than a
+correction. A workload spec in this project needs five things: the einsum, the
+extents, the operand and accumulator dtypes, the epilogue, and where each
+tensor sits in DRAM. For an MLP, <code class="docutils literal notranslate"><span class="pre">fx</span></code> plus <code class="docutils literal notranslate"><span class="pre">ShapeProp</span></code> supplies the first
+four exactly and the fifth is the mapper’s business. Going through TOSA would
+mean importing <code class="docutils literal notranslate"><span class="pre">torch-mlir</span></code>, lowering to a dialect, and then reading M, K and
+N back out of a <code class="docutils literal notranslate"><span class="pre">tosa.matmul</span></code> — the same five facts, through two more
+tools, with two more versions to pin.</p>
+<p>Where TOSA would start to earn its place:</p>
+<ul class="simple">
+<li><p><strong>a wider op set.</strong> The moment the suite wants convolutions, pooling,
+normalisation or quantisation-aware graphs, hand-written <code class="docutils literal notranslate"><span class="pre">fx</span></code> rules stop
+being a page of code and start being a compiler. TOSA has already made those
+choices, and it has made them the same way for everyone.</p></li>
+<li><p><strong>a second front end.</strong> TOSA is an interchange. Today there is one producer
+(PyTorch) and one consumer (ACT), so the interchange carries no traffic. A
+TensorFlow or ONNX front end, or a second target reading the same specs,
+would change that.</p></li>
+</ul>
+<p>Neither is true yet. When one becomes true, the boundary to replace is
+<code class="docutils literal notranslate"><span class="pre">workloads/extract.py</span></code> and nothing downstream of it, because what it emits
+is already the corpus’s JSON.</p>
+</section>
+</section>
+<section id="the-suite">
+<h2>The suite<a class="headerlink" href="#the-suite" title="Link to this heading"><span>¶</span></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/workloads/models.py</span></code>. Ordinary
+<code class="docutils literal notranslate"><span class="pre">nn.Module</span></code>s with nothing Allo-specific in them, sized so every layer fits
+one build (M, K, N all at most <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code>), with <code class="docutils literal notranslate"><span class="pre">bias=False</span></code> for the reason
+in <a class="reference internal" href="#workload-suite-what-maps"><span class="std std-ref">What maps, and what does not</span></a>.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>model</p></th>
+<th class="head"><p>batch</p></th>
+<th class="head"><p>layers</p></th>
+<th class="head"><p>what it is for</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_tiny</span></code></p></td>
+<td><p>4</p></td>
+<td><p>16 -&gt; 16 -&gt; 16</p></td>
+<td><p>the smallest thing that is still a model; the one measured on RTL</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_deep</span></code></p></td>
+<td><p>4</p></td>
+<td><p>16 -&gt; 16 -&gt; 16 -&gt; 12 -&gt; 8</p></td>
+<td><p>a run of small layers, where almost everything is fixed cost</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_small</span></code></p></td>
+<td><p>8</p></td>
+<td><p>32 -&gt; 32 -&gt; 16</p></td>
+<td><p>a middle shape, and the one where <code class="docutils literal notranslate"><span class="pre">Kt</span> <span class="pre">=</span> <span class="pre">QD</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_wide</span></code></p></td>
+<td><p>64</p></td>
+<td><p>64 -&gt; 64 -&gt; 64</p></td>
+<td><p>two layers at exactly the steady-state shape the GEMM table quotes</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_bias</span></code></p></td>
+<td><p>4</p></td>
+<td><p>16 -&gt; 16, with bias and a sigmoid</p></td>
+<td><p>the probe: it is meant <em>not</em> to map</p></td>
+</tr>
+</tbody>
+</table>
+<p><code class="docutils literal notranslate"><span class="pre">mlp_deep</span></code> and <code class="docutils literal notranslate"><span class="pre">mlp_wide</span></code> are the two ends of one axis on purpose. They are
+what lets the page say something about a design decision that the shape table
+could not: see <a class="reference internal" href="#workload-suite-widening"><span class="std std-ref">The measurement that justifies the suite</span></a>.</p>
+<p>Weights are drawn in [-8, 8) and used as integers, so “quantising” the module
+is a cast rather than a calibration. That is a deliberate limit — a real
+quantisation scheme is a second unvalidated thing between the model and the
+number, and this suite is about the mapping.</p>
+</section>
+<section id="what-maps-and-what-does-not">
+<span id="workload-suite-what-maps"></span><h2>What maps, and what does not<a class="headerlink" href="#what-maps-and-what-does-not" title="Link to this heading"><span>¶</span></a></h2>
+<p>The design computes <code class="docutils literal notranslate"><span class="pre">int8</span> <span class="pre">x</span> <span class="pre">int8</span> <span class="pre">-&gt;</span> <span class="pre">int32</span></code> with an optional ReLU on the
+accumulator before the narrowing. So:</p>
+<p><strong>Maps.</strong> <code class="docutils literal notranslate"><span class="pre">nn.Linear</span></code> without bias, at any (M, K, N) within <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code>,
+including extents that are not multiples of <code class="docutils literal notranslate"><span class="pre">T</span></code>; and a ReLU that consumes a
+Linear’s result directly and is its only consumer, which becomes the fused
+epilogue rather than a second pass.</p>
+<p><strong>Does not map, and is reported rather than approximated.</strong></p>
+<ul class="simple">
+<li><p><strong>``nn.Linear`` with bias.</strong> The ISA has <code class="docutils literal notranslate"><span class="pre">vadd</span></code> between accumulator rows,
+but no mapping that broadcasts one bias row across the M rows of the
+accumulator, so the baseline cannot express it. This is a mapper gap, not an
+encoding gap — <code class="docutils literal notranslate"><span class="pre">vadd</span></code> exists.</p></li>
+<li><p><strong>Any other activation.</strong> <code class="docutils literal notranslate"><span class="pre">sigmoid</span></code>, <code class="docutils literal notranslate"><span class="pre">tanh</span></code>, <code class="docutils literal notranslate"><span class="pre">gelu</span></code> and the rest have
+no unit. <code class="docutils literal notranslate"><span class="pre">vru</span></code> does ReLU.</p></li>
+<li><p><strong>A ReLU that is not the sole consumer of a Linear.</strong> With two consumers the
+unfused value is needed as well, and there is no epilogue to ride on.</p></li>
+<li><p><strong>Anything above ``MAXDIM`` in any of M, K or N.</strong> The operands are one
+<code class="docutils literal notranslate"><span class="pre">int8[MAXDIM*MAXDIM]</span></code> region, so a shape has to fit the addressable space
+rather than being tiled into it. This is the capability limit
+<a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a> calls worse than the cycle deficit, and the suite
+inherits it exactly.</p></li>
+<li><p><strong>Everything else in a graph</strong> — reshape, concatenation, attention,
+normalisation, residual adds. The extractor names the node and the op.</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">mlp_bias</span></code> exists so that this list is demonstrated and not merely asserted:
+it reports two refusals and maps its one remaining layer.</p>
+</section>
+<section id="the-extractor">
+<h2>The extractor<a class="headerlink" href="#the-extractor" title="Link to this heading"><span>¶</span></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">workloads/extract.py</span></code>. It walks the <code class="docutils literal notranslate"><span class="pre">ShapeProp</span></code>-annotated graph once and
+turns each <code class="docutils literal notranslate"><span class="pre">nn.Linear</span></code> into a spec in the <strong>same convention</strong>
+<code class="docutils literal notranslate"><span class="pre">act/corpus/</span></code> uses — same required fields, same <code class="docutils literal notranslate"><span class="pre">einsum</span></code> string, same
+epilogue rules, and validated by the same <code class="docutils literal notranslate"><span class="pre">act.spec.validate</span></code> the corpus is
+held to. There is no second convention. <code class="docutils literal notranslate"><span class="pre">run.py</span> <span class="pre">--emit</span></code> writes them to
+<code class="docutils literal notranslate"><span class="pre">workloads/specs/</span></code>, where they are readable next to the corpus’s own.</p>
+<p>M is the product of every activation dimension but the last, so a batch is
+rows; K and N come from the Linear’s <code class="docutils literal notranslate"><span class="pre">in_features</span></code> and <code class="docutils literal notranslate"><span class="pre">out_features</span></code>. The
+weight is transposed on the way into DRAM, because <code class="docutils literal notranslate"><span class="pre">nn.Linear</span></code> holds
+<code class="docutils literal notranslate"><span class="pre">(out,</span> <span class="pre">in)</span></code> and the spec’s <code class="docutils literal notranslate"><span class="pre">B</span></code> is <code class="docutils literal notranslate"><span class="pre">kn</span></code>.</p>
+</section>
+<section id="verification">
+<h2>Verification<a class="headerlink" href="#verification" title="Link to this heading"><span>¶</span></a></h2>
+<p>Three checks, and a layer that fails any of them is reported, never rounded.</p>
+<ol class="arabic simple">
+<li><p><strong>The program against the spec.</strong> <code class="docutils literal notranslate"><span class="pre">act.correctness.check</span></code> runs
+<code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code> — the ISA as numpy — over four operand distributions and
+compares against <code class="docutils literal notranslate"><span class="pre">spec.gold</span></code>, the einsum in int64, over the output region,
+with everything outside the write window required to be untouched. This is
+the corpus’s own bar and every layer of every model clears it.</p></li>
+<li><p><strong>The chain against PyTorch.</strong> The suite then runs the <em>model</em>: each layer’s
+program in turn through <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code>, with the real weights in DRAM and the
+previous layer’s int8 output as the next layer’s activation, against
+PyTorch’s own evaluation of the same modules with the machine’s epilogue
+(ReLU where fused, then the clip to int8) applied in torch. Every model
+matches on every byte. This is what makes the suite a workload rather than
+a shape table: the machine computes the model, not a GEMM of the model’s
+size.</p></li>
+<li><p><strong>The RTL.</strong> Three of the four models’ layers go through <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code>’s
+machinery, below, each compared against <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code> over all 4096 bytes of
+<code class="docutils literal notranslate"><span class="pre">C</span></code> rather than over the result region alone.</p></li>
+</ol>
+<section id="what-is-verified-and-what-is-only-executed">
+<span id="workload-suite-claims"></span><h3>What is verified, and what is only executed<a class="headerlink" href="#what-is-verified-and-what-is-only-executed" title="Link to this heading"><span>¶</span></a></h3>
+<p>These are different claims and the suite keeps them apart, on the ladder
+<code class="docutils literal notranslate"><span class="pre">act/judge.py</span></code> already defines — <code class="docutils literal notranslate"><span class="pre">legal</span></code>, then <code class="docutils literal notranslate"><span class="pre">correct</span></code>, then
+<code class="docutils literal notranslate"><span class="pre">confirmed</span></code>.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>model</p></th>
+<th class="head"><p>correct (bit-exact vs <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code> and vs PyTorch)</p></th>
+<th class="head"><p>confirmed (RTL ran it)</p></th>
+<th class="head"><p>its cycle figure is</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_tiny</span></code></p></td>
+<td><p>yes, 2/2 layers</p></td>
+<td><p><strong>yes</strong>, 2/2 layers</p></td>
+<td><p><strong>measured</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_deep</span></code></p></td>
+<td><p>yes, 4/4 layers</p></td>
+<td><p><strong>yes</strong>, 4/4 layers</p></td>
+<td><p><strong>measured</strong></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_small</span></code></p></td>
+<td><p>yes, 2/2 layers</p></td>
+<td><p><strong>yes</strong>, 2/2 layers</p></td>
+<td><p><strong>measured</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_wide</span></code></p></td>
+<td><p>yes, 2/2 layers</p></td>
+<td><p><strong>no</strong> — RTL does not complete</p></td>
+<td><p><em>estimated only</em></p></td>
+</tr>
+</tbody>
+</table>
+<p>So three of four models carry a measured number and one carries a modelled
+one, and the page never adds them together. <code class="docutils literal notranslate"><span class="pre">mlp_wide</span></code> is <strong>correct and not
+confirmed</strong>: its programs agree with <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code> and with PyTorch in software,
+and Vitis csim reports <code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">/</span> <span class="pre">4096</span></code> mismatches, but no RTL run of it has ever
+produced a cycle count (<a class="reference internal" href="#workload-suite-widening"><span class="std std-ref">why</span></a>).</p>
+<p>Two provenance facts that belong with the claims rather than under them:</p>
+<ul class="simple">
+<li><p><strong>The bit-exactness claims need no bindings.</strong> <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code> is numpy and the
+<code class="docutils literal notranslate"><span class="pre">act/</span></code> core imports numpy only, so “correct” is established by code that
+is entirely this checkout’s.</p></li>
+<li><p><strong>The compiled half is borrowed.</strong> This worktree has no <code class="docutils literal notranslate"><span class="pre">mlir/build</span></code>, so
+<code class="docutils literal notranslate"><span class="pre">allo._mlir</span></code> resolves to <code class="docutils literal notranslate"><span class="pre">/home/sk3463/allo-bench</span></code> at <code class="docutils literal notranslate"><span class="pre">ff7beaf1</span></code> —
+<code class="docutils literal notranslate"><span class="pre">tests/act/test_bindings.py</span></code> fails here and names both paths, which is
+what it is for. <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">diff</span> <span class="pre">ff7beaf1</span> <span class="pre">HEAD</span> <span class="pre">--</span> <span class="pre">mlir/</span></code> is <strong>empty</strong>, so the
+emitter that produced the HLS for every cosim below is the same source as
+this branch’s. That is the “borrowed, same commit” case <code class="docutils literal notranslate"><span class="pre">dev/toolchains.rst</span></code>
+describes, said out loud as it asks.</p></li>
+</ul>
+</section>
+</section>
+<section id="the-numbers">
+<h2>The numbers<a class="headerlink" href="#the-numbers" title="Link to this heading"><span>¶</span></a></h2>
+<section id="layer-by-layer-with-nothing-between-layers">
+<span id="workload-suite-layer-by-layer"></span><h3>Layer by layer, with nothing between layers<a class="headerlink" href="#layer-by-layer-with-nothing-between-layers" title="Link to this heading"><span>¶</span></a></h3>
+<p><strong>A model’s cycle figure is a sum over its layers, and that is the honest
+description of what the machine does today, not a simplification of it.</strong>
+TinyTPU-isa runs one program per layer: operands in from DRAM, result out to
+DRAM. There is no inter-layer fusion, and nothing — not the activation, not a
+weight tile — stays resident between layers. So the sum is the whole cost,
+with one qualification in the other direction: the sum also omits whatever a
+host would spend between layers, which on this design is not modelled at all.</p>
+<p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">workloads/run.py</span></code> at the shipped build (<code class="docutils literal notranslate"><span class="pre">T=4</span></code>, <code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code>,
+<code class="docutils literal notranslate"><span class="pre">DMA_WORDS=1</span></code>). <code class="docutils literal notranslate"><span class="pre">mapping</span></code> is what the ACT search picked, and it is worth
+knowing that <strong>the mapper is not the variable here</strong>: on eight of the ten
+layers its pick is bit-identical to the hand-written <code class="docutils literal notranslate"><span class="pre">gemm_program</span></code> for that
+shape. The exception is <code class="docutils literal notranslate"><span class="pre">mlp_wide</span></code>’s two 64x64x64 layers, where ACT prefers
+<code class="docutils literal notranslate"><span class="pre">M2&gt;N16&gt;K16</span></code> — a split of the row dimension the hand mapping does not make
+— at <em>exactly</em> the same modelled cost, 30 051 and 28 392, so the difference
+is a tie broken on the label and not a disagreement about which is better.</p>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text">Per layer, ACT’s pick, estimated</span><a class="headerlink" href="#id1" title="Link to this table"><span>¶</span></a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>layer</p></th>
+<th class="head"><p>shape</p></th>
+<th class="head"><p>epilogue</p></th>
+<th class="head"><p>mapping</p></th>
+<th class="head"><p>dynamic</p></th>
+<th class="head"><p>critical unit</p></th>
+<th class="head"><p>estimate</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">isa_ref</span></code></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_tiny_l0</span></code></p></td>
+<td><p>4x16x16</p></td>
+<td><p>relu</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">N4&gt;K4</span></code></p></td>
+<td><p>32</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code> 144</p></td>
+<td><p>407</p></td>
+<td><p>bit-exact</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_tiny_l1</span></code></p></td>
+<td><p>4x16x16</p></td>
+<td><p>–</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">N4&gt;K4</span></code></p></td>
+<td><p>28</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code> 144</p></td>
+<td><p>407</p></td>
+<td><p>bit-exact</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_deep_l0</span></code></p></td>
+<td><p>4x16x16</p></td>
+<td><p>relu</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">N4&gt;K4</span></code></p></td>
+<td><p>32</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code> 144</p></td>
+<td><p>407</p></td>
+<td><p>bit-exact</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_deep_l1</span></code></p></td>
+<td><p>4x16x16</p></td>
+<td><p>relu</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">N4&gt;K4</span></code></p></td>
+<td><p>32</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code> 144</p></td>
+<td><p>407</p></td>
+<td><p>bit-exact</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_deep_l2</span></code></p></td>
+<td><p>4x16x12</p></td>
+<td><p>relu</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">N3&gt;K4</span></code></p></td>
+<td><p>25</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code> 108</p></td>
+<td><p>348</p></td>
+<td><p>bit-exact</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_deep_l3</span></code></p></td>
+<td><p>4x12x8</p></td>
+<td><p>–</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">N2&gt;K3</span></code></p></td>
+<td><p>13</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code> 54</p></td>
+<td><p>261</p></td>
+<td><p>bit-exact</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_small_l0</span></code></p></td>
+<td><p>8x32x32</p></td>
+<td><p>relu</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">N8&gt;K8</span></code></p></td>
+<td><p>96</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code> 640</p></td>
+<td><p>1 211</p></td>
+<td><p>bit-exact</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_small_l1</span></code></p></td>
+<td><p>8x32x16</p></td>
+<td><p>–</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">N4&gt;K8</span></code></p></td>
+<td><p>48</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code> 320</p></td>
+<td><p>692</p></td>
+<td><p>bit-exact</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_wide_l0</span></code></p></td>
+<td><p>64x64x64</p></td>
+<td><p>relu</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">M2&gt;N16&gt;K16</span></code></p></td>
+<td><p>624</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code> 18 432</p></td>
+<td><p>30 051</p></td>
+<td><p>bit-exact</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_wide_l1</span></code></p></td>
+<td><p>64x64x64</p></td>
+<td><p>–</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">M2&gt;N16&gt;K16</span></code></p></td>
+<td><p>592</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code> 17 408</p></td>
+<td><p>28 392</p></td>
+<td><p>bit-exact</p></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>These are estimates and one of them is structurally blind.</strong>
+<code class="docutils literal notranslate"><span class="pre">act.cycles.estimate</span></code> is <code class="docutils literal notranslate"><span class="pre">173.2</span> <span class="pre">+</span> <span class="pre">1.621</span> <span class="pre">x</span> <span class="pre">critical</span> <span class="pre">work</span></code>, fitted to the
+five published <code class="docutils literal notranslate"><span class="pre">MAXDIM=16</span></code> cosim points, and its per-unit work counts come
+from the header <code class="docutils literal notranslate"><span class="pre">assemble</span></code> writes — where <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code>’s entry is the
+number of instruction <em>rows</em>, not the number of burst <em>iterations</em>. So the
+estimate cannot see the DMA burst at all. At <code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code> the burst is a
+large fixed cost at small shapes (<a class="reference internal" href="benchmarks.html"><span class="doc">The Benchmark Set</span></a> prices the
+<code class="docutils literal notranslate"><span class="pre">MAXDIM=16</span> <span class="pre">-&gt;</span> <span class="pre">64</span></code> move at +193 cycles on 16x16x16 alone), and it is
+exactly the term the burst-widening candidate moves. Every conclusion below
+about the widening therefore rests on cosim, not on this column.</p>
+</div>
+</section>
+<section id="measured-on-rtl">
+<h3>Measured on RTL<a class="headerlink" href="#measured-on-rtl" title="Link to this heading"><span>¶</span></a></h3>
+<p>Three of the four models, every layer through <code class="docutils literal notranslate"><span class="pre">cosim_design</span></code> on one
+<code class="docutils literal notranslate"><span class="pre">csynth</span></code> of the shipped build, bit-exact against <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code> over all 4096
+bytes of <code class="docutils literal notranslate"><span class="pre">C</span></code>. These are <strong>measurements</strong>; the column beside them is the
+estimate, for scale.</p>
+<table class="docutils align-default" id="id2">
+<caption><span class="caption-text"><code class="docutils literal notranslate"><span class="pre">T=4</span> <span class="pre">MAXDIM=64</span> <span class="pre">DMA_WORDS=1</span> <span class="pre">TPU_QD=16</span></code>, <code class="docutils literal notranslate"><span class="pre">m_axi_latency</span></code> 0</span><a class="headerlink" href="#id2" title="Link to this table"><span>¶</span></a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>model</p></th>
+<th class="head"><p>layers</p></th>
+<th class="head"><p>estimated</p></th>
+<th class="head"><p><strong>measured</strong></p></th>
+<th class="head"><p>the estimate is</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_tiny</span></code></p></td>
+<td><p>584 + 566</p></td>
+<td><p>813</p></td>
+<td><p><strong>1 150</strong></p></td>
+<td><p>29 % low</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_deep</span></code></p></td>
+<td><p>584 + 584 + 542 + 407</p></td>
+<td><p>1 422</p></td>
+<td><p><strong>2 117</strong></p></td>
+<td><p>33 % low</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_small</span></code></p></td>
+<td><p>1 636 + 1 145</p></td>
+<td><p>1 903</p></td>
+<td><p><strong>2 781</strong></p></td>
+<td><p>32 % low</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_wide</span></code></p></td>
+<td><p>–</p></td>
+<td><p>58 443</p></td>
+<td><p><em>no completion</em></p></td>
+<td><p>–</p></td>
+</tr>
+</tbody>
+</table>
+<p><code class="docutils literal notranslate"><span class="pre">mlp_wide</span></code> is dealt with in <a class="reference internal" href="#workload-suite-widening"><span class="std std-ref">its own section</span></a>. Note that these needed <code class="docutils literal notranslate"><span class="pre">TPU_QD=16</span></code>: at the
+shipped <code class="docutils literal notranslate"><span class="pre">TPU_QD=8</span></code> not even <code class="docutils literal notranslate"><span class="pre">mlp_tiny</span></code>’s first layer finishes, which is
+new information about <a class="reference internal" href="../developer/limitations.html#limitation-24"><span class="std std-ref">limitations item 24</span></a> and is
+recorded there.</p>
+</section>
+</section>
+<section id="the-measurement-that-justifies-the-suite">
+<span id="workload-suite-widening"></span><h2>The measurement that justifies the suite<a class="headerlink" href="#the-measurement-that-justifies-the-suite" title="Link to this heading"><span>¶</span></a></h2>
+<p>A workload changes <em>which</em> design decisions look good. The suite’s one job,
+once it ran, was to test that claim on a decision the project already had in
+front of it.</p>
+<p>The decision is the <strong>burst-widening candidate</strong>, <code class="docutils literal notranslate"><span class="pre">TPU_DMA_WIDEN=1</span></code>: the
+<code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> operand burst reads <code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code> packed words per loop iteration
+instead of one, up to the 64-byte beat <code class="docutils literal notranslate"><span class="pre">align_value(64)</span></code> lets Vitis widen
+the port to. It is parametric, bit-exact at both settings, and costs +123 %
+BRAM. It is also the knob in the <code class="docutils literal notranslate"><span class="pre">parity-t4</span></code> baseline
+(<code class="docutils literal notranslate"><span class="pre">TPU_T=4</span> <span class="pre">TPU_MAXDIM=64</span> <span class="pre">TPU_DMA_WIDEN=1</span></code>), so the widened column below is
+that baseline and not a variant invented here. <a class="reference internal" href="benchmarks.html"><span class="doc">The Benchmark Set</span></a> measures it
+at two shapes:</p>
+<table class="docutils align-default" id="id3">
+<caption><span class="caption-text">What the GEMM table says</span><a class="headerlink" href="#id3" title="Link to this table"><span>¶</span></a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>shape</p></th>
+<th class="head"><p>shipped</p></th>
+<th class="head"><p>widened</p></th>
+<th class="head"><p>saving</p></th>
+<th class="head"><p><strong>as a fraction</strong></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>48x48x48</p></td>
+<td><p>10 289</p></td>
+<td><p>9 569</p></td>
+<td><p>720</p></td>
+<td><p><strong>7.0 %</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>64x64x64</p></td>
+<td><p>22 123</p></td>
+<td><p>21 163</p></td>
+<td><p>960</p></td>
+<td><p><strong>4.3 %</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p>Read as a GEMM table, that is a worthwhile but unspectacular few per cent,
+shrinking as the shape grows — the profile of a fixed cost being amortised.
+The question the suite exists to answer is what the same change is worth to a
+<em>model</em>.</p>
+<section id="why-the-shape-table-cannot-be-extrapolated">
+<h3>Why the shape table cannot be extrapolated<a class="headerlink" href="#why-the-shape-table-cannot-be-extrapolated" title="Link to this heading"><span>¶</span></a></h3>
+<p>The mechanism is that widening removes burst iterations. A burst of
+<code class="docutils literal notranslate"><span class="pre">span</span> <span class="pre">x</span> <span class="pre">WPR</span></code> words costs <code class="docutils literal notranslate"><span class="pre">ceil(span</span> <span class="pre">x</span> <span class="pre">WPR</span> <span class="pre">/</span> <span class="pre">DMA_WORDS)</span></code> iterations, and
+<code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> issues one burst for the activations and one for the weights. Two
+laws fit that:</p>
+<ul class="simple">
+<li><p>charge <strong>every</strong> removed iteration, activations and weights both;</p></li>
+<li><p>charge only the <strong>longer</strong> of the two bursts, the other being hidden.</p></li>
+</ul>
+<p>The first predicts 1440 and 1920 cycles at 48<sup>3</sup> and 64<sup>3</sup>; the
+second predicts 720 and 960. The measurements are 720 and 960, so the two
+points settle it: only the longer burst is ever critical.</p>
+<p><strong>But both fitted shapes have equal spans.</strong> At 48x48x48 the activation span
+is 48 rows and the weight span is <code class="docutils literal notranslate"><span class="pre">ceil(48/T)</span> <span class="pre">x</span> <span class="pre">T</span></code> = 48 rows; at
+64x64x64 both are 64. When the two spans are equal the two laws are the same
+arithmetic, and the shape table never visits a point where they differ.</p>
+<p><strong>Every MLP layer is such a point.</strong> A 4x16x16 layer bursts 4 activation rows
+against 16 weight rows — 64 word-iterations against 256. The spans differ by
+4x, the weight burst dominates, and which law holds decides the answer. That
+is not a subtlety the GEMM table could have surfaced, because the GEMM table
+only ever asked square questions.</p>
+<p>So the suite measures.</p>
+</section>
+<section id="what-it-is-worth-on-a-model">
+<h3>What it is worth on a model<a class="headerlink" href="#what-it-is-worth-on-a-model" title="Link to this heading"><span>¶</span></a></h3>
+<p>Two builds, one <code class="docutils literal notranslate"><span class="pre">csynth</span></code> each, every layer through <code class="docutils literal notranslate"><span class="pre">cosim_design</span></code> on both.
+<code class="docutils literal notranslate"><span class="pre">T=4</span></code>, <code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code>, <code class="docutils literal notranslate"><span class="pre">TPU_QD=16</span></code>, <code class="docutils literal notranslate"><span class="pre">TPU_AXI_LATENCY=0</span></code>; the only
+difference between the columns is <code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code>. Every run is bit-exact
+against <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code> over all 4096 bytes of <code class="docutils literal notranslate"><span class="pre">C</span></code> at both settings.</p>
+<table class="docutils align-default" id="id4">
+<caption><span class="caption-text">Per layer, measured on RTL</span><a class="headerlink" href="#id4" title="Link to this table"><span>¶</span></a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>layer</p></th>
+<th class="head"><p>shape</p></th>
+<th class="head"><p>shipped</p></th>
+<th class="head"><p>widened</p></th>
+<th class="head"><p>saving</p></th>
+<th class="head"><p>predicted</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_tiny_l0</span></code></p></td>
+<td><p>4x16x16</p></td>
+<td><p>584</p></td>
+<td><p>443</p></td>
+<td><p>141</p></td>
+<td><p>240</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_tiny_l1</span></code></p></td>
+<td><p>4x16x16</p></td>
+<td><p>566</p></td>
+<td><p>420</p></td>
+<td><p>146</p></td>
+<td><p>240</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_deep_l0</span></code></p></td>
+<td><p>4x16x16</p></td>
+<td><p>584</p></td>
+<td><p>443</p></td>
+<td><p>141</p></td>
+<td><p>240</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_deep_l1</span></code></p></td>
+<td><p>4x16x16</p></td>
+<td><p>584</p></td>
+<td><p>443</p></td>
+<td><p>141</p></td>
+<td><p>240</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_deep_l2</span></code></p></td>
+<td><p>4x16x12</p></td>
+<td><p>542</p></td>
+<td><p>378</p></td>
+<td><p>164</p></td>
+<td><p>240</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_deep_l3</span></code></p></td>
+<td><p>4x12x8</p></td>
+<td><p>407</p></td>
+<td><p>270</p></td>
+<td><p>137</p></td>
+<td><p>180</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_small_l0</span></code></p></td>
+<td><p>8x32x32</p></td>
+<td><p>1 636</p></td>
+<td><p>1 156</p></td>
+<td><p><strong>480</strong></p></td>
+<td><p><strong>480</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_small_l1</span></code></p></td>
+<td><p>8x32x16</p></td>
+<td><p>1 145</p></td>
+<td><p>665</p></td>
+<td><p><strong>480</strong></p></td>
+<td><p><strong>480</strong></p></td>
+</tr>
+</tbody>
+</table>
+<table class="docutils align-default" id="id5">
+<caption><span class="caption-text">Per model, and against the GEMM table</span><a class="headerlink" href="#id5" title="Link to this table"><span>¶</span></a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>model</p></th>
+<th class="head"><p>shipped</p></th>
+<th class="head"><p>widened</p></th>
+<th class="head"><p>saving</p></th>
+<th class="head"><p><strong>as a fraction</strong></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_tiny</span></code> (2 layers)</p></td>
+<td><p>1 150</p></td>
+<td><p>863</p></td>
+<td><p>287</p></td>
+<td><p><strong>25.0 %</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_deep</span></code> (4 layers)</p></td>
+<td><p>2 117</p></td>
+<td><p>1 534</p></td>
+<td><p>583</p></td>
+<td><p><strong>27.5 %</strong></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_small</span></code> (2 layers)</p></td>
+<td><p>2 781</p></td>
+<td><p>1 821</p></td>
+<td><p>960</p></td>
+<td><p><strong>34.5 %</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p><em>GEMM table</em>, 48x48x48</p></td>
+<td><p><em>10 289</em></p></td>
+<td><p><em>9 569</em></p></td>
+<td><p><em>720</em></p></td>
+<td><p><em>7.0 %</em></p></td>
+</tr>
+<tr class="row-even"><td><p><em>GEMM table</em>, 64x64x64</p></td>
+<td><p><em>22 123</em></p></td>
+<td><p><em>21 163</em></p></td>
+<td><p><em>960</em></p></td>
+<td><p><em>4.3 %</em></p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>The answer is that the widening is worth four to eight times more on a model
+than the shape table says.</strong> 25 to 34 per cent of a model’s cycles against 4.3
+to 7.0 per cent of a big GEMM’s. Read only as a GEMM table, <code class="docutils literal notranslate"><span class="pre">TPU_DMA_WIDEN</span></code>
+is a few per cent that shrinks as the shape grows; read on a model, it is a
+quarter to a third of the whole runtime and it does not shrink, because a
+model does not get bigger — it gets <em>longer</em>, and every layer pays the
+prologue again. That is the argument for the suite existing, and it is a
+conclusion the shape table could not have produced, at any level of detail,
+because it never asked a question shaped like a model.</p>
+<p>Two smaller findings fall out of the same measurement, and both are about our
+instruments rather than the design:</p>
+<p><strong>The prediction is exact where the burst is critical and over-predicts where
+it is not.</strong> At <code class="docutils literal notranslate"><span class="pre">mlp_small</span></code>’s two layers the measured saving is 480 cycles
+and the predicted saving is 480 cycles, twice, to the cycle. At the 4-row
+layers it over-predicts by 40 %: 240 predicted against 141 measured. The
+reading is that the burst is fully on the critical path once it is long
+enough, and at four activation rows the rest of the prologue overlaps about a
+hundred cycles of it. So <code class="docutils literal notranslate"><span class="pre">workloads/burst.py</span></code> is a usable screen for which
+layers the widening will help and <strong>not</strong> a substitute for measuring how much.</p>
+<p><strong>The static estimate is accidentally calibrated for a machine we do not
+ship.</strong> <code class="docutils literal notranslate"><span class="pre">act.cycles.estimate</span></code> is 26 to 36 per cent <em>low</em> against the shipped
+<code class="docutils literal notranslate"><span class="pre">DMA_WORDS=1</span></code> build and within 8 per cent of the <em>widened</em> one — it fits
+the widened machine better than the real one. That is not a coincidence: the
+fit was taken at <code class="docutils literal notranslate"><span class="pre">MAXDIM=16</span></code>, where <code class="docutils literal notranslate"><span class="pre">WPR</span></code> is 4 instead of 16 and the burst
+is four times shorter, so the constant absorbed a burst term that no longer
+matches. An estimate carries its calibration regime with it, and this one’s
+regime is not the shipped build.</p>
+</section>
+<section id="the-64x64x64-point-is-missing-and-why">
+<h3>The 64x64x64 point is missing, and why<a class="headerlink" href="#the-64x64x64-point-is-missing-and-why" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">mlp_wide</span></code> is in the suite precisely so that the steady-state shape could be
+measured on <em>these two builds</em> rather than compared across published ones, and
+<strong>it does not complete in cosim at any channel depth tried</strong>. Six runs, four
+builds, both burst widths:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p><code class="docutils literal notranslate"><span class="pre">TPU_QD</span></code></p></th>
+<th class="head"><p>bound</p></th>
+<th class="head"><p>last RTL progress</p></th>
+<th class="head"><p>verdict</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>16</p></td>
+<td><p>600 s</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&#64;</span> <span class="pre">109000</span></code> ps — the first periodic report, no second</p></td>
+<td><p>no completion</p></td>
+</tr>
+<tr class="row-odd"><td><p>32</p></td>
+<td><p>1500 s</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&#64;</span> <span class="pre">33400115000</span></code> ps = <strong>33.4 ms, about 10 million cycles</strong></p></td>
+<td><p>no completion</p></td>
+</tr>
+</tbody>
+</table>
+<p>Its layers have <code class="docutils literal notranslate"><span class="pre">Kt</span> <span class="pre">=</span> <span class="pre">16</span></code>, so <code class="docutils literal notranslate"><span class="pre">Kt</span> <span class="pre">&gt;=</span> <span class="pre">QD</span></code> holds at <code class="docutils literal notranslate"><span class="pre">QD=16</span></code>, which is the
+one condition the parity work has a rule for — but <code class="docutils literal notranslate"><span class="pre">QD=32</span></code> breaks that
+condition and does not fix the hang. What <code class="docutils literal notranslate"><span class="pre">QD=32</span></code> does change is the
+<em>evidence</em>: the simulation advanced ten million cycles on a program the model
+prices at 22 000 and still did not finish, which is a deadlock and not a slow
+run. So <code class="docutils literal notranslate"><span class="pre">Kt</span> <span class="pre">&gt;=</span> <span class="pre">QD</span></code> is <strong>not</strong> the whole rule, and this is a distinct fact
+from the <code class="docutils literal notranslate"><span class="pre">QD=8</span></code>/<code class="docutils literal notranslate"><span class="pre">QD=16</span></code> cases at the small shapes, where the sim never got
+past its first report at all.</p>
+<p>One consequence for the headline. The 4.3 % row above is carried from
+<a class="reference internal" href="benchmarks.html"><span class="doc">The Benchmark Set</span></a>, measured at <code class="docutils literal notranslate"><span class="pre">TPU_QD=8</span></code> on the <em>hand</em> 64x64x64 mapping,
+while the three model rows are measured here at <code class="docutils literal notranslate"><span class="pre">TPU_QD=16</span></code> — so the
+comparison crosses a build boundary, and the ratio should be read as
+four-to-eight-fold rather than as a precise multiple. The three model rows are
+internally controlled: one <code class="docutils literal notranslate"><span class="pre">csynth</span></code> per burst width, everything else equal.</p>
+</section>
+</section>
+<section id="limits">
+<h2>Limits<a class="headerlink" href="#limits" title="Link to this heading"><span>¶</span></a></h2>
+<ul class="simple">
+<li><p><strong>Layer by layer, no fusion, no residency</strong> — <a class="reference internal" href="#workload-suite-layer-by-layer"><span class="std std-ref">the section above</span></a>. The sum is what the machine does; it is
+also why a model with many small layers pays the prologue many times.</p></li>
+<li><p><strong>No host time.</strong> Nothing between layers is modelled: no driver, no
+scheduling, no cost for the activation making a round trip through DRAM that
+a fused design would not make.</p></li>
+<li><p><strong>MLPs only, and small ones.</strong> <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code> bounds every extent, which rules
+out the shapes a real network uses. The suite is a way of asking the
+question, not an answer about real networks.</p></li>
+<li><p><strong>Integer weights, not a quantisation scheme.</strong> See above.</p></li>
+<li><p><strong>Cosim has no DRAM model.</strong> Every RTL figure here is at
+<code class="docutils literal notranslate"><span class="pre">TPU_AXI_LATENCY=0</span></code>, a value we chose; <code class="docutils literal notranslate"><span class="pre">m_axi_latency</span></code> is an HLS
+scheduling directive and not a memory latency, as <a class="reference internal" href="benchmarks.html"><span class="doc">The Benchmark Set</span></a>
+establishes at length. No row here may be read as behaviour against a memory
+system.</p></li>
+<li><p><strong>Every RTL figure on this page needed ``TPU_QD=16``.</strong> At the shipped
+<code class="docutils literal notranslate"><span class="pre">TPU_QD=8</span></code> the very first layer of the smallest model does not finish
+cosim, and it is the <em>shipped</em> GEMM mapping at 4x16x16, not an exotic
+one. This is a new instance of <a class="reference internal" href="../developer/limitations.html#limitation-24"><span class="std std-ref">limitations item 24</span></a>
+and it is recorded there, because the knob that flips it is new
+information: the earlier bisection never varied a channel depth.
+<code class="docutils literal notranslate"><span class="pre">run.py</span> <span class="pre">--cosim</span></code> bounds every run and kills by process group; if a layer
+does not finish, raise <code class="docutils literal notranslate"><span class="pre">TPU_QD</span></code> before concluding anything from the hang.</p></li>
+</ul>
+</section>
+<section id="running-it">
+<h2>Running it<a class="headerlink" href="#running-it" title="Link to this heading"><span>¶</span></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>examples/accelerator/tinytpu_vitis
+
+python<span class="w"> </span>workloads/run.py<span class="w">                      </span><span class="c1"># every model, static, ~1 min</span>
+python<span class="w"> </span>workloads/run.py<span class="w"> </span>--emit<span class="w">               </span><span class="c1"># and write workloads/specs/</span>
+python<span class="w"> </span>workloads/run.py<span class="w"> </span>--simulator<span class="w">          </span><span class="c1"># also check the built design</span>
+python<span class="w"> </span>workloads/run.py<span class="w"> </span>--burst<span class="w">              </span><span class="c1"># what the widening should be worth</span>
+
+<span class="nv">TPU_QD</span><span class="o">=</span><span class="m">16</span><span class="w"> </span>python<span class="w"> </span>workloads/run.py<span class="w"> </span>--cosim<span class="w"> </span>mlp_tiny<span class="w">                   </span><span class="c1"># RTL</span>
+<span class="nv">TPU_QD</span><span class="o">=</span><span class="m">16</span><span class="w"> </span><span class="nv">TPU_DMA_WIDEN</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>python<span class="w"> </span>workloads/run.py<span class="w"> </span>--cosim<span class="w"> </span>mlp_tiny<span class="w">   </span><span class="c1"># widened</span>
+
+pytest<span class="w"> </span>tests/act/test_workload_suite.py<span class="w">      </span><span class="c1"># no Vitis, seconds</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">--cosim</span></code> synthesises once into <code class="docutils literal notranslate"><span class="pre">--project</span></code> (default
+<code class="docutils literal notranslate"><span class="pre">workloads/workload.prj</span></code>, removed when the run ends) and measures every named
+model’s layers on that one build, so a sum over layers is a sum over one
+machine. Put the project inside your worktree: <code class="docutils literal notranslate"><span class="pre">/home</span></code> is chronically full.</p>
+<p><strong>``torch`` is not a dependency of this repository</strong> and is not in
+<code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code> — upstream keeps it optional, and
+<code class="docutils literal notranslate"><span class="pre">tests/pytorch/test_linear.py</span></code> guards its import. The suite needs it, and
+the <code class="docutils literal notranslate"><span class="pre">allo</span></code> environment on this host did not have it until 2026-09-22:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/cpu<span class="w"> </span><span class="nv">torch</span><span class="o">==</span><span class="m">2</span>.14.0
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">tests/act/test_workload_suite.py</span></code> skips rather than fails when
+<code class="docutils literal notranslate"><span class="pre">torch</span></code> is <em>absent</em>, so a machine without it still runs the rest of
+<code class="docutils literal notranslate"><span class="pre">tests/act</span></code>. It does <strong>not</strong> skip when <code class="docutils literal notranslate"><span class="pre">torch</span></code> is installed but broken:
+<code class="docutils literal notranslate"><span class="pre">pytest.importorskip</span></code> re-raises anything that is not a
+<code class="docutils literal notranslate"><span class="pre">ModuleNotFoundError</span></code>, which is the behaviour you want and is worth knowing
+before you read a red collection error as “the suite is wrong”.</p>
+</section>
+<section id="a-co-design-change-read-end-to-end-through-the-suite">
+<span id="workload-suite-loop"></span><h2>A co-design change, read end to end through the suite<a class="headerlink" href="#a-co-design-change-read-end-to-end-through-the-suite" title="Link to this heading"><span>¶</span></a></h2>
+<p>This is the whole point, so here is the loop once, concretely, with the change
+that was actually put through it.</p>
+<p><strong>The change.</strong> Widen the <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code> operand burst from one packed word per
+loop iteration to a whole 64-byte beat. It is already parametric, so the
+change is an environment variable rather than a patch, and it costs +123 %
+BRAM. <strong>The question a co-design loop has to answer is whether that BRAM buys
+anything on software anyone would run.</strong></p>
+<p><strong>Step 1 — what does the workload look like to the machine?</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>workloads/run.py<span class="w"> </span>--emit
+</pre></div>
+</div>
+<p>Ten layers, all mappable, each one a spec in <code class="docutils literal notranslate"><span class="pre">workloads/specs/</span></code>. Six of the
+ten are four-row GEMMs: the suite is mostly <em>small</em> work, which a shape table
+chosen by hand would not have told you.</p>
+<p><strong>Step 2 — cheap screen: which layers could the change even touch?</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>workloads/run.py<span class="w"> </span>--burst
+</pre></div>
+</div>
+<p>Every layer, because every layer’s weight burst is four to sixteen times its
+activation burst. Seconds, no tools. If this had come back zeros the loop would
+stop here.</p>
+<p><strong>Step 3 — measure the two machines on the workload.</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">TPU_QD</span><span class="o">=</span><span class="m">16</span><span class="w"> </span>python<span class="w"> </span>workloads/run.py<span class="w"> </span>--cosim<span class="w"> </span>mlp_tiny<span class="w"> </span>mlp_deep<span class="w"> </span>mlp_small
+<span class="nv">TPU_QD</span><span class="o">=</span><span class="m">16</span><span class="w"> </span><span class="nv">TPU_DMA_WIDEN</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>python<span class="w"> </span>workloads/run.py<span class="w"> </span>--cosim<span class="w"> </span>mlp_tiny<span class="w"> </span>mlp_deep<span class="w"> </span>mlp_small
+</pre></div>
+</div>
+<p>One <code class="docutils literal notranslate"><span class="pre">csynth</span></code> per build, every layer bit-exact against <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code> on both.
+2 117 cycles becomes 1 534 on <code class="docutils literal notranslate"><span class="pre">mlp_deep</span></code>; 2 781 becomes 1 821 on
+<code class="docutils literal notranslate"><span class="pre">mlp_small</span></code>.</p>
+<p><strong>Step 4 — the number the decision turns on.</strong> <strong>25 to 34 per cent of a
+model’s runtime</strong>, where the GEMM table said 4.3 to 7.0 per cent. That is the
+output of the loop: not “the widening is 720 cycles at 48<sup>3</sup>”, which is
+true and does not decide anything, but “the widening removes a quarter to a
+third of the time our software spends”, which does.</p>
+<p><strong>What the loop also returned, unasked.</strong> Three things the GEMM table could
+not have produced, and each of them is a correction to an instrument rather
+than to the design: the static estimate is calibrated for a machine we do not
+ship; the burst law is exact at eight rows and 40 % optimistic at four; and
+the shipped channel depth does not run the shipped mapping at 4x16x16. A
+workload is a better test of the instruments than a shape is, because it
+exercises them where they were never fitted.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+    
+        <div id="show_right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&lt;</span><span>Page contents</span></a></p>
+        </div>
+
+        <div id="right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
+            <div class="page_toc">
+                <ul>
+<li><a class="reference internal" href="#">The Workload Suite: PyTorch MLPs on TinyTPU</a><ul>
+<li><a class="reference internal" href="#the-sentence-to-take-away-first">The sentence to take away first</a><ul>
+<li><a class="reference internal" href="#why-not-tosa">Why not TOSA</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#the-suite">The suite</a></li>
+<li><a class="reference internal" href="#what-maps-and-what-does-not">What maps, and what does not</a></li>
+<li><a class="reference internal" href="#the-extractor">The extractor</a></li>
+<li><a class="reference internal" href="#verification">Verification</a><ul>
+<li><a class="reference internal" href="#what-is-verified-and-what-is-only-executed">What is verified, and what is only executed</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#the-numbers">The numbers</a><ul>
+<li><a class="reference internal" href="#layer-by-layer-with-nothing-between-layers">Layer by layer, with nothing between layers</a></li>
+<li><a class="reference internal" href="#measured-on-rtl">Measured on RTL</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#the-measurement-that-justifies-the-suite">The measurement that justifies the suite</a><ul>
+<li><a class="reference internal" href="#why-the-shape-table-cannot-be-extrapolated">Why the shape table cannot be extrapolated</a></li>
+<li><a class="reference internal" href="#what-it-is-worth-on-a-model">What it is worth on a model</a></li>
+<li><a class="reference internal" href="#the-64x64x64-point-is-missing-and-why">The 64x64x64 point is missing, and why</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#limits">Limits</a></li>
+<li><a class="reference internal" href="#running-it">Running it</a></li>
+<li><a class="reference internal" href="#a-co-design-change-read-end-to-end-through-the-suite">A co-design change, read end to end through the suite</a></li>
+</ul>
+</li>
+</ul>
+
+            </div>
+        </div>
+    
+
+      <div class="clearer"></div>
+    </div>
+    <div class="button_nav_wrapper">
+        <div class="button_nav">
+            <div class="left">
+                
+                <a href="benchmarks.html">
+                    <span class="icon">&lt;</span><span>The Benchmark Set</span></a>
+                
+            </div>
+
+            <div class="right">
+                
+                    <a href="tinytpu_history.html"><span>TinyTPU-isa: Design History</span><span class="icon">&gt;</span></a>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Allo Authors.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+
+<p id="theme_credit">Styled using the <a href="https://github.com/piccolo-orm/piccolo_theme">Piccolo Theme</a></p>
+  </body>
+</html>

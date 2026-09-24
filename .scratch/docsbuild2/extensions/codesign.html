@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>The Co-design Loop: Mapping and Hardware Together &#8212; Allo Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic_mod.css?v=9b2032db" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=db78e746"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/petite-vue.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Developer Setup" href="../developer/index.html" />
+    <link rel="prev" title="ACT Workload Specs and the Judge" href="act_specs.html" /> 
+  </head><body data-dark_mode_code_blocks="true">
+
+<div id="top_nav">
+    
+
+    <nav>
+        
+            
+        
+
+        <p id="toggle_sidebar">
+            <a href="#" title="Toggle sidebar">|||</a>
+        </p>
+        <h1><a href="../index.html" title="Go to homepage">Allo Documentation</a></h1>
+            <a id="source_link" href="https://github.com/sunwookim028/allo">
+    
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512">
+            <path fill="white" d="M 244.8,8 C 106.1,8 0,113.3 0,252 c 0,110.9 69.8,205.8 169.5,239.2 12.8,2.3 17.3,-5.6 17.3,-12.1 0,-6.2 -0.3,-40.4 -0.3,-61.4 0,0 -70,15 -84.7,-29.8 0,0 -11.4,-29.1 -27.8,-36.6 0,0 -22.9,-15.7 1.6,-15.4 0,0 24.9,2 38.6,25.8 21.9,38.6 58.6,27.5 72.9,20.9 2.3,-16 8.8,-27.1 16,-33.7 -55.9,-6.2 -112.3,-14.3 -112.3,-110.5 0,-27.5 7.6,-41.3 23.6,-58.9 -2.6,-6.5 -11.1,-33.3 2.6,-67.9 20.9,-6.5 69,27 69,27 20,-5.6 41.5,-8.5 62.8,-8.5 21.3,0 42.8,2.9 62.8,8.5 0,0 48.1,-33.6 69,-27 13.7,34.7 5.2,61.4 2.6,67.9 16,17.7 25.8,31.5 25.8,58.9 0,96.5 -58.9,104.2 -114.8,110.5 9.2,7.9 17,22.9 17,46.4 0,33.7 -0.3,75.4 -0.3,83.6 0,6.5 4.6,14.4 17.3,12.1 C 428.2,457.8 496,362.9 496,252 496,113.3 383.5,8 244.8,8 Z"/>
+        </svg>
+    
+</a>
+        
+
+        <a id="mode_toggle" href="#" @click.prevent="handleClick" :title="mode">
+    <template v-if="mode == 'light'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_light"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M67.48,18.073c1.913,-1.912 1.913,-5.018 0,-6.931c-1.912,-1.912 -5.018,-1.912 -6.931,0l-6.798,6.799c-1.912,1.912 -1.912,5.018 0,6.931c1.913,1.912 5.018,1.912 6.931,-0l6.798,-6.799Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.728,61.108c1.912,-1.913 1.912,-5.018 -0,-6.931c-1.913,-1.913 -5.019,-1.913 -6.931,-0l-6.799,6.798c-1.912,1.913 -1.912,5.019 0,6.931c1.913,1.913 5.019,1.913 6.931,0l6.799,-6.798Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.682,54.177c-1.913,-1.913 -5.018,-1.913 -6.931,-0c-1.912,1.913 -1.912,5.018 0,6.931l6.798,6.798c1.913,1.913 5.019,1.913 6.931,0c1.913,-1.912 1.913,-5.018 0,-6.931l-6.798,-6.798Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M4.901,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,-0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M18.929,11.142c-1.912,-1.912 -5.018,-1.912 -6.931,0c-1.912,1.913 -1.912,5.019 0,6.931l6.799,6.799c1.912,1.912 5.018,1.912 6.931,-0c1.912,-1.913 1.912,-5.019 -0,-6.931l-6.799,-6.799Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.108,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c-0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c-0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'dark'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_dark"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.901,2.196 -4.901,4.901c0,2.705 2.197,4.901 4.901,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.662,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.989,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.732,61.103c1.91,-1.91 1.91,-5.011 0,-6.921l-0.009,-0.01c-1.91,-1.91 -5.012,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.909,1.91 5.011,1.91 6.92,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.672,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.52,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l-0,-0.01c-0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.901,2.196 -4.901,4.901c0,2.704 2.197,4.9 4.901,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.73,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 -0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.098,34.623c-2.699,0 -4.891,2.192 -4.891,4.892l-0,0.019c-0,2.699 2.192,4.891 4.891,4.891c2.7,0 4.892,-2.192 4.892,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.892,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'darkest'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_darkest"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><path d="M39.315,23.791c8.684,-0 15.734,7.05 15.734,15.733c0,8.684 -7.05,15.734 -15.734,15.734c-8.683,0 -15.733,-7.05 -15.733,-15.734c-0,-8.683 7.05,-15.733 15.733,-15.733Zm0,4.737c6.069,0 10.997,4.927 10.997,10.996c-0,6.069 -4.928,10.996 -10.997,10.996c-6.068,0 -10.996,-4.927 -10.996,-10.996c0,-6.069 4.928,-10.996 10.996,-10.996Z" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.216,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.9,2.196 -4.9,4.901c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.666,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.99,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.737,61.103c1.909,-1.91 1.909,-5.011 -0,-6.921l-0.01,-0.01c-1.91,-1.91 -5.011,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.91,1.91 5.011,1.91 6.921,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.676,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.524,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l0,-0.01c0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.216,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901c-0,2.704 2.196,4.9 4.9,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.734,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.103,34.623c-2.7,0 -4.892,2.192 -4.892,4.892l-0,0.019c-0,2.699 2.192,4.891 4.892,4.891c2.699,0 4.891,-2.192 4.891,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.891,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+</a>
+
+<script>
+(function() {
+    const LOCAL_STORAGE_KEY = 'piccoloThemeMode'
+
+    var initialMode = localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (initialMode) {
+        // Make sure the value in local storage is valid
+        if (['light', 'dark', 'darkest'].indexOf(initialMode) == -1) {
+            initialMode = 'light'
+            localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+        }
+    } else {
+        // Check if the client prefers dark mode
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialMode = 'dark'
+        } else {
+            initialMode = 'light'
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+    }
+
+    document.documentElement.dataset.mode = initialMode
+
+    PetiteVue.createApp({
+        'mode': initialMode,
+        handleClick() {
+            let currentMode = this.mode
+
+            if (currentMode == 'light') {
+                this.mode = 'dark'
+            } else if (currentMode == 'dark') {
+                this.mode = 'darkest'
+            } else if (currentMode == 'darkest') {
+                this.mode = 'light'
+            }
+
+            document.documentElement.dataset.mode = this.mode
+            localStorage.setItem(LOCAL_STORAGE_KEY, this.mode)
+
+            console.log(this.mode)
+        }
+    }).mount('#mode_toggle')
+})()
+</script>
+            <p class="mobile_search_link">
+                <a href="../search.html" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65 64" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                        <path d="M14.873 40.009c-2.315-3.943-3.642-8.532-3.642-13.429C11.231 11.91 23.141 0 37.811 0s26.58 11.91 26.58 26.58-11.91 26.58-26.58 26.58a26.44 26.44 0 0 1-14.277-4.161L9.739 62.794a3.12 3.12 0 0 1-4.413 0L.913 58.382c-1.217-1.218-1.217-3.196 0-4.413l13.96-13.96zM37.811 8.054c10.225 0 18.526 8.301 18.526 18.526s-8.301 18.526-18.526 18.526-18.526-8.301-18.526-18.526S27.586 8.054 37.811 8.054z" fill="#fff" />
+                    </svg>
+                </a>
+            </p>
+        
+
+        <div class="searchbox_wrapper">
+            
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+    </nav>
+</div>
+
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Paper</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../paper.html">A Co-Design Compilation Flow as a Harness for Language Models to Improve It</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup/index.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_01_get_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_02_vhls.html">Vivado/Vitis HLS Backend</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Deep Dive</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dive/frontend_syntax.html">Frontend Syntax Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/dataflow.html">Dataflow Programming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_01_data_types.html">Data Types and Type Casting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_02_template.html">Template Kernels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_03_composition.html">Kernel Composition</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/ip.html">IP Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/pytorch.html">PyTorch Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_05_verifier.html">Equivalence Checking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_04_features.html">Other Features</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Backends</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/minitpu.html">MiniTPU: Reference Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Extensions</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
+<li class="toctree-l1"><a class="reference internal" href="chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">The Co-design Loop: Mapping and Hardware Together</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/extending_allo.html">Extending Allo’s Abstractions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/stream_ports.html">Stream Ports: a Unit with an Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">Schedule Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html#data-types">Data Types</a></li>
+</ul>
+
+        </div>
+      </div>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="the-co-design-loop-mapping-and-hardware-together">
+<h1>The Co-design Loop: Mapping and Hardware Together<a class="headerlink" href="#the-co-design-loop-mapping-and-hardware-together" title="Link to this heading"><span>¶</span></a></h1>
+<p>An agent proposes a machine. A <strong>frozen mapper</strong> enumerates the whole loop-nest
+mapspace against that machine, asks it which nests it can encode, and the best
+one it can is what goes under the RTL. Cycles come from Vitis C/RTL cosim and
+resources from <code class="docutils literal notranslate"><span class="pre">csynth</span></code> of the same build, reported as a pair.</p>
+<p>This is the loop <a class="reference internal" href="act.html"><span class="doc">ACT, and Why We Cite It</span></a> argued for, built. It reuses ACT’s
+<em>interface</em> – a mapping as a tuple of <code class="docutils literal notranslate"><span class="pre">Loop(rank,</span> <span class="pre">factor,</span> <span class="pre">level,</span> <span class="pre">spatial)</span></code> –
+and none of its code, for the reasons that page measures. ACT is Kai Shao’s
+work (<a class="reference external" href="https://github.com/kkkaishao/allo">https://github.com/kkkaishao/allo</a>, branch <code class="docutils literal notranslate"><span class="pre">act</span></code>); see <code class="docutils literal notranslate"><span class="pre">ATTRIBUTION.md</span></code>
+at tag <code class="docutils literal notranslate"><span class="pre">chia-codesign-final</span></code>.</p>
+<p>The design-level loop it is built on – the tool surface, the path allowlist,
+the fresh evaluation tree from <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">show</span></code>, byte-identity on frozen files,
+import-time policing, <code class="docutils literal notranslate"><span class="pre">bwrap</span></code>, nonce-vouched gates, the spend caps – is
+<a class="reference internal" href="chia.html"><span class="doc">CHIA Agentic Co-Design</span></a>. Only what the co-design loop adds is described here.</p>
+<section id="why-the-loop-has-to-be-a-co-design-loop">
+<h2>Why the loop has to be a co-design loop<a class="headerlink" href="#why-the-loop-has-to-be-a-co-design-loop" title="Link to this heading"><span>¶</span></a></h2>
+<p>Because the mapping search alone finds almost nothing, and that is measured.</p>
+<p>At 16x16x16 the mapper enumerates 1,226 nests and the shipped hardware can
+encode <strong>3</strong>. On the shipped hardware the nest the design already ships is the
+best of those 3 at 16x16x16, so the only thing a pure mapping search buys is
+<strong>3 cycles at 4x4x4</strong> – the trip-count-1 <code class="docutils literal notranslate"><span class="pre">loop</span></code>/<code class="docutils literal notranslate"><span class="pre">endloop</span></code> pair the
+enumerator omits and the hand-written program keeps (see <em>The control</em>, below).</p>
+<p>The thing that collapsed the mapspace is a <strong>hardware/ISA parameter</strong>, not a
+compiler bug:</p>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text">refusals at 16x16x16, shipped hardware</span><a class="headerlink" href="#id1" title="Link to this table"><span>¶</span></a></caption>
+<colgroup>
+<col style="width: 10.0%" />
+<col style="width: 20.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>nests</p></th>
+<th class="head"><p>cause</p></th>
+<th class="head"><p>what it is</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1,150</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">acc-peel</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">acc</span></code> is a <strong>static instruction field with no predicate on an
+induction variable</strong>, so the k=0 tile has to be a peelable prefix. That
+pins K innermost and unsplit and kills every permutation that moves it.</p></td>
+</tr>
+<tr class="row-odd"><td><p>54</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">emitter</span></code></p></td>
+<td><p>a limitation of <code class="docutils literal notranslate"><span class="pre">isa_dsl.gemm_from_nest</span></code> itself, not of the machine:
+it re-stages A per m-tile and cannot interleave that with an n loop.</p></td>
+</tr>
+<tr class="row-even"><td><p>17</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">agu-terms</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">AGU_TERMS=3</span></code>, one instruction word’s address-term budget. It does not
+merely forbid nests, it <strong>chooses the reuse strategy</strong>: an m-tiled nest
+is encodable only if A is re-staged per m-tile, because keeping A
+resident across m needs a fourth term on the accumulating <code class="docutils literal notranslate"><span class="pre">mm</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">accumulator-raw-distance</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span></code>, refused by <code class="docutils literal notranslate"><span class="pre">check_program</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
+<p><code class="docutils literal notranslate"><span class="pre">LOOP_DEPTH=4</span></code> refuses nothing at all here. So the agent’s lever is the
+machine, and the number of encodable nests is the first thing a change moves.</p>
+</section>
+<section id="what-is-editable-and-what-is-frozen">
+<h2>What is editable, and what is frozen<a class="headerlink" href="#what-is-editable-and-what-is-frozen" title="Link to this heading"><span>¶</span></a></h2>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 18.0%" />
+<col style="width: 40.0%" />
+<col style="width: 42.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"></th>
+<th class="head"><p>files</p></th>
+<th class="head"><p>how it is enforced</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>editable</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code> (the hardware, the ISA, the encoding, the program
+validator: <code class="docutils literal notranslate"><span class="pre">acc</span></code>’s predicability, <code class="docutils literal notranslate"><span class="pre">AGU_TERMS</span></code> and the AGU word’s
+packing, <code class="docutils literal notranslate"><span class="pre">LOOP_DEPTH</span></code>, <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span></code>, <code class="docutils literal notranslate"><span class="pre">IMEM_SIZE</span></code> via
+<code class="docutils literal notranslate"><span class="pre">_MAX_STATIC</span></code>, the intrinsic tile) and <code class="docutils literal notranslate"><span class="pre">isa_dsl.py</span></code> (the encoder,
+including <code class="docutils literal notranslate"><span class="pre">gemm_from_nest</span></code>)</p></td>
+<td><p>the agent edits a private copy under <code class="docutils literal notranslate"><span class="pre">&lt;run&gt;/&lt;worker&gt;/spec/</span></code>, never the
+repository, and only through three MCP tools that refuse any path but
+those two bare names</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>frozen</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">chia_agent/mapspace.py</span></code> – <strong>the mapper: its enumerator, its
+selection rule and its objective</strong> – plus <code class="docutils literal notranslate"><span class="pre">codesign_gate.py</span></code>,
+<code class="docutils literal notranslate"><span class="pre">codesign_cosim.py</span></code>, and everything the design-level loop already
+freezes: <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code>, <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code>, <code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code>,
+<code class="docutils literal notranslate"><span class="pre">isa_ref.py</span></code>, <code class="docutils literal notranslate"><span class="pre">kpn_model.py</span></code>, <code class="docutils literal notranslate"><span class="pre">param_check.py</span></code>,
+<code class="docutils literal notranslate"><span class="pre">gate_runner.py</span></code>, <code class="docutils literal notranslate"><span class="pre">evaluate.py</span></code>, <code class="docutils literal notranslate"><span class="pre">spec_policy.py</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">evaluate.py</span></code> composes a fresh evaluation tree per candidate, with
+every frozen file read from <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">show</span></code> and never from disk; the design
+evaluator is additionally checked byte-identical to main &#64; <code class="docutils literal notranslate"><span class="pre">MAIN_BASE</span></code>;
+the two spec files are the only thing taken from the spec directory and
+anything else there is <strong>ignored</strong>; every candidate process runs under
+<code class="docutils literal notranslate"><span class="pre">bwrap</span></code> and the tree is re-hashed after each stage</p></td>
+</tr>
+</tbody>
+</table>
+<p>The agent may <strong>read</strong> the mapper (<code class="docutils literal notranslate"><span class="pre">read_reference(&quot;mapspace.py&quot;)</span></code>). It should
+– the rule is what “better nest” means. It just cannot change it. The frozen
+half is what makes “the best mapping for this hardware” a claim rather than a
+sample.</p>
+</section>
+<section id="the-inner-loop-is-exhaustive-not-agentic">
+<h2>The inner loop is exhaustive, not agentic<a class="headerlink" href="#the-inner-loop-is-exhaustive-not-agentic" title="Link to this heading"><span>¶</span></a></h2>
+<p>For each hardware candidate, <code class="docutils literal notranslate"><span class="pre">mapspace.search</span></code> enumerates the <strong>whole</strong>
+mapspace and asks the candidate’s encoder about every nest. It does not search
+cleverly and does not stop early.</p>
+<p>That is the design decision the loop turns on. A non-exhaustive inner search
+would turn “which hardware runs the better program” into “whose search got
+luckier”. Keeping the mapspace enumerable is therefore a requirement, not a
+convenience – at 16x16x16 it is 1,226 nests and about one second of pure
+python.</p>
+<p>The selection rule, stated once and frozen: among the nests the candidate can
+encode at a shape, take the minimum of <code class="docutils literal notranslate"><span class="pre">(dynamic</span> <span class="pre">instruction</span> <span class="pre">issues,</span> <span class="pre">static</span>
+<span class="pre">instruction</span> <span class="pre">words,</span> <span class="pre">nest</span> <span class="pre">string)</span></code>. Both counts are <em>static</em> properties of the
+program, not cycle estimates; the nest string only breaks ties so the choice is
+deterministic. A nest must be encodable at <strong>both</strong> relu settings, and is
+ranked by the <code class="docutils literal notranslate"><span class="pre">relu=False</span></code> program, which is the one the scored testbench
+runs.</p>
+<p>A nest counts as encodable only if the encoder produced a program <strong>and</strong>
+<code class="docutils literal notranslate"><span class="pre">assemble</span></code> took it – which is where <code class="docutils literal notranslate"><span class="pre">IMEM_SIZE</span></code> is enforced. A program the
+instruction memory cannot hold is refused, never truncated.</p>
+</section>
+<section id="feedback-is-measured-not-modelled">
+<h2>Feedback is measured, not modelled<a class="headerlink" href="#feedback-is-measured-not-modelled" title="Link to this heading"><span>¶</span></a></h2>
+<ul class="simple">
+<li><p><strong>Cycles</strong>: Vitis HLS 2023.2 <code class="docutils literal notranslate"><span class="pre">csynth</span></code> + <code class="docutils literal notranslate"><span class="pre">xsim</span></code> C/RTL cosim, through main’s
+frozen <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code>, at 4x4x4 and 16x16x16 in the search and at all five
+<code class="docutils literal notranslate"><span class="pre">SHAPES</span></code> in <code class="docutils literal notranslate"><span class="pre">accept.py</span></code>. Each testbench bit-exact against numpy, one row
+per shape, <code class="docutils literal notranslate"><span class="pre">mismatches</span> <span class="pre">=</span> <span class="pre">0</span></code> in the summary <em>and</em> in that shape’s own log,
+a PASS, and the cycle count cross-checked against the log’s simulated time.</p></li>
+<li><p><strong>Resources</strong>: FF, LUT, BRAM18K, DSP, URAM and the estimated clock from the
+<code class="docutils literal notranslate"><span class="pre">csynth.xml</span></code> of the same build. The clock must meet 3.33 ns, or cycles at a
+clock the design cannot meet are not comparable.</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">codesign_cosim.py</span></code> is how the mapper’s program reaches the RTL: <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code>
+stays byte-identical to main, and this frozen driver binds <code class="docutils literal notranslate"><span class="pre">cosim.gemm_program</span></code>
+to <code class="docutils literal notranslate"><span class="pre">gemm_from_nest(mapspace.select(...))</span></code> before calling <code class="docutils literal notranslate"><span class="pre">cosim.main()</span></code>.
+Same testbench generator, same operands, same golden reference, same TCL.</p>
+<p><strong>No modelled cycle count is ever reported.</strong> The only proxy in the loop is the
+static ranking above, it lives inside <code class="docutils literal notranslate"><span class="pre">mapspace.py</span></code>, and it never leaves it.
+The failure mode being avoided is named in <a class="reference internal" href="act.html"><span class="doc">ACT, and Why We Cite It</span></a>: ACT’s
+<code class="docutils literal notranslate"><span class="pre">Priced.cost</span></code> is <code class="docutils literal notranslate"><span class="pre">(makespan,</span> <span class="pre">emits)</span></code> and models no instruction memory, while
+<code class="docutils literal notranslate"><span class="pre">assemble</span></code> asserts <code class="docutils literal notranslate"><span class="pre">len(words)</span> <span class="pre">&lt;=</span> <span class="pre">IMEM_SIZE</span></code>, so a loop scored on it would
+reward a program the machine cannot hold. The five-point regression
+<code class="docutils literal notranslate"><span class="pre">74.5</span> <span class="pre">+</span> <span class="pre">21.70</span> <span class="pre">x</span> <span class="pre">dynamic</span></code> invites the same mistake more cheaply.</p>
+</section>
+<section id="the-objective-is-a-pair-and-is-never-collapsed">
+<h2>The objective is a pair, and is never collapsed<a class="headerlink" href="#the-objective-is-a-pair-and-is-never-collapsed" title="Link to this heading"><span>¶</span></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">classify()</span></code> in <code class="docutils literal notranslate"><span class="pre">loop.py</span></code>, frozen:</p>
+<ul class="simple">
+<li><p><strong>win</strong> – a Pareto improvement: no shape’s cycle count higher, at least one
+lower, and no resource term grown.</p></li>
+<li><p><strong>trade</strong> – the total cycles fall, but something is paid for it: a resource
+term grew, or another shape regressed.</p></li>
+<li><p><strong>regression</strong> – the total does not fall.</p></li>
+</ul>
+<p>A candidate that trades 2.3x the block RAM for 9% of the cycles is a trade. That
+exact trade has already happened on this design once: run 1’s <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code>
+widening took BRAM18K from 42 to 98 for -59 cycles at the largest shape. The
+loop still tracks its best by total cycles so that the search can move, but the
+pair is what gets reported.</p>
+</section>
+<section id="correctness-is-absolute">
+<h2>Correctness is absolute<a class="headerlink" href="#correctness-is-absolute" title="Link to this heading"><span>¶</span></a></h2>
+<p>A candidate must pass, in order, before any cycle is reported:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code> – ALL EXACT, and it requires <code class="docutils literal notranslate"><span class="pre">isa_dsl.gemm_program</span></code> to
+equal <code class="docutils literal notranslate"><span class="pre">microarch_isa.gemm_program_handwritten</span></code> word for word.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code> – 492/492 runs exact: full-range/corner/boundary int8 at
+all 64 shapes, <code class="docutils literal notranslate"><span class="pre">C</span></code> prefilled and compared in full, vector and 200 random
+programs against <code class="docutils literal notranslate"><span class="pre">isa_ref.py</span></code>, and the program validator’s controls.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">param_check.py</span></code> – the design rebuilt at MAXDIM 8 and 12 and exact there.</p></li>
+<li><p><strong>the mapspace gate</strong> (new): the seam – the canonical nest must re-emit the
+candidate’s own <code class="docutils literal notranslate"><span class="pre">gemm_program</span></code> word for word – then the exhaustive
+enumeration, then <strong>every</strong> encodable nest (up to 48 per shape, best first,
+always including the one that gets cosimmed) proved against <code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code>
+at full-range int8 with <code class="docutils literal notranslate"><span class="pre">C</span></code> prefilled and the whole of <code class="docutils literal notranslate"><span class="pre">C</span></code> compared.</p></li>
+<li><p><strong>the cosim</strong> – bit-exact at every shape reported.</p></li>
+</ol>
+<p>Point 4 is what makes “we widened the encoder” checkable. Deleting a legality
+check to make 1,150 nests encodable is the cheap way to a big number, and the
+gate rejects it immediately: the nests compute the wrong thing.</p>
+<p>Each check runs under <code class="docutils literal notranslate"><span class="pre">gate_runner.py</span></code>, which reads a per-run nonce on stdin
+before the candidate is imported, takes the check’s <strong>return value</strong> rather than
+its printed output, freezes every loaded <code class="docutils literal notranslate"><span class="pre">numpy*</span></code>/<code class="docutils literal notranslate"><span class="pre">allo*</span></code> module against
+rebinding, and only then prints the line the evaluator requires.</p>
+</section>
+<section id="the-control">
+<h2>The control<a class="headerlink" href="#the-control" title="Link to this heading"><span>¶</span></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">accept.py</span></code>’s <code class="docutils literal notranslate"><span class="pre">BASELINES</span></code> table is keyed on the git blob of the two spec
+files, so prose-only edits invalidate it. The co-design loop therefore
+<strong>measures its control in the same run</strong>: <code class="docutils literal notranslate"><span class="pre">loop.py</span></code> iteration 0, and
+<code class="docutils literal notranslate"><span class="pre">test_codesign.py</span></code> case k1.</p>
+<p>Measured 2026-09-22, unmodified design, same environment and tool state:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 16.0%" />
+<col style="width: 16.0%" />
+<col style="width: 16.0%" />
+<col style="width: 52.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>shape</p></th>
+<th class="head"><p>co-design</p></th>
+<th class="head"><p>published</p></th>
+<th class="head"><p>why</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>4x4x4</p></td>
+<td><p><strong>169</strong></p></td>
+<td><p>172</p></td>
+<td><p>N/T = K/T = 1, so the enumerator offers a nest with no emitted loops
+while the hand-written program keeps a trip-count-1 <code class="docutils literal notranslate"><span class="pre">loop</span></code>/<code class="docutils literal notranslate"><span class="pre">endloop</span></code>
+pair around the output body: 24 words against 28, the same 4 dynamic
+issues, 3 fewer cycles. Bit-exact.</p></td>
+</tr>
+<tr class="row-odd"><td><p>16x16x16</p></td>
+<td><p><strong>686</strong></p></td>
+<td><p>686</p></td>
+<td><p>the mapper’s pick <strong>is</strong> the canonical nest, so the program under the RTL
+is <code class="docutils literal notranslate"><span class="pre">gemm_program</span></code> word for word.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The published column is main &#64; <code class="docutils literal notranslate"><span class="pre">476a70d8</span></code>: 172 / 262 / 418 / 484 / 686. It
+reproduces exactly wherever the program is the same one, which is the check that
+matters – the 4x4x4 difference is the mapper finding a better program, not the
+tools moving.</p>
+<p>Resources at that build, <code class="docutils literal notranslate"><span class="pre">csynth</span></code>: BRAM18K 42, DSP 14, FF 17,481, LUT 26,583,
+URAM 0, estimated clock 2.431 ns against the 3.33 ns target.</p>
+</section>
+<section id="running-it">
+<h2>Running it<a class="headerlink" href="#running-it" title="Link to this heading"><span>¶</span></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">$0</span></code>, no model, before anything is spent:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">activate</span> <span class="n">allo</span>
+<span class="n">export</span> <span class="n">LLVM_BUILD_DIR</span><span class="o">=/</span><span class="n">home</span><span class="o">/</span><span class="n">sk3463</span><span class="o">/</span><span class="n">llvm</span><span class="o">-</span><span class="n">allo</span><span class="o">-</span><span class="mi">6</span><span class="n">b09f739</span><span class="o">/</span><span class="n">build</span> <span class="n">OMP_NUM_THREADS</span><span class="o">=</span><span class="mi">8</span>
+<span class="n">examples</span><span class="o">/</span><span class="n">accelerator</span><span class="o">/</span><span class="n">tinytpu_vitis</span><span class="o">/</span><span class="n">reproduce_codesign</span><span class="o">.</span><span class="n">sh</span> <span class="n">mapspace</span>   <span class="c1"># ~2 s</span>
+<span class="n">examples</span><span class="o">/</span><span class="n">accelerator</span><span class="o">/</span><span class="n">tinytpu_vitis</span><span class="o">/</span><span class="n">reproduce_codesign</span><span class="o">.</span><span class="n">sh</span> <span class="n">control</span>    <span class="c1"># ~3 min</span>
+<span class="n">examples</span><span class="o">/</span><span class="n">accelerator</span><span class="o">/</span><span class="n">tinytpu_vitis</span><span class="o">/</span><span class="n">chia_agent</span><span class="o">/</span><span class="n">test_codesign</span><span class="o">.</span><span class="n">py</span>      <span class="c1"># ~7 min</span>
+</pre></div>
+</div>
+<p>A search:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">activate</span> <span class="n">chia_env</span>
+<span class="nb">set</span> <span class="o">-</span><span class="n">a</span><span class="p">;</span> <span class="n">source</span> <span class="n">chia</span><span class="o">.</span><span class="n">env</span><span class="p">;</span> <span class="nb">set</span> <span class="o">+</span><span class="n">a</span>          <span class="c1"># CHIA_TOTAL_CAP_USD per allocation.json</span>
+<span class="n">ray</span> <span class="n">start</span> <span class="o">--</span><span class="n">head</span> <span class="o">--</span><span class="n">resources</span><span class="o">=</span><span class="s1">'{"opencode_creds": 2}'</span> <span class="o">--</span><span class="n">include</span><span class="o">-</span><span class="n">dashboard</span><span class="o">=</span><span class="n">false</span>
+<span class="n">cd</span> <span class="n">examples</span><span class="o">/</span><span class="n">accelerator</span><span class="o">/</span><span class="n">tinytpu_vitis</span><span class="o">/</span><span class="n">chia_agent</span>
+<span class="n">python</span> <span class="n">preflight</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">budget</span><span class="o">-</span><span class="n">usd</span> <span class="mi">15</span>                       <span class="c1"># the gate alone, $0</span>
+<span class="n">python</span> <span class="n">swarm</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">codesign</span> <span class="o">--</span><span class="n">workers</span> <span class="mi">2</span> <span class="o">--</span><span class="n">iterations</span> <span class="mi">3</span> <span class="o">--</span><span class="n">budget</span><span class="o">-</span><span class="n">usd</span> <span class="mi">15</span>
+<span class="n">python</span> <span class="n">accept</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">codesign</span> <span class="o">--</span><span class="n">diff</span> <span class="o">&lt;</span><span class="n">run</span><span class="o">&gt;/&lt;</span><span class="n">worker</span><span class="o">&gt;/</span><span class="n">best</span><span class="o">.</span><span class="n">diff</span> \
+                 <span class="o">--</span><span class="n">out</span> <span class="o">&lt;</span><span class="n">run</span><span class="o">&gt;/</span><span class="n">accept</span><span class="o">-&lt;</span><span class="n">worker</span><span class="o">&gt;</span>
+<span class="n">ray</span> <span class="n">stop</span>
+</pre></div>
+</div>
+<p>The Vitis project goes wherever <code class="docutils literal notranslate"><span class="pre">TPU_PRJ</span></code> says and is wiped before every
+evaluation, so a stale report can never be read as a result. Disk on this host
+is tight; <code class="docutils literal notranslate"><span class="pre">reproduce_codesign.sh</span></code> deletes each project when it is done.</p>
+</section>
+<section id="the-llvm-free-test-suite">
+<h2>The LLVM-free test suite<a class="headerlink" href="#the-llvm-free-test-suite" title="Link to this heading"><span>¶</span></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">chia_agent/test_codesign.py</span></code>, <code class="docutils literal notranslate"><span class="pre">$0</span></code>, no model. <code class="docutils literal notranslate"><span class="pre">test_harness.py</span></code> still
+covers the design-level loop; this covers only what the co-design loop adds.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 8.0%" />
+<col style="width: 42.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>case</p></th>
+<th class="head"><p>what it does</p></th>
+<th class="head"><p>expected</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>k1</p></td>
+<td><p>a no-op (re-save the two files)</p></td>
+<td><p>reproduces the control exactly: the cycles, and the <strong>whole</strong> pinned
+refusal histogram and chosen nest at both shapes</p></td>
+</tr>
+<tr class="row-odd"><td><p>k2</p></td>
+<td><p>a real hardware widening: <code class="docutils literal notranslate"><span class="pre">AGU_TERMS</span></code> 3 -&gt; 4 with the AGU word
+repacked from three 19-bit terms to four 16-bit ones, in all five places
+the 19 was a literal (encoder, sequencer kernel, <code class="docutils literal notranslate"><span class="pre">expand</span></code>,
+<code class="docutils literal notranslate"><span class="pre">check_program</span></code>)</p></td>
+<td><p>the gate passes and the <strong>encodable count rises</strong>, 3 -&gt; 7 at 16x16x16,
+with <code class="docutils literal notranslate"><span class="pre">agu-terms</span></code> going to 0 and the next constraint appearing. A
+fixture for the harness, not a recommendation</p></td>
+</tr>
+<tr class="row-even"><td><p>k3</p></td>
+<td><p>the encoder widened by <strong>deleting</strong> <code class="docutils literal notranslate"><span class="pre">gemm_from_nest</span></code>’s <code class="docutils literal notranslate"><span class="pre">acc-peel</span></code>
+position check</p></td>
+<td><p>REJECTED at <code class="docutils literal notranslate"><span class="pre">gate:mapspace</span></code>: the newly “encodable” nests are WRONG
+against <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>k4</p></td>
+<td><p>the seam broken – <code class="docutils literal notranslate"><span class="pre">gemm_from_nest</span></code>’s prologue order changed so
+<code class="docutils literal notranslate"><span class="pre">gemm_program</span></code> still matches the hand-written reference but the
+canonical nest no longer re-emits it</p></td>
+<td><p>REJECTED at <code class="docutils literal notranslate"><span class="pre">gate:mapspace</span></code>, naming the differing instruction</p></td>
+</tr>
+<tr class="row-even"><td><p>k5</p></td>
+<td><p>the PE partial sum narrowed from int32 to int16</p></td>
+<td><p>REJECTED at <code class="docutils literal notranslate"><span class="pre">gate:stress</span></code>, and <strong>no mapspace report is produced</strong> –
+the co-design stages never run on a design that is not correct</p></td>
+</tr>
+<tr class="row-odd"><td><p>k6</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">_MAX_STATIC</span></code> 24 -&gt; 12, so <code class="docutils literal notranslate"><span class="pre">IMEM_SIZE</span></code> is 32 words and the chosen
+16x16x16 program needs 34</p></td>
+<td><p>REJECTED, the refusal naming <code class="docutils literal notranslate"><span class="pre">IMEM_SIZE</span></code>; <code class="docutils literal notranslate"><span class="pre">assemble</span></code> <strong>raises</strong>
+rather than truncating, and the mapper reports 0 encodable with the
+refusal attributed to <code class="docutils literal notranslate"><span class="pre">imem</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>k7</p></td>
+<td><p>a sabotaged <code class="docutils literal notranslate"><span class="pre">mapspace.py</span></code>/<code class="docutils literal notranslate"><span class="pre">codesign_gate.py</span></code>/<code class="docutils literal notranslate"><span class="pre">cosim.py</span></code> dropped
+into the spec directory, and <code class="docutils literal notranslate"><span class="pre">accept.py</span></code> handed diffs that touch the
+mapper, <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code> and <code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code></p></td>
+<td><p>the sabotage is <strong>ignored</strong> (the evaluator composes those from git) and
+the verdict is the control’s; each diff is refused by path</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+    
+        <div id="show_right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&lt;</span><span>Page contents</span></a></p>
+        </div>
+
+        <div id="right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
+            <div class="page_toc">
+                <ul>
+<li><a class="reference internal" href="#">The Co-design Loop: Mapping and Hardware Together</a><ul>
+<li><a class="reference internal" href="#why-the-loop-has-to-be-a-co-design-loop">Why the loop has to be a co-design loop</a></li>
+<li><a class="reference internal" href="#what-is-editable-and-what-is-frozen">What is editable, and what is frozen</a></li>
+<li><a class="reference internal" href="#the-inner-loop-is-exhaustive-not-agentic">The inner loop is exhaustive, not agentic</a></li>
+<li><a class="reference internal" href="#feedback-is-measured-not-modelled">Feedback is measured, not modelled</a></li>
+<li><a class="reference internal" href="#the-objective-is-a-pair-and-is-never-collapsed">The objective is a pair, and is never collapsed</a></li>
+<li><a class="reference internal" href="#correctness-is-absolute">Correctness is absolute</a></li>
+<li><a class="reference internal" href="#the-control">The control</a></li>
+<li><a class="reference internal" href="#running-it">Running it</a></li>
+<li><a class="reference internal" href="#the-llvm-free-test-suite">The LLVM-free test suite</a></li>
+</ul>
+</li>
+</ul>
+
+            </div>
+        </div>
+    
+
+      <div class="clearer"></div>
+    </div>
+    <div class="button_nav_wrapper">
+        <div class="button_nav">
+            <div class="left">
+                
+                <a href="act_specs.html">
+                    <span class="icon">&lt;</span><span>ACT Workload Specs and the Judge</span></a>
+                
+            </div>
+
+            <div class="right">
+                
+                    <a href="../developer/index.html"><span>Developer Setup</span><span class="icon">&gt;</span></a>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Allo Authors.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+
+<p id="theme_credit">Styled using the <a href="https://github.com/piccolo-orm/piccolo_theme">Piccolo Theme</a></p>
+  </body>
+</html>

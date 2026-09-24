@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Extending Allo’s Abstractions &#8212; Allo Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic_mod.css?v=9b2032db" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=db78e746"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/petite-vue.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Stream Ports: a Unit with an Interface" href="stream_ports.html" />
+    <link rel="prev" title="MLIR Translation Guide" href="../gallery/developer_02_mlir.html" /> 
+  </head><body data-dark_mode_code_blocks="true">
+
+<div id="top_nav">
+    
+
+    <nav>
+        
+            
+        
+
+        <p id="toggle_sidebar">
+            <a href="#" title="Toggle sidebar">|||</a>
+        </p>
+        <h1><a href="../index.html" title="Go to homepage">Allo Documentation</a></h1>
+            <a id="source_link" href="https://github.com/sunwookim028/allo">
+    
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512">
+            <path fill="white" d="M 244.8,8 C 106.1,8 0,113.3 0,252 c 0,110.9 69.8,205.8 169.5,239.2 12.8,2.3 17.3,-5.6 17.3,-12.1 0,-6.2 -0.3,-40.4 -0.3,-61.4 0,0 -70,15 -84.7,-29.8 0,0 -11.4,-29.1 -27.8,-36.6 0,0 -22.9,-15.7 1.6,-15.4 0,0 24.9,2 38.6,25.8 21.9,38.6 58.6,27.5 72.9,20.9 2.3,-16 8.8,-27.1 16,-33.7 -55.9,-6.2 -112.3,-14.3 -112.3,-110.5 0,-27.5 7.6,-41.3 23.6,-58.9 -2.6,-6.5 -11.1,-33.3 2.6,-67.9 20.9,-6.5 69,27 69,27 20,-5.6 41.5,-8.5 62.8,-8.5 21.3,0 42.8,2.9 62.8,8.5 0,0 48.1,-33.6 69,-27 13.7,34.7 5.2,61.4 2.6,67.9 16,17.7 25.8,31.5 25.8,58.9 0,96.5 -58.9,104.2 -114.8,110.5 9.2,7.9 17,22.9 17,46.4 0,33.7 -0.3,75.4 -0.3,83.6 0,6.5 4.6,14.4 17.3,12.1 C 428.2,457.8 496,362.9 496,252 496,113.3 383.5,8 244.8,8 Z"/>
+        </svg>
+    
+</a>
+        
+
+        <a id="mode_toggle" href="#" @click.prevent="handleClick" :title="mode">
+    <template v-if="mode == 'light'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_light"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M67.48,18.073c1.913,-1.912 1.913,-5.018 0,-6.931c-1.912,-1.912 -5.018,-1.912 -6.931,0l-6.798,6.799c-1.912,1.912 -1.912,5.018 0,6.931c1.913,1.912 5.018,1.912 6.931,-0l6.798,-6.799Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.728,61.108c1.912,-1.913 1.912,-5.018 -0,-6.931c-1.913,-1.913 -5.019,-1.913 -6.931,-0l-6.799,6.798c-1.912,1.913 -1.912,5.019 0,6.931c1.913,1.913 5.019,1.913 6.931,0l6.799,-6.798Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.682,54.177c-1.913,-1.913 -5.018,-1.913 -6.931,-0c-1.912,1.913 -1.912,5.018 0,6.931l6.798,6.798c1.913,1.913 5.019,1.913 6.931,0c1.913,-1.912 1.913,-5.018 0,-6.931l-6.798,-6.798Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M4.901,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,-0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M18.929,11.142c-1.912,-1.912 -5.018,-1.912 -6.931,0c-1.912,1.913 -1.912,5.019 0,6.931l6.799,6.799c1.912,1.912 5.018,1.912 6.931,-0c1.912,-1.913 1.912,-5.019 -0,-6.931l-6.799,-6.799Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.108,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c-0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c-0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'dark'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_dark"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.901,2.196 -4.901,4.901c0,2.705 2.197,4.901 4.901,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.662,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.989,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.732,61.103c1.91,-1.91 1.91,-5.011 0,-6.921l-0.009,-0.01c-1.91,-1.91 -5.012,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.909,1.91 5.011,1.91 6.92,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.672,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.52,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l-0,-0.01c-0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.901,2.196 -4.901,4.901c0,2.704 2.197,4.9 4.901,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.73,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 -0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.098,34.623c-2.699,0 -4.891,2.192 -4.891,4.892l-0,0.019c-0,2.699 2.192,4.891 4.891,4.891c2.7,0 4.892,-2.192 4.892,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.892,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'darkest'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_darkest"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><path d="M39.315,23.791c8.684,-0 15.734,7.05 15.734,15.733c0,8.684 -7.05,15.734 -15.734,15.734c-8.683,0 -15.733,-7.05 -15.733,-15.734c-0,-8.683 7.05,-15.733 15.733,-15.733Zm0,4.737c6.069,0 10.997,4.927 10.997,10.996c-0,6.069 -4.928,10.996 -10.997,10.996c-6.068,0 -10.996,-4.927 -10.996,-10.996c0,-6.069 4.928,-10.996 10.996,-10.996Z" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.216,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.9,2.196 -4.9,4.901c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.666,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.99,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.737,61.103c1.909,-1.91 1.909,-5.011 -0,-6.921l-0.01,-0.01c-1.91,-1.91 -5.011,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.91,1.91 5.011,1.91 6.921,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.676,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.524,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l0,-0.01c0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.216,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901c-0,2.704 2.196,4.9 4.9,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.734,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.103,34.623c-2.7,0 -4.892,2.192 -4.892,4.892l-0,0.019c-0,2.699 2.192,4.891 4.892,4.891c2.699,0 4.891,-2.192 4.891,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.891,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+</a>
+
+<script>
+(function() {
+    const LOCAL_STORAGE_KEY = 'piccoloThemeMode'
+
+    var initialMode = localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (initialMode) {
+        // Make sure the value in local storage is valid
+        if (['light', 'dark', 'darkest'].indexOf(initialMode) == -1) {
+            initialMode = 'light'
+            localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+        }
+    } else {
+        // Check if the client prefers dark mode
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialMode = 'dark'
+        } else {
+            initialMode = 'light'
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+    }
+
+    document.documentElement.dataset.mode = initialMode
+
+    PetiteVue.createApp({
+        'mode': initialMode,
+        handleClick() {
+            let currentMode = this.mode
+
+            if (currentMode == 'light') {
+                this.mode = 'dark'
+            } else if (currentMode == 'dark') {
+                this.mode = 'darkest'
+            } else if (currentMode == 'darkest') {
+                this.mode = 'light'
+            }
+
+            document.documentElement.dataset.mode = this.mode
+            localStorage.setItem(LOCAL_STORAGE_KEY, this.mode)
+
+            console.log(this.mode)
+        }
+    }).mount('#mode_toggle')
+})()
+</script>
+            <p class="mobile_search_link">
+                <a href="../search.html" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65 64" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                        <path d="M14.873 40.009c-2.315-3.943-3.642-8.532-3.642-13.429C11.231 11.91 23.141 0 37.811 0s26.58 11.91 26.58 26.58-11.91 26.58-26.58 26.58a26.44 26.44 0 0 1-14.277-4.161L9.739 62.794a3.12 3.12 0 0 1-4.413 0L.913 58.382c-1.217-1.218-1.217-3.196 0-4.413l13.96-13.96zM37.811 8.054c10.225 0 18.526 8.301 18.526 18.526s-8.301 18.526-18.526 18.526-18.526-8.301-18.526-18.526S27.586 8.054 37.811 8.054z" fill="#fff" />
+                    </svg>
+                </a>
+            </p>
+        
+
+        <div class="searchbox_wrapper">
+            
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+    </nav>
+</div>
+
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Paper</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../paper.html">A Co-Design Compilation Flow as a Harness for Language Models to Improve It</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup/index.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_01_get_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_02_vhls.html">Vivado/Vitis HLS Backend</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Deep Dive</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dive/frontend_syntax.html">Frontend Syntax Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/dataflow.html">Dataflow Programming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_01_data_types.html">Data Types and Type Casting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_02_template.html">Template Kernels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_03_composition.html">Kernel Composition</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/ip.html">IP Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/pytorch.html">PyTorch Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_05_verifier.html">Equivalence Checking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_04_features.html">Other Features</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Backends</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/minitpu.html">MiniTPU: Reference Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Extensions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="index.html">Developer Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Extending Allo’s Abstractions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="stream_ports.html">Stream Ports: a Unit with an Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="limitations.html">Allo Limitations Register</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pitfalls.html">Dataflow Region Pitfalls</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">Schedule Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html#data-types">Data Types</a></li>
+</ul>
+
+        </div>
+      </div>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="extending-allo-s-abstractions">
+<span id="extending-allo"></span><h1>Extending Allo’s Abstractions<a class="headerlink" href="#extending-allo-s-abstractions" title="Link to this heading"><span>¶</span></a></h1>
+<p>This page is for whoever – person or agent – is about to add something to
+Allo. It is not a catalogue of features. It is a way of getting from a
+<em>symptom</em> to the right kind of extension, and a standard the extension has to
+meet before it is worth writing.</p>
+<p>The standard comes from CAKE (arXiv 2608.12629): at an equal budget, generating
+into a <strong>typed IR</strong> reached 1.144x of a reference while generating raw CUDA/PTX
+reached 0.928x. The lesson this fork draws from that is not “use an IR”. It is
+three specific things, and they are the whole of this page:</p>
+<ol class="arabic simple">
+<li><p>a primitive arrives with its <strong>analyses</strong> and its <strong>legality rule</strong>, or it
+is not ready;</p></li>
+<li><p><strong>construction should type-check</strong> – the mistake should be refused at the
+call that made it, not at the build twenty minutes later;</p></li>
+<li><p><strong>cheap static gates run before expensive ones.</strong></p></li>
+</ol>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p><strong>If you cannot finish the sentence “X is legal if and only if …”, stop.</strong>
+Write the gap down on this page instead of writing the extension. An
+extension that cannot state its own legality rule will be <em>used</em> by an
+agent that cannot tell when it is lying. If part of the property is not
+decidable, that part is an <strong>obligation</strong> and must be declared as one, never
+implied to be checked; <a class="reference internal" href="#extending-allo-dependence"><span class="std std-ref">s.dependence – the rule/obligation split, worked</span></a> is that split,
+worked end to end.</p>
+</div>
+<section id="start-from-the-symptom">
+<h2>Start from the symptom<a class="headerlink" href="#start-from-the-symptom" title="Link to this heading"><span>¶</span></a></h2>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 40.0%" />
+<col style="width: 24.0%" />
+<col style="width: 36.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>What you noticed</p></th>
+<th class="head"><p>What kind of gap it is</p></th>
+<th class="head"><p>Where the extension belongs</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>You hand-coded a hardware limit (a field width, a stack depth, a term
+budget) in Python, outside <code class="docutils literal notranslate"><span class="pre">allo/</span></code>, to decide whether a schedule was
+buildable.</p></td>
+<td><p>Allo has no <strong>target</strong>. There is nowhere to write down what
+distinguishes this architecture from another.</p></td>
+<td><p>A <strong>type</strong> (a capability record) plus a <strong>pass</strong> that checks it. Done
+once: see <a class="reference internal" href="#extending-allo-encoding"><span class="std std-ref">The abstraction added here: Encoding</span></a>.</p></td>
+</tr>
+<tr class="row-odd"><td><p>You copied a unit instead of instantiating it; or the same design exists
+several times, differing only in topology.</p></td>
+<td><p>Allo had no <strong>unit with an interface</strong>. Composition was by lexical
+capture, so a unit could not be named, imported or wired.</p></td>
+<td><p>A <strong>type</strong> (a stream that can be a port) plus <strong>frontend</strong> support for
+calls that pass it. Done: <a class="reference internal" href="#extending-allo-ports"><span class="std std-ref">1. A stream that can be a port, so a unit can have an interface – done</span></a>, and
+<a class="reference internal" href="stream_ports.html#stream-ports"><span class="std std-ref">Stream Ports: a Unit with an Interface</span></a> for the rules.</p></td>
+</tr>
+<tr class="row-even"><td><p>You wanted one iteration of a loop to do something different from the
+rest, and wrote two loop nests by hand.</p></td>
+<td><p>Allo has no <strong>index-set splitting</strong>. <code class="docutils literal notranslate"><span class="pre">split</span></code> cuts a loop into a nest;
+nothing cuts an iteration space into pieces with different bodies.</p></td>
+<td><p>A <strong>schedule primitive</strong> (dialect op + <code class="docutils literal notranslate"><span class="pre">LoopTransformations.cpp</span></code>).
+Open: <a class="reference internal" href="#extending-allo-peel"><span class="std std-ref">3. s.peel(axis, count=1) – index-set splitting</span></a>.</p></td>
+</tr>
+<tr class="row-odd"><td><p>A long backend run failed, or silently produced the wrong RTL, for a
+reason that was already visible in the MLIR.</p></td>
+<td><p>A <strong>gate</strong> is missing, not a feature. The information was there and
+nothing looked at it.</p></td>
+<td><p>A <strong>pass</strong> that refuses and never transforms. Add a rule to
+<a class="reference internal" href="#extending-allo-encoding"><span class="std std-ref">The abstraction added here: Encoding</span></a>.</p></td>
+</tr>
+<tr class="row-even"><td><p>A primitive accepted something it should not have, and the damage
+appeared later somewhere else.</p></td>
+<td><p>A primitive shipped <strong>without its legality rule</strong>.</p></td>
+<td><p>Add the rule to the existing primitive. This is repair, not extension,
+and it outranks new features.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Allo cannot express the thing at all, and you are not sure what the
+thing <em>is</em> yet.</p></td>
+<td><p>Not a gap yet. It is a question.</p></td>
+<td><p>Write it on this page with the evidence. An unnamed gap with a repro
+beats a named abstraction without one.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The distinction that matters most in that table is between <strong>cannot express</strong>
+and <strong>cannot refuse</strong>. They look the same from inside a failing build and they
+need opposite extensions. Establish which one you have before proposing
+anything:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Build the thing and look at the IR. If Allo emitted it, Allo can express</span>
+<span class="c1"># it, and what is missing is a refusal -- not a feature.</span>
+<span class="n">s</span> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">kernel</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">module</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Four of the five gaps recorded below turned out to be <em>cannot refuse</em>. The IR
+was already right. Only the frontend, or a checker, was missing.</p>
+</section>
+<section id="the-abstraction-added-here-encoding">
+<span id="extending-allo-encoding"></span><h2>The abstraction added here: <code class="docutils literal notranslate"><span class="pre">Encoding</span></code><a class="headerlink" href="#the-abstraction-added-here-encoding" title="Link to this heading"><span>¶</span></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">allo/encoding.py</span></code> plus the <code class="docutils literal notranslate"><span class="pre">s.encodable_on</span></code> primitive in
+<code class="docutils literal notranslate"><span class="pre">allo/customize.py</span></code>.</p>
+<section id="what-it-is-for">
+<h3>What it is for<a class="headerlink" href="#what-it-is-for" title="Link to this heading"><span>¶</span></a></h3>
+<p>An architecture differs from another architecture mostly in <strong>what one
+instruction word can carry</strong>. A machine with a 3-term address generator and a
+4-deep hardware loop stack refuses schedules that a machine with an
+8-term generator accepts, and neither refusal is a property of the <em>kernel</em> –
+it is a property of the pairing of kernel and target. Before this, Allo had
+nowhere to write that down. <code class="docutils literal notranslate"><span class="pre">configs={&quot;device&quot;:</span> <span class="pre">&quot;u280&quot;}</span></code> names a part number
+for a vendor tool; it says nothing an Allo pass can check.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Encoding</span></code> is that record, and <code class="docutils literal notranslate"><span class="pre">s.encodable_on(encoding)</span></code> makes it a
+standing obligation on a schedule:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">allo.encoding</span><span class="w"> </span><span class="kn">import</span> <span class="n">Encoding</span>
+
+<span class="n">LPU_LIKE</span> <span class="o">=</span> <span class="n">Encoding</span><span class="p">(</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">"deterministic-vliw"</span><span class="p">,</span>
+    <span class="n">has_predicated_fields</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>       <span class="c1"># instruction fields fixed at assembly</span>
+    <span class="n">requires_static_trip_counts</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># the sequencer's trip count is a field</span>
+    <span class="n">requires_affine_addressing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">s</span> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">kernel</span><span class="p">)</span>
+<span class="n">s</span><span class="o">.</span><span class="n">encodable_on</span><span class="p">(</span><span class="n">LPU_LIKE</span><span class="p">)</span>
+<span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"i"</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>        <span class="c1"># raises EncodingError here, not at s.build()</span>
+</pre></div>
+</div>
+<p>The declaration is re-checked after <strong>every</strong> subsequent primitive, and the
+error names the primitive that broke it. That is point 2 of the standard,
+implemented as one call in <code class="docutils literal notranslate"><span class="pre">wrapped_apply</span></code>.</p>
+</section>
+<section id="the-invariants-it-must-preserve">
+<h3>The invariants it must preserve<a class="headerlink" href="#the-invariants-it-must-preserve" title="Link to this heading"><span>¶</span></a></h3>
+<p>These are not style preferences. Breaking any one of them turns a gate into a
+source of miscompiles, which is strictly worse than having no gate.</p>
+<ol class="arabic simple">
+<li><p><strong>A rule refuses; it never transforms.</strong> <code class="docutils literal notranslate"><span class="pre">allo/encoding.py</span></code> imports no
+builder and constructs no op. A gate that also rewrites cannot be trusted as
+a gate, because a failure to refuse becomes a silent rewrite.</p></li>
+<li><p><strong>An unset field constrains nothing.</strong> <code class="docutils literal notranslate"><span class="pre">Encoding()</span></code> must be a no-op on
+every kernel in the tree, and there is a test that says so
+(<code class="docutils literal notranslate"><span class="pre">test_unconstrained_encoding_refuses_nothing</span></code>). Every existing target
+keeps working because every existing target declares nothing.</p></li>
+<li><p><strong>A rule is decidable from the IR in front of it.</strong> No rule may need a
+measurement, a vendor run, or a promise from the user. If a property is not
+decidable, it is not a rule – see the obligation/rule split under
+<a class="reference internal" href="#extending-allo-dependence"><span class="std std-ref">s.dependence – the rule/obligation split, worked</span></a>.</p></li>
+<li><p><strong>A violation carries its repair.</strong> <code class="docutils literal notranslate"><span class="pre">Violation.repair</span></code> is not
+documentation, it is the payload: the reader is usually an agent that has to
+act on the refusal without a catalogue. A refusal that does not say what to
+do instead is a dead end.</p></li>
+<li><p><strong>The rule set is open and the rules are independent.</strong> A rule is a
+generator over <code class="docutils literal notranslate"><span class="pre">Site</span></code> records added to <code class="docutils literal notranslate"><span class="pre">RULES</span></code>; no rule may depend on
+another having run.</p></li>
+</ol>
+</section>
+<section id="the-rules-that-ship-with-it">
+<h3>The rules that ship with it<a class="headerlink" href="#the-rules-that-ship-with-it" title="Link to this heading"><span>¶</span></a></h3>
+<p>Each is stated as the legality sentence that the standard demands.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 22.0%" />
+<col style="width: 44.0%" />
+<col style="width: 34.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Rule</p></th>
+<th class="head"><p>Legal if and only if</p></th>
+<th class="head"><p>Caught at construction</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">predicated-field</span></code></p></td>
+<td><p>every <code class="docutils literal notranslate"><span class="pre">scf.if</span></code> / <code class="docutils literal notranslate"><span class="pre">affine.if</span></code> inside an affine band has a condition
+that is <strong>invariant</strong> in all enclosing induction variables.</p></td>
+<td><p>A reduction whose accumulator is guarded by its own reduction index
+(<code class="docutils literal notranslate"><span class="pre">if</span> <span class="pre">k</span> <span class="pre">==</span> <span class="pre">0</span></code>).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">address-terms</span></code></p></td>
+<td><p>every <code class="docutils literal notranslate"><span class="pre">affine.load</span></code> / <code class="docutils literal notranslate"><span class="pre">affine.store</span></code> depends on at most <code class="docutils literal notranslate"><span class="pre">N</span></code>
+distinct enclosing induction variables. (Distinct <em>variables</em>, not
+subscripts: <code class="docutils literal notranslate"><span class="pre">C[i,</span> <span class="pre">i]</span></code> linearises to one strided term, and MLIR has
+already dropped unused dims from the map, so the count is exact.)</p></td>
+<td><p>A nest one level deeper than the address generator can stride.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">loop-depth</span></code></p></td>
+<td><p>no <code class="docutils literal notranslate"><span class="pre">affine.for</span></code> is nested more than <code class="docutils literal notranslate"><span class="pre">N</span></code> deep.</p></td>
+<td><p>A tiling that outgrows the hardware loop stack.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">static-trip-count</span></code></p></td>
+<td><p>every <code class="docutils literal notranslate"><span class="pre">affine.for</span></code> has single-result lower and upper bound maps with
+no dims and no symbols.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">s.split(axis,</span> <span class="pre">f)</span></code> where <code class="docutils literal notranslate"><span class="pre">f</span></code> does not divide the extent – which
+Allo otherwise accepts, emitting <code class="docutils literal notranslate"><span class="pre">to</span> <span class="pre">min</span> <span class="pre">affine_map&lt;(d0)</span> <span class="pre">-&gt;</span> <span class="pre">(3,</span> <span class="pre">d0</span> <span class="pre">*</span>
+<span class="pre">-3</span> <span class="pre">+</span> <span class="pre">10)&gt;</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">affine-addressing</span></code></p></td>
+<td><p>no <code class="docutils literal notranslate"><span class="pre">memref.load</span></code> / <code class="docutils literal notranslate"><span class="pre">memref.store</span></code> appears inside an affine band.</p></td>
+<td><p>A subscript that fell off Allo’s affine path. <code class="docutils literal notranslate"><span class="pre">build_indices</span></code>
+(<code class="docutils literal notranslate"><span class="pre">allo/ir/builder.py:997</span></code>) takes that fallback <strong>silently</strong> on the
+first non-affine expression, so this is otherwise invisible.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="how-to-add-a-rule">
+<h3>How to add a rule<a class="headerlink" href="#how-to-add-a-rule" title="Link to this heading"><span>¶</span></a></h3>
+<p>Write the legality sentence first. Then:</p>
+<ol class="arabic simple">
+<li><p>Add the field to <code class="docutils literal notranslate"><span class="pre">Encoding</span></code> with a default that constrains nothing.</p></li>
+<li><p>Write the analysis as a free function over a <code class="docutils literal notranslate"><span class="pre">Site</span></code>, and reuse
+<code class="docutils literal notranslate"><span class="pre">varying_induction_variables</span></code> if the question is “does this vary per
+iteration” – two of the five rules are the same analysis asked twice.</p></li>
+<li><p>Write the rule as a generator yielding <code class="docutils literal notranslate"><span class="pre">Violation</span></code>, add it to <code class="docutils literal notranslate"><span class="pre">RULES</span></code>.</p></li>
+<li><p>Add a <strong>pair</strong> of tests: one kernel refused, one kernel accepted for the
+same rule. A gate with only negative tests will happily refuse everything.</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/test_encoding.py<span class="w"> </span>-q<span class="w">     </span><span class="c1"># 12 tests, ~2 s</span>
+</pre></div>
+</div>
+</section>
+<section id="what-it-does-not-do">
+<h3>What it does not do<a class="headerlink" href="#what-it-does-not-do" title="Link to this heading"><span>¶</span></a></h3>
+<p>It does not model instruction <em>semantics</em>, so it cannot tell you whether a
+band computes what an instruction computes; that is
+<a class="reference internal" href="#extending-allo-tensorize"><span class="std std-ref">4. s.tensorize(band, intrinsic) – NOT READY</span></a>, which is not ready. It does not model timing
+or capacity. And it is a necessary condition only: passing every rule does not
+make a schedule encodable, it only means these five reasons for refusing it are
+absent.</p>
+</section>
+</section>
+<section id="the-precedents-in-this-tree">
+<h2>The precedents in this tree<a class="headerlink" href="#the-precedents-in-this-tree" title="Link to this heading"><span>¶</span></a></h2>
+<p>Read these before proposing anything. All three are templates now; the first
+was this page’s warning until its rule landed, and its history is kept below
+because the shape of the repair is the point.</p>
+<section id="s-dependence-the-rule-obligation-split-worked">
+<span id="extending-allo-dependence"></span><h3><code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> – the rule/obligation split, worked<a class="headerlink" href="#s-dependence-the-rule-obligation-split-worked" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">allo/customize.py:836</span></code> and <code class="docutils literal notranslate"><span class="pre">allo/dependence.py</span></code>; fork commit <code class="docutils literal notranslate"><span class="pre">bbea2af0</span></code>
+for the primitive, and the commit that added <code class="docutils literal notranslate"><span class="pre">allo/dependence.py</span></code> for its
+rule. Register item <a class="reference internal" href="limitations.html#limitation-21"><span class="std std-ref">21</span></a>.</p>
+<p>This is the template for <strong>how</strong> to land a primitive on this fork: about 112
+lines of Python that attach a <code class="docutils literal notranslate"><span class="pre">dependence</span></code> attribute to a loop, 46 lines of
+C++ in <code class="docutils literal notranslate"><span class="pre">EmitVivadoHLS.cpp</span></code> to emit the pragma, three tests in
+<code class="docutils literal notranslate"><span class="pre">tests/test_vhls.py</span></code>. It closed a real defect and it is the reason
+TinyTPU-isa’s accumulator reaches II=1.</p>
+<p>It was also, for four days, this page’s own counter-example to point 1 of the
+standard. <code class="docutils literal notranslate"><span class="pre">dependent=False</span></code> is <em>the programmer’s claim</em>, and its docstring
+said so:</p>
+<blockquote>
+<div><p>if the claim is false the RTL computes a wrong answer while every software
+simulation, which ignores the pragma, still passes.</p>
+</div></blockquote>
+<p>The lesson was never “don’t ship primitives with unprovable claims” – an
+escape hatch for what the scheduler cannot prove is exactly what the pragma is
+for. It was that such a primitive has two halves and must ship both, and that
+they must not be confused: a decidable <strong>rule</strong> that is enforced, and an
+undecidable <strong>obligation</strong> that is declared as one so that whoever relies on it
+knows they are discharging it. Both now ship.</p>
+<section id="the-rule">
+<h4>The rule<a class="headerlink" href="#the-rule" title="Link to this heading"><span>¶</span></a></h4>
+<blockquote>
+<div><p>A <code class="docutils literal notranslate"><span class="pre">dependence</span></code> claim is legal <strong>unless</strong> the IR proves a dependence on
+the claimed array at a distance the claim denies.</p>
+</div></blockquote>
+<p><em>Denied distances</em> come from the claim itself: <code class="docutils literal notranslate"><span class="pre">inter</span></code> with
+<code class="docutils literal notranslate"><span class="pre">dependent=False</span></code> denies every distance of one iteration or more; <code class="docutils literal notranslate"><span class="pre">inter</span></code>
+with <code class="docutils literal notranslate"><span class="pre">dependent=True,</span> <span class="pre">distance=d</span></code> denies 1 through <code class="docutils literal notranslate"><span class="pre">d-1</span></code>; <code class="docutils literal notranslate"><span class="pre">intra</span></code> with
+<code class="docutils literal notranslate"><span class="pre">dependent=False</span></code> denies distance 0, i.e. within one iteration.</p>
+<p><strong>Read the direction of that sentence carefully, because backwards it is worse
+than no rule at all.</strong></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 34.0%" />
+<col style="width: 16.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>What the analysis finds</p></th>
+<th class="head"><p>What happens</p></th>
+<th class="head"><p>Why</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>A dependence <strong>provable</strong> at a denied distance.</p></td>
+<td><p><strong>Refused</strong>, naming both accesses, the direction and the distance, and
+the claim that would be legal instead.</p></td>
+<td><p>The claim is false. Vitis will schedule on it and the RTL will compute a
+wrong answer that no simulation shows.</p></td>
+</tr>
+<tr class="row-odd"><td><p>A dependence that is <strong>not provable</strong>.</p></td>
+<td><p><strong>Accepted.</strong></p></td>
+<td><p>This is the entire purpose of the primitive. Refusing here would remove
+the only thing <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dependence</span></code> is for, so the rule must never
+do it.</p></td>
+</tr>
+</tbody>
+</table>
+<p>So the rule can only ever catch a demonstrably false claim. <strong>It never
+confirms a true one</strong>, and a passing check is not evidence that a claim holds.
+<code class="docutils literal notranslate"><span class="pre">tests/test_dependence.py</span></code> states that in both directions, including a
+kernel (<code class="docutils literal notranslate"><span class="pre">A[idx[i]]</span> <span class="pre">=</span> <span class="pre">A[idx[i]]</span> <span class="pre">+</span> <span class="pre">1</span></code>) whose dependence is real, is asserted to
+be real by running it, and is accepted anyway.</p>
+<p><strong>What that evidence is worth, stated plainly.</strong> Every refusal in
+<code class="docutils literal notranslate"><span class="pre">tests/test_dependence.py</span></code> is against a kernel <em>constructed</em> to be refused.
+The rule has never fired on a real design in this tree – because there is no
+false claim in the tree to fire on. All three live claims (TinyTPU-isa’s <code class="docutils literal notranslate"><span class="pre">ar</span></code>
+and the two in <code class="docutils literal notranslate"><span class="pre">tests/test_vhls.py</span></code>) have subscripts the analysis cannot
+resolve, so they are accepted for exactly the reason the primitive exists. A
+stack of cheap checks agreeing is weaker evidence than it looks, and this one
+has not been tested by a real mistake yet.</p>
+<p>The real mistake it <em>would</em> catch has a recognisable shape: an author pipelines
+a reduction or a sliding window whose recurrence is written plainly in the
+subscripts – <code class="docutils literal notranslate"><span class="pre">C[i]</span> <span class="pre">=</span> <span class="pre">C[i-1]</span> <span class="pre">+</span> <span class="pre">A[i]</span></code>, <code class="docutils literal notranslate"><span class="pre">ar[r]</span> <span class="pre">=</span> <span class="pre">ar[r-1]</span> <span class="pre">+</span> <span class="pre">v</span></code> – meets
+<code class="docutils literal notranslate"><span class="pre">Unable</span> <span class="pre">to</span> <span class="pre">enforce</span> <span class="pre">a</span> <span class="pre">carried</span> <span class="pre">dependence</span> <span class="pre">constraint</span> <span class="pre">(II</span> <span class="pre">=</span> <span class="pre">1,</span> <span class="pre">distance</span> <span class="pre">=</span> <span class="pre">1)</span></code>,
+and reaches for <code class="docutils literal notranslate"><span class="pre">inter</span> <span class="pre">false</span></code> to make the message go away instead of
+restructuring the loop. That claim is false, the IR says so, and the rule
+refuses it. The mistake it cannot catch is the one TinyTPU-isa’s design has
+legitimately: the recurrence runs through a register-computed index, the
+subscript says nothing, and only the obligation covers it.</p>
+<p>What the analysis is: a same-element test over subscripts written as
+<code class="docutils literal notranslate"><span class="pre">constant</span> <span class="pre">+</span> <span class="pre">sum(coefficient</span> <span class="pre">*</span> <span class="pre">induction</span> <span class="pre">variable)</span></code>. Two accesses provably
+alias at distance <code class="docutils literal notranslate"><span class="pre">k</span></code> when their forms agree in every coefficient and the
+constants differ by exactly <code class="docutils literal notranslate"><span class="pre">k</span></code> times the claimed axis’s stride and step.
+Everything else – a subscript that is not affine in the induction variables (a
+loaded index, a carried register), a non-uniform stride (<code class="docutils literal notranslate"><span class="pre">A[2*i]</span> <span class="pre">=</span> <span class="pre">A[i]</span></code>), a
+<code class="docutils literal notranslate"><span class="pre">mod</span></code>/<code class="docutils literal notranslate"><span class="pre">floordiv</span></code> subscript, an access under an <code class="docutils literal notranslate"><span class="pre">scf.if</span></code> or <code class="docutils literal notranslate"><span class="pre">affine.if</span></code>,
+an inner loop whose bounds are not constants – yields <em>no proof</em>, which is the
+accepting answer. Each of those is an incompleteness of the rule, and each
+fails in the safe direction by construction.</p>
+<p>The check runs at the <code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> call, before the attribute is written,
+so a refused claim leaves the schedule untouched (point 2 of the standard). It
+then runs again after <strong>every</strong> later primitive, like <code class="docutils literal notranslate"><span class="pre">s.encodable_on</span></code>, and
+re-derives each claim from the loop attribute the emitter reads rather than
+from anything the schedule remembers.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Correction to this page, in the open.</strong> The text here used to say the
+analysis “already exists in C++ (<code class="docutils literal notranslate"><span class="pre">analyzeDependency</span></code>, <code class="docutils literal notranslate"><span class="pre">checkDependence</span></code>,
+<code class="docutils literal notranslate"><span class="pre">mlir/include/allo/Support/Utils.h:111</span></code>) and is not wired to the
+primitive”. Half of that is wrong in a way that matters.
+<code class="docutils literal notranslate"><span class="pre">allo::checkDependence</span></code> (<code class="docutils literal notranslate"><span class="pre">mlir/lib/Support/Utils.cpp:520</span></code>) is
+<code class="docutils literal notranslate"><span class="pre">return</span> <span class="pre">true;</span></code> with its body commented out since <code class="docutils literal notranslate"><span class="pre">cec32446</span></code>, and it has
+no callers. Wiring it to the primitive would have reported <em>every</em> pair of
+accesses as dependent and refused every claim, including TinyTPU-isa’s true
+one – the exact backwards failure the rule above warns about.
+<code class="docutils literal notranslate"><span class="pre">analyzeDependency</span></code> is live but answers a different question (which
+dependence kinds run between two whole loop <em>bands</em>, with no distance), so
+it cannot decide a claim either. The rule is a new analysis in Python,
+where the claim is constructed and where the diagnostic can name the
+subscripts as the author wrote them.</p>
+</div>
+</section>
+<section id="the-obligation">
+<h4>The obligation<a class="headerlink" href="#the-obligation" title="Link to this heading"><span>¶</span></a></h4>
+<p>Everything the rule accepts is still the author’s to discharge, so
+<code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> now takes <code class="docutils literal notranslate"><span class="pre">because=</span></code>: what the claim rests on, in the
+author’s words. Nothing checks it. It is</p>
+<ul class="simple">
+<li><p>recorded on the schedule as <code class="docutils literal notranslate"><span class="pre">s.dependence_obligations</span></code>, a list of
+<code class="docutils literal notranslate"><span class="pre">Obligation(where,</span> <span class="pre">pragma,</span> <span class="pre">premise)</span></code>;</p></li>
+<li><p>emitted into the generated HLS immediately above the pragma, as
+<code class="docutils literal notranslate"><span class="pre">//</span> <span class="pre">dependence</span> <span class="pre">obligation,</span> <span class="pre">checked</span> <span class="pre">by</span> <span class="pre">no</span> <span class="pre">tool:</span> <span class="pre">...</span></code>, which is where a
+reviewer of the RTL will be standing;</p></li>
+<li><p><strong>required in practice</strong>: omitting it warns
+(<code class="docutils literal notranslate"><span class="pre">allo.dependence.UndeclaredPremise</span></code>) at the call site, saying that the
+claim is accepted but not proven and that discharging it is the author’s.</p></li>
+</ul>
+<p>TinyTPU-isa is the worked example, and it is the reason the rule must not
+overreach. <code class="docutils literal notranslate"><span class="pre">accu</span></code>’s <code class="docutils literal notranslate"><span class="pre">ar</span></code> row index is a carried register, so no analysis of
+that kernel can prove or disprove the claim; the claim is true only because
+<code class="docutils literal notranslate"><span class="pre">check_program</span></code> rejects every program that reads an <code class="docutils literal notranslate"><span class="pre">ar</span></code> row within
+<code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span></code> accu iterations of writing it. That guarantee lives in
+<code class="docutils literal notranslate"><span class="pre">assemble()</span></code>, outside the compiler entirely, and <code class="docutils literal notranslate"><span class="pre">because=</span></code> is where
+<code class="docutils literal notranslate"><span class="pre">schedule()</span></code> now says so. The evidence that this half is genuinely
+undecidable is already in the tree: <code class="docutils literal notranslate"><span class="pre">mutate.py</span></code>’s <code class="docutils literal notranslate"><span class="pre">ar_claim_false</span></code> mutant
+sets <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span> <span class="pre">=</span> <span class="pre">1</span></code>, and it is the one mutant that passes <code class="docutils literal notranslate"><span class="pre">bench_isa</span></code>,
+passes <code class="docutils literal notranslate"><span class="pre">stress_isa</span></code>, passes the legality rule, and is caught by
+<code class="docutils literal notranslate"><span class="pre">TPU_TB=stress</span></code> cosimulation alone. The middle claim was checked directly
+rather than assumed: with <code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span> <span class="pre">=</span> <span class="pre">1</span></code> the rule still accepts the claim,
+because the falsehood is in <code class="docutils literal notranslate"><span class="pre">assemble()</span></code> and not in the kernel’s IR.</p>
+</section>
+</section>
+<section id="align-value-an-opt-in-that-admits-it-is-not-sufficient">
+<h3><code class="docutils literal notranslate"><span class="pre">align_value</span></code> – an opt-in that admits it is not sufficient<a class="headerlink" href="#align-value-an-opt-in-that-admits-it-is-not-sufficient" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">configs={&quot;align_value&quot;:</span> <span class="pre">N}</span></code> (<code class="docutils literal notranslate"><span class="pre">allo/backend/hls.py:356</span></code>, register item
+<a class="reference internal" href="limitations.html#limitation-23"><span class="std std-ref">23</span></a>). The template for a <em>promise</em> to a downstream tool:
+opt-in, off by default, no effect on any existing flow. Its register entry is
+recorded as a <strong>negative result</strong> – necessary and not sufficient for port
+widening – which is the right way to leave an extension that did not reach
+its goal. Do that rather than quietly dropping it.</p>
+</section>
+<section id="check-perfect-affine-kernel-the-in-tree-shape-of-a-gate">
+<h3><code class="docutils literal notranslate"><span class="pre">check_perfect_affine_kernel</span></code> – the in-tree shape of a gate<a class="headerlink" href="#check-perfect-affine-kernel-the-in-tree-shape-of-a-gate" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">allo/autoscheduler/util.py:30</span></code>, with <code class="docutils literal notranslate"><span class="pre">check_call_graph_acyclic</span></code>,
+<code class="docutils literal notranslate"><span class="pre">check_all_functions_inlined</span></code>, <code class="docutils literal notranslate"><span class="pre">check_single_producer_single_consumer</span></code>.
+These are whole-program admissibility predicates that run before an expensive
+MILP – point 3 of the standard, already in the tree. Two limitations follow
+them, and <code class="docutils literal notranslate"><span class="pre">Encoding</span></code> exists to fix both: they are <code class="docutils literal notranslate"><span class="pre">assert</span></code>s (so they name
+no site and offer no repair), and the constraints are <strong>hard-coded</strong> rather
+than a property of a declared target, so nothing else can reuse them.</p>
+</section>
+<section id="refusal-as-a-feature">
+<h3>Refusal as a feature<a class="headerlink" href="#refusal-as-a-feature" title="Link to this heading"><span>¶</span></a></h3>
+<p>Fork commit <code class="docutils literal notranslate"><span class="pre">c5a45338</span></code> makes the emitter refuse a <code class="docutils literal notranslate"><span class="pre">Stateful</span></code> shared by more
+than one function instead of emitting silent per-kernel copies. Turning a
+silent miscompile into an error is a legitimate, landable contribution on its
+own. It needs no new syntax.</p>
+</section>
+</section>
+<section id="the-open-gaps-ranked">
+<span id="extending-allo-gaps"></span><h2>The open gaps, ranked<a class="headerlink" href="#the-open-gaps-ranked" title="Link to this heading"><span>¶</span></a></h2>
+<p>Ranked by whether the extension makes <strong>a second architecture expressible</strong>,
+per unit of implementation risk. The end state this serves is a library of
+parametrized, modular units that compose into different architectural choices
+– a deterministic-dataflow pipeline, a tiled NPU, a column of AIE-style tiles
+– with any one accelerator being something the library <em>instantiates</em>.
+An extension that removes a wart from the design we already have ranks below
+one that lets a second design share a representation with it.</p>
+<section id="a-stream-that-can-be-a-port-so-a-unit-can-have-an-interface-done">
+<span id="extending-allo-ports"></span><h3>1. A stream that can be a port, so a unit can have an interface – <strong>done</strong><a class="headerlink" href="#a-stream-that-can-be-a-port-so-a-unit-can-have-an-interface-done" title="Link to this heading"><span>¶</span></a></h3>
+<p>Landed as <code class="docutils literal notranslate"><span class="pre">&#64;df.unit</span></code> plus <code class="docutils literal notranslate"><span class="pre">allo/netlist.py</span></code>; <a class="reference internal" href="stream_ports.html#stream-ports"><span class="std std-ref">Stream Ports: a Unit with an Interface</span></a> is the
+page, and the record below is what was predicted, kept because one half of the
+prediction was wrong in an instructive way.</p>
+<p><strong>What it cost, against the estimate.</strong> No IR change, no C++, no rebuild: about
+420 lines of Python in two new modules (<code class="docutils literal notranslate"><span class="pre">allo/netlist.py</span></code>,
+<code class="docutils literal notranslate"><span class="pre">allo/ir/units.py</span></code>), one method on <code class="docutils literal notranslate"><span class="pre">Stream</span></code>, and five single-line hooks in
+<code class="docutils literal notranslate"><span class="pre">allo/ir/infer.py</span></code> / <code class="docutils literal notranslate"><span class="pre">allo/ir/builder.py</span></code>. The whole <code class="docutils literal notranslate"><span class="pre">tests/dataflow</span></code>
+suite was the regression net, as predicted, and caught nothing – because the
+change is an addition: a region that instantiates no unit is not touched at
+all, and there is a test that says so.</p>
+<p><strong>The correction worth reading.</strong> Blocker 2 below – six <code class="docutils literal notranslate"><span class="pre">.clone()</span></code> sites in
+<code class="docutils literal notranslate"><span class="pre">allo/ir/builder.py</span></code> – was never touched. It is only a blocker if a port has
+to <em>become</em> a block argument in the frontend. It does not:
+<code class="docutils literal notranslate"><span class="pre">move_stream_to_interface</span></code> already turns a kernel’s construct ops into block
+arguments, and it keys them by the op’s <code class="docutils literal notranslate"><span class="pre">name</span></code> attribute, so a port is a
+construct op carrying the <strong>channel’s</strong> name bound to the <strong>unit’s</strong> parameter
+name. Binding those two names is the whole of the mechanism. Blocker 1,
+<code class="docutils literal notranslate"><span class="pre">Stream.__class_getitem__</span></code>, was real and is fixed. The lesson is the one at
+the top of this page, applied to a diagnosis rather than a design: the IR
+being right meant even less had to change than the analysis that found it
+believed.</p>
+<p><strong>The gap, as it was.</strong> A <code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code> cannot name its stream ports. Streams are
+declared as annotations in a <code class="docutils literal notranslate"><span class="pre">&#64;df.region</span></code> body and reached from kernel bodies
+by lexical name, so a unit’s interface is not a property of the unit – it is
+derived, by whole-region analysis (<code class="docutils literal notranslate"><span class="pre">move_stream_to_interface</span></code>), from the
+region it is pasted into. Therefore no unit can be lifted out, imported,
+instantiated twice, or tested alone, and a topology cannot be written down
+separately from the units it wires.</p>
+<p><strong>The evidence.</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/microarch_isa.py</span></code>: one
+<code class="docutils literal notranslate"><span class="pre">&#64;df.region()</span></code> taking no arguments, 8 <code class="docutils literal notranslate"><span class="pre">&#64;df.kernel</span></code>s all nested inside
+it as closures, 0 defined at module level. 16 stream declarations, <strong>29
+capture edges</strong>, and every stream has exactly one producer kernel and one
+consumer kernel. The closure surface is <em>exclusively</em> streams: 0 shared
+arrays, 0 captured Python values, 0 captured region parameters. The blocker
+for lifting a kernel is 2 captured streams at best (<code class="docutils literal notranslate"><span class="pre">dma_st</span></code>) and 5 at
+worst (<code class="docutils literal notranslate"><span class="pre">sequencer</span></code>, <code class="docutils literal notranslate"><span class="pre">pe</span></code>). Nothing else stands in the way.</p></li>
+<li><p>A second, smaller constraint, measured on the decomposed design
+(2026-09-22): <strong>a bit slice’s bounds cannot be symbolic.</strong>
+<code class="docutils literal notranslate"><span class="pre">word[OP_LO:OP_HI]</span></code> with the bounds in the region’s namespace parses,
+builds and computes the right answer, but <code class="docutils literal notranslate"><span class="pre">allo/ir/infer.py:582</span></code> warns
+“Cannot infer the bitwidth of the slice, use UInt(32) as default” and every
+extract widens to i32 – 796 lines of normalized MLIR difference on one
+unit. The consequence is concrete: an instruction’s bit layout can be named
+once for the software that encodes it and must be written out again for the
+hardware that decodes it (<a class="reference internal" href="../designs/tinytpu_library.html#tinytpu-library-symbolic-slice"><span class="std std-ref">The third site cannot, and that is a front-end limitation</span></a>).</p></li>
+<li><p>That design has since been decomposed as far as the current syntax allows
+(<a class="reference internal" href="../designs/tinytpu_library.html"><span class="doc">The Unit Library: Composing a Region from Units</span></a>): all 8 units are module-level functions
+with no closure, and the parameters and ISA constants are passed rather than
+captured. It took <strong>composing the region’s source</strong> to do it, because a
+kernel is reached only as a nested <code class="docutils literal notranslate"><span class="pre">ast.FunctionDef</span></code>. The 29 capture edges
+did not go away – they became 29 <em>declarations</em>, checked against each
+body’s free names, and they are listed per unit at
+<a class="reference internal" href="../designs/tinytpu_library.html#tinytpu-library-capture-census"><span class="std std-ref">The census of what is still bound by name</span></a>. That table is the exact scope of what
+this extension would replace, and the three things still impossible without
+it: two architectures must agree on a channel’s <em>name</em>, a unit cannot be
+instantiated twice against different channels, and a unit cannot be built or
+tested outside a composed region.</p></li>
+<li><p>Upstream’s own suite, independently: <code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_1D_systolic.py</span></code>,
+<code class="docutils literal notranslate"><span class="pre">test_systolic.py</span></code>, <code class="docutils literal notranslate"><span class="pre">test_tiled_systolic.py</span></code>, <code class="docutils literal notranslate"><span class="pre">test_packed_systolic.py</span></code>
+and <code class="docutils literal notranslate"><span class="pre">test_weight_stationary_gemm.py</span></code> are five separate files, each one
+region with <strong>one</strong> kernel, whose topology lives in subscript arithmetic on a
+stream array inside the replicated body. 1-D and 2-D share no unit.</p></li>
+<li><p><strong>The IR is already right.</strong> <code class="docutils literal notranslate"><span class="pre">df.customize</span></code> on a three-kernel region emits
+exactly the composable form – each unit a standalone <code class="docutils literal notranslate"><span class="pre">func.func</span></code> with
+explicit <code class="docutils literal notranslate"><span class="pre">!allo.stream&lt;i32,</span> <span class="pre">4&gt;</span></code> arguments and an <code class="docutils literal notranslate"><span class="pre">stypes</span></code> attribute
+giving each port’s direction (<code class="docutils literal notranslate"><span class="pre">&quot;_o&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;io&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;_i&quot;</span></code>), and the region a
+<code class="docutils literal notranslate"><span class="pre">func.func</span></code> that constructs the streams and wires them by <code class="docutils literal notranslate"><span class="pre">call</span></code>. Allo’s
+IR is a netlist over ported units. Only the frontend cannot write one.</p></li>
+<li><p><strong>Parametrized units already exist too.</strong> <code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_hierachical.py</span></code>
+defines <code class="docutils literal notranslate"><span class="pre">def</span> <span class="pre">inner[P0,</span> <span class="pre">P1](A,</span> <span class="pre">B,</span> <span class="pre">C)</span></code> and instantiates it twice in one
+program as <code class="docutils literal notranslate"><span class="pre">inner[2,</span> <span class="pre">2](...)</span></code> and <code class="docutils literal notranslate"><span class="pre">inner[4,</span> <span class="pre">4](...)</span></code>. Parameters work;
+they just cannot be wired by streams.</p></li>
+</ul>
+<p><strong>The measured blocker.</strong> Two hops, both narrow:</p>
+<ol class="arabic">
+<li><p><code class="docutils literal notranslate"><span class="pre">Stream</span></code> has no <code class="docutils literal notranslate"><span class="pre">__class_getitem__</span></code> (<code class="docutils literal notranslate"><span class="pre">allo/ir/types.py:306</span></code>), so
+<code class="docutils literal notranslate"><span class="pre">Stream[int32,</span> <span class="pre">4]</span></code> raises <code class="docutils literal notranslate"><span class="pre">TypeError:</span> <span class="pre">type</span> <span class="pre">'Stream'</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">subscriptable</span></code>
+whenever it is <em>evaluated</em> – which is what happens in a signature, and
+never happens for a body annotation. <code class="docutils literal notranslate"><span class="pre">Stream</span></code> is a syntax, not a type.</p></li>
+<li><p>With that patched, a module-level kernel with stream ports defines and the
+next failure is one line, repeated six times – once per stream method
+(<code class="docutils literal notranslate"><span class="pre">put</span></code>, <code class="docutils literal notranslate"><span class="pre">get</span></code>, <code class="docutils literal notranslate"><span class="pre">try_put</span></code>, <code class="docutils literal notranslate"><span class="pre">try_get</span></code>, <code class="docutils literal notranslate"><span class="pre">empty</span></code>, <code class="docutils literal notranslate"><span class="pre">full</span></code>) – at
+<code class="docutils literal notranslate"><span class="pre">allo/ir/builder.py</span></code> lines 2610, 2632, 2655, 2686, 2717 and 2745:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">stream</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">get_symbol</span><span class="p">(</span><span class="n">new_name</span><span class="p">)</span><span class="o">.</span><span class="n">clone</span><span class="p">(</span><span class="n">ip</span><span class="o">=</span><span class="n">ctx</span><span class="o">.</span><span class="n">get_stream_construct_ip</span><span class="p">())</span>
+</pre></div>
+</div>
+<p>A stream operation is keyed to a <strong>construct site</strong>, not to a value: it
+re-clones the <code class="docutils literal notranslate"><span class="pre">allo.stream_construct</span></code> op that the declaration created. A
+parameter has no construct site, so a port fails with <code class="docutils literal notranslate"><span class="pre">AttributeError:</span>
+<span class="pre">'MockArg'</span> <span class="pre">object</span> <span class="pre">has</span> <span class="pre">no</span> <span class="pre">attribute</span> <span class="pre">'clone'</span></code>. Meanwhile the <em>op</em> already
+takes a block argument – the lowered dump above is
+<code class="docutils literal notranslate"><span class="pre">allo.stream_put(%arg1,</span> <span class="pre">[],</span> <span class="pre">%0)</span></code> where <code class="docutils literal notranslate"><span class="pre">%arg1</span></code> is a block argument. The
+fix is to resolve the stream as a value.</p>
+</li>
+</ol>
+<p><strong>Legality rules that must ship with it.</strong> These are the point of the
+extension: constraints that are whole-program analyses today become local
+checks on a signature or on one wiring edge. All five shipped, with one
+correction that only the real design could have found: <strong>a stream array is a
+chain</strong>, read at <code class="docutils literal notranslate"><span class="pre">ch[i]</span></code> and written at <code class="docutils literal notranslate"><span class="pre">ch[i</span> <span class="pre">+</span> <span class="pre">1]</span></code> with a runtime index,
+so for an array port neither <em>direction is single-valued</em> nor <em>single
+producer, single consumer</em> is decidable. Both rules are therefore scoped to
+scalar ports, and the array case is declared rather than checked – the same
+split <code class="docutils literal notranslate"><span class="pre">design-modular</span></code>’s architecture check had already arrived at
+independently. The drafted rules, as drafted:</p>
+<ul class="simple">
+<li><p><em>Direction is single-valued.</em> Within a unit, each stream port is used only
+for <code class="docutils literal notranslate"><span class="pre">get</span></code>/<code class="docutils literal notranslate"><span class="pre">empty</span></code> (in) or only for <code class="docutils literal notranslate"><span class="pre">put</span></code>/<code class="docutils literal notranslate"><span class="pre">full</span></code> (out). Mixed use is
+refused. The analysis exists – <code class="docutils literal notranslate"><span class="pre">allo/dataflow.py:127</span></code> already raises
+<code class="docutils literal notranslate"><span class="pre">Stream</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">used</span> <span class="pre">correctly</span></code> – but it runs over a whole region; here it
+runs once per unit and becomes part of the unit’s declared type.</p></li>
+<li><p><em>Wiring type-checks.</em> A stream wired to a port must agree on element type,
+shape, and depth, and the arity must match. Pure construction-time checking.</p></li>
+<li><p><em>Single producer, single consumer.</em> Each stream has exactly one writer
+instance and one reader instance – a degree constraint on the wiring graph,
+checkable without opening any unit. There is already an implementation to
+reuse (<code class="docutils literal notranslate"><span class="pre">check_single_producer_single_consumer</span></code>,
+<code class="docutils literal notranslate"><span class="pre">allo/autoscheduler/util.py:164</span></code>), and TinyTPU-isa’s 16 streams already
+satisfy it, so the rule type-checks the shipped design on day one.</p></li>
+<li><p><em>No dangling port and no unconnected stream.</em> Every port of every instance is
+wired; every declared stream has in-degree and out-degree one.</p></li>
+<li><p><em>Cycles are legal; zero-capacity cycles are not.</em> Feedback is normal in
+dataflow, so acyclicity must <strong>not</strong> be required. The decidable necessary
+condition is that every cycle in the wiring graph has positive total stream
+depth. <strong>Deadlock-freedom itself is not decidable from the netlist</strong> – it
+needs per-unit rates – so that half is an obligation, declared as one, not a
+rule. State this limit in the primitive’s docstring and give the user a way
+to record what they are relying on, the way
+<a class="reference internal" href="#extending-allo-dependence"><span class="std std-ref">s.dependence</span></a> takes <code class="docutils literal notranslate"><span class="pre">because=</span></code>: an
+extension that overstates its own guarantee is the failure mode that
+primitive paid for before its rule landed.</p></li>
+</ul>
+<p><strong>Risk, as estimated.</strong> Moderate, and lower than it looks: the destination IR
+is already emitted and already exercised by the whole <code class="docutils literal notranslate"><span class="pre">tests/dataflow</span></code> suite,
+so this is a frontend path to an existing IR shape rather than a new IR. The
+two blockers above are located to the line. The risk is concentrated in
+<code class="docutils literal notranslate"><span class="pre">allo/ir/builder.py</span></code> and <code class="docutils literal notranslate"><span class="pre">allo/ir/infer.py</span></code>, which the golden tests cover
+densely – run them at every step.</p>
+<p><strong>Risk, as it turned out.</strong> Lower still. <code class="docutils literal notranslate"><span class="pre">allo/ir/builder.py</span></code> took one
+import and two lines. The one defect the work exposed was pre-existing and
+unrelated to ports: <code class="docutils literal notranslate"><span class="pre">get_global_vars</span></code> read a region’s namespace off the
+<code class="docutils literal notranslate"><span class="pre">functools.wraps</span></code> wrapper, i.e. <code class="docutils literal notranslate"><span class="pre">allo/dataflow.py</span></code>’s module dict, and
+every region in the tree resolved its stream declarations correctly only
+because the <em>caller</em> happened to import the same names. See <a class="reference internal" href="stream_ports.html#stream-ports"><span class="std std-ref">Stream Ports: a Unit with an Interface</span></a>.</p>
+</section>
+<section id="encoding-and-s-encodable-on">
+<h3>2. <code class="docutils literal notranslate"><span class="pre">Encoding</span></code> and <code class="docutils literal notranslate"><span class="pre">s.encodable_on</span></code><a class="headerlink" href="#encoding-and-s-encodable-on" title="Link to this heading"><span>¶</span></a></h3>
+<p>Landed; see <a class="reference internal" href="#extending-allo-encoding"><span class="std std-ref">The abstraction added here: Encoding</span></a>. It ranks second on the same
+criterion for a reason worth stating: gap 1 is the <em>unit</em> half of “a library of
+units instantiated on a target”, and this is the <strong>target</strong> half. A unit is
+only reusable if the compiler can check it against the machine it is being
+instantiated for, and before this there was nowhere to say what that machine
+is. The evidence that this was being done outside Allo instead: a loop-nest
+mapper written against TinyTPU-isa hand-codes its four architectural
+constraints in Python over a hand-written assembler, none of it reachable from
+an Allo schedule, and <code class="docutils literal notranslate"><span class="pre">check_perfect_affine_kernel</span></code> hard-codes the
+autoscheduler’s own constraints with no target parameter.</p>
+</section>
+<section id="s-peel-axis-count-1-index-set-splitting">
+<span id="extending-allo-peel"></span><h3>3. <code class="docutils literal notranslate"><span class="pre">s.peel(axis,</span> <span class="pre">count=1)</span></code> – index-set splitting<a class="headerlink" href="#s-peel-axis-count-1-index-set-splitting" title="Link to this heading"><span>¶</span></a></h3>
+<p><strong>The gap.</strong> Allo’s whole mapping vocabulary is <code class="docutils literal notranslate"><span class="pre">split</span></code> and <code class="docutils literal notranslate"><span class="pre">reorder</span></code>.
+There is no way to give one iteration of a loop a different body from the
+rest – no <code class="docutils literal notranslate"><span class="pre">peel</span></code>, no index-set split, no <code class="docutils literal notranslate"><span class="pre">tensorize</span></code>, nothing. So a
+reduction whose first tile must behave differently from the rest can only be
+expressed by writing two loop nests by hand, and once they are two nests no
+primitive can tile or reorder them together.</p>
+<p><strong>The evidence.</strong> Measured on a two-level loop-nest mapspace for TinyTPU-isa
+(branch <code class="docutils literal notranslate"><span class="pre">act-investigation</span></code>,
+<code class="docutils literal notranslate"><span class="pre">examples/accelerator/tinytpu_vitis/act_nest.py</span></code>; reproduced here):
+<strong>1,226 nests enumerated, 3 encodable, and 1,150 of them refused at one
+instruction field, ``acc``.</strong> The <code class="docutils literal notranslate"><span class="pre">k</span> <span class="pre">=</span> <span class="pre">0</span></code> tile has to be a peelable prefix,
+which pins the reduction innermost and unsplit and kills every permutation that
+moves it. The next constraint down, the 3-term address generator, refuses 17.
+The 4-deep loop stack refuses none.</p>
+<p><strong>Two corrections to that evidence, both found after this page was first
+written, and both worth reading before relying on the headline.</strong> First, the
+mechanism: <code class="docutils literal notranslate"><span class="pre">acc</span></code> is <em>not</em> a static field that cannot be driven from an
+induction variable. It is <code class="docutils literal notranslate"><span class="pre">mm</span></code>’s <code class="docutils literal notranslate"><span class="pre">f2</span></code>, <code class="docutils literal notranslate"><span class="pre">f2</span></code> is a legal AGU target, and
+driving it from the reduce loop assembles for exactly two k-tiles before
+rejecting at Kt≥3 — the obstacle is <strong>additive monotonicity in the address
+term</strong>. The need for <code class="docutils literal notranslate"><span class="pre">s.peel</span></code> is unaffected, since a peelable prefix is still
+the only way to express the first tile differently; what changes is that the
+hardware fix is cheaper than “make the field dynamic” implies. Second, the
+count: a first-cause census hides overlap, and <strong>930 of those 1,150 nests also
+violate the accumulator RAW-distance contract</strong>, so the primitive does not
+recover 94 % of the mapspace on its own. Sorted by the distinction this page
+argues for, it is <strong>1,166 express against 55 refuse</strong>.</p>
+<p>A third fact, which is the one that should temper any promise made for this
+primitive: widening the address generator from 3 terms to 4 raises the
+encodable count and <strong>does not change the chosen nest</strong>, so the emitted program
+is identical, the cycles do not move, and the area rises. Enlarging a legal set
+is not the same as improving a design, and this mapspace has already
+demonstrated the difference.</p>
+<p><strong>Legality rule.</strong> <code class="docutils literal notranslate"><span class="pre">s.peel(axis,</span> <span class="pre">count)</span></code> is legal if and only if <code class="docutils literal notranslate"><span class="pre">axis</span></code>
+names a loop with constant bounds whose trip count exceeds <code class="docutils literal notranslate"><span class="pre">count</span></code>. Peeling
+is an index-set split, not a reordering, so it is unconditionally
+semantics-preserving for a sequential <code class="docutils literal notranslate"><span class="pre">affine.for</span></code> – which is what makes
+this a rule and not an obligation. The real content of the rule is the handle
+algebra: after peeling, the band has two loops where it had one, so any
+<code class="docutils literal notranslate"><span class="pre">LoopWrapper</span></code> previously captured for <code class="docutils literal notranslate"><span class="pre">axis</span></code>, and any replayed
+<code class="docutils literal notranslate"><span class="pre">primitive_sequences</span></code> entry naming it, is invalid and must be refused rather
+than silently resolved to one of the two.</p>
+<p><strong>Construction-time checking</strong> catches a non-constant bound, <code class="docutils literal notranslate"><span class="pre">count</span></code> at or
+above the trip count, and a stale handle.</p>
+<p><strong>Risk.</strong> Higher than it sounds. Every structural primitive in Allo is a
+dialect op consumed by the C++ <code class="docutils literal notranslate"><span class="pre">loop-opt</span></code> pass, so this needs <code class="docutils literal notranslate"><span class="pre">allo.peel</span></code>
+in <code class="docutils literal notranslate"><span class="pre">AlloOps.td</span></code>, an implementation in <code class="docutils literal notranslate"><span class="pre">LoopTransformations.cpp</span></code>, and a
+rebuild of <code class="docutils literal notranslate"><span class="pre">mlir/build</span></code>. It is the largest unlock on this list and the one
+most likely to go wrong; do it after gap 1, not before, and never by pointing
+one worktree’s build at another worktree’s tree.</p>
+</section>
+<section id="s-tensorize-band-intrinsic-not-ready">
+<span id="extending-allo-tensorize"></span><h3>4. <code class="docutils literal notranslate"><span class="pre">s.tensorize(band,</span> <span class="pre">intrinsic)</span></code> – NOT READY<a class="headerlink" href="#s-tensorize-band-intrinsic-not-ready" title="Link to this heading"><span>¶</span></a></h3>
+<p><strong>The gap.</strong> Nothing in Allo says “this innermost band <em>is</em> one instruction of
+shape T x T”. The mapper cited above hand-codes it: its <code class="docutils literal notranslate"><span class="pre">split_body</span></code> asserts
+that the innermost level carries all three ranks, that two of them equal the
+array dimension, and that the third is within <code class="docutils literal notranslate"><span class="pre">MAXROWS</span></code>. Every accelerator
+design repeats that by hand.</p>
+<p><strong>Why it is not ready.</strong> It cannot state its own legality rule. “This band
+implements this instruction” requires a model of instruction semantics to check
+against, and Allo has none – there is no instruction op, no ISA type, nothing
+in the dialect between <code class="docutils literal notranslate"><span class="pre">affine.for</span></code> and the HLS emitter. Without that, a
+<code class="docutils literal notranslate"><span class="pre">tensorize</span></code> primitive would be a promise with no discharger, i.e.
+<a class="reference internal" href="#extending-allo-dependence"><span class="std std-ref">s.dependence</span></a> before its repair, on a much
+larger surface: a wrong <code class="docutils literal notranslate"><span class="pre">dependence</span></code> claim costs a wrong pipeline, a wrong
+<code class="docutils literal notranslate"><span class="pre">tensorize</span></code> claim costs a wrong answer.</p>
+<p><strong>What would make it ready.</strong> A checkable instruction semantics. Note the
+narrow path: a <em>structural</em> rule (the band’s shape, rank set and access
+pattern match the intrinsic’s declaration) is decidable and would catch most
+mistakes, while equivalence of the computation is not. If you take that path,
+ship the structural rule as the rule, and declare the semantic half an
+obligation – do not let the structural check imply the semantic one.</p>
+</section>
+<section id="repair-give-s-dependence-its-rule-done">
+<h3>5. Repair: give <code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> its rule – <strong>done</strong><a class="headerlink" href="#repair-give-s-dependence-its-rule-done" title="Link to this heading"><span>¶</span></a></h3>
+<p>Not a new abstraction, which is why it ranked below the four, but it had the
+best ratio of risk to harm removed. Landed as <code class="docutils literal notranslate"><span class="pre">allo/dependence.py</span></code> with
+<code class="docutils literal notranslate"><span class="pre">tests/test_dependence.py</span></code>: the rule refuses a provably false claim, accepts
+an unprovable one, and <code class="docutils literal notranslate"><span class="pre">because=</span></code> carries the half that is not decidable.
+<a class="reference internal" href="#extending-allo-dependence"><span class="std std-ref">s.dependence – the rule/obligation split, worked</span></a> is now the precedent for that split rather
+than the warning against skipping it.</p>
+<p>One thing it found and did not fix: <code class="docutils literal notranslate"><span class="pre">s.split</span></code> rewrites a band onto two new
+loops and carries the <code class="docutils literal notranslate"><span class="pre">dependence</span></code> attribute onto neither, so a claim made
+before a split silently disappears along with its pragma
+(<code class="docutils literal notranslate"><span class="pre">test_a_loop_transformation_drops_the_claim_rather_than_moving_it</span></code>). That is
+a defect in the loop transformations, not in the rule, and it is why no
+primitive in this tree can currently falsify a standing claim. It belongs to
+whoever next touches <code class="docutils literal notranslate"><span class="pre">LoopTransformations.cpp</span></code>.</p>
+</section>
+</section>
+<section id="before-you-claim-an-extension-is-legal">
+<h2>Before you claim an extension is legal<a class="headerlink" href="#before-you-claim-an-extension-is-legal" title="Link to this heading"><span>¶</span></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>[ ] The legality sentence is written down, in the form
+    "X is legal if and only if ...", in the docstring and on this page.
+[ ] What the rule cannot decide is named as an obligation, not implied to
+    be checked.
+[ ] There is a refused example AND an accepted example, as tests.
+[ ] The default constrains nothing, and a test proves the no-op case.
+[ ] The mistake is refused at the call that made it, not at build time.
+[ ] The diagnostic names the site and the repair.
+[ ] No rule transforms anything.
+[ ] The golden tests pass, and you say that you ran them:
+      python tests/dataflow/test_df_unit.py
+      python tests/dataflow/test_region_stateful.py
+[ ] The fork-vs-upstream feature map is updated:
+      https://github.com/sunwookim028/allo/issues/13
+</pre></div>
+</div>
+<p>The last two are not formalities. Everything on this page was found by running
+things, and every number on it was measured in this tree.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+    
+        <div id="show_right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&lt;</span><span>Page contents</span></a></p>
+        </div>
+
+        <div id="right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
+            <div class="page_toc">
+                <ul>
+<li><a class="reference internal" href="#">Extending Allo’s Abstractions</a><ul>
+<li><a class="reference internal" href="#start-from-the-symptom">Start from the symptom</a></li>
+<li><a class="reference internal" href="#the-abstraction-added-here-encoding">The abstraction added here: <code class="docutils literal notranslate"><span class="pre">Encoding</span></code></a><ul>
+<li><a class="reference internal" href="#what-it-is-for">What it is for</a></li>
+<li><a class="reference internal" href="#the-invariants-it-must-preserve">The invariants it must preserve</a></li>
+<li><a class="reference internal" href="#the-rules-that-ship-with-it">The rules that ship with it</a></li>
+<li><a class="reference internal" href="#how-to-add-a-rule">How to add a rule</a></li>
+<li><a class="reference internal" href="#what-it-does-not-do">What it does not do</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#the-precedents-in-this-tree">The precedents in this tree</a><ul>
+<li><a class="reference internal" href="#s-dependence-the-rule-obligation-split-worked"><code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> – the rule/obligation split, worked</a><ul>
+<li><a class="reference internal" href="#the-rule">The rule</a></li>
+<li><a class="reference internal" href="#the-obligation">The obligation</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#align-value-an-opt-in-that-admits-it-is-not-sufficient"><code class="docutils literal notranslate"><span class="pre">align_value</span></code> – an opt-in that admits it is not sufficient</a></li>
+<li><a class="reference internal" href="#check-perfect-affine-kernel-the-in-tree-shape-of-a-gate"><code class="docutils literal notranslate"><span class="pre">check_perfect_affine_kernel</span></code> – the in-tree shape of a gate</a></li>
+<li><a class="reference internal" href="#refusal-as-a-feature">Refusal as a feature</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#the-open-gaps-ranked">The open gaps, ranked</a><ul>
+<li><a class="reference internal" href="#a-stream-that-can-be-a-port-so-a-unit-can-have-an-interface-done">1. A stream that can be a port, so a unit can have an interface – <strong>done</strong></a></li>
+<li><a class="reference internal" href="#encoding-and-s-encodable-on">2. <code class="docutils literal notranslate"><span class="pre">Encoding</span></code> and <code class="docutils literal notranslate"><span class="pre">s.encodable_on</span></code></a></li>
+<li><a class="reference internal" href="#s-peel-axis-count-1-index-set-splitting">3. <code class="docutils literal notranslate"><span class="pre">s.peel(axis,</span> <span class="pre">count=1)</span></code> – index-set splitting</a></li>
+<li><a class="reference internal" href="#s-tensorize-band-intrinsic-not-ready">4. <code class="docutils literal notranslate"><span class="pre">s.tensorize(band,</span> <span class="pre">intrinsic)</span></code> – NOT READY</a></li>
+<li><a class="reference internal" href="#repair-give-s-dependence-its-rule-done">5. Repair: give <code class="docutils literal notranslate"><span class="pre">s.dependence</span></code> its rule – <strong>done</strong></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#before-you-claim-an-extension-is-legal">Before you claim an extension is legal</a></li>
+</ul>
+</li>
+</ul>
+
+            </div>
+        </div>
+    
+
+      <div class="clearer"></div>
+    </div>
+    <div class="button_nav_wrapper">
+        <div class="button_nav">
+            <div class="left">
+                
+                <a href="../gallery/developer_02_mlir.html">
+                    <span class="icon">&lt;</span><span>MLIR Translation Guide</span></a>
+                
+            </div>
+
+            <div class="right">
+                
+                    <a href="stream_ports.html"><span>Stream Ports: a Unit with an Interface</span><span class="icon">&gt;</span></a>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Allo Authors.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+
+<p id="theme_credit">Styled using the <a href="https://github.com/piccolo-orm/piccolo_theme">Piccolo Theme</a></p>
+  </body>
+</html>

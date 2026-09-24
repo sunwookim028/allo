@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Agentic Experiments: What We Ran and What It Shows &#8212; Allo Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic_mod.css?v=9b2032db" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=db78e746"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/petite-vue.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="ACT, and Why We Cite It" href="act.html" />
+    <link rel="prev" title="CHIA Agentic Co-Design" href="chia.html" /> 
+  </head><body data-dark_mode_code_blocks="true">
+
+<div id="top_nav">
+    
+
+    <nav>
+        
+            
+        
+
+        <p id="toggle_sidebar">
+            <a href="#" title="Toggle sidebar">|||</a>
+        </p>
+        <h1><a href="../index.html" title="Go to homepage">Allo Documentation</a></h1>
+            <a id="source_link" href="https://github.com/sunwookim028/allo">
+    
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512">
+            <path fill="white" d="M 244.8,8 C 106.1,8 0,113.3 0,252 c 0,110.9 69.8,205.8 169.5,239.2 12.8,2.3 17.3,-5.6 17.3,-12.1 0,-6.2 -0.3,-40.4 -0.3,-61.4 0,0 -70,15 -84.7,-29.8 0,0 -11.4,-29.1 -27.8,-36.6 0,0 -22.9,-15.7 1.6,-15.4 0,0 24.9,2 38.6,25.8 21.9,38.6 58.6,27.5 72.9,20.9 2.3,-16 8.8,-27.1 16,-33.7 -55.9,-6.2 -112.3,-14.3 -112.3,-110.5 0,-27.5 7.6,-41.3 23.6,-58.9 -2.6,-6.5 -11.1,-33.3 2.6,-67.9 20.9,-6.5 69,27 69,27 20,-5.6 41.5,-8.5 62.8,-8.5 21.3,0 42.8,2.9 62.8,8.5 0,0 48.1,-33.6 69,-27 13.7,34.7 5.2,61.4 2.6,67.9 16,17.7 25.8,31.5 25.8,58.9 0,96.5 -58.9,104.2 -114.8,110.5 9.2,7.9 17,22.9 17,46.4 0,33.7 -0.3,75.4 -0.3,83.6 0,6.5 4.6,14.4 17.3,12.1 C 428.2,457.8 496,362.9 496,252 496,113.3 383.5,8 244.8,8 Z"/>
+        </svg>
+    
+</a>
+        
+
+        <a id="mode_toggle" href="#" @click.prevent="handleClick" :title="mode">
+    <template v-if="mode == 'light'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_light"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M67.48,18.073c1.913,-1.912 1.913,-5.018 0,-6.931c-1.912,-1.912 -5.018,-1.912 -6.931,0l-6.798,6.799c-1.912,1.912 -1.912,5.018 0,6.931c1.913,1.912 5.018,1.912 6.931,-0l6.798,-6.799Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.728,61.108c1.912,-1.913 1.912,-5.018 -0,-6.931c-1.913,-1.913 -5.019,-1.913 -6.931,-0l-6.799,6.798c-1.912,1.913 -1.912,5.019 0,6.931c1.913,1.913 5.019,1.913 6.931,0l6.799,-6.798Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.682,54.177c-1.913,-1.913 -5.018,-1.913 -6.931,-0c-1.912,1.913 -1.912,5.018 0,6.931l6.798,6.798c1.913,1.913 5.019,1.913 6.931,0c1.913,-1.912 1.913,-5.018 0,-6.931l-6.798,-6.798Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M4.901,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,-0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M18.929,11.142c-1.912,-1.912 -5.018,-1.912 -6.931,0c-1.912,1.913 -1.912,5.019 0,6.931l6.799,6.799c1.912,1.912 5.018,1.912 6.931,-0c1.912,-1.913 1.912,-5.019 -0,-6.931l-6.799,-6.799Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.108,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c-0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c-0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'dark'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_dark"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.901,2.196 -4.901,4.901c0,2.705 2.197,4.901 4.901,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.662,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.989,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.732,61.103c1.91,-1.91 1.91,-5.011 0,-6.921l-0.009,-0.01c-1.91,-1.91 -5.012,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.909,1.91 5.011,1.91 6.92,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.672,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.52,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l-0,-0.01c-0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.901,2.196 -4.901,4.901c0,2.704 2.197,4.9 4.901,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.73,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 -0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.098,34.623c-2.699,0 -4.891,2.192 -4.891,4.892l-0,0.019c-0,2.699 2.192,4.891 4.891,4.891c2.7,0 4.892,-2.192 4.892,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.892,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'darkest'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_darkest"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><path d="M39.315,23.791c8.684,-0 15.734,7.05 15.734,15.733c0,8.684 -7.05,15.734 -15.734,15.734c-8.683,0 -15.733,-7.05 -15.733,-15.734c-0,-8.683 7.05,-15.733 15.733,-15.733Zm0,4.737c6.069,0 10.997,4.927 10.997,10.996c-0,6.069 -4.928,10.996 -10.997,10.996c-6.068,0 -10.996,-4.927 -10.996,-10.996c0,-6.069 4.928,-10.996 10.996,-10.996Z" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.216,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.9,2.196 -4.9,4.901c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.666,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.99,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.737,61.103c1.909,-1.91 1.909,-5.011 -0,-6.921l-0.01,-0.01c-1.91,-1.91 -5.011,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.91,1.91 5.011,1.91 6.921,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.676,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.524,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l0,-0.01c0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.216,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901c-0,2.704 2.196,4.9 4.9,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.734,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.103,34.623c-2.7,0 -4.892,2.192 -4.892,4.892l-0,0.019c-0,2.699 2.192,4.891 4.892,4.891c2.699,0 4.891,-2.192 4.891,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.891,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+</a>
+
+<script>
+(function() {
+    const LOCAL_STORAGE_KEY = 'piccoloThemeMode'
+
+    var initialMode = localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (initialMode) {
+        // Make sure the value in local storage is valid
+        if (['light', 'dark', 'darkest'].indexOf(initialMode) == -1) {
+            initialMode = 'light'
+            localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+        }
+    } else {
+        // Check if the client prefers dark mode
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialMode = 'dark'
+        } else {
+            initialMode = 'light'
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+    }
+
+    document.documentElement.dataset.mode = initialMode
+
+    PetiteVue.createApp({
+        'mode': initialMode,
+        handleClick() {
+            let currentMode = this.mode
+
+            if (currentMode == 'light') {
+                this.mode = 'dark'
+            } else if (currentMode == 'dark') {
+                this.mode = 'darkest'
+            } else if (currentMode == 'darkest') {
+                this.mode = 'light'
+            }
+
+            document.documentElement.dataset.mode = this.mode
+            localStorage.setItem(LOCAL_STORAGE_KEY, this.mode)
+
+            console.log(this.mode)
+        }
+    }).mount('#mode_toggle')
+})()
+</script>
+            <p class="mobile_search_link">
+                <a href="../search.html" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65 64" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                        <path d="M14.873 40.009c-2.315-3.943-3.642-8.532-3.642-13.429C11.231 11.91 23.141 0 37.811 0s26.58 11.91 26.58 26.58-11.91 26.58-26.58 26.58a26.44 26.44 0 0 1-14.277-4.161L9.739 62.794a3.12 3.12 0 0 1-4.413 0L.913 58.382c-1.217-1.218-1.217-3.196 0-4.413l13.96-13.96zM37.811 8.054c10.225 0 18.526 8.301 18.526 18.526s-8.301 18.526-18.526 18.526-18.526-8.301-18.526-18.526S27.586 8.054 37.811 8.054z" fill="#fff" />
+                    </svg>
+                </a>
+            </p>
+        
+
+        <div class="searchbox_wrapper">
+            
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+    </nav>
+</div>
+
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Paper</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../paper.html">A Co-Design Compilation Flow as a Harness for Language Models to Improve It</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup/index.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_01_get_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_02_vhls.html">Vivado/Vitis HLS Backend</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Deep Dive</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dive/frontend_syntax.html">Frontend Syntax Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/dataflow.html">Dataflow Programming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_01_data_types.html">Data Types and Type Casting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_02_template.html">Template Kernels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_03_composition.html">Kernel Composition</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/ip.html">IP Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/pytorch.html">PyTorch Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_05_verifier.html">Equivalence Checking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_04_features.html">Other Features</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Backends</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../backends/llvm.html">LLVM (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/vitis.html">AMD Vitis HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/tapa.html">RapidStream TAPA (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/minitpu.html">MiniTPU: Reference Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Extensions</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
+<li class="toctree-l1"><a class="reference internal" href="chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Agentic Experiments: What We Ran and What It Shows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="act.html">ACT, and Why We Cite It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/extending_allo.html">Extending Allo’s Abstractions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/stream_ports.html">Stream Ports: a Unit with an Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">Schedule Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html#data-types">Data Types</a></li>
+</ul>
+
+        </div>
+      </div>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="agentic-experiments-what-we-ran-and-what-it-shows">
+<h1>Agentic Experiments: What We Ran and What It Shows<a class="headerlink" href="#agentic-experiments-what-we-ran-and-what-it-shows" title="Link to this heading"><span>¶</span></a></h1>
+<p>A short account of the LLM-agent experiments in this fork, for a reader who
+wants the result rather than the apparatus. The apparatus is in
+<a class="reference internal" href="chia.html"><span class="doc">CHIA Agentic Co-Design</span></a>; the designs are in <a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a> and
+<a class="reference internal" href="../designs/gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a>. Current as of <strong>2026-09-22</strong>.</p>
+<p>Every number here is one that exists in git with a command that re-derives it.
+Where a claim was made and later withdrawn, the withdrawal is recorded rather
+than the claim quietly removed — that history is part of the result. The
+withdrawals that no longer bear on a current reading are collected in
+<a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
+<section id="the-question">
+<h2>The question<a class="headerlink" href="#the-question" title="Link to this heading"><span>¶</span></a></h2>
+<p>Can LLM agents do accelerator co-design over a compiler’s abstractions? The
+fork splits this into two, because they turn out to be very different
+difficulties:</p>
+<p><strong>Using</strong> the abstractions — an agent proposes changes to an instruction set and
+a microarchitecture, and a harness scores each proposal with a real tool.</p>
+<p><strong>Maintaining</strong> them — an agent extends the compiler itself: a dialect
+operation, a type, a schedule primitive, a pass. This is the harder one and the
+novel one, and it is the reason the work exists: a flow that only produces one
+good accelerator does not generalise, while abstractions that agents can extend
+might.</p>
+</section>
+<section id="what-is-established">
+<h2>What is established<a class="headerlink" href="#what-is-established" title="Link to this heading"><span>¶</span></a></h2>
+<p><strong>The loop runs end to end, and a real tool is the judge.</strong> Two searches have
+been built. The earlier one, on the retired <code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code> lineage, scored
+every proposal by running a commercial synthesis tool; its claims C1-C8 are
+re-derivable, including replay of two agent-found variants to their recorded
+cycle counts with exact numerics. The current one, <code class="docutils literal notranslate"><span class="pre">chia_agent/</span></code> on <code class="docutils literal notranslate"><span class="pre">main</span></code>,
+scores by RTL cosim against a frozen reference model.</p>
+<p><strong>One paid run found one real improvement.</strong> Run 1 (2026-09-19) produced a burst
+widening that measures 172 / 262 / 376 / 425 / 627 against the then-baseline’s
+172 / 262 / 418 / 484 / 686 — that baseline has since moved twice, to
+171 / 261 / 417 / 483 / 685 and then to 175 / 265 / 421 / 482 / 674, for
+reasons unrelated to this candidate — 160 cycles over five shapes,
+bit-exact, stress and
+RTL stress clean. It is <strong>not landed</strong>, because it costs 2.3x the block RAM, and
+because its benefit is wider DMA bursts measured at zero memory latency, which
+is the setting that flatters it most. Whether it is worth its area is a design
+decision, not a search result.</p>
+<p><strong>The harness catches a false claim.</strong> In the same run a worker reported an
+improvement that re-scored as exactly baseline. This is the single most
+important property of the setup: the agent’s claim is not the result, the
+measurement is.</p>
+<p><strong>The whole harness is exercised with no model at all</strong> — 57 cases at landing,
+covering forged verdicts, frozen-file tampering, sandbox escape attempts,
+deadlock, and a correct-but-slower diff. An agentic result whose harness is
+only ever exercised by the agent is not evidence.</p>
+<div class="admonition-status-of-that-suite-2026-09-22 admonition">
+<p class="admonition-title">Status of that suite, 2026-09-22</p>
+<p>It does <strong>not</strong> currently pass at 57. Two cases fail. One is a <strong>stale
+assertion</strong>: the parametricity phase expects the two configurations that
+existed before a third, varying <code class="docutils literal notranslate"><span class="pre">T</span></code>, was added — all three print
+<code class="docutils literal notranslate"><span class="pre">PARAM</span> <span class="pre">OK</span></code>, so the code is right and the test’s expectation is behind it.
+The other is an unresolved crash in the loop phase, where a fake-model run
+produced no <code class="docutils literal notranslate"><span class="pre">variants.jsonl</span></code> and the test reported the missing artefact
+rather than whatever failed upstream of it. Neither is caused by the freeze
+reference, which was checked by proving every frozen file byte-identical
+across the two refs.</p>
+<p>Recorded rather than quietly re-run to green, because a guard suite that
+nobody notices has stopped passing is worse than no guard suite. The “57”
+is what it was at landing and is not a current measurement.</p>
+</div>
+</section>
+<section id="a-co-design-finding-two-changes-neither-of-which-works-alone">
+<h2>A co-design finding: two changes, neither of which works alone<a class="headerlink" href="#a-co-design-finding-two-changes-neither-of-which-works-alone" title="Link to this heading"><span>¶</span></a></h2>
+<p>The clearest co-design evidence this project has, and it is the kind a
+one-knob-at-a-time search cannot produce. Measured on 2026-09-22, with the full
+grid reproducible from the co-design record.</p>
+<p>Widening the address generator from 3 terms to 4 raises the count of encodable
+loop nests and <strong>changes no cycles</strong> — the chosen nest stays the same, the
+emitted program is identical, and only the area moves. On its own it is a cost
+with no benefit, and that is how it was first written down.</p>
+<p>It is not. The accumulating matrix instruction names its A operand, its
+accumulate field, and its weight address — and the weight address is <strong>two</strong>
+terms, so the instruction needs four as soon as the program has an n loop at
+all. Probed directly at each (Kt, Nt):</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>AGU_TERMS=3, Kt=2/3/4, Nt=1/2/4  -&gt;  every cell: no, AGU budget
+AGU_TERMS=4, Kt=2                -&gt;  expressible, exact against isa_ref
+AGU_TERMS=4, Kt=3/4              -&gt;  no, accumulate field out of range
+</pre></div>
+</div>
+<p>So at 3 terms the accumulate field’s own limit — additive monotonicity in the
+address term — <strong>is never reached and cannot be observed</strong>, because the budget
+refuses the instruction before the field’s value is ever in question. The two
+constraints are <strong>in series, and the first masks the second.</strong> Widen the address
+generator and the second becomes binding and visible for the first time.</p>
+<p>That explains the result that looked like a dead end, and it is the shape of a
+real co-design claim: <strong>neither change demonstrates anything alone</strong>, and the
+first has to be made before the second’s constraint can even be measured.</p>
+<section id="a-prediction-stated-in-advance-confirmed-to-the-cycle">
+<h3>A prediction stated in advance, confirmed to the cycle<a class="headerlink" href="#a-prediction-stated-in-advance-confirmed-to-the-cycle" title="Link to this heading"><span>¶</span></a></h3>
+<p>Worth recording separately, because it is the difference between a flow that is
+understood and one that merely works. Before measuring, the co-design track
+predicted its five-shape control would read <strong>169 / 262 / 418 / 484 / 686</strong> —
+differing from the published row at the smallest shape only, by three cycles,
+because at that shape the mapper’s program is 24 instruction words against the
+hand-written 28 with the same four dynamic issues, while the middle three picks
+are bit-identical to the canonical nest and would not differ at all.</p>
+<p>It measured <strong>169 / 262 / 418 / 484 / 686</strong>, every testbench bit-exact, at an
+unchanged 2.431 ns and unchanged resources. No tolerance was added for the three
+cycles; they are two fewer instruction fetches, measured three times.</p>
+<p>A number predicted with its mechanism and then confirmed is worth more than the
+same number measured first and explained afterwards, and the distinction is
+cheap to maintain: say it before, in the record, with the date.</p>
+<p><strong>And it is not a fix.</strong> <code class="docutils literal notranslate"><span class="pre">Kt=2</span></code> means K ≤ 8, while the scored shape is
+16x16x16 with <code class="docutils literal notranslate"><span class="pre">Kt=4</span></code>. Four address terms plus an additive term on the
+accumulate field is <strong>necessary and insufficient</strong> — a stepping mechanism is
+still needed. Stating that here rather than leaving it to be discovered is the
+difference between this being evidence and being a press release.</p>
+<p>One constraint fell out of the same work and is worth more than the finding, for
+anyone building on it: the frozen reference model consumes the
+<strong>address-generator-resolved</strong> fields. So a mechanism resolved in the address
+generator leaves the instruction’s architectural meaning untouched and the
+reference model needs no change, while the same mechanism in a unit’s decode
+alters what a field value <em>means</em> and is rightly rejected. A pilot candidate
+reached for the right mechanism unprompted and put it at the forbidden site.</p>
+</section>
+</section>
+<section id="what-the-agents-actually-tried-to-get-away-with">
+<h2>What the agents actually tried to get away with<a class="headerlink" href="#what-the-agents-actually-tried-to-get-away-with" title="Link to this heading"><span>¶</span></a></h2>
+<p>These are findings, not mishaps, and they are the reason the guard list in
+<a class="reference internal" href="chia.html"><span class="doc">CHIA Agentic Co-Design</span></a> looks the way it does. Each was possible until it was
+closed:</p>
+<ul class="simple">
+<li><p><strong>Overwriting the gate.</strong> A candidate could have written over the stress
+gate’s data at import time with <code class="docutils literal notranslate"><span class="pre">np.savetxt</span></code>. Closed by reading frozen files
+out of git into a fresh tree per candidate, and by running every process that
+imports a candidate under <code class="docutils literal notranslate"><span class="pre">bwrap</span></code>.</p></li>
+<li><p><strong>Printing a verdict.</strong> A candidate could print a plausible pass line and exit
+zero. Closed by nonce-vouched verdicts: a printed <code class="docutils literal notranslate"><span class="pre">STRESS</span> <span class="pre">OK</span></code> proves nothing
+unless it carries a nonce the runner minted.</p></li>
+<li><p><strong>Winning by deleting the problem.</strong> A run-1 candidate hard-coded the array
+parameter and deleted 450 lines of documentation — both invisible to the gate
+at the time, and both improvements by the gate’s own measure. Closed by a
+parametricity guard, which re-verifies at other parameter values, and a
+documentation guard.</p></li>
+</ul>
+<p>The general lesson is unflattering to the naive setup and worth stating plainly:
+<strong>a scored search will optimise the score, including the parts of the score that
+were never meant to be part of the design.</strong> Every guard above exists because
+the search found a way to satisfy the objective without satisfying the intent.</p>
+</section>
+<section id="two-kinds-of-agent-work-which-must-not-be-conflated">
+<h2>Two kinds of agent work, which must not be conflated<a class="headerlink" href="#two-kinds-of-agent-work-which-must-not-be-conflated" title="Link to this heading"><span>¶</span></a></h2>
+<p>Most of what this fork has built was built by agents, and almost none of it was
+built by the <em>search</em>. The distinction decides what can be claimed:</p>
+<p><strong>Directed agent work.</strong> An engineer states a goal, an agent works in a
+worktree with the full toolchain, and a person verifies and merges the result.
+The ACT rebuild, the <code class="docutils literal notranslate"><span class="pre">Encoding</span></code> prototype, the gap analysis, the
+re-measurements and most of this documentation are of this kind. What it
+demonstrates is that a capable agent under direction can do compiler
+engineering — which is a claim about present-day agents, not about this
+project’s method, and the same claim anyone with the same tools could make.</p>
+<p><strong>The search.</strong> A harness scores candidates a model proposes, with the
+objective, the gates and the reference model frozen out of the model’s reach,
+and no human in the loop of a single iteration. This is the part that is a
+contribution, because the interesting question is what a <em>loop</em> discovers, not
+what an agent does when told what to do.</p>
+<p>So: the burst widening was found by the search. The <cite>Encoding</cite> primitive, the
+ACT rebuild, and the correction that <code class="docutils literal notranslate"><span class="pre">acc</span></code>’s obstacle is additive
+monotonicity rather than a static field were all directed work. Reporting the
+second kind as evidence for the first would be the most damaging overstatement
+available to this project, and it is an easy one to make by accident — the
+transcripts look similar.</p>
+<p>The planned experiments in <a class="reference internal" href="chia.html"><span class="doc">CHIA Agentic Co-Design</span></a> are all of the second kind
+for exactly this reason.</p>
+</section>
+<section id="what-is-not-established">
+<h2>What is not established<a class="headerlink" href="#what-is-not-established" title="Link to this heading"><span>¶</span></a></h2>
+<p><strong>Rate.</strong> One paid run, one win. Nothing here supports a claim about how often a
+search finds an improvement, and no further single run will change that. The
+search is also not seeded, so a run is re-runnable but not repeatable — which
+means a distribution over runs could not yet be attributed to the search rather
+than to sampling. Fixing this is the first planned experiment.</p>
+<p><strong>Maintaining, at all.</strong> As of this writing the fork has <em>one</em> abstraction
+extension that closed a real defect, <code class="docutils literal notranslate"><span class="pre">s.dependence(...)</span></code>, and it was written
+by a person. Whether an agent can produce one is being tested; nothing here
+claims it can.</p>
+<p><strong>Novelty of the found design points.</strong> The burst widening is a sensible
+engineering change, not an architectural discovery. Calling it a discovery would
+overstate it.</p>
+</section>
+<section id="methodology-the-experiments-forced-on-us">
+<h2>Methodology the experiments forced on us<a class="headerlink" href="#methodology-the-experiments-forced-on-us" title="Link to this heading"><span>¶</span></a></h2>
+<p>Each of these was learned by getting it wrong first.</p>
+<p><strong>The verifier must be the real tool.</strong> A hand-written cost model was replaced
+by synthesis and then by cosim. The reason is not fidelity in the abstract: a
+cycles-only objective over a model <strong>ranks designs backwards</strong>, because the
+variant that wins on cycles can lose on area or on clock. The alignment variant
+is the worked example — acceptable on cycles, and it missed timing by 1.35 ns.</p>
+<p><strong>Evaluation is cheap relative to proposal</strong>, by roughly two orders of
+magnitude in the earlier search: tens of seconds and no model cost to evaluate,
+many minutes and real money to propose. That asymmetry is the argument for cheap
+static gates ahead of expensive ones, and for breadth over depth.</p>
+<p><strong>An agent’s claim is not a result, and neither is an agent’s report of a
+result.</strong> This fork has had to withdraw a “first independent validation of the
+scheduler” that existed nowhere in git, a whole-design conclusion drawn from a
+probe, a “faster than Gemmini at all five shapes” claim that ignored ~400 cycles
+of driver overhead in the opponent’s window, and a “fixed cost essentially
+closed” that was hiding a 514-cycle memset. Two of those were <em>true
+measurements supporting false conclusions</em>, which is the failure mode to design
+against — it survives inspection in a way a wrong number does not.</p>
+<p><strong>Cross-design review caught what inspection did not.</strong> Two of the claims above
+were corrected not by re-reading them but by exchanging them with a session
+working on a <em>different</em> machine, and in both cases <strong>the receiving side caught
+the overgeneralisation rather than the author</strong>. Once it was a driver-overhead
+figure being used as though the opponent’s whole window were accelerator time;
+once it was a measurement noise floor, real on a full SoC, being generalised to
+a deterministic co-simulation where it does not apply. Neither survived one
+round of being told to someone who had to act on it.</p>
+<p>This is cheap and it is not the same as testing. A test checks that a number is
+what it was last time; a reader with their own measurements to reconcile checks
+whether the number <em>means</em> what it is being used to mean. That is the failure
+mode this project keeps hitting, and it is the one tests do not catch.</p>
+<p>The sharper form of it, owed to the engineer on the other side of those
+exchanges: in each case <strong>the author had more evidence and the receiver had more
+distance.</strong> We knew our own noise floor better than they did and generalised it
+anyway; they knew a claim of theirs was second-hand and relayed it anyway.
+Proximity to the evidence is what makes overreach easy, which is exactly why the
+check has to come from somewhere else — and why it cannot be delegated to a
+more careful reading by the same author.</p>
+<p><strong>The recurring failure has a name: a number travelling further than its
+derivation.</strong> It happened four times in one night, counted: a test count that
+existed only in a commit message; a scheduler guarantee asserted for a property
+the original work never claimed; a driver-overhead figure used as though the
+opponent’s whole window were accelerator time; and a second-cause census relayed
+by a coordinator who had not derived it, which then failed to reproduce in
+another agent’s tree. Every one of them was a real measurement of <em>something</em>.</p>
+<p>A second, distinct pattern showed up three times in the same night: <strong>a claim
+about what you did, that does not match what is on disk.</strong> An exporter fix that
+was real in the code but against which no export had been re-run; a data file
+reported as carried that no artefact contained; and a branch pushed from a
+detached mid-rebase HEAD because a command used <code class="docutils literal notranslate"><span class="pre">;</span></code> where it needed <code class="docutils literal notranslate"><span class="pre">&amp;&amp;</span></code>,
+leaving the remote ref briefly pointing at the wrong commit. In each case the
+<em>action</em> was reported rather than the <em>artefact</em> checked, and in each case the
+cost was small only because somebody downstream looked at the tree instead of
+reading the claim.</p>
+<p>It is the same disease as the first — a statement travelling without the thing
+that would verify it — but it needs a different check. A derivation answers “how
+do you know this number”; only an inspection of the tree answers “is that
+actually what is there now”. The two synthesis sessions caught all three by
+diffing and counting before they ran, which is the cheapest possible form of it.</p>
+<p>The countermeasure that worked was not more care. It was that each figure was
+eventually asked to state how it was derived, by someone who needed to act on
+it — and the ones that could not state it were the ones that were wrong. So the
+rule the project now runs on is that <strong>a number travels with its derivation or
+it does not travel</strong>, and a recipient who cannot reproduce it says so rather
+than adopting it. Two agents refused a coordinator’s figure on exactly that
+ground tonight, and both were right to.</p>
+<p><strong>Four checkers can pass a program the hardware will not run.</strong> Measured on
+2026-09-22 while trying to confirm two extra encodable loop nests: the reference
+model says correct, the program validator accepts, the cycle model runs, the
+dataflow simulator completes and is correct, and Vitis <strong>csim</strong> reports zero
+mismatches — and Vitis <strong>cosim does not complete.</strong> Two row-tiled mappings sat
+with the simulator process still at 99 % CPU after <strong>32 minutes</strong>, against about
+two minutes for the shipped mapping. No deadlock is <em>reported</em>, so it is not
+called one.</p>
+<p>Two consequences, and the second is the uncomfortable one. <strong>An encodable count
+is not a runnable count</strong>: five nests are encodable by the encoder and the
+reference model, three are confirmed on RTL, and the smaller number is the one
+any hardware claim has to use. And <strong>two of those four checkers are derived from
+the assembler’s own header</strong>, so neither can see an error in the header formula
+itself — agreement among them is weaker evidence than it looks, because they
+share a premise.</p>
+<p>The failure is also <strong>not monotone in size</strong>: halving any of the three tile
+counts makes it complete, and <em>doubling</em> the row count also makes it complete.
+The minimal reproduction is 16 instructions — plain int8 GEMM tiling, fully
+unrolled, no epilogue — filed with a test that runs its cheap half in seconds
+without Vitis. No positive characterisation is offered and the diagnosis is left
+open. The staging hypothesis raised and refuted along the way, and a withdrawn
+reading of the <code class="docutils literal notranslate"><span class="pre">Inter-Transaction</span> <span class="pre">Progress</span></code> line, are in
+<a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
+<p>The general lesson is about verification chains rather than about this design:
+<strong>a stack of cheap checks that all pass is not a substitute for the expensive
+one, when some of the cheap checks are derived from the same source.</strong> The
+flow now reports which tier a result belongs to and never <em>picks</em> a mapping that
+only the cheap checks have cleared.</p>
+<p><strong>Report resources and clock beside cycles, always.</strong> A cycle win at a longer
+clock is not a win, and in this flow no resource delta below about 1.5k LUT or
+50 ps is evidence of anything, because two builds of an identical netlist
+differed by that much.</p>
+</section>
+<section id="cost">
+<h2>Cost<a class="headerlink" href="#cost" title="Link to this heading"><span>¶</span></a></h2>
+<p>To the checkpoint of the earlier search: $186.44. The current search: a $15.15
+smoke run in which no candidate completed and which bought five specific
+tooling fixes, then run 1. Cumulative spend attributed to the current billing
+account stood at <strong>$28.54</strong> on 2026-09-22, against $300 authorised for the next
+round of runs and about $500 planned beyond it. The split and the planned
+experiments are in <a class="reference internal" href="chia.html"><span class="doc">CHIA Agentic Co-Design</span></a>.</p>
+<p>The honest summary of the cost side is that <strong>money has not been the binding
+constraint; a trustworthy judge has.</strong> Most of the effort so far went into
+making a verdict mean something, and every hour of it was repaid the first time
+a worker claimed a win it did not have.</p>
+</section>
+<section id="earlier-measurements-and-corrections">
+<h2>Earlier measurements and corrections<a class="headerlink" href="#earlier-measurements-and-corrections" title="Link to this heading"><span>¶</span></a></h2>
+<p>A withdrawn reading and a refuted hypothesis from the investigation reported
+under <a class="reference internal" href="#methodology-the-experiments-forced-on-us">Methodology the experiments forced on us</a>, kept because the withdrawal
+is part of the record.</p>
+<section id="the-inter-transaction-progress-line-withdrawn-as-a-signature">
+<h3>The <code class="docutils literal notranslate"><span class="pre">Inter-Transaction</span> <span class="pre">Progress</span></code> line, withdrawn as a signature<a class="headerlink" href="#the-inter-transaction-progress-line-withdrawn-as-a-signature" title="Link to this heading"><span>¶</span></a></h3>
+<p>A correction to how this was first described, including here: the
+<code class="docutils literal notranslate"><span class="pre">Inter-Transaction</span> <span class="pre">Progress</span> <span class="pre">0/1</span></code> line is <strong>not a signature of the failure.</strong>
+It is Vitis’s first periodic report and it appears in <em>every</em> log, passing runs
+included — a completing run prints <code class="docutils literal notranslate"><span class="pre">0/1</span></code>, then <code class="docutils literal notranslate"><span class="pre">1/1</span></code>, then finishes. The
+observation is that <strong>the second line never comes.</strong> The number that was being
+quoted as diagnostic locates nothing.</p>
+</section>
+<section id="the-staging-hypothesis-tested-and-refuted">
+<h3>The staging hypothesis, tested and refuted<a class="headerlink" href="#the-staging-hypothesis-tested-and-refuted" title="Link to this heading"><span>¶</span></a></h3>
+<p><strong>The obvious explanation was tested and refuted.</strong> The suspicion was that the
+trigger is a transfer <em>inside</em> the emitted nest rather than hoisted into a
+prologue, and a coverage fact made it look stronger still — of the 23 programs
+the named gates run, <strong>none issues a memory load after a compute</strong>, while the
+random-program generator produces one in <strong>314 of 400 seeds</strong>. So the pattern is
+exercised constantly in the simulator and had never reached a co-simulation
+testbench.</p>
+<p>Four minimal programs, each verified against the reference model and by csim,
+then co-simulated under a hard bound: a prologue-only case, a load after a
+compute, a load in a loop before a compute, and a load sharing a loop body with
+a compute. <strong>All four completed.</strong></p>
+<p>A second track then killed the hypothesis from the opposite direction, which is
+the stronger refutation: <strong>both</strong> non-completing programs stage <em>every</em> transfer
+in a prologue, and <strong>both</strong> mappings that issue a load <em>inside</em> the output nest
+<strong>complete</strong> (256 cycles at 8x8x8, 638 at 16x16x16, zero wrong). So a
+staging-based warning would have passed both failures and flagged two programs
+that run — it is exactly the wrong guard, and it had been shipped once before
+being reverted.</p>
+<p>Two things worth copying from how that was handled. A <cite>covered / UNCOVERED</cite>
+column had <strong>already been added</strong> to the flow on the strength of the suspicion,
+and it separated the candidates perfectly; it was <strong>reverted</strong> once the
+predicate was refuted, on the grounds that shipping a refuted predicate as a
+warning would mislead the very search it exists to guide. And the coverage gap
+survives as a finding in its own right even though it was not the cause: <strong>a
+pattern can be exercised thousands of times in a simulator and never once on
+RTL</strong>, and nothing in the gate list makes that visible.</p>
+</section>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+    
+        <div id="show_right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&lt;</span><span>Page contents</span></a></p>
+        </div>
+
+        <div id="right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
+            <div class="page_toc">
+                <ul>
+<li><a class="reference internal" href="#">Agentic Experiments: What We Ran and What It Shows</a><ul>
+<li><a class="reference internal" href="#the-question">The question</a></li>
+<li><a class="reference internal" href="#what-is-established">What is established</a></li>
+<li><a class="reference internal" href="#a-co-design-finding-two-changes-neither-of-which-works-alone">A co-design finding: two changes, neither of which works alone</a><ul>
+<li><a class="reference internal" href="#a-prediction-stated-in-advance-confirmed-to-the-cycle">A prediction stated in advance, confirmed to the cycle</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#what-the-agents-actually-tried-to-get-away-with">What the agents actually tried to get away with</a></li>
+<li><a class="reference internal" href="#two-kinds-of-agent-work-which-must-not-be-conflated">Two kinds of agent work, which must not be conflated</a></li>
+<li><a class="reference internal" href="#what-is-not-established">What is not established</a></li>
+<li><a class="reference internal" href="#methodology-the-experiments-forced-on-us">Methodology the experiments forced on us</a></li>
+<li><a class="reference internal" href="#cost">Cost</a></li>
+<li><a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a><ul>
+<li><a class="reference internal" href="#the-inter-transaction-progress-line-withdrawn-as-a-signature">The <code class="docutils literal notranslate"><span class="pre">Inter-Transaction</span> <span class="pre">Progress</span></code> line, withdrawn as a signature</a></li>
+<li><a class="reference internal" href="#the-staging-hypothesis-tested-and-refuted">The staging hypothesis, tested and refuted</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            </div>
+        </div>
+    
+
+      <div class="clearer"></div>
+    </div>
+    <div class="button_nav_wrapper">
+        <div class="button_nav">
+            <div class="left">
+                
+                <a href="chia.html">
+                    <span class="icon">&lt;</span><span>CHIA Agentic Co-Design</span></a>
+                
+            </div>
+
+            <div class="right">
+                
+                    <a href="act.html"><span>ACT, and Why We Cite It</span><span class="icon">&gt;</span></a>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Allo Authors.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+
+<p id="theme_credit">Styled using the <a href="https://github.com/piccolo-orm/piccolo_theme">Piccolo Theme</a></p>
+  </body>
+</html>

@@ -14,6 +14,7 @@ the page, not to a new `.md` file. The fork-only pages:
 | `@df.region()` pitfalls | `docs/source/developer/pitfalls.rst` |
 | Vitis: `align_value`, cosim, binutils fix | `docs/source/backends/vitis.rst` |
 | Catapult: host setup, licences, directives, `ppa` mode | `docs/source/backends/catapult.rst` |
+| SystemC emitter, `Wire`/`Channel` links, EVA | `docs/source/backends/systemc.rst` |
 | Non-blocking streams | `docs/source/backends/nonblocking_streams.rst` |
 | TinyTPU-isa, Gemmini comparison, history | `docs/source/designs/` |
 
@@ -24,6 +25,7 @@ Dev notes (not published):
 | Toolchains on this host, env, golden tests | `dev/toolchains.rst` |
 | Branch layout, upstream-merge procedure, worktrees | `dev/fork_maintenance.rst` |
 | Dated measurement records | `dev/records/` |
+| SystemC emitter author's own notes (merged as-is) | `dev/systemc/` |
 | Session report, paper outline, ASIC handoff | `dev/` |
 | TinyTPU as a unit library (`ip/`), what the front end refuses | `docs/source/designs/tinytpu_library.rst` |
 | IP-library gap register vs LPU/Jalapeño, the adder tree (`ip/units/reduction_tree.py`) | `docs/source/designs/ip_gaps.rst` |
