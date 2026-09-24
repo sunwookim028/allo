@@ -732,6 +732,18 @@ partial sum to int16 still prints ``ALL EXACT``. The correctness gates are
 below. Run ``stress_isa.py`` after **any** change to the design, and
 ``mutate.py`` after any change to the harness.
 
+``examples/tinytpu/e2e_gate.sh``
+   About 36 s, no Vitis and no licence. The gate for the claim no single-flow
+   check can make: **a PyTorch model through mapping to cycles, and the join
+   to area.** It runs the workload suite's claims gate
+   (:doc:`workload_suite`), then ``check_pairing.py``, which refuses to let a
+   cycle count stand beside an area figure from a different configuration,
+   then ``check_numbers.py``. It prints the remote tier -- the Design Compiler
+   run -- rather than claiming it, because that needs a licence this
+   repository does not have, and it names what it therefore cannot cover. The
+   failure paths of both gates are tested in
+   ``tests/act/test_gates_negative.py``.
+
 ``gen_isa.py --check``
    About 6 s. The ISA conformance check described in
    :ref:`tinytpu-isa-conformance`: both generated artefacts regenerated and
