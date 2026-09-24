@@ -1,5 +1,20 @@
 # dev/systemc/
 
+> **Merged in from `choonsik1/allo`, branch `SystemC-emitter`, and kept as its
+> author wrote it.** Read it that way: "this checkout", "the `sup` fork",
+> `STATE.md`'s remotes and branches and the `/home/zsm9/...` paths all describe
+> *that* tree, not this one. Three differences that matter here:
+>
+> - the seven `archive/*.sup*`/inherited files listed at the bottom are **not
+>   present** -- they were this fork's own retired notes, and their content is
+>   in `docs/source/` now, so the merge kept them deleted;
+> - `SIMULATOR.md` describes a timed dataflow simulator that was **not merged**
+>   (see the merge commit for why);
+> - paths were rewritten for where the material landed here (`notes/` ->
+>   `dev/systemc/`, `examples/systemc/eva_example/` -> `examples/eva/`).
+>
+> The published page for the emitter is `docs/source/backends/systemc.rst`.
+
 Working documentation for this checkout. Four live documents; everything else is either
 next to the code it describes, or in `archive/`.
 
