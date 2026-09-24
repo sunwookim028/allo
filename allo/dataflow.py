@@ -55,6 +55,20 @@ def get_pid():
     raise NotImplementedError("This function should be called in a kernel function.")
 
 
+# Wire and Channel arrived with the SystemC emitter and need MLIR bindings
+# built at or after that merge. Without them the failure is an AttributeError
+# on a dialect op, thrown from an import several frames deep, which reads as a
+# bug in Allo rather than as a stale build -- so name it here instead.
+if not hasattr(allo_d, "WireConstructOp"):
+    raise ImportError(
+        "allo._mlir is older than the Python it is being imported by: the "
+        "dialect has no WireConstructOp. Wire and Channel came in with the "
+        "SystemC emitter, so a build predating it cannot serve this tree. "
+        "Rebuild this checkout's bindings -- examples/tinytpu/reproduce.sh "
+        "configures and builds mlir/build -- or point the editable install at "
+        "a checkout whose build is current."
+    )
+
 # Dataflow link ops -- Stream (FIFO), Wire (combinational), Channel (handshake)
 # -- all get the same interface-lifting treatment. These tuples let the lifting
 # logic below treat all three link kinds uniformly.
