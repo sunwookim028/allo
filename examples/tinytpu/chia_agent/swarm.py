@@ -334,8 +334,18 @@ def status(run_dir: Path) -> None:
         print(f"    asked: {run['strategies'][worker].strip().splitlines()[0]}")
         for e in cands:
             v = e.get("verdict") or {}
+            # The primary term moved from the GEMM total to total model cycles
+            # when the objective gained its model term, and the record's field
+            # from `delta_cycles` to `delta_primary`. Evidence directories on
+            # disk carry the old spelling, and reading those back is the point
+            # of this command, so both are accepted.
+            key = e.get("primary") or ("total_model_cycles"
+                                       if v.get("total_model_cycles")
+                                       else "total_cycles")
+            delta = e.get("delta_primary", e.get("delta_cycles"))
             print(f"    iter {e['iteration']}: "
-                  + (f"cosim {v['cycles']} total {v['total_cycles']}"
+                  + (f"cosim {v['cycles']} {key} {v.get(key, v.get('total_cycles'))}"
+                     + (f" ({delta:+d})" if isinstance(delta, int) else "")
                      if v.get("ok") else f"FAILED at {v.get('stage')}" if v
                      else f"not scored ({e.get('reason')})")
                   + ("  ACCEPTED" if e["accepted"] else "  rejected"))
@@ -399,6 +409,21 @@ def main() -> None:
     if args.budget_usd is None:
         parser.error("--budget-usd is required: no run starts without an "
                      "explicit per-run spend cap")
+    # Two searches from one checkout collide: the tool servers bind fixed
+    # ports from 8000 up, and each candidate is now ~578 s of Vitis rather than
+    # ~230 s, so a second run doubles licence and CPU contention against a
+    # first one that is still evaluating. There is no resume, so this is the
+    # shape a "restart" actually takes -- refuse it here rather than let the
+    # two interleave.
+    live = subprocess.run(["pgrep", "-f", f"{AGENT_DIR}/loop.py"],
+                          capture_output=True, text=True).stdout.split()
+    if live:
+        raise SystemExit(
+            f"refusing to start: {len(live)} loop.py process(es) from "
+            f"{AGENT_DIR} are still running (pids {' '.join(live)}).\n"
+            f"  Find the run with `python swarm.py --status <run-dir>`, and "
+            f"either wait for it or abandon it -- see 'If a run was "
+            f"interrupted' in README.md.")
     run_dir = args.run_dir.resolve()
     # A run directory is written once and never resumed. Re-using one
     # overwrites run.json -- and with it the tag that attributes this run's

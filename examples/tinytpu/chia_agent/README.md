@@ -23,17 +23,27 @@ page is why the harness is built the way it is.
 A **run** is `swarm.py`: K workers (2 by default, at most 3) each doing up to N
 iterations (3 by default) against the TinyTPU-isa design in
 `examples/tinytpu/`. One iteration is one model call -- which may run the full
-40-minute timeout -- then a gate and an RTL cosim of whatever the worker
-changed, about 2-3 minutes per candidate. Nothing is landed by a run; a run
-produces scored diffs and a verdict per diff.
+40-minute timeout -- then the gates and the scored measurements of whatever the
+worker changed. Nothing is landed by a run; a run produces scored diffs and a
+verdict per diff.
 
-Measured, on the two runs of this shape that finished:
+**Evaluating one candidate takes about 578 s** since the objective gained its
+model term: ~65 s of gates, ~162 s of GEMM cosim at MAXDIM=16, and 348 s for
+the model term at MAXDIM=64 (one csynth plus six layers). That is 2.5x the
+~230 s it was, and `dev/records/tinytpu/model-term-maxdim-20260924.rst` has the
+measurement. Wall time for a whole run rises only about 1.28x, because the
+model calls dominate and they have not changed -- but **Vitis load per
+candidate is 2.5x**, which is licence and CPU contention across a swarm, and is
+the term to watch rather than the dollars.
+
+Measured, on the two runs that finished (both under the previous, GEMM-only
+objective):
 
 | | run 1, 2026-09-19 | run 3, 2026-09-24 |
 | --- | --- | --- |
 | shape | 2 workers x 3 iterations | 2 workers x 3 iterations |
-| wall | 100 min | 167 min |
-| cost | **$28.54** | **$20.72** |
+| wall | 100 min | 167 min (about 1.28x under the current objective) |
+| cost | **$28.54** | **$20.72** (the same cap buys the same candidates) |
 | result | 1 win of 4 candidates, not landable as written | 1 win of 6, accepted on a clean checkout |
 
 **Money.** Cumulative CHIA spend on the CHIA2026 billing account is
@@ -255,6 +265,13 @@ fill in the index row. Every accepted diff still gets read by a person.
 leaves the previous run's edited spec in place -- so the "baseline" the new run
 measures is that design rather than `HEAD`'s.
 
+It also **refuses to start while any `loop.py` from this checkout is still
+running**, which is the other shape a "restart" takes. Two searches from one
+checkout collide on the tool servers' fixed ports from 8000 up, and each
+candidate is now ~578 s of Vitis rather than ~230 s, so a second run doubles
+licence and CPU contention against a first one that is still evaluating. The
+refusal names the pids; `--status` tells you which run they belong to.
+
 To abandon one cleanly:
 
 ```bash
@@ -404,9 +421,24 @@ This is a policy, not a sandbox. Real isolation would mean a container.
   `stress_isa.py` imports. The system prompt says so. An ISA-changing search
   would need `isa_ref.py` (and `stress_isa.py`'s crafted programs) to become
   part of the candidate -- a separate design decision.
-- **score**: the sum of **RTL cosim** cycles (Vitis HLS 2023.2 csynth + xsim)
-  at 4x4x4 and 16x16x16, each testbench bit-exact. About 2.2 min per
-  candidate. Area and clock are recorded but not scored.
+- **score**: three terms, all from **RTL cosim** (Vitis HLS 2023.2 csynth +
+  xsim), each testbench bit-exact -- `loop.classify` is the frozen rule and its
+  docstring is the argument for each term:
+  - **model**, the primary: cosim cycles for each of `SCORED_MODELS`
+    (`mlp_tiny`, `mlp_deep`) at MAXDIM=64. A model does not make the problem
+    bigger, it makes it longer, so a fixed cost a single large GEMM amortises
+    away is repaid once per layer -- the same change is worth 4.3-7.0 % on GEMM
+    shapes and 25-34 % here.
+  - **gemm**, the control: cycles at 4x4x4 and 16x16x16, kept unchanged and
+    unweighted, so a change that helps models and hurts GEMM shapes has to be
+    *stated* as a trade rather than hidden.
+  - **area**: the standard-cell estimate (`area_estimate`), not csynth's
+    resource table.
+
+  A `win` is a Pareto improvement across all three; a `trade` is not a win. The
+  hill-climb keeps on `total_model_cycles`, falling back to `total_cycles` when
+  no model term was measured, and `variants.jsonl` names which in `primary`.
+  About **578 s per candidate** (was ~230 s): see the quick start.
 - **acceptance**: `accept.py` is the only way a win is claimed. It makes a
   clean `git worktree` of HEAD, `git apply`s the candidate diff, builds that
   checkout's own `mlir/` in-tree (~40 s), then runs `bench_isa.py`,
