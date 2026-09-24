@@ -80,6 +80,14 @@ REFERENCE = {
     "patch_policy.py": "chia_abstraction/patch_policy.py",
     "limitations.rst": "docs/source/developer/limitations.rst",
     "tinytpu_isa.rst": "docs/source/designs/tinytpu_isa.rst",
+    # The 2026-09-24 docs restyle split tinytpu_isa.rst from 2266 lines to 952,
+    # moving 819 lines of ISA spec -- including the whole generated encoding
+    # table -- and 600 lines of results to these two pages. Without them an
+    # agent reads materially less than agents in earlier runs did, which would
+    # make a run incomparable to its own predecessors for a reason nothing in
+    # the record would show. Listed to restore parity, not to widen the set.
+    "tinytpu_isa_spec.rst": "docs/source/designs/tinytpu_isa_spec.rst",
+    "tinytpu_isa_results.rst": "docs/source/designs/tinytpu_isa_results.rst",
     "tinytpu_history.rst": "docs/source/designs/tinytpu_history.rst",
 }
 
