@@ -201,6 +201,83 @@ subtraction where addition was meant. The model verifies *composition*, not
 arithmetic. A control mutant that changes nothing is correctly not caught,
 which is what shows the harness ran the file it was given.
 
+**5.1 Can the behavioural model be derived from the structural one?** The two
+descriptions were written independently: a `compose` unit declares what names a
+body needs from outside, an `actions` unit declares what effect lands where and
+when. If the second can be *derived* from the first, an Action becomes an
+annotation on an existing model rather than a second declaration of every unit.
+We built the derivation and made the diff a gate.
+
+**Of 28 ports the Action model declares, 24 stop being independent**: 20 are
+the architecture's own channels and memories, read off the same AST the
+structural checker already parses, and 4 more stand for them. Two units derive
+completely. The residue is exactly the interesting part:
+
+- **3 are arithmetic** — a multiplexer, a multiply-accumulate, an ALU. No
+  composition can carry these: they are what a unit *does*, not what it is
+  connected to.
+- **1 counts instructions** and corresponds to nothing physical.
+- **The control path cannot be an action at all.** A unit reads its dispatch
+  queue inside a step it is already spending; an action is per-row or
+  per-instruction, and the per-instruction form adds a head step to the work
+  count the instruction header carries. Measured rather than asserted: one
+  instruction's cost goes from 6 to 7.
+- **The derivation found three on-chip memories the Action model never had** —
+  real state, invisible to the ISA because no instruction field names a row of
+  them.
+
+**And the load-bearing finding: the two models do not agree on what a unit
+is.** A `compose` unit is a *kernel*, replicated by an instance count. An
+`actions` unit is a *dispatch domain*, one work counter. They are the same
+object for seven of eight units and a different object for the array, where
+T×T kernels are one dispatch domain the ISA calls `array`. No naming convention
+closes that: a header field counts rows per instance across T×T kernels, and
+the behavioural model has no word for the distinction.
+
+**5.2 The two defects the second machine exposed, and what fixing them cost.**
+Lane width was previously read off a shadow one-row *state*, because a lane map
+seemed to need addressed storage. It does not: giving the structural
+``Channel`` a lane count and deriving its element type from it removes the
+shadow state entirely, and a fold takes its operand width from the channel the
+value arrived on. **The missing thing was a lane count, not addressed state** —
+a channel has no rows, no bank map and no collision rule, and a fold needs none
+of them.
+
+The work model charged latency as occupancy, reporting 80 steps where the
+hardware does 16. Separating an action's **span** (which a declared latency
+lengthens) from its **initiation** (the busiest resource a row books, read off
+ports already declared) gives 16, leaves the calendar unchanged, and declares
+nothing new. Every count on the first machine is unchanged, because a unit with
+no declared latency has span equal to initiation — which is why one machine
+could never have shown the defect.
+
+**It cost a static catch, and we kept the loss visible.** One deliberately
+wrong declaration — an ALU declared one lane operation per step instead of two
+— was previously caught by the cost check *because of the defect*: the broken
+model pushed the work into a third cycle. Correctly pipelined, the accumulator's
+single read port binds at two per row either way, so no work count can see the
+ALU's width. The fifteen-mutant split moves from 5 / 4 / 6 to **5 refused
+structurally, 3 caught by cost, 6 invisible, 1 caught by nothing**.
+
+**5.3 Consolidation: not one file, and the reason is a result.** The intended
+end state was a single file. It should not be, on two independent grounds.
+First, the behavioural model imports nothing from the compiler, and that
+independence is what lets an ISA be composed and checked without the front end;
+merging would make it depend on the dataflow layer and on MLIR bindings for no
+new capability. Second, the specification's discipline is that the spec is the
+source of truth and the design is held to it — **a spec that reads its ports
+out of the design cannot check the design's ports.**
+
+What is available, and what we built, is a **checked projection**: where the
+two models overlap they can no longer drift, and where they cannot overlap the
+reason is written down and checked in both directions. Two architectures now
+compose, and the second one's behavioural model is *derived* rather than
+written.
+
+So the end state is reachable in a modified form, and the modification is the
+finding: **`Unit` means two different things**, and one file would mean one of
+the two meanings silently winning.
+
 **Recommendation.** Worth using where several consumers would otherwise restate
 one per-unit fact; **not** a default, because one machine has exercised it.
 This is directed work, not a search result, and is reported as such.
