@@ -141,12 +141,32 @@ def test_region_stateful_with_stream():
 # ---------------------------------------------------------------------------
 
 
-def test_region_stateful_shared_by_two_kernels_is_rejected_for_hls(capfd):
-    """Sharing is honoured by the simulator; Vitis refuses several clients.
+# Every HLS emitter must refuse a shared region-scope Stateful. Parametrised
+# rather than written once for ``vhls``, because the one that was NOT tested is
+# exactly the one that had the hole: ``catapult`` emitted the shared global as a
+# single file-scope ``static`` touched by every process under ``#pragma
+# hls_design dataflow`` -- a race, with no diagnostic -- and nothing here caught
+# it. A fourth emitter should have to answer this question too, so add its name
+# to this list rather than writing a fourth test.
+HLS_TARGETS = ["vhls", "systemc", "catapult"]
+
+# Whether the emitter's message names the kernels, not just the variable. The
+# ``vhls`` and ``catapult`` messages list them; the ``systemc`` one reports a
+# count ("is used by 3 kernels") instead. Recorded rather than papered over: the
+# refusal is what matters, and the difference is visible here if anyone wants to
+# close it.
+NAMES_THE_KERNELS = {"vhls": True, "catapult": True, "systemc": False}
+
+
+@pytest.mark.parametrize("target", HLS_TARGETS)
+def test_region_stateful_shared_by_two_kernels_is_rejected_for_hls(target, capfd):
+    """Sharing is honoured by the simulator; every HLS emitter must refuse it.
 
     The emitter re-emits each stateful global as a function-local ``static``,
     so two kernels referencing one region-scope ``Stateful`` would get two
-    *independent* copies.
+    *independent* copies -- except on ``catapult``, where the global is emitted
+    at file scope and the two kernels really do land on one array with no
+    arbitration, which is worse.
 
     Vitis does have unsynchronised sharing -- ``#pragma HLS stream
     variable=X type=shared`` and ``type=unsync`` -- but neither reaches more
@@ -180,10 +200,121 @@ def test_region_stateful_shared_by_two_kernels_is_rejected_for_hls(capfd):
 
     s = df.customize(top)
     with pytest.raises(RuntimeError):
-        s.build(target="vhls")
+        s.build(target=target)
     err = capfd.readouterr().err
     assert "__stateful_top_acc" in err, err
-    assert "producer" in err and "reader" in err, err
+    if NAMES_THE_KERNELS[target]:
+        assert "producer" in err and "reader" in err, err
+
+
+@pytest.mark.parametrize("target", HLS_TARGETS)
+def test_region_stateful_shared_by_three_kernels_is_rejected_for_hls(
+    target, capfd
+):
+    """The three-client shape: one writer, one read-modify-writer, one reader.
+
+    This is the design that found the ``catapult`` hole. Two clients can be
+    argued about (producer/consumer looks like a stream that has not been
+    written as one); three, with a read-modify-write in the middle, cannot be
+    turned into any ordering the emitter could pick on its own. Every emitter
+    must refuse it.
+    """
+
+    @df.region()
+    def top(out_a: int32[4], out_b: int32[4], out_c: int32[4]):
+        acc: int32[4] @ Stateful = 0  # touched by all three kernels
+
+        @df.kernel(mapping=[1], args=[out_a])
+        def writer(o: int32[4]):
+            for i in range(4):
+                acc[i] = i
+                o[i] = acc[i]
+
+        @df.kernel(mapping=[1], args=[out_b])
+        def rmw(o: int32[4]):
+            for i in range(4):
+                acc[i] += 1
+                o[i] = acc[i]
+
+        @df.kernel(mapping=[1], args=[out_c])
+        def pure_reader(o: int32[4]):
+            for i in range(4):
+                o[i] = acc[i]
+
+    s = df.customize(top)
+    with pytest.raises(RuntimeError):
+        s.build(target=target)
+    err = capfd.readouterr().err
+    assert "__stateful_top_acc" in err, err
+    # The count must be right: a guard that fires on "more than one" but
+    # miscounts would also fire here, and would mislead whoever reads it.
+    assert "3" in err, err
+    if NAMES_THE_KERNELS[target]:
+        for k in ("writer", "rmw", "pure_reader"):
+            assert k in err, err
+
+
+@pytest.mark.parametrize("target", HLS_TARGETS)
+def test_catapult_emits_no_shared_file_scope_static(target, capfd):
+    """The refusal must come before emission, not after a plausible file.
+
+    ``catapult`` used to emit ``static int32_t __stateful_top_acc[4]`` at file
+    scope and return success. Assert that no emitter hands back code for this
+    program at all -- the failure mode being guarded is precisely "a build that
+    succeeds and is wrong".
+    """
+
+    @df.region()
+    def top(out_a: int32[4], out_b: int32[4]):
+        acc: int32[4] @ Stateful = 0
+
+        @df.kernel(mapping=[1], args=[out_a])
+        def p(o: int32[4]):
+            for i in range(4):
+                acc[i] += 1
+                o[i] = acc[i]
+
+        @df.kernel(mapping=[1], args=[out_b])
+        def c(o: int32[4]):
+            for i in range(4):
+                o[i] = acc[i]
+
+    s = df.customize(top)
+    code = None
+    try:
+        code = str(s.build(target=target))
+    except RuntimeError:
+        pass
+    capfd.readouterr()
+    assert code is None, (
+        f"{target} returned code for a shared region-scope Stateful "
+        f"instead of refusing it:\n{code}"
+    )
+
+
+@pytest.mark.parametrize("target", HLS_TARGETS)
+def test_kernel_private_stateful_is_not_caught_by_the_guard(target, capfd):
+    """The guard must not fire on the kernel-private model.
+
+    Each mapped instance gets its own ``__stateful_k_<pid>_acc``, so no global
+    has more than one user and every emitter must still build. Without this,
+    the guard above could be "fixed" by refusing all Statefuls.
+    """
+
+    @df.region()
+    def top(out: int32[2, 4]):
+        @df.kernel(mapping=[2], args=[out])
+        def k(o: int32[2, 4]):
+            acc: int32[4] @ Stateful = 0  # private to each instance
+            p = df.get_pid()
+            for i in range(4):
+                acc[i] += 1
+                o[p, i] = acc[i]
+
+    code = str(df.customize(top).build(target=target))
+    capfd.readouterr()
+    assert "__stateful_k_0_acc" in code, code
+    assert "__stateful_k_1_acc" in code, code
 
 
 def test_kernel_private_stateful_still_builds_for_hls():
