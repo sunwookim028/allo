@@ -96,7 +96,15 @@ three `dirname` calls from `asic_synthesis/` reach the repository root only from
 ## D. Push-button headline numbers
 
 A headline claim counts only when **a gate enforces it**, not when a page states
-it. Today three of eight are enforced.
+it. **Six of eight are enforced**, up from three.
+
+*Known-failing tests, so nobody chases them.* `pytest tests/` does not collect
+on this host: 25 errors, all `tests/dataflow/aie/*`, no `aie` module. With that
+directory ignored: **800 passed, 64 skipped, 2 xfailed, 7 failed** — and those
+same seven fail on a clean `main`, so they are pre-existing and unrelated to
+anything recent: `test_hierachical_mesh::test_2x2`, three in
+`ip_integration/test_external.py`, `test_builder::test_minmax_cast`, and two in
+`test_stateful.py`.
 
 | flow | claim | gate | state |
 | --- | --- | --- | --- |
@@ -173,6 +181,11 @@ Recorded because each cost real work today.
   what it does when committed snapshots disagree about the library -- for the
   good reason that there is no second library to test it with, and that is
   recorded rather than glossed.
+- **Subagents do not reliably have `ListAgents`.** An agent told to announce
+  its path claim to its peers could not see them, and guessing at names
+  returned "no agent reachable". Pass peer agent IDs explicitly in a brief
+  rather than instructing an agent to look them up — and when an agent cannot
+  reach a peer it should say so and let the dispatcher relay, not guess.
 - **The session scratchpad is shared between concurrent agents.** Two agents
   writing `reproduce.sh` output to the same scratchpad path truncated one
   another's log mid-cosim; the verdict survived only because the summary block
