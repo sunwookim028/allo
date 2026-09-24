@@ -69,7 +69,7 @@ PARAMS = TpuParams(
     SPAD_ROWS=_override("TPU_SPAD"),
     NVR=_override("TPU_NVR"),
     NAR=_override("TPU_NAR"),
-    QD=int(os.environ.get("TPU_QD", 8)),
+    QD=int(os.environ.get("TPU_QD", 16)),
     IMEM_SIZE=int(os.environ.get("TPU_IMEM", NHDR + IWORDS * _MAX_STATIC)),
     DMA_WORDS=DMA_WORDS,
 )

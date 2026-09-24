@@ -26,7 +26,7 @@ ROOT=$(cd "$HERE/../../.." && pwd)
 # BRAM 42 -> 40 says two memories left block RAM -- and the shorter operand
 # read path takes one cycle out of the FIXED term, which is why the delta is
 # the same at every shape regardless of work. It is a small improvement.
-EXPECTED="4x4x4=171 8x8x8=261 12x12x12=417 16x16x8=483 16x16x16=685"
+EXPECTED="4x4x4=175 8x8x8=265 12x12x12=421 16x16x8=482 16x16x16=674"
 
 usage() {
     cat <<'EOF'
