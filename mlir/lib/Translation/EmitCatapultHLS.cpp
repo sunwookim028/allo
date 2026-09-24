@@ -16,6 +16,8 @@
 #include "mlir/IR/IntegerSet.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/Tools/mlir-translate/Translation.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "allo/Dialect/AlloDialect.h"
@@ -775,7 +777,81 @@ void CatapultModuleEmitter::emitNarrowCastSuffix(Value src, Value dst) {
   }
 }
 
+/// A region-scope `@ Stateful` touched by more than one kernel is shared mutable
+/// state between concurrently-running processes, and this emitter has no correct
+/// form for it. Unlike the Vhls emitter -- which re-emits each stateful global as
+/// a function-local `static`, giving every kernel a private copy -- emitModule()
+/// below emits memref::GlobalOps at FILE scope, so the kernels really do land on
+/// one array. That is not sharing, it is a race: under `#pragma hls_design
+/// dataflow` the processes run concurrently with no arbitration between them, and
+/// nothing in the generated C++ or in Catapult says so. The result reads as
+/// plausible hardware and computes whatever the schedule happens to produce.
+///
+/// Both other emitters already refuse this (EmitVivadoHLS.cpp, EmitSystemC.cpp);
+/// Catapult was the one that did not, and only bf16 aborting earlier kept it from
+/// biting the one affected design. Refuse it here too, BEFORE any emission, so the
+/// refusal does not depend on which error happens to fire first.
+///
+/// This is a guard, not a lowering. Real sharing needs a memory with arbitration
+/// (the AlloMem memory-port path), which is a separate feature and a decision that
+/// has not been made.
+static bool rejectSharedStatefulGlobals(ModuleOp module,
+                                        AlloEmitterState &state) {
+  auto isStateful = [](memref::GlobalOp g) {
+    if (g.getConstant())
+      return false; // read-only: every client sees the same bytes, no race
+    return g->hasAttr("static") ||
+           g.getSymName().str().find("__stateful_") != std::string::npos;
+  };
+
+  // Symbol -> the functions that reference it, in module order so the message is
+  // deterministic. A function that touches the same global twice counts once.
+  llvm::MapVector<StringRef, SmallVector<StringRef, 4>> users;
+  for (auto func : module.getOps<func::FuncOp>()) {
+    if (func.getBlocks().empty())
+      continue; // a declaration references nothing
+    llvm::DenseSet<StringRef> seenInThisFunc;
+    func.walk([&](memref::GetGlobalOp gg) {
+      auto g = module.lookupSymbol<memref::GlobalOp>(gg.getName());
+      if (!g || !isStateful(g))
+        return;
+      if (seenInThisFunc.insert(g.getSymName()).second)
+        users[g.getSymName()].push_back(func.getName());
+    });
+  }
+
+  for (auto &kv : users) {
+    if (kv.second.size() < 2)
+      continue;
+    std::string msg;
+    llvm::raw_string_ostream ss(msg);
+    ss << "stateful global '" << kv.first << "' is referenced by "
+       << kv.second.size() << " functions (";
+    for (unsigned i = 0; i < kv.second.size(); ++i)
+      ss << (i ? ", " : "") << kv.second[i];
+    ss << "), and the Catapult emitter gives it a single file-scope `static` "
+          "that all of them run against concurrently under `#pragma hls_design "
+          "dataflow`. That is an unsynchronised race, not the shared buffer the "
+          "dataflow region promises: Catapult has no directive that arbitrates a "
+          "plain array between concurrent processes. Declare the buffer inside a "
+          "single kernel, or pass the values between kernels through a Stream so "
+          "the ordering is explicit. NOTE: passing it as a region argument does "
+          "NOT work either -- the memory-port path REPLICATES a shared array (one "
+          "AlloMem per client, writes summed at readout), which reproduces this "
+          "same failure.";
+    state.encounteredError = true;
+    module.emitError(msg);
+    return true;
+  }
+  return false;
+}
+
 void CatapultModuleEmitter::emitModule(ModuleOp module) {
+  // Before anything is written: a shared stateful global has no correct Catapult
+  // form, and emitting one silently is worse than failing the build.
+  if (rejectSharedStatefulGlobals(module, state))
+    return;
+
   std::string device_header = R"XXX(
 //===------------------------------------------------------------*- C++ -*-===//
 //
