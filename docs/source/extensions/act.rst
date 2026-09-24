@@ -25,16 +25,19 @@ ACT and the TinyTPU-isa Mapper
 ``allo/act/`` is a loop-nest mapper for :doc:`/designs/tinytpu_isa`. Given a workload
 spec and a shape it enumerates the mapspace, lowers each nest to the machine's
 instruction words, prices what it lowered, and prints the ranked mappings with a
-census of why the rest were refused. It is target-independent pure python whose
-own imports are numpy only --- though it moved from ``act/`` at the repository
-root to ``allo/act/`` on 2026-09-24, so importing it now runs
+census of why the rest were refused. The mapper itself is target-independent
+pure python whose own imports are numpy only; it moved from ``act/`` at the
+repository root to ``allo/act/`` on 2026-09-24, so importing it now runs
 ``allo/__init__.py`` and **does** need this checkout's compiled MLIR bindings,
-which it did not before. It is a rebuild of the core of **ACT**
--- Kai Shao's accelerator-compilation work -- against this fork's abstractions,
-using ACT's algorithms as the reference and copying none of its code. The corpus
-it compiles and the judge that grades the result are on :doc:`act_specs`; the
-audit that produced the rebuild decision, the measurements and every withdrawn
-claim are on :doc:`act_results`.
+which it did not before -- and the TOSA front end added the same day
+(:ref:`act-tosa-recognizer`) needs them in its own right, since it is written
+against ``allo._mlir``'s ``ir`` and ``tosa``. The mapper is a rebuild of the core
+of **ACT** -- Kai Shao's accelerator-compilation work -- against this fork's
+abstractions, using ACT's algorithms as the reference and copying none of its
+code. The front end is the exception and says so: it is cherry-picked from ACT
+with attribution. The corpus it compiles and the judge that grades the result are
+on :doc:`act_specs`; the audit that produced the rebuild decision, the
+measurements and every withdrawn claim are on :doc:`act_results`.
 
 .. note::
 
@@ -43,8 +46,12 @@ claim are on :doc:`act_results`.
    imports it at commit ``3c1ad38d`` as merge ``29cb1d99``; ``ATTRIBUTION.md``
    at tag ``chia-codesign-final`` (``629c2767``) records the terms. These pages
    audit that work **from the outside** to decide whether to connect it to
-   :doc:`/designs/tinytpu_isa`. It cites ACT; it does not republish it. ``main``
-   has no ACT sources.
+   :doc:`/designs/tinytpu_isa`. It cites ACT; it does not republish it.
+
+   Since 2026-09-24 that is true of the mapper but no longer of the whole tree:
+   ``main`` carries the TOSA **recognizer**, cherry-picked from that commit with
+   a provenance line in every file and an item-by-item record in
+   ``ATTRIBUTION.md`` at the repository root. See :ref:`act-tosa-recognizer`.
 
 Audited 2026-09-22 against ``chia-codesign-final``: ``allo/exp/dsa/`` is 12
 files, 8,347 lines.
@@ -118,9 +125,11 @@ oversight; ours would be the first loop machine it met.
 The rebuilt core
 ----------------
 
-Target-independent, pure python, and deliberately **not** under ``allo/``,
-because ``allo/__init__.py`` imports ``allo._mlir`` unconditionally and the core
-has to stay testable without a build of the bindings:
+Target-independent and pure python. It was deliberately **not** under ``allo/``
+while ``allo/__init__.py``'s unconditional ``allo._mlir`` import was a reason to
+keep the core testable without a build of the bindings; that argument lost when
+the front end arrived, since recognizing TOSA needs the bindings anyway, and the
+tree now lives at ``allo/act/``:
 
 .. list-table::
    :header-rows: 1
@@ -238,6 +247,127 @@ rank and moving it off the innermost slot are different asks of the hardware --
 one needs a per-iteration predicate, the other needs a whole body duplicated --
 and lumping them as one ``acc-peel`` bucket of 1,150 is what made this census
 incomparable with an independently built one. Together they are still 1,150.
+
+.. _act-tosa-recognizer:
+
+The TOSA front end
+------------------
+
+Everything above this point takes a workload from ``allo/act/workloads.py``, a
+registry of four hand-written entries, or from
+``examples/tinytpu/workloads/extract.py``, which reads a PyTorch module through
+``torch.fx`` and ShapeProp. Neither speaks the language this page says ACT
+compiles. "An accelerator ISA is declared with decorators, and a **TOSA program**
+is compiled onto it"; ``@I.compute`` takes a **TOSA DAG**. TOSA is the design's
+vocabulary, not an implementation choice of Kai's that we could decline -- and
+the UIUC ACT paper does the same thing. Our own epilogue vocabulary was
+``{"relu"}`` in ``allo/act/workload.py`` and ``("relu", "saturate")`` in
+``examples/tinytpu/act/spec.py``, which is not standard vocabulary by any
+reading.
+
+So on 2026-09-24 the recognizer was **cherry-picked** from ACT rather than
+rebuilt: eight items, about 330 lines, from branch ``act`` commit ``3c1ad38``.
+Every file keeps its Apache header and names the author, the repository and the
+commit; ``ATTRIBUTION.md`` at the repository root carries the item table and what
+was left behind. Nothing taken touches ``allo.lang.core`` or ``allo/_mlir``
+beyond ``ir`` and the ``tosa`` dialect, and ``allo/_mlir/dialects/tosa.py``
+already exists in this checkout's build, so the port needed no new MLIR work.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 26 74
+
+   * - module
+     - what it is
+   * - ``allo/act/primitive.py``
+     - the closed compute vocabulary as a table: 29 prims over 8 categories.
+       ``tosa.<tag>`` is derived from it, so adding a prim is one row.
+   * - ``allo/act/recognize.py``
+     - ``source_tag`` -- what a TOSA op *means* -- plus ``normalize_source``,
+       which brackets torch-mlir's 2-D transpose into the 3-D form a batched
+       matmul pattern carries.
+   * - ``allo/act/errors.py``
+     - the refusal taxonomy. ``assert`` is for invariants that hold by design;
+       anything depending on a source program raises, because ``python -O``
+       deletes an ``assert``-based validation layer wholesale.
+   * - ``allo/act/frontend.py``
+     - fork-local: a TOSA program in, one ``Workload`` out. The grammar it
+       accepts is the one a ``Workload`` can express -- a sum of unit-batch
+       ``tosa.matmul`` under a pointwise epilogue -- and nothing wider.
+
+Recognition is **fail-safe**, and that is the whole value of it. An op earns a
+tag only when every part of its definition is accounted for. Two defects in the
+original are what the ported tests pin: ``tosa.clamp`` was read as relu on
+``min_val == 0`` alone, so relu6 compiled as relu and returned wrong numbers; and
+``tosa.mul``'s ``shift`` and the matmul / conv / ``negate`` / ``avg_pool``
+zero-points were *dropped* rather than checked, so a fixed-point multiply
+selected a float one.
+
+int8, and where the boundary is
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+ACT's corpus is float with zero integer, and its recognizer is shaped by that in
+two ways this fork had to change.
+
+**Integer relu was unrecognizable.** ``_is_relu_clamp`` hard-returned ``False``
+for ``IntegerAttr`` bounds -- correct as a crash-avoidance measure there, fatal
+here, because int8/int32 relu is the only relu our corpus has. The integer branch
+reads the same pattern: lower bound 0, upper bound at or above the element type's
+maximum. A clamp to ``[0, 127]`` on an ``i32`` value is therefore **not** relu but
+relu composed with a saturating narrow, and is refused.
+
+**Quantization is carried, not merely rejected.** ``recognize`` returns a
+``Match`` holding the op's shift and zero-point *values*, read through
+``const_elements``; ``source_tag`` still refuses anything non-neutral, so the
+check is not deleted, but the numbers survive and a refusal can name what it
+refused. Unknown -- a zero-point that is a function argument, or a constant in a
+``dialect_resource`` blob the Python bindings cannot read -- counts as
+non-neutral, never as zero.
+
+**The refusal of non-zero zero-points is kept on purpose**, and it is a corpus
+constraint rather than an RTL gap. ``(A - za)(B - zb)`` expands to
+``AB - za*B - zb*A + za*zb``, and those three correction terms are row and column
+sums of the operands taken on their own. The MXU contracts two int8 operands into
+an int32 accumulator and has no path to such a reduction, so requiring
+``za == zb == 0`` is requiring **per-tensor symmetric** int8 quantization -- which
+is what PyTorch's symmetric observers emit. Stating it is the point: a silent
+assumption here is a model that maps and computes something else.
+
+**``tosa.rescale`` is refused by name.** Requantization is how a quantized model
+gets from the int32 accumulator back to int8 between layers, so no real model
+compiles without it. A hardware opcode for it has been approved, to live in
+``dma_st`` as an ``mvout`` mode, and is scoped as separate work; the refusal
+message names that plan so the next reader does not read the gap as an oversight.
+
+Not the default path yet
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+``examples/tinytpu/workloads/extract.py`` is unchanged and still the producer.
+The front end is proven only on hand-built TOSA: ``tests/act/test_tosa_frontend.py``
+recognizes each of the four registered workloads back into the *same*
+``Workload`` object the registry holds -- equality, not equivalence -- including
+the shapes torch-mlir's bracketing produces (a 2-D argument reshaped to 3-D, and
+``a @ b.T`` as a transpose absorbed into a ``(N, K)`` rank order).
+
+Making torch-mlir the producer needs four things, in this order:
+
+1. **torch-mlir in the environment.** It is not installed in the ``allo`` env
+   today, which is why every test source here is MLIR text. It is a dependency
+   decision, not a code change: ``fx.export_and_import(..., output_type=TOSA)``
+   is the whole producer.
+2. **The rescale opcode.** Between two quantized layers torch-mlir emits
+   ``tosa.rescale``, so a real model stops at the first one until ``mvout``
+   exists. This is the binding constraint, not the front end.
+3. **A symmetric-quantized corpus.** Per-tensor symmetric int8 observers, so the
+   zero-points are provably zero. An asymmetric export is refused, correctly, and
+   the refusal will look like a bug to anyone who has not read this section.
+4. **Weights as constants, not arguments.** torch-mlir puts model weights in
+   ``dialect_resource`` blobs, which ``const_elements`` documents as unreadable
+   from Python. Operands that are weights therefore have to reach the front end
+   as function arguments, or the blob reader has to be added.
+
+Only the first is cheap. The honest summary is that the front end is ready and
+the hardware is not.
 
 What this flow should emit next
 -------------------------------
