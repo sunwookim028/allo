@@ -190,6 +190,23 @@ Recorded because each cost real work today.
 
 - **Never run a tree-wide git operation in a checkout another agent is writing
   to.** This destroyed an agent's work once and nearly a second time.
+- **Removing a worktree can orphan a daemon that keeps accepting connections.**
+  Third instance of "removing a worktree is not free". A Ray head started
+  2026-09-22 had its raylet's cwd inside a worktree removed later that day.
+  It kept listening, kept accepting connections, and **could not spawn a single
+  worker** -- every one died in `setup_worker.py` at `os.getcwd()`. A driver
+  using `address="auto"` blocked in `ray.get` with no error, because
+  `/tmp/ray/ray_current_cluster` still named it. It cost an agent 25 minutes to
+  diagnose, and it is the same fails-open shape: the service was up, the
+  connection succeeded, and nothing worked.
+  *Do not fix this with `ray stop`* -- it matches by process name across the
+  whole host and would kill every other track's raylet. Kill the orphaned
+  session's PIDs, owner confirmed. To avoid it: start a head with a private
+  `--temp-dir` and port and export `RAY_ADDRESS`, which overrides even an
+  explicit `address="auto"`, so no code change is needed and
+  `ray_current_cluster` is left alone for everyone else.
+  Related: the CHIA tool servers bind fixed ports from 8000 upward, so two
+  `chia_agent` processes collide. Serialise them.
 - **Remove a worktree when its agent finishes, not when the disk fills.** Each
   costs 0.6–1.9 GB; five live agents accrue ~2 GB.
 - **`/tmp` is 15 GB and shared.** When it fills, the harness cannot create its
