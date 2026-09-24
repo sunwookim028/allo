@@ -543,9 +543,9 @@ found by trying.
    names `export_rtl.py`, `export_gemmini_rtl.py`, `saif_capture.py` and
    `reduce_asic.py`. Applying this file's own test -- *could MiniTPU call this
    without editing it?* -- all four fail it as they stand: `export_rtl.py`
-   hardcodes `TOP = "tinytpu_isa"` and a `DEST` inside the design,
-   `saif_capture.py` names `sim/verilog/tinytpu_isa.tcl`, and `reduce_asic.py`
-   is about the adder tree specifically. Moving them wholesale is exactly what
+   hardcodes `TOP = "tinytpu_isa"` and a `DEST` naming TinyTPU's export
+   directory, `saif_capture.py` names `sim/verilog/tinytpu_isa.tcl`, and
+   `reduce_asic.py` is about the adder tree specifically. Moving them wholesale is exactly what
    the "honest caveat about generic" section forbids. **Blocked on the
    design-generic half being separated from the shim**, which is where
    `reduce_asic.py`'s launch/collect and `export_rtl.py`'s `compile_order`
