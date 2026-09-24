@@ -29,6 +29,22 @@ machine, not one published at some past commit:
 
     win          ok, and the five-shape total is lower than the control's
     not-better   ok, and it is not -- correct but no improvement; nothing to claim
+
+**`claim` is still the GEMM total, and the loop's objective is no longer.**
+Since 2026-09-24 the loop ranks on model cycles with the GEMM shapes as its
+control and a standard-cell area estimate as its resource axis
+(`docs/source/extensions/chia.rst`, "The objective, and the two axes it
+replaced"). Acceptance has not moved with it: a candidate the loop kept for a
+25-34 % model win whose GEMM total is flat or up is reported here as
+`not-better`, which is *true of the GEMM shapes* and is not the claim the
+search was making. Reading `claim` as the verdict on such a candidate would be
+reading the old objective's answer to the new objective's question.
+
+Closing it means measuring `evaluate.SCORED_MODELS` on the acceptance
+worktree too -- six more cosim runs on one csynth, on the same clean checkout,
+against a control measured in the same run like every other number here. It is
+not done, and `objective` below reports what was measured rather than pretending
+the gap is not there.
     rejected     not ok
     no-control   the control could not be measured or reused; nothing is
                  comparable, and no result of this run means anything
@@ -429,9 +445,15 @@ def main():
                    ("BRAM_18K", "DSP", "FF", "LUT", "URAM")
                    for m in [re.search(rf"<{k}>(\d+)", t)] if m}
             result["objective"] = {
-                "cycles": {s: v["cycles"] for s, v in result["cosim"].items()},
+                "gemm": {s: v["cycles"] for s, v in result["cosim"].items()},
+                "model": None,
+                "area": None,
                 "resources": dict(res, estimated_ns=result.get("estimated_ns")),
-                "note": "two terms, reported as a pair per shape; never summed"}
+                "note": "the GEMM term and csynth's FPGA table, per shape, "
+                        "never summed. `model` and `area` are None because "
+                        "acceptance does not yet measure them -- see the "
+                        "module docstring; a `claim` of `not-better` is a "
+                        "statement about the GEMM shapes alone"}
         if ctl is None:
             ctl = control.record(
                 cycles={s: v["cycles"] for s, v in result["cosim"].items()},
