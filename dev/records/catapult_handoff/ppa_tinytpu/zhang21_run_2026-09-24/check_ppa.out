@@ -1,0 +1,5 @@
+FAIL
+   1. no power report at Catapult/tinytpu_isa.v1/power.rpt
+   3. the testbench's summary line is not in the log: it did not run to the end (or did not run)
+   3. no 'Simulation PASSED' from scverify_top in the log (the RTL simulation did not finish)
+   4. Catapult/tinytpu_isa.v1/rtl.v missing

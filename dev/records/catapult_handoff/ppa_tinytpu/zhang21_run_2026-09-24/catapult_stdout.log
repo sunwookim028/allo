@@ -1,0 +1,169 @@
+//  Catapult Ultra Synthesis 2024.2/1130128 (Production Release) Mon Aug 26 21:59:12 PDT 2024
+//  
+//          Copyright (c) Siemens EDA, 1996-2024, All Rights Reserved.
+//                        UNPUBLISHED, LICENSED SOFTWARE.
+//             CONFIDENTIAL AND PROPRIETARY INFORMATION WHICH IS THE
+//                   PROPERTY OF SIEMENS EDA OR ITS LICENSORS.
+//  
+//  Running on Linux sk3463@zhang-21.ece.cornell.edu:2101586 4.18.0-553.126.1.el8_10.x86_64 x86_64 aol
+//  
+//  Package information: SIFLIBS v27.2_0.0, HLS_PKGS v27.2_0.0, 
+//                       SIF_TOOLKITS v27.2_0.0, SIF_XILINX v27.2_0.0, 
+//                       SIF_ALTERA v27.2_0.0, CCS_LIBS v27.2_0.0, 
+//                       CDS_PPRO v2024.1_3, CDS_DesignChecker v2024.2, 
+//                       CDS_OASYS v21.1_3.1, CDS_PSR v24.1_0.20, 
+//                       DesignPad v2.78_1.0, DesignAnalyzer 2024.2/1129066
+//  
+# Connected to license server 1717@en-license-05.coecis.cornell.edu (LIC-13)
+# Catapult product license successfully checked out, elapsed time 00:01 (LIC-14)
+dofile ./run.tcl
+# > set sfd [file dir [info script]]
+# .
+# > solution new -state initial
+# Info: Branching solution 'solution.v2' at state 'initial' (PRJ-2)
+# solution.v2
+# > solution options defaults
+# > solution options set /Input/CppStandard c++11
+# c++11
+# > flow package require /SCVerify
+# 10.4
+# > flow package option set /SCVerify/USE_QUESTASIM false
+# false
+# > flow package option set /SCVerify/USE_NCSIM true
+# true
+# > flow package require /NCSim
+# 8.2
+# > flow package option set /NCSim/NC_ROOT /opt/cadence/XCELIUM2403
+# /opt/cadence/XCELIUM2403
+# > flow package require /LowPower
+# 99
+# > flow package option set /LowPower/SWITCHING_ACTIVITY_TYPE saif
+# saif
+# > solution file add "$sfd/kernel.cpp" -type C++
+# /INPUTFILES/1
+# > solution file add "$sfd/tinytpu_tb.cpp" -type C++ -exclude true
+# /INPUTFILES/2
+# > directive set -DESIGN_HIERARCHY tinytpu_isa
+# solution design set tinytpu_isa -top (HC-8)
+# /DESIGN_HIERARCHY tinytpu_isa
+# > directive set -CLOCKS {clk {-CLOCK_PERIOD 5.0}}
+# /CLOCKS {clk {-CLOCK_PERIOD 5.0}}
+# > solution options set /Output/OutputVerilog true
+# true
+# > solution options set /Output/OutputVHDL false
+# false
+# > solution library add nangate-45nm_beh
+# > go analyze
+# Info: Starting transformation 'analyze' on solution 'solution.v2' (SOL-8)
+# Creating project directory 'Catapult/'. (PRJ-1)
+# Moving session transcript to file "catapult.log"
+# Front End called with arguments: -- kernel.cpp (CIN-69)
+# Edison Design Group C++/C Front End - Version 6.6 (CIN-1)
+# Error: $PROJECT_HOME/kernel.cpp(47): identifier "ap_int" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(47): identifier "v16_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(97): no suitable conversion function from "ac_int<65, true>" to "int" exists (CRD-413)
+# Error: $PROJECT_HOME/kernel.cpp(108): no suitable conversion function from "ac_int<66, true>" to "int" exists (CRD-413)
+# Error: $PROJECT_HOME/kernel.cpp(114): identifier "v48_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(121): identifier "v51_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(211): identifier "v117_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(218): identifier "v120_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(225): identifier "v123_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(232): identifier "v126_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(239): identifier "v129_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(246): identifier "v132_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(253): identifier "v135_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(314): identifier "v178_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(321): identifier "v181_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(328): identifier "v184_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(389): identifier "v227_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(396): identifier "v230_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(403): identifier "v233_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(469): identifier "v279_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(477): identifier "v283_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(485): identifier "v287_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(493): identifier "v291_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(528): identifier "v307_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(536): identifier "v311_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(559): identifier "v323_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(584): identifier "v336_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(627): identifier "ap_int" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(627): identifier "v356_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(637): identifier "v360_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(644): identifier "v363_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(665): no suitable conversion function from "ac_int<97, true>" to "int" exists (CRD-413)
+# Error: $PROJECT_HOME/kernel.cpp(672): identifier "v379_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(678): no suitable conversion function from "ac_int<98, true>" to "int" exists (CRD-413)
+# Error: $PROJECT_HOME/kernel.cpp(685): identifier "v386_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(690): no suitable conversion function from "ac_int<98, true>" to "int" exists (CRD-413)
+# Error: $PROJECT_HOME/kernel.cpp(697): identifier "v392_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(702): no suitable conversion function from "ac_int<98, true>" to "int" exists (CRD-413)
+# Error: $PROJECT_HOME/kernel.cpp(709): identifier "v398_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(730): no suitable conversion function from "ac_int<97, true>" to "int" exists (CRD-413)
+# Error: $PROJECT_HOME/kernel.cpp(737): identifier "v414_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(743): no suitable conversion function from "ac_int<98, true>" to "int" exists (CRD-413)
+# Error: $PROJECT_HOME/kernel.cpp(750): identifier "v421_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(755): no suitable conversion function from "ac_int<98, true>" to "int" exists (CRD-413)
+# Error: $PROJECT_HOME/kernel.cpp(762): identifier "v427_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(767): no suitable conversion function from "ac_int<98, true>" to "int" exists (CRD-413)
+# Error: $PROJECT_HOME/kernel.cpp(774): identifier "v433_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(808): identifier "v447_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(814): identifier "v450_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(820): identifier "v453_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(826): identifier "v456_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(849): no suitable conversion function from "ac_int<66, true>" to "int" exists (CRD-413)
+# Error: $PROJECT_HOME/kernel.cpp(864): no suitable conversion function from "ac_int<66, true>" to "int" exists (CRD-413)
+# Error: $PROJECT_HOME/kernel.cpp(892): identifier "ap_int" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(892): identifier "v497_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(904): identifier "v501_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(908): identifier "v503_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(941): identifier "v517_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(947): identifier "v520_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(953): identifier "v523_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(959): identifier "v526_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1027): identifier "v568_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1052): identifier "ap_int" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1052): identifier "v577_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1085): identifier "v591_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1091): identifier "v594_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1097): identifier "v597_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1103): identifier "v600_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1178): identifier "ap_int" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1178): identifier "v641_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1187): identifier "v644_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1191): identifier "v646_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1224): identifier "v660_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1228): identifier "v662_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1234): identifier "v664_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1238): identifier "v666_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1260): identifier "ap_int" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1260): identifier "v674_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1269): identifier "v677_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1273): identifier "v679_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1298): identifier "v689_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1302): identifier "v691_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1308): identifier "v693_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1312): identifier "v695_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1334): identifier "ap_int" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1334): identifier "v703_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1343): identifier "v706_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1347): identifier "v708_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1372): identifier "v718_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1376): identifier "v720_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1382): identifier "v722_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1386): identifier "v724_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1405): identifier "ap_int" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1405): identifier "v730_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1414): identifier "v733_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1418): identifier "v735_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1439): identifier "v743_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1443): identifier "v745_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1449): identifier "v747_tmp" is undefined (CRD-20)
+# Error: $PROJECT_HOME/kernel.cpp(1453): identifier "v749_tmp" is undefined (CRD-20)
+# Error: Compilation aborted (CIN-5)
+# Info: Completed transformation 'new' on solution 'solution.v2': elapsed time 1.89 seconds, memory usage 1413796kB, peak memory usage 1413796kB (SOL-9)
+# > end dofile ./run.tcl
+# Error: go analyze: Failed analyze
+
+real	0m7.286s
+user	0m4.834s
+sys	0m0.785s
