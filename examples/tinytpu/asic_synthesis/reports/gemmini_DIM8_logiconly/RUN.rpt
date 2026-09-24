@@ -1,0 +1,33 @@
+Gemmini DIM=8, int8, capacity-matched export, LOGIC-ONLY
+
+Run by session allo-zhang-21 on 2026-09-24, build /scratch/users/sk3463/builds/gemmini-dim8-logic.
+RTL: gemmini_rtl/DIM8_int8_capmatched on main, sv2v_manifest_nomem_stubbed.f -- the
+scratchpad and accumulator arrays stubbed, the same criterion as our side. Settings
+identical to every run in the set, verified in settings.json beside this file: DC
+W-2024.09, FreePDK45 view-standard, 3.33 ns, topographical, flatten_effort 3,
+sram_mode='none', normalize_rtl True with +define+SYNTHESIS, stdcells.db md5
+f5560259. Constrained on get_ports clock, against ap_clk on our side.
+
+  Total cell area          524,401.97
+    combinational          329,526.65   (buf/inv 28,601.38)
+    noncombinational       194,875.32   (37.2%)
+    macro/black box              0.00
+  Cells                    283,842 leaf: 43,158 sequential, 240,684 combinational
+  Timing                   MET. Design WNS 0.00, TNS 0.00, zero violating paths;
+                           hold WNS 0.00, zero violations. Worst critical-path
+                           slack 0.00 ns, next +0.07 ns.
+  Wall                     8,056 s (134 min), 05:08:35Z to 07:22:51Z
+
+Against Gemmini DIM=4 logic-only (382,026.00): +37.3% for doubling DIM. Both are
+logic-only under the same stub rule, so this is the array-and-control cost of the
+2x mesh without either side's memory treatment in it.
+
+Shape, which differs from ours more than the size does: 37.2% non-combinational
+here, and 37.5% at DIM=4, against our 80.1% at T=4/MAXDIM=64. Gemmini's logic is
+gate-heavy where ours is flop-heavy, consistently at both sizes.
+
+The worst path group closes at exactly 0.00 ns, tighter than DIM=4's slack and
+tighter than any of our runs (+0.20 to +0.21 ns). Timing is MET with zero
+violating paths, so this is a pass; but at 0.00 ns it is a pass with nothing
+spare, and a DC topographical estimate is a floor rather than an achieved Fmax.
+Read it as "closes at 3.33 ns", not as headroom.
