@@ -15,6 +15,7 @@ stream. The fix guards the index extraction with isinstance(..., ast.Subscript)
 and passes indices=[] for scalar streams. These tests fail on the pre-fix code.
 """
 from __future__ import annotations
+import os
 import allo
 from allo.ir.types import int32, int1, Stream
 import allo.dataflow as df
@@ -53,11 +54,15 @@ def test_scalar_empty_full_sim():
     assert out[4] == 1, f"try_put() should succeed, got {out[4]}"
     print("test_scalar_empty_full_sim PASSED")
 
-    mod_sc = df.build(nb_status, target="systemc", mode="cosim", project="test_stream_nb_scalar")
-    out[...] = 0   # clear the simulator's result first
-    mod_sc(out)
-    assert out[4] == 1, f"try_put() should succeed, got {out[4]}"
-    print("SystemC Cosim Passed!")
+    # The simulator half above runs anywhere; the cosim half needs Catapult, which
+    # the development host does not have (dev/toolchains.rst). Guarded on merge into
+    # this fork so `pytest tests/` still collects the simulator coverage.
+    if os.environ.get("MGC_HOME"):
+        mod_sc = df.build(nb_status, target="systemc", mode="cosim", project="test_stream_nb_scalar")
+        out[...] = 0   # clear the simulator's result first
+        mod_sc(out)
+        assert out[4] == 1, f"try_put() should succeed, got {out[4]}"
+        print("SystemC Cosim Passed!")
 
 
 def test_scalar_try_put_try_get_sim():
@@ -88,11 +93,12 @@ def test_scalar_try_put_try_get_sim():
     np.testing.assert_array_equal(out, [0, 10, 20, 30])
     print("test_scalar_try_put_try_get_sim PASSED")
 
-    mod_sc = df.build(top_nb, target="systemc", mode="cosim", project="test_stream_nb_scalar_2")
-    out[...] = 0   # clear the simulator's result first
-    mod_sc(out)
-    np.testing.assert_array_equal(out, [0, 10, 20, 30])
-    print("SystemC Cosim Passed!")
+    if os.environ.get("MGC_HOME"):   # see the note in test_scalar_empty_full_sim
+        mod_sc = df.build(top_nb, target="systemc", mode="cosim", project="test_stream_nb_scalar_2")
+        out[...] = 0   # clear the simulator's result first
+        mod_sc(out)
+        np.testing.assert_array_equal(out, [0, 10, 20, 30])
+        print("SystemC Cosim Passed!")
 
 
 def test_scalar_nb_ops_hls_codegen():

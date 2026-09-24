@@ -14,11 +14,23 @@ only cosim proves the RTL reset produces the same values -- exactly the class of
 divergence the `#ifdef __SYNTHESIS__` splits can hide.
 """
 
+import os
+
 import numpy as np
+import pytest
 
 import allo
 import allo.dataflow as df
 from allo.ir.types import int32, Stateful, Stream
+
+# Every test here is a cosim, so the whole module needs Catapult. Added on merge
+# into this fork: the file arrived ungated and the development host has neither
+# Catapult nor Xcelium (dev/toolchains.rst), so `pytest tests/` collected it and
+# failed. Matches the guard test_systemc_backend.py already uses.
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("MGC_HOME"),
+    reason="Catapult (MGC_HOME) not available -- SystemC cosim needs it",
+)
 
 N = 8
 W = 4
