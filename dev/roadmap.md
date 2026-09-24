@@ -96,12 +96,13 @@ three `dirname` calls from `asic_synthesis/` reach the repository root only from
 ## D. Push-button headline numbers
 
 A headline claim counts only when **a gate enforces it**, not when a page states
-it. **Six of eight are enforced**, up from four. The headline here said six
+it. **Seven of eight are enforced**, up from four. The headline here said six
 before the workloads and end-to-end gates existed, which its own table did not
-support -- it listed four. The two that are still not enforced are named rather
-than counted: **CHIA**, whose harness exists and whose repair is unfinished,
-and the **ASIC run**, which has a preflight and needs a Design Compiler
-licence. Neither is an agent-session away.
+support -- it listed four. CHIA joined on 2026-09-24: its $0 suite passes 98/98
+in one invocation (46.9 min), and the loop it gates now runs end to end and
+produces graded verdicts on a paid run. The one that is still not enforced is
+named rather than counted: the **ASIC run**, which has a preflight and needs a
+Design Compiler licence.
 
 *Known-failing tests, so nobody chases them.* `pytest tests/` does not collect
 on this host: 25 errors, all `tests/dataflow/aie/*`, no `aie` module. With that
@@ -117,7 +118,7 @@ anything recent: `test_hierachical_mesh::test_2x2`, three in
 | ACT | every encodable mapping verified, 12/12 | `act_compile.py --gate` | **enforced** |
 | numbers | every published area figure traces to a report | `check_numbers.py` | **enforced** |
 | RTL | cycles bit-exact | inside `reproduce.sh` | **enforced** |
-| CHIA | the loop runs, guards hold, $0 | `test_harness.py` | exists; **repair unfinished** |
+| CHIA | the loop runs, guards hold, $0 | `test_harness.py` | **enforced** (98/98, 46.9 min) |
 | workloads | which models are **verified**, which only **executed** | `workloads/gate.py` | **enforced**, 2026-09-24 |
 | ASIC | area + timing floor, one flow both sides | preflight + sequence | preflight **landed**; a run still needs a licence |
 | **end-to-end** | **PyTorch → mapping → cycles → area** | `e2e_gate.sh` + `check_pairing.py` | **local tier enforced**; area tier needs a licence |
@@ -165,22 +166,45 @@ refusal above becomes an admissible pairing and the gate will say so itself.
 
 ## E. CHIA reproducible from this repository alone
 
-**Blocked on the harness repair**, which was killed twice by usage limits. Four
-known blockers, from `dev/`:
+**Done, 2026-09-24.** The loop runs end to end on `main` and produces graded
+verdicts; the $0 suite passes 98/98 in one invocation (46.9 min); a paid run of
+2 workers x 3 iterations produced six graded evaluations and one win, accepted
+independently at all five shapes (-129 cycles). Evidence:
+`dev/records/tinytpu/chia-evidence/isa-run3-20260924/`, pre-registered in
+`prereg-run3-20260924.md` before the spend.
 
-1. `MAIN_BASE` in `evaluate.py` goes stale — wrong three times in two days.
-   Derive it, or make staleness fail loudly.
-2. `isa_dsl.py` fails its own spec policy. **Do not widen the dunder allowlist
-   unilaterally** — it is a security guard on agent-authored code; this needs a
-   human decision.
-3. `check_invariants` is pinned to `MAXDIM=16`.
-4. `evaluate.FROZEN` needs the ISA spec artefacts.
+The four blockers, and what happened to each:
 
-The bar is not that the harness's own tests pass — it is that **the loop runs
-end to end on current `main`**, or that every step short of a paid call is
-verified with the unverified step named.
+1. `MAIN_BASE` went stale — **derived** now (`evaluate.main_base`: the
+   merge-base of the frozen ref with main). It had gone stale four times in
+   five days and then stopped resolving at all when the design moved to
+   `examples/tinytpu/`. `control.PUBLISHED` had gone stale the same way and now
+   reads `reproduce.sh`'s `EXPECTED`.
+2. `isa_dsl.py` fails its own spec policy — **the dunder allow-list was not
+   widened.** `compose()` charges a file's violations to the candidate only when
+   the candidate *changed* that file, which is how `accept.py` was fixed in
+   29ddc55c. Phase `s` checks both directions. The human decision this item was
+   waiting on is therefore not needed: the guard keeps full strength on
+   everything an agent writes.
+3. `check_invariants` pinned to `MAXDIM=16` — **`SCORED` is set** in `env_for`
+   and in `accept.py`'s environment rather than assumed to be the design's
+   default, which had moved to 64.
+4. `evaluate.FROZEN` lacked the ISA spec artefacts — **`isa_spec.json`,
+   `isa_encoding.py` and `gen_isa.py` joined `DESIGN_EVALUATOR`**, byte-pinned
+   like the rest. Without `isa_encoding.py` the composed tree could not import
+   its own reference model at all.
 
-**ETA:** 1–2 sessions. Blocker 2 needs an answer first.
+**A fifth blocker was not on this list and was the largest.** The design became
+a package: the hardware left `microarch_isa.py` for eight modules under
+`ip/units/`, and the harness still named two editable files, so the agent could
+only edit a 102-line instantiation. `chia_agent/design.py` is now the one
+definition of the fourteen editable paths. The repair is validated by
+behaviour — in the paid run, four of six candidates touched files that were
+not editable at all before it.
+
+**Remaining:** `chia_runs/` still lives at the repository root (§C item 5), and
+the objective is known to be partial (the burst widening is worth zero on the
+model suite at the scored configuration), which is another track's work.
 
 ---
 

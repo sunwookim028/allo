@@ -419,15 +419,48 @@ Limits and known failures
 - **Every search so far is n=1 per arm.** No rate of discovery is
   demonstrated; see :doc:`/extensions/chia_results`.
 - **Run 2 was stopped after 2 of 5 iterations** by a per-run cap that summed
-  the whole account rather than its own sessions.
-- **The $0 guard suite, 57 cases at landing, does not currently pass** (one
-  stale assertion, one crash in the loop phase).
+  the whole account rather than its own sessions. Fixed: every session a run
+  opens is titled with the run's tag (``--title``), and ``spend.run_spend``
+  sums those and the ids the loop saw returned. Nothing else on the account
+  is counted against a run's cap.
+- **The $0 guard suite passes: 98 cases, 46.9 minutes** (2026-09-24,
+  ``dev/records/tinytpu/chia-evidence/isa-run3-20260924/harness-test-20260924-results.json``).
+  It was 57 at landing and did not pass; the repair that restored it also
+  added phase ``s``, which checks the static guards -- the derived main base,
+  the pinned scored configuration, the spend attribution and the policy's
+  scope -- in twenty seconds and without Ray or a model.
 - **A ``tamper`` verdict on a run that should have been clean** is usually a
   person or another agent editing the checkout while a measurement was in
-  flight, not the candidate (guard 4).
+  flight, not the candidate (guard 4). Confirmed the hard way on 2026-09-24:
+  an agent edited ``chia_agent/README.md`` -- inside ``CHECKOUT_WATCH`` --
+  while a gate was running, and the guard refused the candidate at ``tamper``
+  without attributing anything to it. An unplanned violation is a better test
+  of that guard than a constructed one.
 - **Timed-out opencode sessions are billed but reported as $0** by the
   per-worker figures, which is why every cap reads opencode's database
-  (``spend.py``) instead.
+  (``spend.py``) instead. Measured at run scale on 2026-09-24: all four of run
+  3's large iteration calls ran the full 2400 s timeout and returned no
+  ``usage``, so **the whole run reads $0.00 on ``usage`` and $20.72 on the
+  database**. The known form was one call billed $4.33 and reported as $0.00.
+- **A pinned constant nobody notices going stale is the defect, not its
+  value.** ``MAIN_BASE`` went stale four times in five days and then stopped
+  resolving at all when the design moved to ``examples/tinytpu/``; each time it
+  refused **every** candidate at stage ``setup`` with a message that blamed the
+  design. It is derived now (``evaluate.main_base``). ``control.PUBLISHED`` had
+  gone stale the same way -- still 172 / 262 / 418 / 484 / 686 after the design
+  shipped 175 / 265 / 421 / 482 / 674 -- and now reads ``reproduce.sh``'s
+  ``EXPECTED``, the one row a gate checks on every run.
+- **``ray.init(address="auto")`` can hang forever on a dead head.** An orphaned
+  Ray head whose raylet's working directory has been removed accepts the
+  connection and then cannot spawn a single worker: every one dies in
+  ``setup_worker.py`` at ``os.getcwd()``, and the driver blocks in ``ray.get``
+  with no error. Observed 2026-09-24 against a head left by a deleted
+  worktree. ``ray stop`` is not the fix (it is host-wide, see below); start a
+  head with a private ``--temp-dir`` and set ``RAY_ADDRESS``, which overrides
+  even an explicit ``address="auto"`` and leaves
+  ``/tmp/ray/ray_current_cluster`` alone for other tracks.
+- **The tool servers bind fixed ports from 8000 up**, so two ``chia_agent``
+  processes on one host collide. Serialise them.
 
 Running two tracks on one host: ``ray stop`` is global
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
