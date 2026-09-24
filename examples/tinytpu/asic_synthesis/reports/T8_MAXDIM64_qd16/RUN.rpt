@@ -1,0 +1,41 @@
+TinyTPU-isa T=8, MAXDIM=64, QD=16 -- FULL (memories as flip-flops)
+
+Run by session allo-zhang-21 on 2026-09-24, build /scratch/users/sk3463/builds/t8-qd16-full.
+RTL: rtl_handoff/T8_MAXDIM64 as re-exported at f0ee3223, emitted from allo
+92f0618f, content_md5 182af135 over 433 files. Settings identical to every run in
+the set; library md5 f5560259; constrained on ap_clk at 3.33 ns.
+
+THIS IS THE FIRST RUN IN THE SET WHOSE AREA IS PAIRABLE WITH A CYCLE COUNT. Its
+settings.json records QD=16 and the export's own measured cycles: 286 / 425 / 490
+/ 1410 / 3443 / 6916 / 4356 / 2434 at 8x8x8, 16x16x8, 16x16x16, 32x32x32,
+48x48x48, 64x64x64, 64x32x64, 32x64x32. Every earlier TinyTPU row was synthesised
+from an export predating QD=16 and records no QD at all.
+
+  Total cell area        2,833,543.92
+    combinational          563,836.75   (buf/inv 53,870.85)
+    noncombinational     2,269,707.16   (80.1%)
+    macro/black box              0.00
+  Cells                    965,430 leaf: 502,426 sequential, 463,004 combinational
+  Timing                   MET. Design WNS 0.00, TNS 0.00, zero violating paths;
+                           hold WNS 0.00, zero violations. Worst path group
+                           +0.17 ns, next +0.51.
+  Wall                     5,497 s (92 min), 09:10:44Z to 10:42:21Z
+
+AGAINST THE SUPERSEDED T8_MAXDIM64 ROW (2,481,925.71, QD=8 export c169b807):
++14.2% cell area, sequential cells +14.5%, combinational +13.4%, while Vitis
+reports FF +0.9% (43,911 -> 44,303) for the same pair of exports.
+
+That gap -- 14.2% of standard-cell area against 0.9% of flip-flops -- is NOT a
+measurement of the QD=8-to-16 cost, and must not be quoted as one. The two
+exports differ by two days of commits (c169b807 to 92f0618f), not by QD alone, so
+this bounds the cost from above and no more. Isolating it needs one export per QD
+from the same allo commit, which nobody has run.
+
+What it does say, with the same caveat, is that the FPGA resource table and the
+standard-cell area disagree in the same direction as everywhere else in this
+project: +0.9% FF against +14.2% area. It is the third instance -- after the
+dual-write-port RAM that is free on block RAM and impossible in standard cells,
+and MAXDIM 16->64 costing +2.4% FF against +64.1% area.
+
+Non-combinational share 80.1%, against 79.9% on the superseded row and ~80% in
+every TinyTPU run so far, so the flop-heavy shape is unchanged.

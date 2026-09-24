@@ -1,0 +1,54 @@
+Information: Propagating switching activity (low effort zero delay simulation). (PWR-6)
+Warning: Design has unannotated primary inputs. (PWR-414)
+Warning: Design has unannotated sequential cell outputs. (PWR-415)
+ 
+****************************************
+Report : power
+        -hier
+        -analysis_effort low
+Design : tinytpu_isa
+Version: W-2024.09
+Date   : Thu Sep 24 06:41:58 2026
+****************************************
+
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/builds/t8-qd16-full/4-synopsys-dc-synthesis/inputs/adk/stdcells.db)
+
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: Inactive.
+
+
+Global Operating Voltage = 1.1  
+Power-specific unit information :
+    Voltage Units = 1V
+    Capacitance Units = 1.000000ff
+    Time Units = 1ns
+    Dynamic Power Units = 1uW    (derived from V,C,T units)
+    Leakage Power Units = 1nW
+
+
+--------------------------------------------------------------------------------
+                                       Switch   Int      Leak     Total
+Hierarchy                              Power    Power    Power    Power    %
+--------------------------------------------------------------------------------
+tinytpu_isa                            2.26e+04 6.33e+04 4.83e+07 1.34e+05 100.0
+  v6203_U (tinytpu_isa_fifo_w256_d16_A_0)   57.422  321.557 3.78e+05  757.013   0.6
+  v6202_U (tinytpu_isa_fifo_w256_d16_A_1)   48.271  288.577 3.32e+05  668.581   0.5
+  v6201_U (tinytpu_isa_fifo_w256_d16_A_2)   44.313  256.534 2.86e+05  586.462   0.4
+  v6200_U (tinytpu_isa_fifo_w256_d16_A_3)   38.015  224.113 2.39e+05  501.182   0.4
+  v6199_U (tinytpu_isa_fifo_w256_d16_A_4)   31.479  191.598 1.93e+05  415.618   0.3
+  v6198_U (tinytpu_isa_fifo_w256_d16_A_5)   24.148  158.770 1.46e+05  328.937   0.2
+  v5978_c_U (tinytpu_isa_fifo_w64_d22_A)   34.421  198.883 1.31e+05  364.256   0.3
+  accu_0_U0 (tinytpu_isa_accu_0)        153.221 1.08e+03 3.38e+06 4.61e+03   3.4
+  vru_0_U0 (tinytpu_isa_vru_0)           25.277 1.03e+03 3.05e+06 4.11e+03   3.1
+  spm_0_U0 (tinytpu_isa_spm_0)           34.363 1.08e+03 3.06e+06 4.17e+03   3.1
+  dma_ld_0_1_U0 (tinytpu_isa_dma_ld_0_1)  711.794 4.97e+03 6.25e+06 1.19e+04   8.9
+  sequencer_0_1_U0 (tinytpu_isa_sequencer_0_1)  289.192 1.37e+03 5.80e+05 2.24e+03   1.7
+  gmem3_m_axi_U (tinytpu_isa_gmem3_m_axi_CONSERVATIVE1_NUM_READ_OUTSTANDING16_NUM_WRITE_OUTSTANDING16_MAX_READ_BURST_LENGTH16_MAX_WRITE_BURST_LENGTH16_C_M_AXI_ID_WIDTH1_C_M_AXI_ADDR_WIDTH64_C_M_AXI_DATA_WIDTH64_C_M_AXI_AWUSER_WIDTH1_C_M_AXI_ARUSER_WIDTH1_C_M_AXI_WUSER_WIDTH1_C_M_AXI_RUSER_WIDTH1_C_M_AXI_BUSER_WIDTH1_C_USER_VALUE0_C_PROT_VALUE0_C_CACHE_VALUE3_USER_DW64_USER_AW64_USER_MAXREQS4_USER_RFIFONUM_WIDTH9)  203.911 1.15e+03 4.78e+05 1.83e+03   1.4
+  gmem2_m_axi_U (tinytpu_isa_gmem2_m_axi_CONSERVATIVE1_NUM_READ_OUTSTANDING16_NUM_WRITE_OUTSTANDING16_MAX_READ_BURST_LENGTH16_MAX_WRITE_BURST_LENGTH16_C_M_AXI_ID_WIDTH1_C_M_AXI_ADDR_WIDTH64_C_M_AXI_DATA_WIDTH64_C_M_AXI_AWUSER_WIDTH1_C_M_AXI_ARUSER_WIDTH1_C_M_AXI_WUSER_WIDTH1_C_M_AXI_RUSER_WIDTH1_C_M_AXI_BUSER_WIDTH1_C_USER_VALUE0_C_PROT_VALUE0_C_CACHE_VALUE3_USER_DW64_USER_AW64_USER_MAXREQS7_USER_RFIFONUM_WIDTH9)  507.917 2.30e+03 1.78e+06 4.59e+03   3.4
+  gmem1_m_axi_U (tinytpu_isa_gmem1_m_axi_CONSERVATIVE1_NUM_READ_OUTSTANDING16_NUM_WRITE_OUTSTANDING16_MAX_READ_BURST_LENGTH16_MAX_WRITE_BURST_LENGTH16_C_M_AXI_ID_WIDTH1_C_M_AXI_ADDR_WIDTH64_C_M_AXI_DATA_WIDTH64_C_M_AXI_AWUSER_WIDTH1_C_M_AXI_ARUSER_WIDTH1_C_M_AXI_WUSER_WIDTH1_C_M_AXI_RUSER_WIDTH1_C_M_AXI_BUSER_WIDTH1_C_USER_VALUE0_C_PROT_VALUE0_C_CACHE_VALUE3_USER_DW64_USER_AW64_USER_MAXREQS7_USER_RFIFONUM_WIDTH9)  480.441 2.25e+03 1.78e+06 4.51e+03   3.4
+  gmem0_m_axi_U (tinytpu_isa_gmem0_m_axi_CONSERVATIVE1_NUM_READ_OUTSTANDING16_NUM_WRITE_OUTSTANDING16_MAX_READ_BURST_LENGTH16_MAX_WRITE_BURST_LENGTH16_C_M_AXI_ID_WIDTH1_C_M_AXI_ADDR_WIDTH64_C_M_AXI_DATA_WIDTH512_C_M_AXI_AWUSER_WIDTH1_C_M_AXI_ARUSER_WIDTH1_C_M_AXI_WUSER_WIDTH1_C_M_AXI_RUSER_WIDTH1_C_M_AXI_BUSER_WIDTH1_C_USER_VALUE0_C_PROT_VALUE0_C_CACHE_VALUE3_USER_DW512_USER_AW64_USER_MAXREQS7_USER_RFIFONUM_WIDTH9) 3.52e+03 1.01e+04 1.21e+07 2.57e+04  19.2
+1
