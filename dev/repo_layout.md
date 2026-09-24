@@ -58,8 +58,13 @@ allo/
 
 chia/                     the agentic loop, at the root
 
-scripts/asic/             the PD flow: construct graph, RTL export, stubs,
-                          preflight, extractor, number checkers
+backend/asic/             the PD flow, vendored: mflowgen nodes, ADK
+                          definitions, and tools/ -- stubs, preflight,
+                          extractor, number checker. Landed 2026-09-24;
+                          `scripts/asic/` in the first draft, revised on the
+                          flow maintainer's judgement -- see 'Vendoring'.
+                          A design's construct graph stays with the design,
+                          because it names that design's top module.
 
 examples/
   feather/                (exists)
@@ -187,8 +192,9 @@ flow all depend on, so it must not run concurrently with work in flight.
 ## Docs that follow from it
 
 Per `dev/docs_style.md`, each tool gets a page with a **Quick start** before any
-explanation: `tools/asic` (preflight, the documented sequence, what is committed
-and what stays on scratch), `tools/chia` (how to run it, what it costs, what the
+explanation: the ASIC flow (preflight, the documented sequence, what is
+committed and what stays on scratch) — still owed; the quick start currently
+lives in `examples/tinytpu/asic_synthesis/README.md` — `tools/chia` (how to run it, what it costs, what the
 guards are — the existing page is about what it *found*), `tools/act`, and the
 SystemC emitter, which is currently only reachable through the Catapult page.
 Each design gets a page that says what it is, how to run it, and what it
@@ -228,6 +234,15 @@ If the no-vendoring plan is ever restored for the nodes, the preflight must
 **pin and verify** the upstream commit rather than check for presence. An
 unpinned pointer is the thing that bites.
 
+**Verified 2026-09-24, not assumed.** `allo/backend/asic/adks/` holds seven
+files and 28 KB: `freepdk-45nm/` with `configure.yml`, `adk-overlay.tcl`,
+`vcs-compile.args`, `vcs-bagl.args` and a README, and `skywater-130nm/` with
+`configure.yml` and a README. No library data — no `.db`, `.lib`, `.lef`,
+`.tf`, no `pkgs/`, no view. And not only in the tree: every blob that ever
+existed under that path across the whole imported history is one of those seven
+files, so the payload was removed from the history as `PROVENANCE.md` claims,
+not merely deleted in a later commit. The decision stands as recorded.
+
 ## Two results from building the extractor
 
 Both are the kind of thing that only appears when a number is generated rather
@@ -261,3 +276,32 @@ levels are named in a comment there so the next move does not silently break
 it again. Note also that the construct graph and
 `make_stubs.py` were committed by a different session than the one that
 produced the reports; attribute them accordingly when moving.
+
+**The same defect, second instance, fixed 2026-09-24.** `reduce_asic.py`
+generates its own construct graph, and that template hardcoded
+`~/allo-asic` — a path that exists on the synthesis host and nowhere else, so
+the committed `asic_reduce/reduce_8_2/construct-reduce.py` could not run from a
+checkout at all. It now resolves the vendored flow the way
+`construct-commercial.py` does, with the level count named in a comment and
+`ALLO_ASIC_FLOW` for the case the generated file is copied outside the tree,
+which is exactly what the `/scratch` builds on zhang-21 do. Both the template
+and the committed generated file were changed together and are byte-identical.
+
+## The tools folded in, 2026-09-24
+
+`check_numbers.py`, `extract_results.py`, `make_stubs.py` and `preflight.py`
+moved from `examples/tinytpu/asic_synthesis/tools/` to
+`allo/backend/asic/tools/`. **Results stayed**: `asic_synthesis/reports/` is
+TinyTPU's, and so is `construct-commercial.py`, which names its top module.
+
+Each tool now takes the design on the command line instead of deriving it from
+its own location — `--reports` for the number checker and the extractor,
+`--design` for the preflight — which is the same "could MiniTPU call this
+without editing it?" test applied one piece at a time. The extractor's
+`--check` reproduces all eight committed `results.json` byte-for-byte from the
+new home, which is the evidence that the move changed nothing about what the
+numbers are.
+
+The preflight came with them and is **not push-button**, so nothing here should
+describe it as such: it needs a DC licence and roughly 70 minutes of a specific
+machine. What it removes is the hour spent discovering that.

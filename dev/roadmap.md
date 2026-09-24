@@ -96,7 +96,7 @@ it. Today three of eight are enforced.
 | RTL | cycles bit-exact | inside `reproduce.sh` | **enforced** |
 | CHIA | the loop runs, guards hold, $0 | `test_harness.py` | exists; **repair unfinished** |
 | workloads | real models map and run | `workloads/run.py` | runs, **no gate** |
-| ASIC | area + timing floor, one flow both sides | preflight + sequence | **preflight owed** |
+| ASIC | area + timing floor, one flow both sides | preflight + sequence | preflight **landed**; a run still needs a licence |
 | **end-to-end** | **PyTorch → cycles → area in one command** | — | **does not exist** |
 
 **The end-to-end gate is the highest-value missing piece.** Every error in this
@@ -104,8 +104,14 @@ work has lived in the seams *between* flows — a configuration claimed but not
 run, a row measured on a different design, an area figure beside cycles from
 other RTL — and no single-flow gate can see any of them.
 
-**ETA:** workload gate, 1 session. ASIC preflight, 1 session on the synthesis
-side. End-to-end, 2 sessions, and only after §C.
+The ASIC row is **not** push-button and must not be written as though it were:
+`preflight.py` checks `dc_shell`, the pinned mflowgen, sv2v, the vendored nodes,
+the ADK definition, the variant's RTL and lists, and the fetched `stdcells.db`
+against its recorded md5 — and then prints the sequence. A run still needs a DC
+licence and ~70 minutes of a specific machine. Its value is failing in seconds
+rather than an hour in.
+
+**ETA:** workload gate, 1 session. End-to-end, 2 sessions, and only after §C.
 
 ## E. CHIA reproducible from this repository alone
 

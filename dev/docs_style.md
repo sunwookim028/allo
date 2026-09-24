@@ -88,7 +88,8 @@ if there is a lot. Never above the Reference section.
 - **Show code, not only numbers.** A code block a reader can paste is worth
   more than a table of what happened when we pasted it.
 - **One claim per figure, and cite the file it comes from** rather than
-  retyping it — `asic_synthesis/tools/check_numbers.py` enforces this for area.
+  retyping it — `allo/backend/asic/tools/check_numbers.py --reports <design>/asic_synthesis/reports`
+  enforces this for area.
 - **Move history down or out.** Dated measurements belong in `dev/records/`;
   the page states the current state, with a pointer.
 - **Cut the hedges.** Write the measured fact. Caveats belong in one place next
