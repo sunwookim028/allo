@@ -483,8 +483,12 @@ same clock, same exclusion rule, both closing timing**:
 
 **The four memory-interface adapters are 40.9% of our logic, 57.3% with the DMA
 unit; the array that does the arithmetic is under 4%.** Gemmini's entire
-reader/writer/transaction path is 23,885 µm² — **6.3%** of its logic. So the
-4.33× is memory-interface mass that TileLink at this width does not produce,
+reader/writer/transaction path is 23,885 µm² — **6.3%** of its logic *at
+DIM=4*, which is the design point that attribution was measured on; the
+matched-capacity totals above are ours against DIM=8, so the two are not the
+same run and the share is quoted as the order it establishes rather than as a
+paired figure. So the 4.33× is memory-interface mass that TileLink at this
+width does not produce,
 measured at matched capacity with both sides' cycles taken from the RTL that
 was synthesised. It is §6.2's finding at a second design point, and this time
 it is the headline rather than an inference.
