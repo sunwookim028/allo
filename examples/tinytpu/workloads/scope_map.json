@@ -1,0 +1,1141 @@
+{
+  "T=4 MAXDIM=64 QD=16 DMA_WORDS=1": {
+    "assumptions": {
+      "chained_verification": {
+        "bytes": 128,
+        "differ_vs_real_forward": 62,
+        "differ_vs_run_py_reference": 0,
+        "extractor_refusals": 0,
+        "layers_mapped": 2,
+        "probe": "two bias-free nn.Linears off one input, returned as a pair",
+        "status": "silent-wrong",
+        "topology": "layer fanout_probe_l1 consumes 'x', which is not the previous mapped layer's result: the graph is not a chain and run.py chains it anyway, on BOTH sides of the comparison",
+        "topology_sound": false,
+        "why": "the extractor refuses nothing, both layers map, and run.py's own reference agrees on 128 of 128 bytes -- while the machine's output differs from what model(x) actually returns in 62 of 128. run.py chains the layers on BOTH sides of the comparison, so a fan-out graph is checked against a PyTorch evaluation that is not the model either."
+      }
+    },
+    "config": {
+      "AR_RAW_DIST": 4,
+      "DMA_WORDS": 1,
+      "MAXDIM": 64,
+      "MAXROWS": 127,
+      "NAR": 136,
+      "NVR": 1024,
+      "QD": 16,
+      "SPAD_ROWS": 1024,
+      "T": 4
+    },
+    "entries": {
+      "mlp_bias": {
+        "layers": 1,
+        "refusals": [
+          "fc1",
+          "sigmoid"
+        ],
+        "rtl": {
+          "declared_for_this_config": false,
+          "evidence_for": "a TRANSCRIBED record that xsim once printed these cycles at this configuration; gate.py checks it is self-consistent and config-matched, and does not re-measure it",
+          "total": null,
+          "why_not": []
+        },
+        "tier": "probe",
+        "vs_pytorch": {
+          "evidence_for": "not run: gate.py skips the end-to-end check for a probe, so no PyTorch comparison exists for this entry at all",
+          "ok": null
+        },
+        "vs_spec": {
+          "evidence_for": "the mapper agrees with our own semantics; PyTorch is not on either side",
+          "ok": true,
+          "reference": "spec.gold, an int64 numpy einsum in this repository, against isa_ref, a numpy model of the ISA in this repository",
+          "result_bytes": 64
+        }
+      },
+      "mlp_deep": {
+        "layers": 4,
+        "refusals": [],
+        "rtl": {
+          "declared_for_this_config": true,
+          "evidence_for": "a TRANSCRIBED record that xsim once printed these cycles at this configuration; gate.py checks it is self-consistent and config-matched, and does not re-measure it",
+          "total": 2117,
+          "why_not": null
+        },
+        "tier": "confirmed",
+        "vs_pytorch": {
+          "bytes": 208,
+          "differ": 0,
+          "evidence_for": "the machine computes what this model's PyTorch modules compute",
+          "ok": true,
+          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch",
+          "topology": "the mapped Linears form one chain from the model input",
+          "topology_sound": true
+        },
+        "vs_spec": {
+          "evidence_for": "the mapper agrees with our own semantics; PyTorch is not on either side",
+          "ok": true,
+          "reference": "spec.gold, an int64 numpy einsum in this repository, against isa_ref, a numpy model of the ISA in this repository",
+          "result_bytes": 208
+        }
+      },
+      "mlp_small": {
+        "layers": 2,
+        "refusals": [],
+        "rtl": {
+          "declared_for_this_config": true,
+          "evidence_for": "a TRANSCRIBED record that xsim once printed these cycles at this configuration; gate.py checks it is self-consistent and config-matched, and does not re-measure it",
+          "total": 2781,
+          "why_not": null
+        },
+        "tier": "confirmed",
+        "vs_pytorch": {
+          "bytes": 384,
+          "differ": 0,
+          "evidence_for": "the machine computes what this model's PyTorch modules compute",
+          "ok": true,
+          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch",
+          "topology": "the mapped Linears form one chain from the model input",
+          "topology_sound": true
+        },
+        "vs_spec": {
+          "evidence_for": "the mapper agrees with our own semantics; PyTorch is not on either side",
+          "ok": true,
+          "reference": "spec.gold, an int64 numpy einsum in this repository, against isa_ref, a numpy model of the ISA in this repository",
+          "result_bytes": 384
+        }
+      },
+      "mlp_tiny": {
+        "layers": 2,
+        "refusals": [],
+        "rtl": {
+          "declared_for_this_config": true,
+          "evidence_for": "a TRANSCRIBED record that xsim once printed these cycles at this configuration; gate.py checks it is self-consistent and config-matched, and does not re-measure it",
+          "total": 1150,
+          "why_not": null
+        },
+        "tier": "confirmed",
+        "vs_pytorch": {
+          "bytes": 128,
+          "differ": 0,
+          "evidence_for": "the machine computes what this model's PyTorch modules compute",
+          "ok": true,
+          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch",
+          "topology": "the mapped Linears form one chain from the model input",
+          "topology_sound": true
+        },
+        "vs_spec": {
+          "evidence_for": "the mapper agrees with our own semantics; PyTorch is not on either side",
+          "ok": true,
+          "reference": "spec.gold, an int64 numpy einsum in this repository, against isa_ref, a numpy model of the ISA in this repository",
+          "result_bytes": 128
+        }
+      },
+      "mlp_wide": {
+        "layers": 2,
+        "refusals": [],
+        "rtl": {
+          "declared_for_this_config": false,
+          "evidence_for": "a TRANSCRIBED record that xsim once printed these cycles at this configuration; gate.py checks it is self-consistent and config-matched, and does not re-measure it",
+          "total": null,
+          "why_not": []
+        },
+        "tier": "correct",
+        "vs_pytorch": {
+          "bytes": 8192,
+          "differ": 0,
+          "evidence_for": "the machine computes what this model's PyTorch modules compute",
+          "ok": true,
+          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch",
+          "topology": "the mapped Linears form one chain from the model input",
+          "topology_sound": true
+        },
+        "vs_spec": {
+          "evidence_for": "the mapper agrees with our own semantics; PyTorch is not on either side",
+          "ok": true,
+          "reference": "spec.gold, an int64 numpy einsum in this repository, against isa_ref, a numpy model of the ISA in this repository",
+          "result_bytes": 8192
+        }
+      }
+    },
+    "ops": {
+      "Tensor.flatten": {
+        "counts": {
+          "refused": 1
+        },
+        "seen_in": [
+          "cnn"
+        ],
+        "status": "refused",
+        "why": "call_method flatten is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "Tensor.transpose": {
+        "counts": {
+          "refused": 1
+        },
+        "seen_in": [
+          "transformer_block"
+        ],
+        "status": "refused",
+        "why": "call_method transpose is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "call_function:add": {
+        "counts": {
+          "refused": 2
+        },
+        "seen_in": [
+          "transformer_block"
+        ],
+        "status": "refused",
+        "why": "call_function <built-in function add> is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "call_function:matmul": {
+        "counts": {
+          "refused": 2
+        },
+        "seen_in": [
+          "transformer_block"
+        ],
+        "status": "refused",
+        "why": "call_function <built-in function matmul> is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "call_function:relu": {
+        "counts": {
+          "refused": 1
+        },
+        "seen_in": [
+          "cnn"
+        ],
+        "status": "refused",
+        "why": "a ReLU that does not consume a Linear result directly, or is not its only consumer, has no fused epilogue to ride on"
+      },
+      "call_function:sigmoid": {
+        "counts": {
+          "refused": 1
+        },
+        "seen_in": [
+          "mlp_bias"
+        ],
+        "status": "refused",
+        "why": "call_function <built-in method sigmoid of type object at 0x...> is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "call_function:softmax": {
+        "counts": {
+          "refused": 1
+        },
+        "seen_in": [
+          "transformer_block"
+        ],
+        "status": "refused",
+        "why": "call_function <built-in method softmax of type object at 0x...> is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "call_function:truediv": {
+        "counts": {
+          "refused": 1
+        },
+        "seen_in": [
+          "transformer_block"
+        ],
+        "status": "refused",
+        "why": "call_function <built-in function truediv> is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "nn.BatchNorm2d": {
+        "counts": {
+          "refused": 1
+        },
+        "seen_in": [
+          "cnn"
+        ],
+        "status": "refused",
+        "why": "call_module bn is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "nn.Conv2d": {
+        "counts": {
+          "refused": 1
+        },
+        "seen_in": [
+          "cnn"
+        ],
+        "status": "refused",
+        "why": "call_module c1 is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "nn.LayerNorm": {
+        "counts": {
+          "refused": 2
+        },
+        "seen_in": [
+          "transformer_block"
+        ],
+        "status": "refused",
+        "why": "call_module ln is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "nn.Linear(bias=False)": {
+        "counts": {
+          "maps": 18
+        },
+        "seen_in": [
+          "mlp_tiny",
+          "mlp_deep",
+          "mlp_small",
+          "mlp_wide",
+          "mlp_bias",
+          "transformer_block",
+          "cnn"
+        ],
+        "status": "maps",
+        "why": "one nn.Linear becomes one GEMM program"
+      },
+      "nn.Linear(bias=True)": {
+        "counts": {
+          "refused": 1
+        },
+        "seen_in": [
+          "mlp_bias"
+        ],
+        "status": "refused",
+        "why": "nn.Linear with bias: the ISA has vadd but no mapping that broadcasts a bias row into the accumulator, so the baseline cannot express it"
+      },
+      "nn.MaxPool2d": {
+        "counts": {
+          "refused": 1
+        },
+        "seen_in": [
+          "cnn"
+        ],
+        "status": "refused",
+        "why": "call_module p is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "relu (fused on a Linear)": {
+        "counts": {
+          "fused-epilogue": 7
+        },
+        "seen_in": [
+          "mlp_tiny",
+          "mlp_deep",
+          "mlp_small",
+          "mlp_wide",
+          "transformer_block"
+        ],
+        "status": "fused-epilogue",
+        "why": "the sole consumer of a Linear becomes the vrelu epilogue rather than a second pass"
+      }
+    },
+    "shapes": {
+      "16x16x16": {
+        "label": "N4>K4",
+        "nests": 5,
+        "static": 13,
+        "status": "mapped"
+      },
+      "16x16x16.relu": {
+        "label": "N4>K4",
+        "nests": 5,
+        "static": 14,
+        "status": "mapped"
+      },
+      "1x16x16": {
+        "detail": "K2>K2>N4>K4>N4 splits K across 2 emitted loops, so the first partial sum is not a peelable prefix, and `acc` is an instruction field with no predicate on an induction variable",
+        "nests": 14,
+        "status": "refused",
+        "why": "acc-split"
+      },
+      "2x16x16": {
+        "detail": "M2>K2>K2>N4>K4>N4 splits K across 2 emitted loops, so the first partial sum is not a peelable prefix, and `acc` is an instruction field with no predicate on an induction variable",
+        "nests": 74,
+        "status": "refused",
+        "why": "acc-split"
+      },
+      "3x16x16": {
+        "detail": "M3>K2>K2>N4>K4>N4 splits K across 2 emitted loops, so the first partial sum is not a peelable prefix, and `acc` is an instruction field with no predicate on an induction variable",
+        "nests": 74,
+        "status": "refused",
+        "why": "acc-split"
+      },
+      "4x12x16": {
+        "label": "N4>K3",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "4x16x1": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x16x12": {
+        "label": "N3>K4",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "4x16x16": {
+        "label": "N4>K4",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "4x16x16.relu": {
+        "label": "N4>K4",
+        "nests": 1,
+        "static": 14,
+        "status": "mapped"
+      },
+      "4x16x2": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x16x3": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x16x32": {
+        "label": "N8>K4",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "4x16x4": {
+        "label": "K4",
+        "nests": 1,
+        "static": 11,
+        "status": "mapped"
+      },
+      "4x16x5": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x16x6": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x16x60": {
+        "label": "N15>K4",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "4x16x64": {
+        "label": "N16>K4",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "4x16x68": {
+        "detail": "rank N=68 exceeds MAXDIM=64",
+        "nests": 83,
+        "status": "refused",
+        "why": "shape"
+      },
+      "4x16x7": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x16x8": {
+        "label": "N2>K4",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "4x1x16": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x2x16": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x32x16": {
+        "label": "N4>K8",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "4x3x16": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x4x16": {
+        "label": "N4",
+        "nests": 2,
+        "static": 10,
+        "status": "mapped"
+      },
+      "4x4x4": {
+        "label": "-",
+        "nests": 1,
+        "static": 8,
+        "status": "mapped"
+      },
+      "4x5x16": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x60x16": {
+        "label": "N4>K15",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "4x64x16": {
+        "label": "N4>K16",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "4x68x16": {
+        "detail": "rank K=68 exceeds MAXDIM=64",
+        "nests": 83,
+        "status": "refused",
+        "why": "shape"
+      },
+      "4x6x16": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x7x16": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x8x16": {
+        "label": "N4>K2",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "5x12x20": {
+        "label": "N5>K3",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "5x16x16": {
+        "label": "N4>K4",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "63x16x16": {
+        "label": "N4>K4",
+        "nests": 7,
+        "static": 13,
+        "status": "mapped"
+      },
+      "64x16x16": {
+        "label": "M2>N4>K4",
+        "nests": 9,
+        "static": 15,
+        "status": "mapped"
+      },
+      "64x4x4": {
+        "label": "M2",
+        "nests": 5,
+        "static": 10,
+        "status": "mapped"
+      },
+      "65x16x16": {
+        "detail": "rank M=65 exceeds MAXDIM=64",
+        "nests": 504,
+        "status": "refused",
+        "why": "shape"
+      },
+      "6x16x16": {
+        "label": "N4>K4",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "7x16x16": {
+        "label": "N4>K4",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "8x16x16": {
+        "label": "N4>K4",
+        "nests": 3,
+        "static": 13,
+        "status": "mapped"
+      },
+      "8x32x32": {
+        "label": "N8>K8",
+        "nests": 3,
+        "static": 13,
+        "status": "mapped"
+      }
+    }
+  },
+  "T=8 MAXDIM=64 QD=16 DMA_WORDS=1": {
+    "assumptions": {
+      "chained_verification": {
+        "bytes": 128,
+        "differ_vs_real_forward": 62,
+        "differ_vs_run_py_reference": 0,
+        "extractor_refusals": 0,
+        "layers_mapped": 2,
+        "probe": "two bias-free nn.Linears off one input, returned as a pair",
+        "status": "silent-wrong",
+        "topology": "layer fanout_probe_l1 consumes 'x', which is not the previous mapped layer's result: the graph is not a chain and run.py chains it anyway, on BOTH sides of the comparison",
+        "topology_sound": false,
+        "why": "the extractor refuses nothing, both layers map, and run.py's own reference agrees on 128 of 128 bytes -- while the machine's output differs from what model(x) actually returns in 62 of 128. run.py chains the layers on BOTH sides of the comparison, so a fan-out graph is checked against a PyTorch evaluation that is not the model either."
+      }
+    },
+    "config": {
+      "AR_RAW_DIST": 4,
+      "DMA_WORDS": 1,
+      "MAXDIM": 64,
+      "MAXROWS": 127,
+      "NAR": 136,
+      "NVR": 512,
+      "QD": 16,
+      "SPAD_ROWS": 512,
+      "T": 8
+    },
+    "entries": {
+      "mlp_bias": {
+        "layers": 1,
+        "refusals": [
+          "fc1",
+          "sigmoid"
+        ],
+        "rtl": {
+          "declared_for_this_config": false,
+          "evidence_for": "a TRANSCRIBED record that xsim once printed these cycles at this configuration; gate.py checks it is self-consistent and config-matched, and does not re-measure it",
+          "total": null,
+          "why_not": []
+        },
+        "tier": "probe",
+        "vs_pytorch": {
+          "evidence_for": "not run: gate.py skips the end-to-end check for a probe, so no PyTorch comparison exists for this entry at all",
+          "ok": null
+        },
+        "vs_spec": {
+          "evidence_for": "the mapper agrees with our own semantics; PyTorch is not on either side",
+          "ok": true,
+          "reference": "spec.gold, an int64 numpy einsum in this repository, against isa_ref, a numpy model of the ISA in this repository",
+          "result_bytes": 64
+        }
+      },
+      "mlp_deep": {
+        "layers": 4,
+        "refusals": [],
+        "rtl": {
+          "declared_for_this_config": false,
+          "evidence_for": "a TRANSCRIBED record that xsim once printed these cycles at this configuration; gate.py checks it is self-consistent and config-matched, and does not re-measure it",
+          "total": null,
+          "why_not": [
+            "a declared run is T=4 not 8",
+            "a declared run is T=4 not 8, DMA_WORDS=16 not 1"
+          ]
+        },
+        "tier": "confirmed",
+        "vs_pytorch": null,
+        "vs_spec": {
+          "ok": false,
+          "why": "a layer did not map"
+        }
+      },
+      "mlp_small": {
+        "layers": 2,
+        "refusals": [],
+        "rtl": {
+          "declared_for_this_config": false,
+          "evidence_for": "a TRANSCRIBED record that xsim once printed these cycles at this configuration; gate.py checks it is self-consistent and config-matched, and does not re-measure it",
+          "total": null,
+          "why_not": [
+            "a declared run is T=4 not 8",
+            "a declared run is T=4 not 8, DMA_WORDS=16 not 1"
+          ]
+        },
+        "tier": "confirmed",
+        "vs_pytorch": {
+          "bytes": 384,
+          "differ": 0,
+          "evidence_for": "the machine computes what this model's PyTorch modules compute",
+          "ok": true,
+          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch",
+          "topology": "the mapped Linears form one chain from the model input",
+          "topology_sound": true
+        },
+        "vs_spec": {
+          "evidence_for": "the mapper agrees with our own semantics; PyTorch is not on either side",
+          "ok": true,
+          "reference": "spec.gold, an int64 numpy einsum in this repository, against isa_ref, a numpy model of the ISA in this repository",
+          "result_bytes": 384
+        }
+      },
+      "mlp_tiny": {
+        "layers": 2,
+        "refusals": [],
+        "rtl": {
+          "declared_for_this_config": false,
+          "evidence_for": "a TRANSCRIBED record that xsim once printed these cycles at this configuration; gate.py checks it is self-consistent and config-matched, and does not re-measure it",
+          "total": null,
+          "why_not": [
+            "a declared run is T=4 not 8",
+            "a declared run is T=4 not 8, DMA_WORDS=16 not 1"
+          ]
+        },
+        "tier": "confirmed",
+        "vs_pytorch": {
+          "bytes": 128,
+          "differ": 0,
+          "evidence_for": "the machine computes what this model's PyTorch modules compute",
+          "ok": true,
+          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch",
+          "topology": "the mapped Linears form one chain from the model input",
+          "topology_sound": true
+        },
+        "vs_spec": {
+          "evidence_for": "the mapper agrees with our own semantics; PyTorch is not on either side",
+          "ok": true,
+          "reference": "spec.gold, an int64 numpy einsum in this repository, against isa_ref, a numpy model of the ISA in this repository",
+          "result_bytes": 128
+        }
+      },
+      "mlp_wide": {
+        "layers": 2,
+        "refusals": [],
+        "rtl": {
+          "declared_for_this_config": false,
+          "evidence_for": "a TRANSCRIBED record that xsim once printed these cycles at this configuration; gate.py checks it is self-consistent and config-matched, and does not re-measure it",
+          "total": null,
+          "why_not": []
+        },
+        "tier": "correct",
+        "vs_pytorch": {
+          "bytes": 8192,
+          "differ": 0,
+          "evidence_for": "the machine computes what this model's PyTorch modules compute",
+          "ok": true,
+          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch",
+          "topology": "the mapped Linears form one chain from the model input",
+          "topology_sound": true
+        },
+        "vs_spec": {
+          "evidence_for": "the mapper agrees with our own semantics; PyTorch is not on either side",
+          "ok": true,
+          "reference": "spec.gold, an int64 numpy einsum in this repository, against isa_ref, a numpy model of the ISA in this repository",
+          "result_bytes": 8192
+        }
+      }
+    },
+    "ops": {
+      "Tensor.flatten": {
+        "counts": {
+          "refused": 1
+        },
+        "seen_in": [
+          "cnn"
+        ],
+        "status": "refused",
+        "why": "call_method flatten is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "Tensor.transpose": {
+        "counts": {
+          "refused": 1
+        },
+        "seen_in": [
+          "transformer_block"
+        ],
+        "status": "refused",
+        "why": "call_method transpose is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "call_function:add": {
+        "counts": {
+          "refused": 2
+        },
+        "seen_in": [
+          "transformer_block"
+        ],
+        "status": "refused",
+        "why": "call_function <built-in function add> is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "call_function:matmul": {
+        "counts": {
+          "refused": 2
+        },
+        "seen_in": [
+          "transformer_block"
+        ],
+        "status": "refused",
+        "why": "call_function <built-in function matmul> is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "call_function:relu": {
+        "counts": {
+          "refused": 1
+        },
+        "seen_in": [
+          "cnn"
+        ],
+        "status": "refused",
+        "why": "a ReLU that does not consume a Linear result directly, or is not its only consumer, has no fused epilogue to ride on"
+      },
+      "call_function:sigmoid": {
+        "counts": {
+          "refused": 1
+        },
+        "seen_in": [
+          "mlp_bias"
+        ],
+        "status": "refused",
+        "why": "call_function <built-in method sigmoid of type object at 0x...> is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "call_function:softmax": {
+        "counts": {
+          "refused": 1
+        },
+        "seen_in": [
+          "transformer_block"
+        ],
+        "status": "refused",
+        "why": "call_function <built-in method softmax of type object at 0x...> is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "call_function:truediv": {
+        "counts": {
+          "refused": 1
+        },
+        "seen_in": [
+          "transformer_block"
+        ],
+        "status": "refused",
+        "why": "call_function <built-in function truediv> is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "nn.BatchNorm2d": {
+        "counts": {
+          "refused": 1
+        },
+        "seen_in": [
+          "cnn"
+        ],
+        "status": "refused",
+        "why": "call_module bn is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "nn.Conv2d": {
+        "counts": {
+          "refused": 1
+        },
+        "seen_in": [
+          "cnn"
+        ],
+        "status": "refused",
+        "why": "call_module c1 is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "nn.LayerNorm": {
+        "counts": {
+          "refused": 2
+        },
+        "seen_in": [
+          "transformer_block"
+        ],
+        "status": "refused",
+        "why": "call_module ln is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "nn.Linear(bias=False)": {
+        "counts": {
+          "maps": 16,
+          "refused-without-a-cause": 2
+        },
+        "seen_in": [
+          "mlp_tiny",
+          "mlp_deep",
+          "mlp_small",
+          "mlp_wide",
+          "mlp_bias",
+          "transformer_block",
+          "cnn"
+        ],
+        "status": "refused-without-a-cause",
+        "why": "the mapper enumerated NO nest and named no constraint; the extractor had accepted the layer"
+      },
+      "nn.Linear(bias=True)": {
+        "counts": {
+          "refused": 1
+        },
+        "seen_in": [
+          "mlp_bias"
+        ],
+        "status": "refused",
+        "why": "nn.Linear with bias: the ISA has vadd but no mapping that broadcasts a bias row into the accumulator, so the baseline cannot express it"
+      },
+      "nn.MaxPool2d": {
+        "counts": {
+          "refused": 1
+        },
+        "seen_in": [
+          "cnn"
+        ],
+        "status": "refused",
+        "why": "call_module p is not an int8 GEMM or a fused ReLU; this build computes int8 x int8 -> int32 with a ReLU epilogue"
+      },
+      "relu (fused on a Linear)": {
+        "counts": {
+          "fused-epilogue": 6
+        },
+        "seen_in": [
+          "mlp_tiny",
+          "mlp_deep",
+          "mlp_small",
+          "mlp_wide",
+          "transformer_block"
+        ],
+        "status": "fused-epilogue",
+        "why": "the sole consumer of a Linear becomes the vrelu epilogue rather than a second pass"
+      }
+    },
+    "shapes": {
+      "16x16x16": {
+        "label": "N2>K2",
+        "nests": 5,
+        "static": 13,
+        "status": "mapped"
+      },
+      "16x16x16.relu": {
+        "label": "N2>K2",
+        "nests": 5,
+        "static": 14,
+        "status": "mapped"
+      },
+      "1x16x16": {
+        "detail": "K2>N2>K8>N8 does not put K innermost among the emitted loops, which peeling the first partial sum requires",
+        "nests": 2,
+        "status": "refused",
+        "why": "acc-position"
+      },
+      "2x16x16": {
+        "detail": "M2>K2>N2>K8>N8 does not put K innermost among the emitted loops, which peeling the first partial sum requires",
+        "nests": 8,
+        "status": "refused",
+        "why": "acc-position"
+      },
+      "3x16x16": {
+        "detail": "M3>K2>N2>K8>N8 does not put K innermost among the emitted loops, which peeling the first partial sum requires",
+        "nests": 8,
+        "status": "refused",
+        "why": "acc-position"
+      },
+      "4x12x16": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x16x1": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x16x12": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x16x16": {
+        "label": "N2>K2",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "4x16x16.relu": {
+        "label": "N2>K2",
+        "nests": 1,
+        "static": 14,
+        "status": "mapped"
+      },
+      "4x16x2": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x16x3": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x16x32": {
+        "label": "N4>K2",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "4x16x4": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x16x5": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x16x56": {
+        "label": "N7>K2",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "4x16x6": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x16x64": {
+        "label": "N8>K2",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "4x16x7": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x16x72": {
+        "detail": "rank N=72 exceeds MAXDIM=64",
+        "nests": 83,
+        "status": "refused",
+        "why": "shape"
+      },
+      "4x16x8": {
+        "label": "K2",
+        "nests": 1,
+        "static": 11,
+        "status": "mapped"
+      },
+      "4x1x16": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x2x16": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x32x16": {
+        "label": "N2>K4",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "4x3x16": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x4x16": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x4x4": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x56x16": {
+        "label": "N2>K7",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "4x5x16": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x64x16": {
+        "label": "N2>K8",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "4x6x16": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x72x16": {
+        "detail": "rank K=72 exceeds MAXDIM=64",
+        "nests": 83,
+        "status": "refused",
+        "why": "shape"
+      },
+      "4x7x16": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "4x8x16": {
+        "label": "N2",
+        "nests": 1,
+        "static": 10,
+        "status": "mapped"
+      },
+      "5x12x20": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "5x16x16": {
+        "label": "N2>K2",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "63x16x16": {
+        "label": "N2>K2",
+        "nests": 7,
+        "static": 13,
+        "status": "mapped"
+      },
+      "64x16x16": {
+        "label": "M2>N2>K2",
+        "nests": 9,
+        "static": 15,
+        "status": "mapped"
+      },
+      "64x4x4": {
+        "nests": 0,
+        "status": "refused-without-a-cause",
+        "why": "the mapspace generated no nest and no constraint was named"
+      },
+      "65x16x16": {
+        "detail": "rank M=65 exceeds MAXDIM=64",
+        "nests": 42,
+        "status": "refused",
+        "why": "shape"
+      },
+      "6x16x16": {
+        "label": "N2>K2",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "7x16x16": {
+        "label": "N2>K2",
+        "nests": 1,
+        "static": 13,
+        "status": "mapped"
+      },
+      "8x16x16": {
+        "label": "N2>K2",
+        "nests": 3,
+        "static": 13,
+        "status": "mapped"
+      },
+      "8x32x32": {
+        "label": "N4>K4",
+        "nests": 3,
+        "static": 13,
+        "status": "mapped"
+      }
+    }
+  }
+}

@@ -149,10 +149,21 @@ What maps, and what does not
 The design computes ``int8 x int8 -> int32`` with an optional ReLU on the
 accumulator before the narrowing. So:
 
-**Maps.** ``nn.Linear`` without bias, at any (M, K, N) within ``MAXDIM``,
-including extents that are not multiples of ``T``; and a ReLU that consumes a
-Linear's result directly and is its only consumer, which becomes the fused
-epilogue rather than a second pass.
+**Maps.** ``nn.Linear`` without bias, with ``M`` any integer in
+``[AR_RAW_DIST, MAXDIM]`` and ``K`` and ``N`` **multiples of ``T``** up to
+``MAXDIM``; and a ReLU that consumes a Linear's result directly and is its
+only consumer, which becomes the fused epilogue rather than a second pass.
+
+.. note::
+
+   This sentence used to read "at any (M, K, N) within ``MAXDIM``, including
+   extents that are not multiples of ``T``". That is true of ``M`` and false
+   of ``K`` and ``N``: ``mapspace.residual`` admits an intrinsic only where it
+   divides the extent, and the intrinsic is ``T`` on the reduce and column
+   ranks. Corrected by the sweep in
+   ``dev/records/tinytpu/front_half_scope_20260924.rst``, which is also where
+   the consequence is recorded --- at ``T=8``, ``mlp_deep``'s
+   ``Linear(16, 12)`` stops mapping.
 
 **Does not map, and is reported rather than approximated.**
 
@@ -164,16 +175,25 @@ epilogue rather than a second pass.
   no unit. ``vru`` does ReLU.
 * **A ReLU that is not the sole consumer of a Linear.** With two consumers the
   unfused value is needed as well, and there is no epilogue to ride on.
+* **A ``K`` or ``N`` that is not a multiple of ``T``.** ``Linear(6, 8)``
+  passes the extractor and then the mapper enumerates *no* nest and names no
+  constraint, so what reaches the user is ``every nest refused``. The shape is
+  genuinely out of scope; the message is a bug, recorded in the dated note and
+  not fixed there.
 * **Anything above ``MAXDIM`` in any of M, K or N.** The operands are one
   ``int8[MAXDIM*MAXDIM]`` region, so a shape has to fit the addressable space
   rather than being tiled into it. This is the capability limit
   :doc:`gemmini_comparison` calls worse than the cycle deficit, and the suite
-  inherits it exactly.
+  inherits it exactly. **Below** ``MAXDIM`` the mapper does tile: an 8x8x8
+  GEMM on a ``T=4`` instruction is enumerated as 680 nests and mapped, not
+  rejected.
 * **Everything else in a graph** --- reshape, concatenation, attention,
   normalisation, residual adds. The extractor names the node and the op.
 
 ``mlp_bias`` exists so that this list is demonstrated and not merely asserted:
-it reports two refusals and maps its one remaining layer.
+it reports two refusals and maps its one remaining layer. The list as a whole
+is demonstrated by :ref:`the scope map <workload-suite-scope-map>`, which
+walks each boundary and records how it fails rather than that it does.
 
 The extractor
 =============
@@ -274,8 +294,20 @@ confirmed**: its programs agree with ``isa_ref`` and with PyTorch in software,
 and Vitis csim reports ``0 / 4096`` mismatches, but no RTL run of it has ever
 produced a cycle count (:ref:`why <workload-suite-widening>`).
 
-Two provenance facts that belong with the claims rather than under them:
+Three provenance facts that belong with the claims rather than under them:
 
+* **The two bit-exactness checks are not the same strength, and only one of
+  them involves PyTorch.** ``correctness.check`` holds ``isa_ref`` --- a numpy
+  model of the ISA written here --- against ``spec.gold`` --- a numpy einsum
+  written here; agreeing proves the mapper matches our own semantics and puts
+  PyTorch on neither side. Only the chained check has ``torch`` on one side,
+  and what is on it is ``nn.Linear``'s forward rather than ``model(x)``. Over
+  the whole suite that is **8 912 bytes**, of which ``mlp_wide`` is 8 192, and
+  ``mlp_bias`` contributes none at all: ``gate.py`` skips the end-to-end check
+  for a probe, so the probe has no PyTorch comparison. The RTL row is a
+  *record* that xsim once printed those cycles, declared in ``claims.json``
+  (see its ``source.transcribed``) and checked for self-consistency and
+  configuration, never re-measured. ``scope.py`` prints all three per entry.
 * **The bit-exactness claims are pure numpy.** ``isa_ref`` is numpy and the
   ``allo/act/`` core imports numpy only, so "correct" is established by code that
   is entirely this checkout's --- the MLIR bindings are not part of that claim,
@@ -287,6 +319,53 @@ Two provenance facts that belong with the claims rather than under them:
   emitter that produced the HLS for every cosim below is the same source as
   this branch's. That is the "borrowed, same commit" case ``dev/toolchains.rst``
   describes, said out loud as it asks.
+
+.. _workload-suite-scope-map:
+
+The boundary, as a map rather than a list
+------------------------------------------
+
+The list above is prose, and prose cannot be diffed. ``workloads/scope.py``
+measures the same boundary and writes it to ``workloads/scope_map.json``,
+keyed by ``T MAXDIM QD DMA_WORDS``:
+
+.. code-block:: bash
+
+    python examples/tinytpu/workloads/scope.py            # print it, ~50 s
+    python examples/tinytpu/workloads/scope.py --check    # regenerate and diff
+    python examples/tinytpu/workloads/scope.py --emit     # record this config
+
+Four sections, every cell run and none inferred. **ops**: one row per kind of
+``torch.fx`` node, over the suite's five models plus a pre-norm transformer
+block and a small CNN defined in the file, so the refusal list is demonstrated
+rather than asserted. **shapes**: each of M, K and N swept independently
+across its ceiling, every mapped cell verified against ``spec.gold``, so a
+shape that maps to a *wrong* program is a status and not a silence.
+**entries**: per suite entry, which of its checks compares against PyTorch and
+which compares two things this repository wrote --- and whether the graph is
+the chain that comparison assumes. **assumptions**: what the verification
+itself takes for granted, probed.
+
+There is no hand-maintained expected-value list: the committed map is the
+program's own output, so a cell can only move by the measurement moving.
+``--check`` refuses to compare a configuration it has never recorded, on the
+same principle ``claims.json`` follows.
+
+Two things the first run found, both recorded and neither patched:
+
+* **A ``K`` or ``N`` that is not a multiple of ``T`` refuses with no reason
+  given** --- above.
+* **The end-to-end PyTorch check assumes the graph is a chain.**
+  ``run.py`` feeds layer *i*'s output to layer *i+1* on *both* sides of the
+  comparison, so a fan-out graph is compared against a PyTorch evaluation that
+  is not the model either, and they agree. Measured on two bias-free Linears
+  off one input: nothing refused, both layers mapped, the suite's own check
+  reports 0 of 128 bytes differing, and the machine's output differs from
+  ``model(x)`` in 62 of 128. All five committed models are chains ---
+  ``scope.py`` recomputes that and reports ``topology_sound`` per entry rather
+  than assuming it --- so no number on this page is affected. The *claim* is:
+  the suite's PyTorch evidence holds for chain-topology graphs, and nothing in
+  the suite enforces that scope.
 
 The numbers
 ===========
@@ -762,6 +841,7 @@ Running it
 
     python workloads/run.py                      # every model, static, ~1 min
     python workloads/run.py --emit               # and write workloads/specs/
+    python workloads/scope.py --check            # the scope map, ~50 s
     python workloads/run.py --simulator          # also check the built design
     python workloads/run.py --burst              # what the widening should be worth
 
