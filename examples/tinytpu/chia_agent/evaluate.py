@@ -245,6 +245,24 @@ SCORED = {"TPU_T": "4", "TPU_MAXDIM": "16"}
 #: are NOT the control here. The control is measured per run, like the GEMM
 #: one: `accept.py` takes the measurement, it does not look it up.
 SCORED_MODELS = ("mlp_tiny", "mlp_deep")
+#: The configuration the MODEL term is measured at -- MAXDIM=64, not `SCORED`'s
+#: 16. MEASURED, not assumed: at T=4 MAXDIM=16 QD=16 the burst widening is
+#: worth 0 cycles on every layer of both models (861 -> 861, 1,530 -> 1,530,
+#: layer by layer, to the cycle), against 287 and 583 on the same two models at
+#: MAXDIM=64. `dev/records/tinytpu/model-term-maxdim-20260924.rst`.
+#:
+#: At MAXDIM=16 a DRAM row is 4 packed words instead of 16, so every operand
+#: burst is four times shorter and the per-layer prologue covers all of it. The
+#: relationship the model term exists for does not just weaken there, it
+#: INVERTS: at MAXDIM=16 the GEMM shapes see the widening (run 1 measured
+#: 0/0/-42/-59/-59) and the models do not. A model term at MAXDIM=16 would be
+#: the LESS burst-sensitive of the two terms, which is the opposite of the
+#: reason for adding it.
+#:
+#: The GEMM control stays at `SCORED` because that is the published row. Two
+#: configurations means TWO csynths per candidate, and that is the price of the
+#: term being worth anything.
+SCORED_MODEL_ENV = {"TPU_T": "4", "TPU_MAXDIM": "64", "TPU_QD": "16"}
 #: What in the checkout itself the evaluation depends on: the `allo` package
 #: (on PYTHONPATH), and this directory's evaluator, policy and design.
 CHECKOUT_WATCH = ["allo", "examples/__init__.py", PKG]
@@ -659,9 +677,12 @@ def model_score(tree, env, work: Path, models, verify_now):
     if not models:
         return {}, 0.0
     out_json = work / "models.json"
+    # The model term's OWN configuration (SCORED_MODEL_ENV), not the GEMM
+    # term's: measured, and the reason is in that constant's comment.
     ok, rc, out, sec = vouched(
-        "workloads", tree, dict(env, TPU_PRJ=str(work / "workload.prj")), work,
-        work, COSIM_TIMEOUT,
+        "workloads", tree,
+        dict(env, **SCORED_MODEL_ENV, TPU_PRJ=str(work / "workload.prj")),
+        work, work, COSIM_TIMEOUT,
         args=("--cosim", *models, "--project", str(work / "workload.prj"),
               "--json", str(out_json), "--timeout", str(MODEL_TIMEOUT)))
     verify_now("workloads")
@@ -782,7 +803,7 @@ def main():
             models = [m for m in a.models.split(",") if m]
             mcyc, msec = model_score(tree, env, work, models, verify_now)
             result.update(model_cycles=mcyc, total_model_cycles=sum(mcyc.values()),
-                          model_seconds=msec)
+                          model_seconds=msec, model_env=dict(SCORED_MODEL_ENV))
             # The area ESTIMATE, from the candidate's own bit census. It costs
             # milliseconds, so it is taken on every scored candidate; a DC run
             # is ~70 minutes on another host and cannot be.
@@ -819,6 +840,7 @@ def main():
             result["objective"] = {
                 "gemm": cyc,
                 "model": result.get("model_cycles", {}),
+                "model_env": result.get("model_env"),
                 "area": result.get("area"),
                 "resources": dict(synth.get("area", {}),
                                   estimated_ns=synth.get("estimated_ns")),

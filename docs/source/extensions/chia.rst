@@ -207,8 +207,10 @@ The evaluator
   See :ref:`chia-objective` for why each term is there and what it replaced.
 
   1. ``model`` -- RTL cosim cycles for ``mlp_tiny`` and ``mlp_deep``, the two
-     workload-suite models whose every layer fits the scored ``MAXDIM=16``
-     build, one csynth shared by all six layers. **The primary.**
+     workload-suite models whose every layer fits one build, over one csynth
+     shared by all six layers. **The primary**, and measured at
+     ``evaluate.SCORED_MODEL_ENV`` --- ``MAXDIM=64``, **not** the GEMM term's
+     16, for the measured reason below.
   2. ``gemm`` -- RTL cosim cycles at 4x4x4 and 16x16x16, unchanged. **The
      control**, kept so that a change which helps models and hurts GEMM shapes
      has to be stated rather than hidden.
@@ -248,6 +250,23 @@ amortised by one large problem. A loop ranking changes on GEMM shapes ranks
 them on the workload class **least** sensitive to the cost they remove. So the
 model term is the primary and the GEMM shapes are kept as the control: a
 control that is dropped cannot catch a change that buys models with shapes.
+
+**...but only at MAXDIM=64, and that had to be measured.** Every one of those
+figures was taken at ``TPU_MAXDIM=64``, and the loop scores at 16, where a DRAM
+row is 4 packed words instead of 16 and every operand burst is four times
+shorter. Asked directly --- both models, every layer, one csynth per burst
+width, at ``T=4 MAXDIM=16 QD=16`` --- the widening is worth **zero cycles**:
+861 -> 861 and 1,530 -> 1,530, layer by layer, to the cycle
+(``dev/records/tinytpu/model-term-maxdim-20260924.rst``).
+
+Worse than insensitive: at MAXDIM=16 the relationship **inverts**. The GEMM
+shapes there *do* see the widening --- CHIA run 1 measured
+``0 / 0 / -42 / -59 / -59`` on exactly that configuration --- and the models do
+not. A model term at MAXDIM=16 would be the *less* burst-sensitive of the two
+terms, which is the opposite of the reason for having one. So the model term is
+measured at MAXDIM=64 and the GEMM control stays at 16 because that is the
+published row: **two configurations, two csynths per candidate**, and that is
+what the term costs.
 
 **The FPGA table understates silicon in the components a search most wants to
 change.** The burst widening is +43 % flip-flops and +92 % block RAM on FPGA
@@ -324,6 +343,10 @@ Two honest limits on this evidence:
   three the new objective is running on its GEMM control, and is the old
   objective with a better resource axis. The resource axis is supported
   strongly; the model axis on a single point.
+- And that single point is the one the MAXDIM measurement above qualifies: the
+  model term earns its place at MAXDIM=64 and demonstrably does not at 16. The
+  objective is better *because the term is measured where the effect is*, and
+  the honest form of that sentence names the configuration.
 - The proxy's attribution of run 1's win -- +24.3 % area, 99.6 % in the AXI
   master ports -- is the same attribution Design Compiler made for the
   MAXDIM=64 widening (99.1 % in two adapters), reached in milliseconds instead
