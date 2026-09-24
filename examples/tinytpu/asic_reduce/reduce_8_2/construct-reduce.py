@@ -29,8 +29,20 @@ def construct():
     'sram_mode': 'none',
   }
 
-  asic_dir = os.path.expanduser('~/allo-asic')
+  # The vendored flow: allo/backend/asic/{nodes,adks} at the repository root,
+  # four levels above examples/tinytpu/asic_reduce/<config>/. Set
+  # ALLO_ASIC_FLOW when this file is run from a copy outside the checkout --
+  # a /scratch build tree on the synthesis host, for instance.
+  this_dir = os.path.dirname(os.path.abspath(__file__))
+  repo = os.path.dirname(os.path.dirname(os.path.dirname(
+      os.path.dirname(this_dir))))
+  asic_dir = os.environ.get('ALLO_ASIC_FLOW',
+                            os.path.join(repo, 'allo', 'backend', 'asic'))
   nodes_dir = os.path.join(asic_dir, 'nodes')
+  if not os.path.isdir(nodes_dir):
+    raise SystemExit(
+      f'no node library at {nodes_dir}. Set ALLO_ASIC_FLOW to a checkout of it, '
+      'or run allo/backend/asic/tools/preflight.py to see what is missing.')
   graph.sys_path.append(os.path.join(asic_dir, 'adks'))
   graph.set_adk(adk_name)
   adk = graph.get_adk_node()

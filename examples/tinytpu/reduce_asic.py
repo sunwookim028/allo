@@ -26,8 +26,10 @@ Both are the SAME RTL, so the tree's own area appears twice -- once alone and
 once as a line of the region's hierarchical area report -- and the two must
 agree. They are a cross-check on the export, not two measurements.
 
-The flow itself lives on zhang-21 (`~/allo-asic`, mflowgen 0.8.0); ace-01 has
-neither DC nor the ADK. Builds go in `/scratch` there, never on NFS.
+The flow itself is vendored at `allo/backend/asic/`, which the generated
+construct graph resolves from its own location (override with
+`ALLO_ASIC_FLOW`). Running it needs zhang-21: DC W-2024.09 and mflowgen 0.8.0
+live there and ace-01 has neither. Builds go in `/scratch` there, never on NFS.
 
     python reduce_asic.py --export            # RTL + manifests from a kept prj
     python reduce_asic.py --launch tree       # rsync and start DC remotely
@@ -206,8 +208,20 @@ def construct():
     'sram_mode': 'none',
   }
 
-  asic_dir = os.path.expanduser('~/allo-asic')
+  # The vendored flow: allo/backend/asic/{nodes,adks} at the repository root,
+  # four levels above examples/tinytpu/asic_reduce/<config>/. Set
+  # ALLO_ASIC_FLOW when this file is run from a copy outside the checkout --
+  # a /scratch build tree on the synthesis host, for instance.
+  this_dir = os.path.dirname(os.path.abspath(__file__))
+  repo = os.path.dirname(os.path.dirname(os.path.dirname(
+      os.path.dirname(this_dir))))
+  asic_dir = os.environ.get('ALLO_ASIC_FLOW',
+                            os.path.join(repo, 'allo', 'backend', 'asic'))
   nodes_dir = os.path.join(asic_dir, 'nodes')
+  if not os.path.isdir(nodes_dir):
+    raise SystemExit(
+      f'no node library at {nodes_dir}. Set ALLO_ASIC_FLOW to a checkout of it, '
+      'or run allo/backend/asic/tools/preflight.py to see what is missing.')
   graph.sys_path.append(os.path.join(asic_dir, 'adks'))
   graph.set_adk(adk_name)
   adk = graph.get_adk_node()
