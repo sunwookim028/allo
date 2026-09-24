@@ -371,14 +371,15 @@ What has not moved, worst first:
    at `chia/`. `chia_abstraction/evidence*` and `baseline*` are records;
    `chia_abstraction/test_abs_harness.py` and
    `examples/tinytpu/chia_agent/test_{harness,codesign}.py` are tests.
-2. **ACT's generic core is an unjustified new root.** `act/` holds
-   `machine.py`, `mapspace.py`, `nest.py`, `schedule.py`, `search.py`,
-   `target.py`, `workload*.py`; the doc says `allo/act/`, on the
-   `allo/autoscheduler/` precedent, and `allo/act/` does not exist. The
+2. **ACT's generic core is an unjustified new root.** ***Done 2026-09-24,
+   second pass.*** `act/` -> `allo/act/`, on the `allo/autoscheduler/`
+   precedent. It cost the "importable without the MLIR bindings" property,
+   which four pages claimed and which is now false; they say so instead. The
    TinyTPU binding (`examples/tinytpu/act_*.py`, `act/corpus/`) correctly
    stays with the design, but `examples/tinytpu/act/{judge,spec,legality,
    submission,calibrate,cycles,correctness,measure,variants,baseline}.py` is
    the validation layer and the tiered judge, which is not design-specific.
+   **That half has NOT moved** -- see "What the second pass could not do".
 3. **`examples/tinytpu/` is mostly not a design.** Of 33 top-level files about
    six are. Harnesses and gates (`bench_isa.py`, `stress_isa.py`, `cosim.py`,
    `isa_ref.py`, `kpn_model.py`, `mutate.py`, `mutate_actions.py`,
@@ -399,7 +400,8 @@ What has not moved, worst first:
    SystemC, which `examples/systemc/README.md` already rules on ("output, not
    source"); three of its files are byte-identical to the archived copies in
    `dev/records/systemc/`.
-5. **`agents/`, `devtools/` and `playground/` have no slot at all.** `agents/`
+5. **`agents/`, `devtools/` and `playground/` have no slot at all.** ***Done
+   2026-09-24 for the first two; `playground/` deliberately left.*** `agents/`
    is two live Allo designs plus a dated working note (its designs ->
    `examples/`, the note -> `dev/`); `devtools/` is twelve standalone
    introspection scripts whose own README says nothing imports them, which is
@@ -430,3 +432,98 @@ the design (it names that design's top module), and `act/mapspace.py` versus
 `chia_agent/mapspace.py` are deliberately separate -- `docs/source/extensions/
 codesign.rst` says the co-design loop reuses ACT's interface and none of its
 code.
+
+
+## Executed 2026-09-24, second pass
+
+Against the owner's statement of the principle -- *"not mixing designs and
+tools and notes and docs"*, *"'reduce' is a design concept, 'asic' is a
+tooling concept, should not mix"*, *"examples/tinytpu has a lot of different
+types of artifacts; examples/systemc is just not a good naming convention
+there, should be design"* -- so: `examples/` holds designs and is named after
+them, tools live in `allo/`, dated measurements in `dev/records/`, reference
+pages in `docs/source/`, and a file's name says which it is.
+
+| from | to | why |
+| --- | --- | --- |
+| `act/` | `allo/act/` | the mapper core is part of the compiler, not a design and not a tool acting on designs |
+| `examples/systemc/*.py`, `demos/` | `tests/systemc/` | emitter demonstrations, not designs |
+| `examples/systemc/README.md` | merged into `tests/systemc/README.md` | one directory, one README |
+| `agents/{eva_blocks,pe_alu,eva_pe_router_split}.py` | `examples/eva/` | EVA design sources, and EVA already had a home |
+| `agents/INTERCONNECT.md` | `dev/interconnect_reference.md` | a reference document |
+| `agents/README.md` | `dev/records/agent_interconnect_2026-08-15.md` | a dated working note |
+| `devtools/` | `scripts/devtools/` | standalone scripts acting on the compiler; nothing imports them |
+| `examples/tinytpu/csynth_reports/` | `dev/records/tinytpu/csynth_reports/` | 21 raw Vitis `.rpt` dumps, the class `dev/records/tinytpu/logs/` already holds |
+
+`tests/systemc/test_emit.py` is new: the claims the moved programs make about
+the emitted SystemC, collected by pytest. `tiled_systolic.py` was asserting
+`AlloMem<`/`AlloMemW<` counts against an emitter that now produces
+`AlloMemPins<` three times and neither of the old two, and nothing caught it
+because nothing ran it.
+
+### The `examples/systemc/` judgement, and a deliberate divergence from upstream
+
+**Upstream's `examples/` is `aie`, `feather`, `machsuite`, `polybench`,
+`torch`, `transformer_hls.py`.** `aie` is a *backend* name, so
+`examples/systemc/` had upstream precedent and a fork that tracks upstream
+should not drop such a precedent silently. **Recorded here as a deliberate
+divergence, with its reason**: the owner asked for design names under
+`examples/`, and the stronger objection applies anyway -- the files were not
+designs. Five of the seven asserted on the emitted SystemC *text*, which is a
+claim about the emitter; `tiled_systolic.py`'s own header calls itself
+`tests/dataflow/test_tiled_systolic.py` "run through `target='systemc'`";
+`demos/` is "the smallest possible program for one language feature each". So
+the question "rename it after which design?" has no answer, and they went to
+the harness that already acts on them. `examples/aie/` is untouched: it is
+upstream's, it holds designs, and this fork has no standing to rename it.
+
+### What the second pass could not do, and what blocks it
+
+Four findings from the audit above are **not** executed, each for a reason
+found by trying.
+
+1. **The harnesses and gates cannot leave `examples/tinytpu/` by moving.**
+   Audit item 3 says `bench_isa.py`, `stress_isa.py`, `cosim.py`, `mutate*.py`
+   and the rest belong in `tests/`. They cannot go while the *design* imports
+   them: `cosim.py` imports `stress_isa` for the `TPU_TB=stress` testbench and
+   `gen_isa.py` imports it "only for its random-program generator", so moving
+   `stress_isa.py` to `tests/` makes two design entry points import from
+   `tests/`. (`isa_dsl.py` and `act_compile.py` import `bench_isa.SHAPES`,
+   which is only a redirect to the existing `shapes.py` -- those two are free.)
+   Separating them needs the random-program generator and the stress testbench
+   extracted from the gate, which is a refactor, not a move. **Blocked on that
+   extraction.**
+
+2. **The PD-flow stages cannot fold into `allo/backend/asic/`.** Audit item 3
+   names `export_rtl.py`, `export_gemmini_rtl.py`, `saif_capture.py` and
+   `reduce_asic.py`. Applying this file's own test -- *could MiniTPU call this
+   without editing it?* -- all four fail it as they stand: `export_rtl.py`
+   hardcodes `TOP = "tinytpu_isa"` and a `DEST` inside the design,
+   `saif_capture.py` names `sim/verilog/tinytpu_isa.tcl`, and `reduce_asic.py`
+   is about the adder tree specifically. Moving them wholesale is exactly what
+   the "honest caveat about generic" section forbids. **Blocked on the
+   design-generic half being separated from the shim**, which is where
+   `reduce_asic.py`'s launch/collect and `export_rtl.py`'s `compile_order`
+   would go.
+
+3. **`rtl_handoff/` and `gemmini_rtl/` are generated, but moving them changes a
+   tool's interface.** `allo/backend/asic/tools/preflight.py` resolves
+   `<--design>/rtl_handoff/<variant>` and `<--design>/gemmini_rtl/<variant>`;
+   if the exports leave the design, `--design` stops being sufficient and the
+   tool needs an `--exports` of its own, the way `check_pairing.py` already
+   has one. That is an interface change, not a placement change. **Owner's
+   call** -- the two options and their costs are in the session report.
+
+4. **CHIA is still in two places, and neither is `chia/`.** Unchanged: this is
+   the audit's worst item and the one this pass was least able to gate. It is
+   the component that spends real money, none of the required gates exercises
+   it, and merging `chia_abstraction/` with `examples/tinytpu/chia_agent/`
+   under one root is a three-way split (code, records, tests) rather than one
+   rename. **Owner's call.**
+
+**`playground/` was left in place deliberately.** `int8_gemm.py` and
+`mat_vec_test.py` are scratch scripts nothing references, and one of them
+defines `test_single_systolic()` with `MODE = "csyn"` -- moving it under
+`tests/` would have pytest collect a function that needs Vitis. The honest
+answer is that it should probably not be in the repository at all, which is
+not a move to make without being asked.

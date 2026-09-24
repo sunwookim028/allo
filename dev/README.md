@@ -20,7 +20,11 @@ page table for what belongs here versus in `docs/source/`, and why.
   RTL cross-check's `results.txt` and reference xsim runs, and the archived
   emitter output the Catapult scripts in `tests/systemc/` read.
 - `repo_layout.md` -- the target layout for designs, flows and the core
-  package, and what is wrong with today's.
+  package, what is wrong with today's, what each reorganisation pass moved,
+  and what is blocked and on what.
+- `interconnect_reference.md` -- the agent-facing contract for wiring Allo IP
+  blocks: the three link primitives and the op x primitive table. Was
+  `agents/INTERCONNECT.md`.
 - `systemc/` -- the working notes that arrived with the SystemC emitter, from
   `choonsik1/allo` (`SystemC-emitter`). They are that author's notes about
   that fork, kept whole for provenance rather than rewritten: `BACKEND.md`
@@ -32,6 +36,7 @@ page table for what belongs here versus in `docs/source/`, and why.
   this one's, and `SIMULATOR.md` documents the timed dataflow simulator on
   `SystemC-emitter` that this fork has **not** merged.
 - `docs_style.md` -- how the published pages are written.
+- `roadmap.md` -- what is next, and what each numbered step depends on.
 - `paper_outline.md` -- claim, evidence and gap per section.
 - `asic_handoff.md` -- the ASIC/PD evaluation handoff.
 - `SESSION_REPORT.md` -- what the last working session produced.
