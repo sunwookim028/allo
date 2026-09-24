@@ -161,17 +161,31 @@ Editable vs. frozen
      - files
      - how it is enforced
    * - **editable**
-     - ``microarch_isa.py``, ``isa_dsl.py``
-     - The agent edits a private copy in ``<run>/<worker>/spec/``, never the
-       repository.
+     - the fourteen paths ``chia_agent/design.py`` names: ``microarch_isa.py``
+       (the parameter set), ``isa_dsl.py`` (the program generator),
+       ``ip/isa.py``, ``ip/tinytpu.py``, ``ip/assembler.py``,
+       ``ip/programs.py``, and the eight units under ``ip/units/``
+     - The agent edits a private copy in ``<run>/<worker>/spec/``, which
+       mirrors the package, never the repository. The hardware left
+       ``microarch_isa.py`` for ``ip/units/`` when the design became a unit
+       library, so an editable set that stopped at the two old file names
+       would no longer contain the machine -- both wins of run 1 landed in
+       what is now ``ip/units/dma_load.py`` and ``ip/units/sequencer.py``.
    * - **frozen**
      - main's ``cosim.py`` (testbench, ``SHAPES``, golden reference, every
        Vitis/TCL setting), ``bench_isa.py``, ``stress_isa.py``,
-       ``isa_ref.py``, ``kpn_model.py``; and ``chia_agent/``'s
-       ``evaluate.py``, ``gate_runner.py``, ``param_check.py``,
-       ``spec_policy.py``
-     - Read from git, never from disk; main's five files must also be
-       byte-identical to ``MAIN_BASE`` (``476a70d8``) in ``evaluate.py``.
+       ``isa_ref.py``, ``kpn_model.py``, ``shapes.py``, ``isa_spec.json``,
+       ``isa_encoding.py``, ``gen_isa.py``; the design's own machinery
+       (``ip/params.py``, the package ``__init__``\ s, and the reduce IP they
+       import); and ``chia_agent/``'s ``evaluate.py``, ``gate_runner.py``,
+       ``param_check.py``, ``spec_policy.py``, ``mapspace.py``,
+       ``codesign_gate.py``, ``codesign_cosim.py``
+     - Read from git, never from disk; main's design evaluator must also be
+       byte-identical to the base ``evaluate.main_base()`` **derives** -- the
+       merge-base of the frozen ref with main. It was a hand-written
+       ``MAIN_BASE`` constant, and it went stale four times in five days,
+       each time refusing every candidate at stage ``setup`` with a message
+       that blamed the design rather than the pin.
 
 Because ``isa_ref.py`` is frozen and ``stress_isa.py`` checks programs against
 it, **what each instruction means is part of the contract**: the agent may
@@ -241,7 +255,8 @@ Guards
 Mechanical enforcement, not instructions:
 
 1. **Tool surface.** opencode's own file and shell tools are denied; the MCP
-   edit tools accept only the two bare file names.
+   edit tools accept only the paths ``design.EDITABLE`` names, and
+   ``read_spec()`` with no argument lists them.
 2. **Frozen files from git**, a fresh evaluation tree per candidate, anything
    else in the spec directory ignored; ``loop.py`` refuses to start on a dirty
    frozen path.
@@ -306,7 +321,7 @@ Mechanical enforcement, not instructions:
     processes are sandboxed to their work directory (guard 4) and so cannot
     write a control record either, and the control's cosim verdict is
     nonce-vouched (guard 5) like every other. ``accept.json`` records it as
-    ``control`` -- cycles, the two editable files' blob ids, the ref, the
+    ``control`` -- cycles, every editable file's blob id, the ref, the
     estimated clock, the wall time, when it was measured -- so an accepted
     result can be re-derived against the same control.
     ``--control <control-run>/accept.json`` reuses one control for the rest of
@@ -376,7 +391,7 @@ and bills the project in the request URL. ``preflight.py`` runs before any
 worker or model call in ``swarm.py``, ``loop.py`` and ``smoke.py``, and refuses
 unless the project bills ``CHIA_BILLING_ACCOUNT``, Vertex AI is enabled,
 ``--budget-usd`` is given, and CHIA's cumulative spend so far plus this run's cap
-fits **``CHIA_TOTAL_CAP_USD`` ($100 in chia.env)**; it prints the account,
+fits **``CHIA_TOTAL_CAP_USD`` ($500 in chia.env, and the committed default in ``preflight.py``)**; it prints the account,
 project, spend so far, remaining and the run's cap. Cumulative spend is
 opencode's own database, attributed to CHIA2026 by the cutover time recorded
 in ``billing.json`` (opencode stores no GCP project with a session). These are
