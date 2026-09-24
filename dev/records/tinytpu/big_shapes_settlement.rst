@@ -162,7 +162,7 @@ Reproducing
 .. code-block:: bash
 
    export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build OMP_NUM_THREADS=8
-   cd examples/accelerator/tinytpu_vitis
+   cd examples/tinytpu
    TPU_MAXDIM=16 TPU_QD=16 python cosim.py     # the published configuration
    TPU_TILED=32x512x128 TPU_QD=16 TPU_DRAM=65536 \
        ACT_COSIM_TIMEOUT=3600 python cosim.py  # the tiled shape, bounded

@@ -109,13 +109,13 @@ chia.env
 # branch once).
 .scratch/
 
-# tinytpu_vitis verification scratch (mutate.py, ad-hoc runs)
-examples/accelerator/tinytpu_vitis/.mutants/
-examples/accelerator/tinytpu_vitis/.scratch/
-# CHIA co-design loop (examples/accelerator/tinytpu_vitis/chia_agent/)
-examples/accelerator/tinytpu_vitis/chia_agent/node_modules/
-examples/accelerator/tinytpu_vitis/chia_agent/__pycache__/
-!examples/accelerator/tinytpu_vitis/chia_agent/requirements.txt
+# tinytpu verification scratch (mutate.py, ad-hoc runs)
+examples/tinytpu/.mutants/
+examples/tinytpu/.scratch/
+# CHIA co-design loop (examples/tinytpu/chia_agent/)
+examples/tinytpu/chia_agent/node_modules/
+examples/tinytpu/chia_agent/__pycache__/
+!examples/tinytpu/chia_agent/requirements.txt
 # per-evaluation Vitis projects (~110 MB each) and acceptance checkouts
 .chia_scratch/
 # run output (swarm.py / test_harness.py / accept.py write here). What backs a

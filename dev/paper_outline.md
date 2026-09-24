@@ -78,7 +78,7 @@ cycles alone.
 composed into an architecture, rather than as one monolithic design, without
 giving up synthesizability or performance.
 
-**Evidence.** *measured*. `examples/accelerator/tinytpu_vitis/ip/` — eight
+**Evidence.** *measured*. `examples/tinytpu/ip/` — eight
 units in 672 lines, composed by `compose.py` into one `Architecture`;
 `microarch_isa.py` fell to ~100 lines of instantiation. The composed design
 reproduces the published cycle row exactly (175 / 265 / 421 / 482 / 674 since

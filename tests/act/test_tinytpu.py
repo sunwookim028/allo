@@ -16,18 +16,18 @@ from act.search import Problem, price, search  # noqa: E402
 
 pytest.importorskip("allo._mlir", reason="the target needs the bindings")
 
-from examples.accelerator.tinytpu_vitis.act_machine import (  # noqa: E402
+from examples.tinytpu.act_machine import (  # noqa: E402
     CALIBRATION, ENCODING, SEQUENCER_II, fit, is_control,
     orders_checked, steps_of,
 )
-from examples.accelerator.tinytpu_vitis.act_target import (  # noqa: E402
+from examples.tinytpu.act_target import (  # noqa: E402
     CAUSE_KIND, TINYTPU, roles_of,
 )
-from examples.accelerator.tinytpu_vitis.bench_isa import SHAPES  # noqa: E402
-from examples.accelerator.tinytpu_vitis.isa_dsl import (  # noqa: E402
+from examples.tinytpu.bench_isa import SHAPES  # noqa: E402
+from examples.tinytpu.isa_dsl import (  # noqa: E402
     gemm_program,
 )
-from examples.accelerator.tinytpu_vitis.microarch_isa import (  # noqa: E402
+from examples.tinytpu.microarch_isa import (  # noqa: E402
     T, expand,
 )
 

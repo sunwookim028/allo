@@ -50,7 +50,7 @@ from chia.models.opencode import AdditionalModelProvider, RateLimitError
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
-DESIGN_AGENT = REPO / "examples/accelerator/tinytpu_vitis/chia_agent"
+DESIGN_AGENT = REPO / "examples/tinytpu/chia_agent"
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(DESIGN_AGENT))
 
@@ -320,7 +320,7 @@ def run(args, budget: Budget) -> int:
         return 2
     dirty = [l for l in subprocess.run(
         ["git", "status", "--porcelain", "--", "chia_abstraction", "tests",
-         "examples/accelerator/tinytpu_vitis"], cwd=REPO, capture_output=True,
+         "examples/tinytpu"], cwd=REPO, capture_output=True,
         text=True).stdout.splitlines() if l.strip()]
     if dirty:
         print("Refusing to search: frozen paths differ from HEAD:\n"

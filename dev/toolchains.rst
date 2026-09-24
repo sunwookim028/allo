@@ -73,7 +73,7 @@ fix is to make it resolve.
 
 .. code-block:: bash
 
-   ninja -C mlir/build -j"$(nproc)"        # or: examples/accelerator/tinytpu_vitis/reproduce.sh
+   ninja -C mlir/build -j"$(nproc)"        # or: examples/tinytpu/reproduce.sh
 
 -- which is what ``reproduce.sh`` does before it runs anything, and it then
 checks that ``allo`` resolves inside the checkout and exits nonzero if it does
@@ -122,7 +122,7 @@ reproduce or re-point every row. The conda env, ``LLVM_BUILD_DIR`` and
 +------------------------------------------------+---------------------------------------------+-------------------------------------------------+
 | Vitis HLS 2023.2                               | ``/opt/xilinx/Vitis_HLS/2023.2``            | **No.** ``which vitis_hls`` finds nothing;      |
 |                                                | (``settings64.sh`` present)                 | scripts source ``settings64.sh`` themselves —   |
-|                                                |                                             | ``examples/accelerator/tinytpu_vitis/cosim.py`` |
+|                                                |                                             | ``examples/tinytpu/cosim.py``                   |
 |                                                |                                             | hardcodes the path in its ``VITIS`` constant.   |
 +------------------------------------------------+---------------------------------------------+-------------------------------------------------+
 | Verilator 5.051                                | ``VERILATOR_ROOT`` tree at                  | Yes. Leave ``VERILATOR_ROOT`` **unset** — the   |
@@ -152,7 +152,7 @@ Vitis 2023.2 ships binutils 2.37, which cannot read this system's glibc:
 the csim and the cosim link fail without it.
 
 The fix in tree is **not** a ``PATH`` override — it is a compiler-driver flag.
-``examples/accelerator/tinytpu_vitis/cosim.py`` sets ``LDFLAGS = "-B/usr/bin"`` and
+``examples/tinytpu/cosim.py`` sets ``LDFLAGS = "-B/usr/bin"`` and
 splices it into the generated Vitis script, pointing the driver at the system
 linker (2.42) while leaving the rest of the Vitis toolchain in place. Same
 story in ``docs/source/designs/tinytpu_isa.rst``. Any new Vitis flow needs the

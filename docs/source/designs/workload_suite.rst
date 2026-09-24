@@ -99,7 +99,7 @@ is already the corpus's JSON.
 The suite
 =========
 
-``examples/accelerator/tinytpu_vitis/workloads/models.py``. Ordinary
+``examples/tinytpu/workloads/models.py``. Ordinary
 ``nn.Module``\ s with nothing Allo-specific in them, sized so every layer fits
 one build (M, K, N all at most ``MAXDIM``), with ``bias=False`` for the reason
 in :ref:`workload-suite-what-maps`.
@@ -710,7 +710,7 @@ Running it
 
 .. code-block:: bash
 
-    cd examples/accelerator/tinytpu_vitis
+    cd examples/tinytpu
 
     python workloads/run.py                      # every model, static, ~1 min
     python workloads/run.py --emit               # and write workloads/specs/

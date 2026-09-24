@@ -63,24 +63,25 @@ Target and reasoning in `dev/repo_layout.md`. Ordered by dependency:
 1. **Split `ip/compose.py`** — `Unit`, `Channel`, `Memory`, `Architecture` are
    generic and go to `allo/`; `ip/tinytpu.py` stays with the design. *This is
    first because it is what makes §B's manifest emitter possible.*
-2. **`examples/accelerator/tinytpu_vitis/` → `examples/tinytpu/`** — one rename,
-   references updated, gates re-run.
+2. **`examples/accelerator/tinytpu_vitis/` → `examples/tinytpu/`** — one
+   rename, references updated, gates re-run. **Done 2026-09-24.**
 3. **`allo/backend/asic/`** — both entry points: AAAH as the Allo-facing mode,
    the flat flow as the control mode, kept permanently.
 4. **`examples/systemc_rtlsim/` → `examples/systemc/`** — it is a harness, not
    a design.
 5. `chia_runs/` leaves the repository root.
 
-**Blocked until the agents working inside `examples/accelerator/tinytpu_vitis/`
-finish** — the re-measure, the T8 re-export and the `ip-gap` verification all
+**Blocked until the agents working inside `examples/tinytpu/` finish** — the re-measure, the T8 re-export and the `ip-gap` verification all
 write there, and renaming under them would destroy their work. This is the one
 genuinely sequential dependency in the whole plan.
 
 **ETA:** 2 agent-sessions once that tree is quiet.
 
-**Known defect to fix during the move:** `construct-commercial.py` resolves its
-nodes and ADK at `examples/accelerator/{nodes,adks}/`, which do not exist, so it
-cannot run from a clean checkout.
+**Known defect, fixed by the move:** `construct-commercial.py` looked for its
+nodes and ADK at `examples/accelerator/{nodes,adks}/`, which do not exist. The
+vendored flow now lives at `allo/backend/asic/{nodes,adks}/`, and the script's
+three `dirname` calls from `asic_synthesis/` reach the repository root only from
+`examples/tinytpu/` — one level shallower — so it runs from a clean checkout.
 
 ## D. Push-button headline numbers
 

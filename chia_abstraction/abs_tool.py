@@ -46,7 +46,7 @@ import patch_policy
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
-DESIGN_PKG = "examples/accelerator/tinytpu_vitis"
+DESIGN_PKG = "examples/tinytpu"
 
 #: As in the design loop: CHIA binds a tool server to the node's routable
 #: address; the default here is loopback.

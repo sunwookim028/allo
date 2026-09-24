@@ -729,7 +729,7 @@ MAXDIM=64``, 2,481,926 at ``T=8, MAXDIM=64`` — and **none for Gemmini**, while
 comparing cycles against Gemmini at a matched array size. A cycle comparison
 with an area column on only one side is not a comparison; it is an
 advertisement. This section is the correction, and the RTL that makes it
-possible is in ``examples/accelerator/tinytpu_vitis/gemmini_rtl/``.
+possible is in ``examples/tinytpu/gemmini_rtl/``.
 
 The comparable unit is ``Gemmini``, not the SoC
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1206,8 +1206,8 @@ Where the deficit came from, and what was landed
    / 667 / 919), cosimulated at two shapes (4x4x4 and 16x16x16), on branch
    ``impact-limits`` (``f98c0dac``, ``55405e00``). The branch's scripts, raw
    results and timelines are now on ``main`` under
-   `examples/accelerator/tinytpu_vitis/impact/
-   <https://github.com/sunwookim028/allo/tree/main/examples/accelerator/tinytpu_vitis/impact>`__
+   `examples/tinytpu/impact/
+   <https://github.com/sunwookim028/allo/tree/main/examples/tinytpu/impact>`__
    and the branch is deleted.
 
    **Its best stack is now the shipped design.** ``e24e433b`` landed
@@ -1457,7 +1457,7 @@ per-run output it was measured from (``dev/records/tinytpu/impact-results/``)
 are the durable record; they are not re-derived by re-running anything.
 
 Once a variant's ``.py`` file exists (however it was produced), from
-``examples/accelerator/tinytpu_vitis/impact/`` on ``main``:
+``examples/tinytpu/impact/`` on ``main``:
 
 .. code-block:: bash
 

@@ -410,7 +410,7 @@ other ``vitis_hls`` modes route to the ``XDEVICE`` Makefile flow, and the emitte
 ``host.cpp`` is an OpenCL/XRT host -- which is not what Vitis ``cosim_design``
 wants. ``mode="cosim"`` is not wired into ``df.build`` (:ref:`limitation-16`).
 Running C/RTL co-simulation on an Allo dataflow design therefore needs a small
-external driver. ``examples/accelerator/tinytpu_vitis/cosim.py`` (~180 lines) is
+external driver. ``examples/tinytpu/cosim.py`` (~180 lines) is
 a working one and shows the four things any such driver has to do:
 
 1. **A plain C++ testbench.** Build the project with ``mode="csyn"`` to get

@@ -37,7 +37,7 @@ Dev notes (not published):
 - **`LLVM_BUILD_DIR` is NOT set by the conda env** — neither `conda activate allo` nor `conda run` sets it, and the simulator asserts `LLVM_BUILD_DIR is not set` without it. Export it explicitly (below).
 - **Scalar `@df.region()` args** — bare `int32` in `args=[...]` is **rejected** (PR #577); use `int32[1]` → `m_axi`.
 - **Region arg-order reordering**, **OMP segfault at exit**, one-process-per-MLIR-dump: see `docs/source/developer/pitfalls.rst`.
-- **CHIA loop** (`examples/accelerator/tinytpu_vitis/chia_agent/`) spends real money on GCP: read `docs/source/extensions/chia.rst` first; paid runs go through `preflight.py` (CHIA2026 only, `CHIA_TOTAL_CAP_USD`), never commit `chia.env`, and run `test_harness.py` ($0) before any paid run.
+- **CHIA loop** (`examples/tinytpu/chia_agent/`) spends real money on GCP: read `docs/source/extensions/chia.rst` first; paid runs go through `preflight.py` (CHIA2026 only, `CHIA_TOTAL_CAP_USD`), never commit `chia.env`, and run `test_harness.py` ($0) before any paid run.
 
 ## Environment
 
@@ -78,7 +78,7 @@ does not build the fork's site; build locally.
 
 ## TinyTPU-isa (the one accelerator design on `main`)
 
-`examples/accelerator/tinytpu_vitis/`. The hardware is the unit library under
+`examples/tinytpu/`. The hardware is the unit library under
 `ip/` (eight units in `ip/units/`, wired by `ip/tinytpu.py`, composed into one
 region by `allo/compose.py`); `microarch_isa.py` is only the shipped parameter
 set and the names the harness imports. From a clean checkout, one command
@@ -88,7 +88,7 @@ checks the published cycle counts (175/265/421/482/674 since `63ee6ec7` made
 before `e24e433b`):
 
 ```bash
-examples/accelerator/tinytpu_vitis/reproduce.sh            # ~6 min; --no-cosim: ~1 min
+examples/tinytpu/reproduce.sh            # ~6 min; --no-cosim: ~1 min
 ```
 
 `bench_isa.py` / `cosim.py` (default TB) are the **performance** setup
@@ -123,12 +123,12 @@ and `kpn_model` all accept orders the RTL deadlocks on.
 
 `act/` is the target-independent core (pure python, importable without the MLIR
 bindings -- `import allo` is not); the TinyTPU-isa target is
-`examples/accelerator/tinytpu_vitis/act_{machine,target,compile,cosim}.py`.
+`examples/tinytpu/act_{machine,target,compile,cosim}.py`.
 
 ```bash
-python examples/accelerator/tinytpu_vitis/act_compile.py gemm.relu 16x16x16
-python examples/accelerator/tinytpu_vitis/act_compile.py --gate   # ~1.3 s
-pytest tests/act/                                                 # core needs no bindings
+python examples/tinytpu/act_compile.py gemm.relu 16x16x16
+python examples/tinytpu/act_compile.py --gate   # ~1.3 s
+pytest tests/act/                              # core needs no bindings
 ```
 
 Add a workload in one place (`act/workloads.py`); a spec evaluates itself to

@@ -22,7 +22,7 @@
 TinyTPU-isa: A Programmable GEMM Accelerator
 ############################################
 
-TinyTPU-isa (``examples/accelerator/tinytpu_vitis/``) is an int8
+TinyTPU-isa (``examples/tinytpu/``) is an int8
 instruction-programmable tiled-GEMM accelerator written in grid Allo
 (``@df.region`` / ``@df.kernel``) and taken through the Vitis HLS dataflow path to
 **RTL co-simulation**. Each of its units is a module of its own under
@@ -50,10 +50,10 @@ One command takes a clean checkout to the published cycle counts:
    # runs bench_isa + stress_isa, then the default cosim, and checks the five
    # cycle counts against 175 / 265 / 421 / 482 / 674 at the TPU_MAXDIM=16 it
    # pins. Exits nonzero otherwise.
-   examples/accelerator/tinytpu_vitis/reproduce.sh            # ~6 min, incl. a fresh mlir build
-   examples/accelerator/tinytpu_vitis/reproduce.sh --no-cosim # functional, ~1 min
+   examples/tinytpu/reproduce.sh            # ~6 min, incl. a fresh mlir build
+   examples/tinytpu/reproduce.sh --no-cosim # functional, ~1 min
 
-   # Or by hand, from examples/accelerator/tinytpu_vitis (the env sets neither variable):
+   # Or by hand, from examples/tinytpu (the env sets neither variable):
    export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build OMP_NUM_THREADS=8
    python bench_isa.py                   # published functional setup: ALL EXACT
    python bench_isa.py 8 8 8             # one shape
@@ -285,7 +285,7 @@ writer -- it rejects a region-scope ``Stateful`` shared by two kernels
 their opcode dispatch in one process. This rules out a one-process-per-opcode
 split; see :ref:`tinytpu-history-rowflat`. Vitis is not what refuses: a Vitis
 2023.2 probe (`impact/probe_shared/
-<https://github.com/sunwookim028/allo/tree/main/examples/accelerator/tinytpu_vitis/impact/probe_shared>`__)
+<https://github.com/sunwookim028/allo/tree/main/examples/tinytpu/impact/probe_shared>`__)
 shows that ``#pragma HLS stream variable=buf type=unsync`` makes it share an
 on-chip array between two processes, one per BRAM port (``HLS 200-824``,
 ``200-755``, ``200-634``), and ``HLS 200-779`` applies only to *synchronized*
@@ -351,7 +351,7 @@ Files, commands and knobs
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-Files in ``examples/accelerator/tinytpu_vitis/``:
+Files in ``examples/tinytpu/``:
 
 .. list-table::
    :widths: 25 75
@@ -710,8 +710,8 @@ nonzero if any step fails or any number differs:
 
 .. code-block:: bash
 
-   examples/accelerator/tinytpu_vitis/reproduce.sh              # everything, with cosim
-   examples/accelerator/tinytpu_vitis/reproduce.sh --no-cosim   # functional only, ~1 min
+   examples/tinytpu/reproduce.sh              # everything, with cosim
+   examples/tinytpu/reproduce.sh --no-cosim   # functional only, ~1 min
 
 It unsets every ``TPU_*`` knob, pins ``TPU_MAXDIM=16``, and checks that
 ``allo`` resolves to the checkout it is run from (``92fb2f1b``). Added on

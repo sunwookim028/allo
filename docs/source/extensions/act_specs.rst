@@ -24,7 +24,7 @@ ACT Workload Specs and the Judge
 
 The corpus a compiler for :doc:`/designs/tinytpu_isa` is given, and the judge
 that decides whether what came out is right, legal and fast. A spec is a JSON
-file in ``examples/accelerator/tinytpu_vitis/act/corpus/`` stating the
+file in ``examples/tinytpu/act/corpus/`` stating the
 computation and the calling convention and nothing about how to perform it; a
 submission is a program, either ``module:function`` or a ``.json`` file of
 instruction words; the judge returns one of three verdicts -- ``legal``,
@@ -48,7 +48,7 @@ The fork's usual environment (``CLAUDE.md``): the ``allo`` env,
 
 .. code-block:: bash
 
-   cd examples/accelerator/tinytpu_vitis
+   cd examples/tinytpu
    python act/judge.py legal      # the four legality layers
    python act/judge.py correct    # bit-exact against the spec and against isa_ref
    python act/judge.py fast       # the cheap cycle gate; --cosim measures
@@ -205,8 +205,8 @@ Is it legal?
 
 .. code-block:: bash
 
-   python examples/accelerator/tinytpu_vitis/act/judge.py legal
-   python examples/accelerator/tinytpu_vitis/act/judge.py legal --spec gemm_narrow_2x8x4 --program mymod:make
+   python examples/tinytpu/act/judge.py legal
+   python examples/tinytpu/act/judge.py legal --spec gemm_narrow_2x8x4 --program mymod:make
 
 Four layers, reported in the order a program fails them:
 
@@ -280,8 +280,8 @@ Is it correct?
 
 .. code-block:: bash
 
-   python examples/accelerator/tinytpu_vitis/act/judge.py correct
-   python examples/accelerator/tinytpu_vitis/act/judge.py correct --spec relu_16x16 --no-simulator
+   python examples/tinytpu/act/judge.py correct
+   python examples/tinytpu/act/judge.py correct --spec relu_16x16 --no-simulator
 
 Bit-exact, against two named anchors, and the verdict says which one moved:
 
@@ -312,8 +312,8 @@ Is it fast?
 
 .. code-block:: bash
 
-   python examples/accelerator/tinytpu_vitis/act/judge.py fast
-   python examples/accelerator/tinytpu_vitis/act/judge.py fast --spec gemm_16x16x16 --cosim
+   python examples/tinytpu/act/judge.py fast
+   python examples/tinytpu/act/judge.py fast --spec gemm_16x16x16 --cosim
 
 The cheap gate costs microseconds and involves no tool. Every unit in this
 design is one flat loop over the work count the header promises it

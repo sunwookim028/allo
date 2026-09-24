@@ -32,7 +32,7 @@ skim for a field width or an opcode number. The machine that executes it is
 :doc:`tinytpu_isa`; the measurements are on :doc:`tinytpu_isa_results`.
 
 **Every fact on this page is generated from**
-``examples/accelerator/tinytpu_vitis/isa_spec.json``, which is the source of
+``examples/tinytpu/isa_spec.json``, which is the source of
 truth for the instruction encoding, the opcodes, the instruction-memory header,
 the memory map, the two program contracts, the build parameters and the
 numerics. ``gen_isa.py --write`` regenerates the tables below and
@@ -40,9 +40,9 @@ numerics. ``gen_isa.py --write`` regenerates the tables below and
 design or the reference model has drifted from the spec. The prose outside the
 generated region is hand-written rationale.
 
-.. BEGIN GENERATED: examples/accelerator/tinytpu_vitis/gen_isa.py
+.. BEGIN GENERATED: examples/tinytpu/gen_isa.py
 
-.. Generated from examples/accelerator/tinytpu_vitis/isa_spec.json.
+.. Generated from examples/tinytpu/isa_spec.json.
    Edit the spec and run ``python gen_isa.py --write``; ``--check``
    fails if this region is stale.
 
@@ -76,28 +76,28 @@ Bits 62, 63 of word 0 and bits 63:57 of word 1 are unused.
    * - file
      - held
      - note
-   * - ``examples/accelerator/tinytpu_vitis/isa_encoding.py``
+   * - ``examples/tinytpu/isa_encoding.py``
      - generated
      - The spec as Python. Regenerated and diffed byte for byte by gen_isa.py --check.
    * - ``docs/source/designs/tinytpu_isa.rst``
      - generated
      - The ISA tables, between the GENERATED markers. The prose around them is hand-written.
-   * - ``examples/accelerator/tinytpu_vitis/microarch_isa.py``
+   * - ``examples/tinytpu/microarch_isa.py``
      - checked
      - The shipped instantiation: the build parameters, read from the environment, and the names the harness imports. Held to this file by parameter range and by parameter agreement under several configurations.
-   * - ``examples/accelerator/tinytpu_vitis/ip/isa.py``
+   * - ``examples/tinytpu/ip/isa.py``
      - checked
      - Opcodes, DMA flags, AGU targets and budgets, and the instruction layout named once (OP_LO .. NR_HI, AGU_*_BITS), which ``enc``/``enc_agu`` build from. Held by value, layout name by layout name, and by behaviour.
-   * - ``examples/accelerator/tinytpu_vitis/ip/assembler.py``
+   * - ``examples/tinytpu/ip/assembler.py``
      - checked
      - ``expand``, the program validator and the imem header, decoding through ip/isa.py. Held by behaviour on every program the check generates, and AR_RAW_DIST by value.
-   * - ``examples/accelerator/tinytpu_vitis/ip/units``
+   * - ``examples/tinytpu/ip/units``
      - checked
      - The hardware. Its bit slices of a 64-bit word are literal because a symbolic bound widens the extract to i32 (docs/source/designs/tinytpu_library.rst), so every slice is checked against the field table here, as is the mvout saturation.
-   * - ``examples/accelerator/tinytpu_vitis/isa_dsl.py``
+   * - ``examples/tinytpu/isa_dsl.py``
      - checked
      - The program generator, through the encoder it shares with the design.
-   * - ``examples/accelerator/tinytpu_vitis/isa_ref.py``
+   * - ``examples/tinytpu/isa_ref.py``
      - built on the generated module
      - The reference model. Names operands by the ``name`` given below and never sees a bit position, an opcode number or a numeric width the design chose.
    * - ``allo/encoding.py``

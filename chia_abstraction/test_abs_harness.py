@@ -68,7 +68,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
-DESIGN_PKG = "examples/accelerator/tinytpu_vitis"
+DESIGN_PKG = "examples/tinytpu"
 DESIGN_AGENT = REPO / DESIGN_PKG / "chia_agent"
 sys.path.insert(0, str(HERE))
 

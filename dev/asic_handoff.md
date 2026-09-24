@@ -57,7 +57,7 @@ under these because the flop-memory array dominates elaboration.
 
 ## Where results belong
 
-In git, under `examples/accelerator/tinytpu_vitis/asic_synthesis/`: the area
+In git, under `examples/tinytpu/asic_synthesis/`: the area
 numbers, the per-instance `report_area -hierarchy` breakdowns including the
 Gemmini ones, worst slack and violating-path counts, and the settings each run
 used. Not in a chat message.

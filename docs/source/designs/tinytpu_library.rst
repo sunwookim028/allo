@@ -23,7 +23,7 @@ The Unit Library: Composing a Region from Units
 ###############################################
 
 TinyTPU-isa is not written as a design any more. It is written as eight units
-in ``examples/accelerator/tinytpu_vitis/ip/units/``, one per module, and one
+in ``examples/tinytpu/ip/units/``, one per module, and one
 *architecture* -- ``ip/tinytpu.py`` -- that names the channels wiring them, the
 parameters sizing them and the order they are declared in.
 ``microarch_isa.py`` is what is left of the design file: the parameter set read
@@ -284,7 +284,7 @@ Instantiating it
 
 .. code-block:: python
 
-   from examples.accelerator.tinytpu_vitis.ip import TinyTPU, TpuParams
+   from examples.tinytpu.ip import TinyTPU, TpuParams
 
    wide = TinyTPU(TpuParams(T=8, MAXDIM=32, IMEM_SIZE=56), name="tinytpu_t8")
    module = df.build(wide.region, target="simulator")

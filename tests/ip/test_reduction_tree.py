@@ -13,7 +13,7 @@ import pytest
 
 import allo.dataflow as df
 from allo.ir.types import Int
-from examples.accelerator.tinytpu_vitis.ip.reduce import DotTree, ReduceParams
+from examples.tinytpu.ip.reduce import DotTree, ReduceParams
 
 CONFIGS = [(8, 2, 8), (8, 4, 8), (8, 8, 8), (4, 2, 8), (16, 4, 16)]
 SHAPES = [(8, 8), (1, 1), (1, 8), (3, 5), (8, 1)]

@@ -54,7 +54,7 @@ exported (``CLAUDE.md``).
 
 .. code-block:: bash
 
-   cd examples/accelerator/tinytpu_vitis
+   cd examples/tinytpu
    python act_compile.py gemm.relu 16x16x16   # map one workload at one shape
    python act_compile.py --gate               # verify every encodable mapping
    python act_compile.py --list               # the registered workloads
@@ -164,7 +164,7 @@ declaration, not a second generator.
 The TinyTPU-isa target
 ~~~~~~~~~~~~~~~~~~~~~~
 
-``examples/accelerator/tinytpu_vitis/act_target.py`` derives what the earlier
+``examples/tinytpu/act_target.py`` derives what the earlier
 ``act_nest.py`` prototype hardcoded:
 
 - the **row / reduce / column roles** from the spec's rank structure, not from

@@ -40,7 +40,7 @@ Our column, from a clean checkout, in the ``allo`` environment with
 
 .. code-block:: bash
 
-   examples/accelerator/tinytpu_vitis/reproduce.sh   # checks the five cycle counts
+   examples/tinytpu/reproduce.sh   # checks the five cycle counts
 
 What it checks is :ref:`tinytpu-isa-verify`. The parity configurations, which
 are the ones measured against matched Gemmini across every shape of the
@@ -48,7 +48,7 @@ matched set:
 
 .. code-block:: bash
 
-   cd examples/accelerator/tinytpu_vitis
+   cd examples/tinytpu
    TPU_PARITY_CONFIG=parity-t4 python parity_sweep.py      # 10 shapes
    TPU_PARITY_CONFIG=parity-t8 python parity_sweep.py      #  8 shapes
 
@@ -58,7 +58,7 @@ a separate shell (``dev/toolchains.rst``).
 
 .. code-block:: bash
 
-   G=<repo>/examples/accelerator/tinytpu_vitis/gemmini
+   G=<repo>/examples/tinytpu/gemmini
    cd ~/chipyard && git apply $G/chipyard_RoCCAcceleratorConfigs.patch
    cd generators/gemmini && git apply $G/gemmini_CustomConfigs.patch
    cd software/gemmini-rocc-tests
@@ -451,7 +451,7 @@ with **one** change, the banked burst widening, at the matched array sizes.
 
 .. code-block:: bash
 
-   cd examples/accelerator/tinytpu_vitis
+   cd examples/tinytpu
    TPU_PARITY_CONFIG=parity-t4 python parity_sweep.py      # 10 shapes
    TPU_PARITY_CONFIG=parity-t8 python parity_sweep.py      #  8 shapes
 
@@ -475,7 +475,7 @@ Reproducing the Gemmini baseline
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Our side of every table reproduces with one command from a clean checkout,
-``examples/accelerator/tinytpu_vitis/reproduce.sh``, which checks the five cycle
+``examples/tinytpu/reproduce.sh``, which checks the five cycle
 counts (:ref:`tinytpu-isa-verify`); ``TPU_WRAP=1 python cosim.py`` builds the
 old hoisted-argument variant for comparison. The Gemmini side follows.
 
@@ -483,7 +483,7 @@ Every Gemmini number on this page came from a Chipyard tree whose changes were
 **never committed anywhere**: four uncommitted diffs across three nested
 repositories, plus a benchmark that was untracked even inside its own
 submodule. They were captured 2026-09-18 into
-``examples/accelerator/tinytpu_vitis/gemmini/``.
+``examples/tinytpu/gemmini/``.
 
 Pins
 ^^^^
@@ -544,7 +544,7 @@ Applying and running
 
 .. code-block:: bash
 
-   G=<repo>/examples/accelerator/tinytpu_vitis/gemmini
+   G=<repo>/examples/tinytpu/gemmini
    cd ~/chipyard && git apply $G/chipyard_RoCCAcceleratorConfigs.patch
    cd generators/gemmini && git apply $G/gemmini_CustomConfigs.patch
    cd software/gemmini-rocc-tests

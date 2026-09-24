@@ -539,7 +539,7 @@ MAXDIM -> resources
 
 One ``csynth_design`` per configuration, ``xcu280-fsvh2892-2L-e``, 3.33 ns
 target (``csynth_sweep.py``; reports kept under
-``examples/accelerator/tinytpu_vitis/csynth_reports/``).
+``examples/tinytpu/csynth_reports/``).
 
 .. list-table::
    :header-rows: 1
@@ -1981,7 +1981,7 @@ Reproducing
    source $(conda info --base)/etc/profile.d/conda.sh && conda activate allo
    export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build OMP_NUM_THREADS=8
    export PYTHONPATH=$PWD
-   cd examples/accelerator/tinytpu_vitis
+   cd examples/tinytpu
 
    # functional, seconds -- the gates every configuration must pass
    TPU_SET=all python bench_isa.py                 # ALL EXACT
@@ -2020,7 +2020,7 @@ Gemmini, in a **separate shell** (``env.sh`` replaces the ``allo`` conda env):
 .. code-block:: bash
 
    R=/home/sk3463/chipyard/generators/gemmini/software/gemmini-rocc-tests
-   cp examples/accelerator/tinytpu_vitis/gemmini/allo_bare_steady.c $R/bareMetalC/
+   cp examples/tinytpu/gemmini/allo_bare_steady.c $R/bareMetalC/
    cd /home/sk3463/chipyard && source env.sh
    make -C $R/build/bareMetalC -f $R/bareMetalC/Makefile \
         abs_top_srcdir=$R XLEN=64 src_dir=$R/bareMetalC allo_bare_steady-baremetal
@@ -2034,7 +2034,7 @@ A shape change is C-only. A **config** change (DIM, dtype, capacity) needs
 elaboration, so the DIM=4 header must be snapshotted first and the C rebuilt
 immediately afterwards. Check the boot banner says the DIM you expect. The
 config patches for both matched points are committed at
-``examples/accelerator/tinytpu_vitis/gemmini/``.
+``examples/tinytpu/gemmini/``.
 
 .. note::
 
