@@ -265,6 +265,9 @@ def main():
         result["sandbox"] = bool(BWRAP)
         # What the diff may touch, before anything is measured: a diff that is
         # refused anyway must not cost a five-shape cosim first.
+        # Which spec files this candidate actually changed. Without a diff we
+        # cannot tell, so we check both -- the conservative direction.
+        touched = {"microarch_isa.py", "isa_dsl.py"}
         if a.diff:
             diff = a.diff.read_text()
             touched = set(re.findall(r"^\+\+\+ b/(\S+)", diff, re.M)) | set(
@@ -296,7 +299,11 @@ def main():
         exec(compile(subprocess.run(
             ["git", "show", f"{ref}:{PKG}/chia_agent/spec_policy.py"], cwd=REPO,
             capture_output=True, check=True).stdout, "spec_policy.py", "exec"), policy)
-        problems = [p for f in ("microarch_isa.py", "isa_dsl.py") for p in
+        # Only the files the candidate touched. Checking a file it never opened
+        # rejects it for a pre-existing violation it cannot see, act on, or
+        # diagnose -- which is worse than a blocked edit, because the message
+        # names a file absent from its diff.
+        problems = [p for f in sorted(touched) for p in
                     policy["policy_violations"](f, (wt / PKG / f).read_text())
                     + policy["doc_violations"](f, subprocess.run(
                         ["git", "show", f"{ref}:{PKG}/{f}"], cwd=REPO,
