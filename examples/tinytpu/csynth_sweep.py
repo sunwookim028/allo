@@ -11,8 +11,8 @@ the repo measured that.
 One `csynth_design` per MAXDIM, in a project this script deletes as soon as it
 has parsed the numbers -- the disk on this host is the binding constraint, not
 the CPU. The REPORT is copied out before the project goes, into
-`csynth_reports/`, so a parsing bug costs a re-parse rather than a
-re-synthesis. Resources come from the synthesis report rather than from
+`dev/records/tinytpu/csynth_reports/`, so a parsing bug costs a re-parse rather
+than a re-synthesis. Resources come from the synthesis report rather than from
 `cosim_design`, because they are the one thing csynth reports exactly and
 cycles are the one thing it cannot (every loop bound is runtime data, so it can
 only print a worst-case bound; see `cosim.py`).
@@ -20,7 +20,7 @@ only print a worst-case bound; see `cosim.py`).
     python csynth_sweep.py                 # T=4 at 16, 32, 48, 64
     python csynth_sweep.py 16 64           # T=4 at just those two
     python csynth_sweep.py 8:32 8:64       # T:MAXDIM pairs
-    python csynth_sweep.py --reparse       # re-read csynth_reports/, no Vitis
+    python csynth_sweep.py --reparse       # re-read the kept reports, no Vitis
 
 A configuration is `T:MAXDIM`, and the two parameters cost completely
 different things, so the table should be read down each column separately:
@@ -39,7 +39,9 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
-REPORTS = os.path.join(HERE, "csynth_reports")
+# Raw Vitis report dumps are measurement records, not design sources, so
+# they live with the rest of them (dev/repo_layout.md).
+REPORTS = os.path.join(ROOT, "dev", "records", "tinytpu", "csynth_reports")
 DEFAULT = ["4:16", "4:32", "4:48", "4:64"]
 
 

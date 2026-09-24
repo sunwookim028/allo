@@ -20,7 +20,8 @@ generated Verilog tells the two apart.
 
 The project is deleted as soon as it has been parsed and audited: the disk on
 this host is the binding constraint. The report is copied out first, into
-`csynth_reports/`, so a parsing bug costs a re-parse and not a re-synthesis.
+`dev/records/tinytpu/csynth_reports/`, so a parsing bug costs a re-parse and
+not a re-synthesis.
 """
 
 import os
@@ -33,7 +34,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, ROOT)
 
-REPORTS = os.path.join(HERE, "csynth_reports")
+# Raw Vitis report dumps are measurement records, not design sources, so
+# they live with the rest of them (dev/repo_layout.md).
+REPORTS = os.path.join(ROOT, "dev", "records", "tinytpu", "csynth_reports")
 VITIS = "/opt/xilinx/Vitis_HLS/2023.2/settings64.sh"
 CLOCK_NS = 3.33
 

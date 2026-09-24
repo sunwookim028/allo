@@ -539,7 +539,7 @@ MAXDIM -> resources
 
 One ``csynth_design`` per configuration, ``xcu280-fsvh2892-2L-e``, 3.33 ns
 target (``csynth_sweep.py``; reports kept under
-``examples/tinytpu/csynth_reports/``).
+``dev/records/tinytpu/csynth_reports/``).
 
 .. list-table::
    :header-rows: 1
