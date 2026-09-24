@@ -77,7 +77,7 @@ remotes is in ``dev/fork_maintenance.rst``.
 
 ``AlloMemPins`` **is** an unarbitrated 1R1W dual-port RAM, and it synthesizes. It is **not** in
 this checkout's working tree; it lives in ``mlir/lib/Translation/EmitSystemC.cpp`` on
-``choonsik1/SystemC-emitter``. Read there (verified 2026-09-18), the module has separate read and
+``choonsik1/allo:SystemC-emitter``. Read there (verified 2026-09-18), the module has separate read and
 write pin bundles (``radr``/``re``/``q`` and ``wadr``/``d``/``we``) over one ``T mem[SIZE]``, with
 both accesses serviced in a single ``wait()``-delimited cycle and both ready lines tied high; its
 own comment says "single-cycle, unarbitrated, no bank conflicts". It is instantiated on both sides
@@ -230,8 +230,10 @@ that only ever passes proves nothing; these are why the passes above count.
 Running it
 ~~~~~~~~~~
 Needs Vivado's xsim on ``PATH`` (``/opt/xilinx/Vivado/2023.2/settings64.sh``) and the netlists,
-which are **not** in this repository -- they are Catapult output from the
-``choonsik1/SystemC-emitter`` fork, and ``REPRO.sh`` documents where they came from. The scripts
+which are **not** in this repository -- they are Catapult output from
+``choonsik1/allo`` (branch ``SystemC-emitter``; there is no
+``choonsik1/SystemC-emitter`` repository) at
+``0eff4888:agents/noc/rtl/<design>/rtl.v``, and ``REPRO.sh`` documents where they came from. The scripts
 look for them under ``../noc/rtl/<design>/rtl.v`` relative to ``tests/systemc/rtlsim/`` (the
 Xcelium runner takes ``RTLDIR`` to override). ``mgc_shim.v`` supplies the Mentor primitives the
 netlists instantiate. No SystemC is needed; each case takes about 6 s.
@@ -307,7 +309,7 @@ hang or a truncated run; the failing one is a complete run with wrong data.
 
 Is it the free-running-loop rewrite? No
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-**The hypothesis (2026-09-18,** ``64b0ca86`` **).** ``choonsik1/SystemC-emitter`` carries
+**The hypothesis (2026-09-18,** ``64b0ca86`` **).** ``choonsik1/allo:SystemC-emitter`` carries
 ``72c70dcb`` (2026-08-20), "SystemC: do not make a port-reading driver loop free-running".
 ``isSteadyStateLoop`` treated an unused induction variable as proof a kernel runs forever and
 rewrote its outermost loop to ``while (1)`` **under** ``__SYNTHESIS__`` -- precisely a bug that
@@ -322,7 +324,7 @@ not a measurement.
 
 **The test (2026-09-18,** ``6b84f7b1`` **): a negative result.** ``guard_experiment/guard.patch``
 stops the rewrite for any loop that reads a ``Wire``. ``pe_split.py`` was re-emitted from
-``choonsik1/SystemC-emitter`` with and without it, synthesised with Catapult 2024.2, and simulated
+``choonsik1/allo:SystemC-emitter`` with and without it, synthesised with Catapult 2024.2, and simulated
 under Xcelium 24.03:
 
 .. list-table::
@@ -365,7 +367,10 @@ Replaying from the committed netlists (no Allo build needed):
    RTLDIR=$PWD/guard_experiment/rtl_guard ./run_mulacc_xrun.sh pe_channel
 
 The lockstep positive control (``-d LOCKSTEP``) is for the August netlists only, because it taps an
-internal signal (``v8_and_cse``) that these netlists do not have.
+internal signal (``v8_and_cse``) that these netlists do not have. So ``REPRO.sh`` section 3 and the
+``BREAK_WIRE`` fault cannot be replayed this way: ``RTLDIR`` does pass through ``REPRO.sh``, but
+those rows die in elaboration and print ``NO VERDICT``. The shipped netlists cover the three
+boundaries and ``BREAK_DATA``, and nothing else.
 
 Regenerating the netlists:
 

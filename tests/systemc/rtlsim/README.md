@@ -30,8 +30,10 @@ one pass and one fail, kept for diffing).
 ## Netlists
 
 The `pe_wire` / `pe_stream` / `pe_channel` netlists the runners default to are **not in
-the checkout**. They survive in the `choonsik1/SystemC-emitter` history at
-`0eff4888:agents/noc/rtl/<design>/rtl.v`; extract them into a sibling `noc/rtl/`
+the checkout**. They survive in the **`choonsik1/allo`** history at
+`0eff4888:agents/noc/rtl/<design>/rtl.v` — not in a `choonsik1/SystemC-emitter`
+repository, which does not exist (`SystemC-emitter` is a *branch* of `choonsik1/allo`);
+`pe_wire` has the same hash at `779e4350^`. Extract them into a sibling `noc/rtl/`
 directory, which is where `run.sh` / `run_mulacc.sh` look (`$S/../noc/rtl`). This was
 already the case before this directory moved — the scripts are unchanged.
 
@@ -46,3 +48,29 @@ RTLDIR=$PWD/guard_experiment/rtl_guard ./run_mulacc_xrun.sh pe_channel
 ```
 
 `RTLDIR` is honoured by the Xcelium runner only.
+
+**`LOCKSTEP` does not run against these netlists**, so the `guard_experiment/`
+commands above are *not* a drop-in replacement for the `REPRO.sh` matrix. Section 3
+of `REPRO.sh` (the positive control) and the `BREAK_WIRE` fault both pass
+`-d LOCKSTEP`, and `tb_mulacc.v:87` then pokes
+`u_mul.mul_0_run_inst.v8_and_cse` — a net that exists only in the original
+(`0eff4888`) netlists. Against `rtl_base/` or `rtl_guard/` that hierarchical
+reference does not elaborate. `RTLDIR` *does* pass through `REPRO.sh` to the
+runner, so pointing the whole matrix at `guard_experiment/` looks like it works —
+but sections 3 and the `BREAK_WIRE` fault then die in elaboration and the runner
+prints `XRUN FAILED`, which `REPRO.sh`'s `grep -oE 'PASS|FAIL .*'` does not match.
+Until 2026-09-24 those rows printed as a **blank line**, indistinguishable from a
+pass at a glance; they now print `NO VERDICT`. Treat the shipped netlists as
+covering the three boundaries and `BREAK_DATA` only. (Also in
+`docs/source/extensions/catapult_systemc.rst`, "Replaying from the committed
+netlists".)
+
+## What the matrix is supposed to show
+
+`Wire` failing 8/8 at **all 18 pacings** is the result under test, not a
+regression: it is [limitation 22](../../../docs/source/developer/limitations.rst),
+and `dev/records/systemc/rtlsim/results.txt` has recorded exactly that since the
+first run. The same is true of `LOCKSTEP` passing at `ACC_RST_DELAY` 3 and 4 and
+failing at 0, 1, 2, 5 and 6 — the two-cycle window is the positive control, and its
+width is the measurement. A run in which `Wire` passed a pacing, or `LOCKSTEP`
+passed outside 3..4, would be the surprise.

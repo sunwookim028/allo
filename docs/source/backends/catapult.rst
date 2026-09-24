@@ -271,7 +271,7 @@ a module to ``$finish``. ``LD_PRELOAD`` was already unset in that login environm
 
 Provenance, for when these stop working: both exports were recovered from the commits that
 produced the Catapult synthesis and Xcelium cosim results on record (``c7402f9f``, ``0eff4888``,
-``67559cad`` on ``choonsik1/SystemC-emitter``; ``git log --all -S"MGLS_LICENSE_FILE"`` finds them).
+``67559cad`` on ``choonsik1/allo:SystemC-emitter``; ``git log --all -S"MGLS_LICENSE_FILE"`` finds them).
 
 **Both tools run** ``-version`` **without checking a licence out**, so a successful ``-version``
 proves nothing. Check a real checkout before concluding the host is ready. Failure modes observed
@@ -361,7 +361,7 @@ structural-conflict / ``SC_METHOD``-emitter path that was the wrong remedy for a
 identified mechanism. If a Connections design will not schedule, open
 ``run_hls_global_setup.tcl`` first.
 
-Provenance: measured on the ``choonsik1/SystemC-emitter`` fork, on the **SystemC/Connections**
+Provenance: measured on the ``choonsik1/allo:SystemC-emitter`` fork, on the **SystemC/Connections**
 flow; ``dev/systemc/noc/FINDINGS_wire_channel.md`` §7 carries the numbers. The directives are
 solution-level and apply to any Catapult run; the 2/32 -> 22/32 figure is specific to that
 Connections corpus and has not been re-measured for ``ac_channel`` designs.
