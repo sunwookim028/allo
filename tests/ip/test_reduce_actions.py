@@ -5,155 +5,48 @@
 
 The Action hypothesis concluded *not yet as the default, but yes for this
 class*, and the stated reason not to promote it was that **only one machine
-had exercised it**. `tests/test_actions.py` already builds a reduction machine,
-but out of nothing: its units, its state and its lane widths are invented for
-the example. This one is built from `ReduceParams` -- the same object that
-parametrizes the unit that goes through csynth and Design Compiler -- so every
-number here is a number the hardware also has.
+had exercised it**. This one is built from `ReduceParams` -- the same object
+that parametrizes the unit that goes through csynth and Design Compiler -- so
+every number here is a number the hardware also has, and both declared
+latencies are what `reduce_latency_probe.py` MEASURED rather than what the
+geometry suggests.
 
-What that buys, concretely, is the one field the Action layer could not
-discharge on its own. `Action.at` is a declared latency, and its own docstring
-says a declared span "has to be MEASURED against the hardware, by a probe that
-scans downward so that it fails when the RTL turns out to be faster than
-declared". `reduce_latency_probe.py` is that probe, and the `at` values below
-are what it measured, not what the geometry suggests they ought to be. The
-structural claim and the measurement DISAGREE, and the Action model is where
-the disagreement becomes visible rather than a comment: `red_group` is one
-adder level above `red_full` and arrives in the same cycle.
+The machine is no longer written here. It is
+`examples.tinytpu.ip.reduce.machine()`, and its units, ports, states and the
+lane count of the packed word are `structure(architecture())` -- read off the
+composed region, not declared a second time. What that file adds is the
+arithmetic, the two measured latencies, the leaf order and the contract.
 
-The answer the second machine returns is a QUALIFIED YES, and the
-qualification is the point. Everything structural carries over -- the unit
-set, the leaf order and its refusal rule, both output depths, the
-reassociation obligation and its dependence on the arithmetic. Two things do
-not, and both are one hole: the model draws no LATENCY-vs-INITIATION-INTERVAL
-distinction on an Action (`test_the_declared_latency_is_charged_as_occupancy`,
-which makes this unit's work count wrong by 5x), and it cannot express one
-physical fold read at two taps, so the single reassociation is reported twice.
-A third friction, the one reported before this run, was NOT resolved on the
-branch: see `test_the_lane_width_had_to_be_hung_on_a_declared_channel`, where
-the packed word is declared as a one-row state to get past it. None of the
-three is a defect of this unit. All three are properties of the Action layer
-that only a unit with MEASURED latencies could surface, which is why TinyTPU,
-whose units are described without `at=`, surfaced none of them.
+Three things this file used to record as the Action layer's limits, and what
+happened to each:
+
+* **the work count was wrong by 5x** -- `Machine.work` charged a declared
+  latency as occupancy and returned 80 steps where the hardware does 16.
+  REPAIRED, by distinguishing a row's LATENCY from the rate the unit
+  sustains, which is derived from the ports and not declared:
+  `test_the_latency_and_the_rate_are_now_two_numbers`.
+* **the lane width hung on addressed state** -- the packed word had to be
+  declared a one-row `State` because a lane map was only checkable against a
+  memory. REPAIRED, by giving the channel the lane count that the width is
+  derived from: `test_the_lane_width_is_the_channels_own`.
+* **one fold read at two taps cannot be said** -- STILL TRUE, and reported as
+  two obligations for one reassociation:
+  `test_a_reassociating_fold_leaves_an_obligation_under_rounding`.
 """
 
 import pytest
 
-actions = pytest.importorskip(
-    "allo.actions",
-    reason="the Action layer is on branch `unit-actions`; this test is the "
-           "second consumer it was asked for and lands green when that "
-           "branch merges")
+import allo.actions as actions  # noqa: E402
 
-from allo.actions import (  # noqa: E402
-    Action, Contract, EXACT, Instruction, Machine, Port, State, Unit, check)
+from allo.actions import EXACT, check  # noqa: E402
 
-from examples.tinytpu.ip.reduce import ReduceParams  # noqa: E402
-
-
-#: What `reduce_latency_probe.py` measured on the emitted Verilog at 8:2,
-#: two-sided and value-checked. NOT derived from RED_DEPTH: the tree is three
-#: adder levels deep and Vitis retires the whole of it in two cycles, so a
-#: number derived from the geometry would be wrong in the direction that a
-#: `>=` check accepts.
-MEASURED = {"red_full": 2, "red_group": 2}
+from examples.tinytpu.ip.reduce import (  # noqa: E402
+    MEASURED, ReduceParams, machine)
 
 
 def tree_machine(params=None, arithmetic=EXACT, leaves=None):
-    """The DotTree region as a Machine, built from `ReduceParams`.
-
-    The leaf mapping is the unit's own, written over the SOURCE lane index:
-    input lane `i` has `g = i % RED_GROUPS` and `s = i // RED_GROUPS`, and
-    lands at leaf `g * RED_GROUP_SIZE + s`. It is deliberately not lane-major
-    whenever RED_GROUPS < RED_LANES, so it reassociates the sum -- which under
-    EXACT arithmetic is a permutation the model may accept and under ROUNDING
-    is an obligation it must report.
-    """
-    p = params or ReduceParams()
-    leaves = leaves or (f"(i % {p.RED_GROUPS}) * {p.RED_GROUP_SIZE} "
-                        f"+ (i // {p.RED_GROUPS})")
-    feed = Unit("dot_feed", ports=(Port("a.read"), Port("b.read"),
-                                   Port("mul", physical=p.RED_LANES),
-                                   Port("red_in")))
-    tree = Unit("reduce_tree", ports=(Port("red_in"),
-                                      Port("adder", physical=p.RED_LANES - 1),
-                                      Port("red_full"), Port("red_group")))
-    sink = Unit("dot_sink", ports=(Port("red_full"), Port("red_group"),
-                                   Port("c.write"), Port("g.write")))
-    return Machine(
-        name="dot_tree",
-        units=(feed, tree, sink),
-        states=(State("A", rows="DOT_MAX * DOT_MAX", owner="dot_feed",
-                      lanes="1"),
-                State("B", rows="DOT_MAX * DOT_MAX", owner="dot_feed",
-                      lanes="1"),
-                State("C", rows="DOT_MAX * DOT_MAX", owner="dot_sink",
-                      lanes="1"),
-                State("G", rows="DOT_MAX * DOT_MAX * RED_GROUPS",
-                      owner="dot_sink", lanes="1"),
-                # THE ONE PLACE THE MODEL HAD TO BEND. A lane map is checked
-                # against a lane COUNT, and the model reads that count off the
-                # action's `state`. MiniTPU's fold reads a vector register
-                # file, so its width is a property of addressed state; ours
-                # arrives on a CHANNEL, and a channel is not a state. Without
-                # something here the composition is refused with "lane map
-                # without a width ... None declares no lane count", so the
-                # packed word is declared as the state it momentarily is --
-                # one row, RED_LANES lanes wide. It is the honest reading of a
-                # FIFO word and it is still a bend: see
-                # `test_the_lane_width_had_to_be_hung_on_a_declared_channel`.
-                State("red_in", rows="1", owner="reduce_tree",
-                      lanes="RED_LANES")),
-        parameters={"DOT_MAX": p.DOT_MAX, "RED_LANES": p.RED_LANES,
-                    "RED_GROUPS": p.RED_GROUPS,
-                    "RED_GROUP_SIZE": p.RED_GROUP_SIZE,
-                    "RED_DEPTH": p.RED_DEPTH},
-        arithmetic=arithmetic,
-        contracts=(Contract(
-            "accumulator_is_wide_enough",
-            "RED_ACC_BITS >= RED_IN_BITS + RED_DEPTH, so no level rounds and "
-            "the leaf order is unobservable",
-            discharged_by="reduction_tree_legality, at composition time"),),
-        instructions=(
-            Instruction("dot", rows="m * n", actions=(
-                Action("dot_feed", "read", "a.read", state="A", base="a_s",
-                       into="a", role="one row of A"),
-                Action("dot_feed", "read", "b.read", state="B", base="b_s",
-                       into="b", role="one column of B"),
-                Action("dot_feed", "compute", "mul", compute="mul",
-                       args=("a", "b"), into="prod",
-                       role="RED_LANES lane products, packed"),
-                Action("dot_feed", "emit", "red_in", args=("prod",),
-                       into="word"),
-                Action("reduce_tree", "receive", "red_in", into="word"),
-                # ONE fold, TWO taps off it. The tree is not run twice: the
-                # group sums are the level the root is built from, which is
-                # why the tap is worth four wires and why MiniTPU's separate
-                # lane-reduce network cost 19,198 LUT against the tree's own
-                # 20,216.
-                Action("reduce_tree", "compute", "adder",
-                       compute="reduce_add", args=("word",), into="full",
-                       state="red_in", lanes=leaves,
-                       at=MEASURED["red_full"],
-                       role="the root: every lane"),
-                Action("reduce_tree", "compute", "adder",
-                       compute="reduce_add_group", args=("word",),
-                       into="groups", state="red_in", lanes=leaves,
-                       at=MEASURED["red_group"],
-                       role="the tap: RED_GROUPS subtree roots"),
-                Action("reduce_tree", "emit", "red_full", args=("full",),
-                       into="full_w", at=MEASURED["red_full"]),
-                Action("reduce_tree", "emit", "red_group", args=("groups",),
-                       into="group_w", at=MEASURED["red_group"]),
-                Action("dot_sink", "receive", "red_full", into="full_w"),
-                Action("dot_sink", "receive", "red_group", into="group_w"),
-                Action("dot_sink", "write", "c.write", state="C",
-                       base="c_d", args=("full_w",)),
-                Action("dot_sink", "write", "g.write", state="G",
-                       base="g_d", args=("group_w",)),
-            )),
-        ),
-    )
+    """The DotTree Machine, as `ip/reduce.py` composes it."""
+    return machine(params=params, arithmetic=arithmetic, leaves=leaves)
 
 
 ENV = {"m": 4, "n": 4, "a_s": 0, "b_s": 0, "c_d": 0, "g_d": 0}
@@ -174,33 +67,64 @@ def test_the_tree_is_expressible_as_actions_on_the_real_unit():
     assert m.work("dot_sink", "dot", ENV) == 16
 
 
-def test_the_declared_latency_is_charged_as_occupancy():
-    """THE NEGATIVE, and the reason this second machine was worth building.
+def test_the_latency_and_the_rate_are_now_two_numbers():
+    """THE REPAIRED NEGATIVE, and how it was repaired matters more than that
+    it was.
 
     `Machine.work` documents itself as "the number a per-unit work count in an
-    instruction-memory header carries". For `reduce_tree` it is wrong by 5x,
-    and the cause is structural rather than a slip: `_book` places each Action
-    at `max(ready of its args) + at` and takes the unit's per-row cost to be
-    the SPAN of that placement, so a declared `at=` is charged as OCCUPANCY.
-    There is no way in this model to say what `reduce_latency_probe.py`
-    measured -- latency 2, one word retired per cycle -- because the probe's
-    12-word back-to-back run and its one-word run agree, which is exactly the
-    definition of a pipelined unit. `Unit.ii` cannot say it either: `ii` is
-    the interval between the unit's own steps, so `ii=5` would buy the right
-    work count by declaring something false.
+    instruction-memory header carries". For `reduce_tree` it used to be 80
+    where the hardware does 16, because `_book` took a row's cost to be the
+    SPAN of its placement, so a measured `at=2` was paid once per row instead
+    of once per stream -- the model drew no distinction between a latency and
+    an initiation interval.
 
-    Both of this file's failures reduce to one missing distinction, LATENCY
-    vs INITIATION INTERVAL on an Action. A unit with no declared latency
-    (`dot_feed`) models correctly; a unit with one does not. TinyTPU never
-    surfaced it because its units are described without `at=`.
-    """
+    It draws one now, and NOTHING NEW IS DECLARED to buy it. The calendar is
+    unchanged -- the fold still lands two cycles after the word arrives, and
+    both emits two after that -- but the cycles between one row and the next
+    are the BUSIEST RESOURCE the row books, which is read off the ports the
+    unit already declares. `Unit.ii` is untouched: buying the number with
+    `ii=5` would have been declaring something false.
+
+    Both numbers survive and they are different questions: 16 steps of work,
+    20 cycles end to end for 16 rows whose last one finishes 5 cycles after
+    it starts."""
     m = tree_machine()
-    row = m.profile("dot", ENV)["reduce_tree"].row
-    # receive at 0, both folds at 2 (`at`), both emits at 4 -- span 5.
-    assert [e.cycle for e in row] == [0, 2, 2, 4, 4]
-    assert m.work("reduce_tree", "dot", ENV) == 80 == 16 * 5
-    # What the hardware does: 16 words in, 16 words out, one per cycle.
-    assert m.work("dot_feed", "dot", ENV) == 16
+    cost = m.profile("dot", ENV)["reduce_tree"]
+    # receive at 0, both folds at 2 (`at`), both emits at 4: unchanged.
+    assert [e.cycle for e in cost.row] == [0, 2, 2, 4, 4]
+    assert cost.row_latency == 5 and cost.row_steps == 1
+    assert m.work("reduce_tree", "dot", ENV) == 16 == m.work("dot_feed",
+                                                             "dot", ENV)
+    assert cost.latency == 20
+    # And the rate is the ports': one word a cycle, because `red_in`,
+    # `red_full` and `red_group` are one item a cycle each and the adder is
+    # RED_LANES - 1 wide. Halve the tree's input port and the rate halves
+    # with it, with no other edit.
+    assert m.unit("reduce_tree").ii == 1
+
+
+def test_the_lane_width_is_the_channels_own():
+    """THE OTHER REPAIRED NEGATIVE. A lane map used to be checkable only
+    against ADDRESSED STATE, so the packed word was declared a one-row
+    `State` -- a memory nothing addresses -- to get the composition accepted.
+
+    What a fold actually needs is a WIDTH, and `compose.Channel` can carry
+    one: `red_in` declares `lanes="RED_LANES"` and `lane_bits="RED_IN_BITS"`,
+    and the bit width of the word is DERIVED from the pair rather than
+    declared beside them. The Action layer reads the count off the channel
+    the operand arrived on, which it finds by following the value flow it
+    already checks. No shadow state, and no second place the lane count can
+    be written."""
+    p = ReduceParams()
+    m = tree_machine(p)
+    assert m.state("red_in") is None, "the shadow state should be gone"
+    assert m.channel("red_in").lanes == "RED_LANES"
+    fold = [e for e in m.effects("dot", ENV) if e.compute == "reduce_add"]
+    assert len(fold[0].lanes) == p.RED_LANES
+    # What a channel does NOT have is rows, a bank map or a collision rule --
+    # and a fold needs none of them. That is the finding: what the model was
+    # missing was a lane count, not addressed state.
+    assert m.channel("red_in").lane_bits == "RED_IN_BITS"
 
 
 def test_the_leaf_order_is_the_units_own_and_is_a_permutation():
@@ -266,21 +190,19 @@ def test_a_reassociating_fold_leaves_an_obligation_under_rounding():
                                                    "reduce_add_group"}
 
 
-def test_the_lane_width_had_to_be_hung_on_a_declared_channel():
-    """The friction, recorded so it is not mistaken for a clean fit.
-
-    `_lanes_of` takes the fold's lane count from `self.state(action.state)`,
-    so a lane map is only checkable against ADDRESSED STATE. A unit whose
-    operand arrives on a channel has no such state, and the composition is
-    refused until one is invented. Declaring the packed word as a one-row
-    state is a fair reading of a FIFO word, but it is the model meeting a
-    dataflow unit half way, and the repair the error suggests ("give the state
-    a `lanes` expression") names a thing that does not exist for this unit.
-    """
-    p = ReduceParams()
-    m = tree_machine(p)
-    word = m.state("red_in")
-    assert word is not None and word.rows == "1"
-    # Its width is the tree's, not an example's.
-    fold = [e for e in m.effects("dot", ENV) if e.compute == "reduce_add"]
-    assert len(fold[0].lanes) == p.RED_LANES
+def test_the_structure_is_the_composed_regions_and_not_a_second_copy():
+    """E1's positive half, on the architecture where the two models' grain
+    agrees. Every unit, every channel-carrying port, every memory port and
+    every state of this machine is `structure(architecture())`; the only
+    ports declared in `ip/reduce.py` are the two COMPUTE ports, which are
+    arithmetic and which no structural declaration carries."""
+    from examples.tinytpu.ip.reduce import architecture  # noqa: PLC0415
+    from allo.actions import projection  # noqa: PLC0415
+    report = projection(architecture(), tree_machine())
+    extra = {u: r["only_declared"] for u, r in report.items()
+             if r["only_declared"]}
+    assert extra == {"dot_feed": ["mul"], "reduce_tree": ["adder"]}
+    assert all(r["grain"] is None for r in report.values())
+    # The unit's own local array is state the composition knows about and the
+    # hand-written machine never had: `node`, the tree itself.
+    assert tree_machine().state("node").rows == "2 * RED_LANES - 1"

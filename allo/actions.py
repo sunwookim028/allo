@@ -149,6 +149,31 @@ class Unit:
 
 
 @dataclass(frozen=True)
+class Channel:
+    """One stream between two units: what an ``emit`` and a ``receive`` spend.
+
+    It is here because a lane map needs a WIDTH and nothing else, and the
+    model used to read a width off addressed state alone. MiniTPU's fold
+    reads a vector register file, so its width is a property of a memory;
+    ours arrives on a FIFO, and the packed word was declared a one-row
+    ``State`` purely to get past the check. A channel is not a memory -- it
+    has no rows, no bank map and no collision behaviour -- and a fold does
+    not need any of those. It needs to know how many operands one word
+    carries, which is the ONE field here.
+
+    ``lanes`` and ``lane_bits`` are what ``allo.compose.Channel`` declares;
+    the bit width of the word is derived from them there. Nothing in this
+    model reads the bit width."""
+
+    name: str
+    lanes: str = None
+    lane_bits: str = None
+    depth: str = None
+    carries: str = None
+    endpoints: tuple = ()
+
+
+@dataclass(frozen=True)
 class State:
     """Something an action reads or writes: a memory, or the outside world.
 
@@ -270,12 +295,35 @@ class Cost:
     rows: int
     head_steps: int
     row_steps: int
+    head_latency: int = 0
+    row_latency: int = 0
+    ii: int = 1
     head: tuple = ()
     row: tuple = ()
 
     @property
     def steps(self):
+        """What the unit's own work loop counts: one step per initiation.
+
+        A step is the unit accepting a row, not the row being finished. The
+        two were the same number until an action declared a latency, and
+        keeping them the same is what made a pipelined unit's work count
+        wrong by its depth."""
         return self.head_steps + self.rows * self.row_steps
+
+    @property
+    def latency(self):
+        """Cycles from the first effect of one issue to its last: the head's
+        own span, plus one row per initiation, plus the last row's span.
+
+        This is the number a designer means by "how long does it take", and
+        it is NOT the number a work count carries. Reporting one for the
+        other is the defect this pair replaces."""
+        rows = max(0, self.rows) if self.row_steps else 0
+        if not rows:
+            return self.head_latency
+        return ((self.head_steps + (rows - 1) * self.row_steps) * self.ii
+                + self.row_latency)
 
     def items(self, port):
         return (sum(1 for e in self.head if e.port == port)
@@ -377,6 +425,7 @@ class Machine:
     name: str
     units: tuple = ()
     states: tuple = ()
+    channels: tuple = ()
     instructions: tuple = ()
     parameters: dict = field(default_factory=dict)
     arithmetic: str = EXACT
@@ -403,6 +452,12 @@ class Machine:
                 return s
         return None
 
+    def channel(self, name):
+        for c in self.channels:
+            if c.name == name:
+                return c
+        return None
+
     def instruction(self, name):
         for i in self.instructions:
             if i.name == name:
@@ -420,9 +475,54 @@ class Machine:
         env.update(extra or {})
         return env
 
-    def _lanes_of(self, action, env):
+    def _value_channels(self, instruction):
+        """For every ``(unit, value)``, the channel its contents arrived on.
+
+        A value that enters a unit through a ``receive`` keeps its channel
+        through the computes that consume it, so a fold can be asked how wide
+        its operand is without the operand being addressed state. This is a
+        query over the composition, not a new field on an action."""
+        out = {}
+        if instruction is None:
+            return out
+        for a in instruction.actions:
+            if a.into is None:
+                continue
+            channel = self.channel(a.port) if a.port else None
+            if channel is not None and a.kind in _MOVES_VALUE:
+                out[(a.unit, a.into)] = channel.name
+                continue
+            for src in a.args:
+                if (a.unit, src) in out:
+                    out[(a.unit, a.into)] = out[(a.unit, src)]
+                    break
+        return out
+
+    def width_of(self, action, env, instruction=None):
+        """How many operands the thing this action folds carries.
+
+        Resolved from, in order: the STATE the action names, a CHANNEL it
+        names, or the channel its operand arrived on. The third is what lets
+        a unit whose operand is a FIFO word declare a leaf order at all --
+        before it, the packed word had to be declared a one-row memory, which
+        is a memory nothing addresses."""
         state = self.state(action.state) if action.state else None
-        width = evaluate(state.lanes, env) if state is not None and state.lanes else 0
+        if state is not None and state.lanes:
+            return evaluate(state.lanes, env)
+        channel = self.channel(action.state) if action.state else None
+        if channel is None:
+            arrived = self._value_channels(instruction)
+            for src in action.args:
+                named = arrived.get((action.unit, src))
+                if named:
+                    channel = self.channel(named)
+                    break
+        if channel is not None and channel.lanes:
+            return evaluate(channel.lanes, env)
+        return None
+
+    def _lanes_of(self, action, env, instruction=None):
+        width = self.width_of(action, env, instruction)
         return lane_order(action.lanes, width or 0, env)
 
     def _resources(self, action, unit, row, env):
@@ -444,14 +544,32 @@ class Machine:
                 out.append((("state", state.name, bank, action.kind), ports))
         return out
 
-    def _book(self, unit, ii, actions, row, env, origin, calendar, loose=False):
+    def _book(self, unit, ii, actions, row, env, origin, calendar,
+              loose=False, instruction=None):
         """Place actions on the unit's CYCLE timeline, booking each resource
         as it goes: an Action is an entry in a calendar, not a predicate over
         resources. Composing in time is what makes a count's two failure
         directions impossible rather than merely watched for.
 
-        Returns ``(effects, span)``: span is the cycles this pass occupies."""
+        Returns ``(effects, span, initiation)``. The two numbers are
+        DIFFERENT QUESTIONS about the same placement and this model used to
+        answer both with the first:
+
+        * ``span`` is the LATENCY -- the cycles from the first effect of one
+          row to the last, which is what a declared ``at=`` lengthens;
+        * ``initiation`` is the RATE -- the cycles that must pass before the
+          same actions can be placed again, which is set by the busiest
+          resource they book and by nothing else. A value in flight occupies
+          no port.
+
+        Charging the span per row is what made ``reduce_tree`` cost 80 steps
+        where the hardware does 16: a pipelined unit with a two-cycle fold
+        retires one word a cycle, and its own docstring says the probe's
+        back-to-back run and its one-word run agree. Neither number is
+        declared: the latency is the actions' ``at=``, the rate is the ports.
+        """
         placed, ready, span = [], {}, 0
+        booked = {}
         for action in actions:
             if holds(action.when, env) is False:
                 continue
@@ -481,10 +599,13 @@ class Machine:
                                      *((0,) if loose else ()))
                     if action.offset else None,
                     role=action.role, into=action.into, args=action.args,
-                    compute=action.compute, lanes=self._lanes_of(action, env),
+                    compute=action.compute,
+                    lanes=self._lanes_of(action, env, instruction),
                     action=action)
-                for key, _cap in resources:
+                for key, cap in resources:
                     calendar.setdefault((key, origin + cycle), []).append(effect)
+                    have, _ = booked.get(key, (0, cap))
+                    booked[key] = (have + 1, cap)
                 placed.append(effect)
                 first = cycle if first is None else first
                 last, at = cycle, cycle + 1
@@ -497,7 +618,9 @@ class Machine:
                 # read and one `wcol` put per step -- and not 2T+1.
                 ready[action.into] = first if first is not None else last
             span = max(span, last + 1)
-        return placed, span
+        initiation = max([-(-n // max(1, cap)) for n, cap in booked.values()]
+                         + [1 if placed else 0])
+        return placed, span, initiation
 
     def profile(self, name, environment=None):
         """Per-unit cost of one issue, WITHOUT materialising every row.
@@ -517,14 +640,17 @@ class Machine:
             mine = instruction.of(unit)
             head = [a for a in mine if a.per == PER_INSTRUCTION]
             body = [a for a in mine if a.per != PER_INSTRUCTION]
-            hits, hspan = self._book(unit, ii, head, 0, env, 0, {}) \
-                if head else ((), 0)
-            rits, rspan = self._book(unit, ii, body, 0, env, 0, {}) \
-                if body else ((), 0)
+            hits, hspan, hinit = self._book(
+                unit, ii, head, 0, env, 0, {}, instruction=instruction) \
+                if head else ((), 0, 0)
+            rits, rspan, rinit = self._book(
+                unit, ii, body, 0, env, 0, {}, instruction=instruction) \
+                if body else ((), 0, 0)
             out[unit] = Cost(
                 unit=unit, rows=max(0, rows),
-                head_steps=_steps(hspan, ii) if hspan else 0,
-                row_steps=_steps(rspan, ii) if rspan else 0,
+                head_steps=_steps(hinit, ii) if hinit else 0,
+                row_steps=_steps(rinit, ii) if rinit else 0,
+                head_latency=hspan, row_latency=rspan, ii=ii,
                 head=tuple(hits), row=tuple(rits))
         return out
 
@@ -576,8 +702,12 @@ class Machine:
         asymmetry is the whole reason a composition can be illegal when each
         of its actions is legal.
 
-        Returns ``{unit: (effects, steps, span)}``, span being the cycles one
-        row costs."""
+        Returns ``{unit: (effects, steps, initiation)}``: the third number is
+        the cycles between one row and the next, NOT the cycles one row takes.
+        Rows overlap exactly as the unit's pipeline overlaps them, so a row
+        whose last effect lands after the next row starts books the resource
+        it is still holding and the next row is pushed off it -- which is the
+        only honest way to place a pipelined unit on a shared calendar."""
         rows = evaluate(instruction.rows, env, *((1,) if loose else ())) \
             if instruction.rows else 1
         if loose:
@@ -592,18 +722,20 @@ class Machine:
             mine_only = {}
             effects, cycle, width = [], 0, None
             if head:
-                placed, span = self._book(unit, ii, head, 0, env, cycle,
-                                          mine_only, loose)
+                placed, span, init = self._book(
+                    unit, ii, head, 0, env, cycle, mine_only, loose,
+                    instruction=instruction)
                 effects += placed
-                width = span
-                cycle += (_steps(span, ii) * ii) if span else 0
+                width = init
+                cycle += (_steps(init, ii) * ii) if init else 0
             for row in range(max(0, rows) if body else 0):
-                placed, span = self._book(unit, ii, body, row, env, cycle,
-                                          mine_only, loose)
+                placed, span, init = self._book(
+                    unit, ii, body, row, env, cycle, mine_only, loose,
+                    instruction=instruction)
                 effects += placed
                 if row == 0 or width is None:
-                    width = span
-                cycle += (_steps(span, ii) * ii) if span else 0
+                    width = init
+                cycle += (_steps(init, ii) * ii) if init else 0
             for key, hits in mine_only.items():
                 calendar.setdefault(key, []).extend(hits)
             out[unit] = (tuple(effects), cycle // ii, width or 0)
@@ -666,10 +798,7 @@ class Machine:
         for instruction in self.instructions:
             for a in instruction.actions:
                 if a.lanes is not None:
-                    width = 0
-                    state = self.state(a.state) if a.state else None
-                    if state is not None and state.lanes:
-                        width = evaluate(state.lanes, env)
+                    width = self.width_of(a, env, instruction) or 0
                     order = lane_order(a.lanes, width, env)
                     if order and tuple(order) != tuple(range(width)):
                         out.append(Obligation(
@@ -856,13 +985,16 @@ def lane_map_violations(machine):
         for a in i.actions:
             if a.lanes is None:
                 continue
-            state = machine.state(a.state) if a.state else None
-            width = evaluate(state.lanes, env) if state is not None and state.lanes else None
+            width = machine.width_of(a, env, i)
             if not width:
                 out.append(Violation(
                     "lane map without a width", f"{i.name}/{a.unit}",
-                    f"lanes={a.lanes!r} but {a.state!r} declares no lane count",
-                    "give the state a `lanes` expression"))
+                    f"lanes={a.lanes!r} and nothing says how wide the operand "
+                    f"is: {a.state!r} is not a state or a channel with a "
+                    f"`lanes` count, and no channel delivered {list(a.args)}",
+                    "give the state or the channel a `lanes` expression, or "
+                    "take the operand from a receive on a channel that has "
+                    "one"))
                 continue
             order = lane_order(a.lanes, width, env)
             if sorted(order) != list(range(width)):
@@ -900,11 +1032,11 @@ def calendar_violations(machine):
     for i in machine.instructions:
         calendar = {}
         issued = machine._issue(i, env, calendar, loose=True)  # pylint: disable=protected-access
-        for unit, (effects, _steps_taken, span) in sorted(issued.items()):
+        for unit, (effects, _steps_taken, initiation) in sorted(issued.items()):
             model = machine.unit(unit)
-            if model is None or model.elastic or span <= max(1, model.ii):
+            if model is None or model.elastic or initiation <= max(1, model.ii):
                 continue
-            window = [e for e in effects if e.cycle < span]
+            window = [e for e in effects if e.cycle < initiation]
             binding = []
             for key, booked in _by_resource(machine, window, env).items():
                 if len(booked) > _capacity(machine, key, unit) * model.ii:
@@ -916,8 +1048,9 @@ def calendar_violations(machine):
                 for key, hits in sorted(binding, key=lambda kv: str(kv[0])))
             out.append(Violation(
                 "does not fit the initiation interval", f"{i.name}/{unit}",
-                f"one row needs {span} cycle(s) but {unit!r} retires every "
-                f"{model.ii}; " + (blamed or "no single resource binds"),
+                f"one row can be started only every {initiation} cycle(s) "
+                f"but {unit!r} retires every {model.ii}; "
+                + (blamed or "no single resource binds"),
                 "bank the memory so these rows differ, raise the unit's II, "
                 "add a port, or make the unit elastic so it spends a step"))
         for (resource, cycle), hits in sorted(calendar.items(),
@@ -996,3 +1129,144 @@ def check(machine, after=None):
     if found:
         raise ActionError(machine, found, after=after)
     return machine.obligations()
+
+
+# ------------------------------------------ derived from a composed region ---
+#: What a unit spends on one element of a memory it addresses. The Action
+#: layer names a memory port ``<state>.<kind>``; nothing chooses that name
+#: twice.
+def _state_port(state, kind):
+    return f"{state}.{kind}"
+
+
+def structure(architecture, name=None):
+    """The units, ports, states and channels a composed ``Architecture``
+    already implies -- built from it, not declared a second time.
+
+    ``allo.compose`` and this module were two descriptions of one machine,
+    and the second was a second declaration of every unit, which is the
+    failure class the Action layer exists to remove. This is the join. A
+    composed architecture declares, and ``Architecture._check`` enforces,
+    every channel a unit touches and which end it is; ``Unit.arrays`` reads
+    the memories it addresses off the same AST the declaration is checked
+    against. Both become ports here.
+
+    WHAT DOES NOT COME ACROSS, and this is the measured result rather than a
+    caveat (``tests/ip/test_derived_ports.py`` pins each one):
+
+    * a COMPUTE port -- ``alu``, ``mac``, ``mux`` -- has no structural
+      counterpart. A unit that multiplies declares no channel and no memory
+      for it, so nothing in the composition implies it. Arithmetic is what
+      the Action layer adds, and it is the layer's reason to exist.
+    * a port's CAPACITY. ``physical=2`` on the accumulator's ALU is the claim
+      that the unit chains two lane operations in one step; it is a hardware
+      fact that has to be measured, and no structural declaration carries it.
+    * the GRAIN, where the two models disagree about what a unit is. A
+      compose unit is a KERNEL, replicated by ``instances``; an Action unit
+      is a DISPATCH DOMAIN, one work counter fed one row count. They are the
+      same thing for every unit instantiated once and a different thing for
+      every unit that is not: TinyTPU's ``pe`` and ``wld`` are ``T x T``
+      kernels wired by five chains, and the Action model's ``array`` is the
+      whole mesh with the chains inside it. Such a unit is reported by
+      :func:`projection` and is not derived.
+
+    Returns a :class:`Machine` with no instructions: the structure, ready for
+    a composition to be written against it.
+    """
+    states, seen = [], {}
+    for memory in architecture.memories:
+        seen[memory.name] = _rows_of(memory.dtype)
+    units, channels = [], []
+    for channel in architecture.channels:
+        ends = tuple(u.name for u in architecture.units
+                     if channel.name in u.reads + u.writes)
+        channels.append(Channel(
+            name=channel.name,
+            lanes=getattr(channel, "lanes", "") or None,
+            lane_bits=getattr(channel, "lane_bits", "") or None,
+            depth=channel.depth, carries=channel.carries or None,
+            endpoints=ends))
+    for unit in architecture.units:
+        ports = [Port(c) for c in _ordered(unit.reads + unit.writes)]
+        for state, use in unit.arrays().items():
+            rows = use["rows"] or seen.get(state)
+            if state not in {s.name for s in states}:
+                states.append(State(name=state, rows=rows, owner=unit.name))
+            for kind in (READ, WRITE):
+                if use[kind]:
+                    ports.append(Port(_state_port(state, kind)))
+        units.append(Unit(name=unit.name, ports=tuple(ports),
+                          note="derived from the composed region"))
+    return Machine(name=name or architecture.name, units=tuple(units),
+                   states=tuple(states), channels=tuple(channels),
+                   parameters={k: v for k, v in architecture.parameters.items()
+                               if isinstance(v, int)})
+
+
+def _ordered(names):
+    out = []
+    for n in names:
+        if n not in out:
+            out.append(n)
+    return tuple(out)
+
+
+def _rows_of(dtype):
+    """``int8[MAXDIM * MAXDIM]`` -> ``MAXDIM * MAXDIM``."""
+    import ast as _ast  # noqa: PLC0415  -- one call, at the boundary
+    node = _ast.parse(dtype, mode="eval").body
+    return _ast.unparse(node.slice) if isinstance(node, _ast.Subscript) else None
+
+
+def projection(architecture, machine, aggregate=None):
+    """Every port and state of ``machine`` that the composed architecture
+    implies, every one it does not, and every one the architecture implies
+    that the machine has not got.
+
+    This is the measurement E1 asked for, and it is also the check: where the
+    two models DO agree, a disagreement is drift and this reports it, so the
+    second declaration stops being independent even where it cannot be
+    removed.
+
+    ``{unit: {"derived": [...], "only_declared": [...],
+    "only_derived": [...], "grain": str or None}}``
+    """
+    implied = structure(architecture)
+    aggregate = dict(aggregate or {})
+    members = {m for names in aggregate.values() for m in names}
+    out, covered = {}, set()
+    for unit in machine.units:
+        declared = [p.name for p in unit.ports]
+        parts = aggregate.get(unit.name, (unit.name,))
+        mine = [implied.unit(p) for p in parts]
+        composed = [u for u in architecture.units if u.name in parts]
+        if not any(m is not None for m in mine):
+            out[unit.name] = {
+                "derived": [], "only_declared": declared, "only_derived": [],
+                "grain": "no unit of this name is composed, and it is not "
+                         "declared to aggregate any"}
+            continue
+        covered.update(parts)
+        have = {p.name for m in mine if m is not None for p in m.ports}
+        shape = [f"{u.name} as {' x '.join(u.instances)}" for u in composed
+                 if u.instances != ("1",)]
+        out[unit.name] = {
+            "derived": [p for p in declared if p in have],
+            "only_declared": [p for p in declared if p not in have],
+            "only_derived": sorted(have - set(declared)),
+            "grain": None if len(parts) == 1 and not shape else
+                     f"{' + '.join(parts)}, composed as {', '.join(shape)}, "
+                     f"modelled here as one dispatch domain"}
+    for unit in implied.units:
+        if unit.name in covered:
+            continue
+        if machine.unit(unit.name) is None:
+            out[unit.name] = {
+                "derived": [], "only_declared": [],
+                "only_derived": [p.name for p in unit.ports],
+                "grain": "composed, and the Action model has no unit of this "
+                         "name"}
+    for name in members:
+        if name in out and name in covered:
+            out.pop(name, None)
+    return out

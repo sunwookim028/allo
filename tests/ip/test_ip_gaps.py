@@ -113,15 +113,28 @@ def test_no_collective_topology():
     """A Channel is a point-to-point stream or an array of them. There is no
     kind, so a collective is whatever chain the unit bodies happen to index."""
     fields = {f.name for f in dataclasses.fields(Channel)}
-    assert fields == {"name", "dtype", "depth", "shape", "carries"}, (
+    # `lanes` and `lane_bits` are a WIDTH, not a topology: how many operands
+    # one word of this stream carries and how wide one of them is, from which
+    # `dtype` is derived. A reduction's leaf order is checked against that
+    # count (`tests/ip/test_reduce_actions.py`). Nothing here says whether the
+    # stream is point-to-point, a broadcast or an all-reduce, so the
+    # COLLECTIVE row stays open.
+    assert fields == {"name", "dtype", "depth", "shape", "carries",
+                      "lanes", "lane_bits"}, (
         "Channel grew a field -- if it is a topology, close the COLLECTIVE row")
     with pytest.raises(placeholders.NotBuilt):
         placeholders.COLLECTIVE()
 
 
 def test_unit_cannot_declare_latency():
-    """Flagged to `unit-actions`: a latency belongs to an action, not to a
-    unit, and reduce_tree's two outputs are the case that needs it."""
+    """A latency belongs to an ACTION, not to a unit, and reduce_tree's two
+    outputs are the case that needed it. FILLED, on the Action side rather
+    than here: `Action.at` carries the measured cycle count for each of the
+    two outputs and `Machine` now distinguishes it from the rate the unit
+    sustains (`tests/ip/test_reduce_actions.py`). `compose.Unit` is unchanged
+    and this test still holds, which is the point: the repair did not put a
+    latency on a unit, because a unit does not have one -- each of its
+    outputs does."""
     from examples.tinytpu.ip.reduce import ReduceParams
     p = ReduceParams()
     assert p.RED_DEPTH - p.RED_TAP_LEVEL == 1, (

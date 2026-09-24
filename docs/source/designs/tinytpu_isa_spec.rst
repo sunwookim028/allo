@@ -272,7 +272,7 @@ Opcodes
 The ``units`` column is **derived** from the actions below, not written beside each opcode: an opcode reaches whichever units its actions name. It used to be typed, and it was wrong twice -- ``mm`` did not name the array, and ``dma_ld`` named its destination in prose.
 
 Instructions as compositions of Actions
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Every instruction is an ordered list of per-unit **effects**. Each effect names a unit, one of that unit's ports, and the element it touches. ``allo.actions`` holds the model and its legality rule; this table is what the spec declares, and the per-unit work counts in the header, the dispatch rewrites and the reads and writes below are queries over it rather than further declarations.
 

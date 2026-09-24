@@ -44,10 +44,37 @@ class Channel:
     """
 
     name: str
-    dtype: str
-    depth: str
+    dtype: str = ""
+    depth: str = "QD"
     shape: tuple[str, ...] = ()
     carries: str = ""
+    lanes: str = ""
+    lane_bits: str = ""
+
+    def __post_init__(self):
+        """A packed word says how many lanes it carries and how wide one is;
+        its bit width is DERIVED from the pair.
+
+        A lane count is what a reduction's leaf order is checked against, and
+        until it was here the only thing that had one was addressed state --
+        so a packed FIFO word had to be declared a one-row memory to be
+        checkable at all (``docs/source/designs/ip_gaps.rst``). Deriving the
+        width rather than declaring it beside the lane count is the whole
+        difference between one declaration and two that can disagree.
+        """
+        if self.lanes and self.lane_bits:
+            derived = f"UInt({self.lanes} * {self.lane_bits})"
+            if not self.dtype:
+                object.__setattr__(self, "dtype", derived)
+            else:
+                assert self.dtype == derived, (
+                    f"channel {self.name}: dtype {self.dtype!r} is not the "
+                    f"width its {self.lanes} lanes of {self.lane_bits} bits "
+                    f"come to ({derived!r}); declare the lanes and let the "
+                    f"width follow")
+        assert self.dtype, (
+            f"channel {self.name}: declare a dtype, or the lanes and the "
+            f"lane width to derive one from")
 
     @property
     def declaration(self) -> str:
@@ -132,6 +159,41 @@ class Unit:
         read = {n.id for n in ast.walk(tree)
                 if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)}
         return read - bound - _BUILTINS - set(FRONTEND_NAMES)
+
+    def arrays(self) -> dict:
+        """Every array the body addresses, and how it addresses it.
+
+        ``{name: {"rows": expression or None, "local": bool,
+        "read": bool, "write": bool}}``. Local arrays are the ones the body
+        declares itself (``ar: UInt(AW)[NAR]``); the rest are the region
+        arguments the unit was given, named positionally by ``memories``.
+
+        This is the same AST the declaration is CHECKED against in
+        ``free_names``, asked a second question. It is here rather than in a
+        consumer because a unit's memory is a structural fact of the unit,
+        and the point of this module is that a structural fact is stated
+        once."""
+        tree = ast.parse(self.source()).body[0]
+        parameters = [a.arg for a in tree.args.args]
+        bound = dict(zip(parameters, self.memories))
+        out = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.AnnAssign) and node.value is None \
+                    and isinstance(node.annotation, ast.Subscript):
+                out[node.target.id] = {
+                    "rows": ast.unparse(node.annotation.slice),
+                    "local": True, "read": False, "write": False}
+        for name in parameters:
+            out[name] = {"rows": None, "local": False,
+                         "read": False, "write": False}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Subscript) \
+                    and isinstance(node.value, ast.Name) \
+                    and node.value.id in out:
+                where = out[node.value.id]
+                where["write" if isinstance(node.ctx, ast.Store)
+                      else "read"] = True
+        return {bound.get(name, name): use for name, use in out.items()}
 
     def check(self):
         assert len(self.memories) == len(inspect.signature(self.body).parameters), (
@@ -258,6 +320,25 @@ class Architecture:
             exec(compile(src, path, "exec"), namespace)  # pylint: disable=exec-used
             self._region = namespace[self.name]
         return self._region
+
+    def machine(self, name=None):
+        """This architecture's STRUCTURE as an ``allo.actions.Machine``: the
+        units, the ports its channels and memories imply, the state they own
+        and the channels' lane counts, with no instruction yet.
+
+        The behavioural model is a separate file on purpose -- it imports
+        nothing from Allo, so an ISA can be composed and checked without the
+        front end -- and this is the one join between them. What it does NOT
+        carry is arithmetic: a composed region declares what a unit is wired
+        to and never what it computes, so a compute port is the Action
+        layer's to add. :doc:`/developer/actions` has the measurement of how
+        much of a hand-written machine this replaces, and of the one thing it
+        cannot: a compose ``Unit`` is a kernel, replicated by ``instances``,
+        and an Action ``Unit`` is one dispatch domain.
+        """
+        from allo.actions import structure  # noqa: PLC0415  -- one direction
+
+        return structure(self, name)
 
     def directives(self, s):
         """Apply every unit's Vitis directives to a built schedule."""

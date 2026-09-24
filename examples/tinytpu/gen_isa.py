@@ -900,7 +900,7 @@ def gen_doc(spec) -> str:
             "-- ``mm`` did not name the array, and ``dma_ld`` named its "
             "destination in prose.", ""]
 
-    out += ["Instructions as compositions of Actions", "^" * 38, "",
+    out += ["Instructions as compositions of Actions", "^" * 39, "",
             "Every instruction is an ordered list of per-unit **effects**. "
             "Each effect names a unit, one of that unit's ports, and the "
             "element it touches. ``allo.actions`` holds the model and its "
@@ -1651,6 +1651,88 @@ def check_behaviour(spec, U, D, E):
     return fails
 
 
+#: Every port `ip/tinytpu.py` gives a unit that the ACTION MODEL does not
+#: model, and why. It is checked in both directions: a port that leaves the
+#: region has to leave this table with it, and a port added to the region has
+#: to be modelled or listed here. The reasons are three kinds, and the kinds
+#: are the result -- each one is something the Action layer cannot say, not
+#: something nobody got round to.
+UNMODELLED = {
+    # ONE. The CONTROL PATH. Every data unit reads its dispatch queue when its
+    # row counter runs out, INSIDE the step it is already spending. An action
+    # is per-row or per-instruction; a per-row receive would say every row
+    # fetches, and a per-instruction one adds a head step to the unit's work
+    # count, which the header then carries and the hardware does not spend.
+    # There is no third option in the model, so the control path is described
+    # by the dispatch table and the rewrites, not by actions.
+    ("dma_ld", "c_dld"): "the control path: an effect that costs no step",
+    ("spm", "c_spm"): "the control path: an effect that costs no step",
+    ("vru", "c_vru"): "the control path: an effect that costs no step",
+    ("accu", "c_acc"): "the control path: an effect that costs no step",
+    ("dma_st", "c_dst"): "the control path: an effect that costs no step",
+    # TWO. STAGING MEMORY the ISA cannot name. `program` is the prefetched
+    # instruction window and `a_onchip`/`b_onchip` are the burst landing
+    # buffers; no field of any instruction names a row of them, so an action
+    # over them would have no base expression to resolve. They are real
+    # memories and the model is silent about them.
+    ("sequencer", "program.read"): "prefetch buffer: no instruction field "
+                                   "names a row of it",
+    ("sequencer", "program.write"): "prefetch buffer: no instruction field "
+                                    "names a row of it",
+    ("dma_ld", "a_onchip.read"): "burst landing buffer: no field names a row",
+    ("dma_ld", "a_onchip.write"): "burst landing buffer: no field names a row",
+    ("dma_ld", "b_onchip.read"): "burst landing buffer: no field names a row",
+    ("dma_ld", "b_onchip.write"): "burst landing buffer: no field names a row",
+    # THREE. The array's INTERNAL chains. `wrow`, `a_fwd`, `p_fwd` and `wq`
+    # join one PE to the next; the spec's `array` is the whole mesh, so they
+    # are inside it. `wcol`, `acol` and `cw` cross its boundary and ARE
+    # modelled -- on the aggregate, through AGGREGATE below.
+    ("array", "wrow"): "inside the array aggregate",
+    ("array", "wq"): "inside the array aggregate",
+    ("array", "a_fwd"): "inside the array aggregate",
+    ("array", "p_fwd"): "inside the array aggregate",
+}
+
+#: A port the spec declares and NO ACTION SPENDS. There is one, and the check
+#: reports it rather than letting it pass as a port like any other: a
+#: declaration nothing refuses is exactly what the Action layer exists to
+#: remove, so one that survives has to be named.
+UNSPENT = {("sequencer", "dispatch"):
+           "the control path is not modelled (see UNMODELLED); this port "
+           "records that the sequencer feeds five queues, and nothing spends "
+           "it"}
+
+#: A port the spec declares that STANDS FOR composed ports, and which ones.
+#: The name and the capacity are the model's -- `dram.read` is the claim that
+#: A and B share one burst beat a cycle, which is a fact about the AXI path
+#: that no structural declaration carries -- but what it stands for is
+#: checked, so an alias cannot name a channel or a memory the region has not
+#: got.
+ALIAS = {
+    ("sequencer", "fetch"): ("imem.read",),
+    ("sequencer", "dispatch"): ("c_dld", "c_spm", "c_vru", "c_acc", "c_dst"),
+    ("dma_ld", "dram.read"): ("A.read", "B.read"),
+    ("dma_st", "dram.write"): ("C.write",),
+}
+
+#: A unit of the spec that is SEVERAL composed units. This is the grain
+#: disagreement between the two models, and it is not a naming difference: a
+#: compose unit is a KERNEL, replicated by `instances`, and an Action unit is
+#: a DISPATCH DOMAIN -- one work counter fed one row count. `array` is
+#: `wld` + `pe`, T x T of each, and the five chains that wire them are
+#: internal to it.
+AGGREGATE = {"array": ("wld", "pe")}
+
+#: A port the spec declares that is neither arithmetic nor anything the
+#: composition has. There is exactly one, and it is worth its own line: the
+#: model counts `mm`s by spending an `emit` on a port that carries nothing,
+#: because a per-unit count is a count of PORT ITEMS and the header word
+#: `mm_count` has no channel to count on.
+INVENTED = {("array", "instructions"):
+            "a counting port: the header's `mm_count` is items(array, "
+            "'instructions'), and nothing physical carries it"}
+
+
 #: Which unit each sequencer dispatch queue feeds. The queue names are the
 #: design's; the units are the spec's.
 DISPATCH_QUEUE = {"c_dld": "dma_ld", "c_spm": "spm", "c_vru": "vru",
@@ -1721,7 +1803,9 @@ def check_actions(spec, U, E):
     machine; what is checked here is that the ONE declaration in `opcodes`
     accounts for every place the design states the same fact independently.
     """
-    from allo.actions import CHECKED, DESCRIPTION, GUARANTEED  # noqa: PLC0415
+    from allo.actions import (  # noqa: PLC0415
+        CHECKED, DESCRIPTION, GUARANTEED, projection)
+    from examples.tinytpu.ip import tinytpu as T_  # noqa: PLC0415
     fails = []
     machine = machine_of(spec, {"T": U.T, "MAXDIM": U.MAXDIM,
                                 "SPAD_ROWS": U.SPAD_ROWS, "NVR": U.NVR,
@@ -1801,7 +1885,6 @@ def check_actions(spec, U, E):
           f"their actions name, read out of ip/units/sequencer.py")
 
     # 3. each unit's declared ISA namespace against the opcodes it acts on.
-    from examples.tinytpu.ip import tinytpu as T_  # noqa: PLC0415
     by_name = {u.name: u for u in T_.units()}
     n = 0
     for u in spec["units"]["list"]:
@@ -1825,6 +1908,80 @@ def check_actions(spec, U, E):
         n += 1
     print(f"  unit ISA namespaces: {n} units decode exactly the opcodes they "
           f"have actions for")
+
+    # 5. every port the COMPOSED REGION implies, against every port declared.
+    #
+    # `ip/tinytpu.py` already declares which channels each unit touches and
+    # `Unit.arrays` reads the memories it addresses off the same AST the
+    # declaration is checked against, so a port that carries a channel or
+    # addresses a memory is a fact the design states ONCE. This holds the
+    # spec's unit table to it: a declared port that the composition does not
+    # imply must be arithmetic (nothing structural carries a multiplier), and
+    # an implied port the spec does not model must be in the table below with
+    # a reason. Both directions fail, so the two models cannot drift apart
+    # where they overlap -- and where they cannot overlap at all, the reason
+    # is written down rather than left as a difference nobody looked at.
+    report = projection(T_.architecture(), machine, aggregate=AGGREGATE)
+    spent = {}
+    for i in machine.instructions:
+        for a in i.actions:
+            spent.setdefault((a.unit, a.port or a.kind), set()).add(a.kind)
+    implied = {(u, p) for u, r in report.items()
+               for p in r["derived"] + r["only_derived"]}
+    accounted = {(u, t) for (u, port), targets in ALIAS.items()
+                 for t in targets}
+    structural, arithmetic, aliased = 0, 0, 0
+    missing = dict(UNMODELLED)
+    for unit, r in sorted(report.items()):
+        structural += len(r["derived"])
+        for port in r["only_declared"]:
+            kinds = spent.get((unit, port), set())
+            targets = ALIAS.get((unit, port))
+            if targets is not None:
+                aliased += 1
+                absent = [t for t in targets if (unit, t) not in implied]
+                if absent:
+                    fails.append(
+                        f"{unit}.{port} is declared to stand for {absent}, "
+                        f"which the composed region does not give {unit}")
+                if not kinds and (unit, port) not in UNSPENT:
+                    fails.append(
+                        f"unit {unit} declares a port {port!r} and no action "
+                        f"spends it")
+                continue
+            if (unit, port) in INVENTED:
+                continue
+            if kinds == {"compute"}:
+                arithmetic += 1
+            elif not kinds:
+                fails.append(
+                    f"unit {unit} declares a port {port!r} that no action "
+                    f"spends and the composed region does not imply")
+            else:
+                fails.append(
+                    f"unit {unit} spends {port!r} on {sorted(kinds)} actions "
+                    f"and the composed region implies no such port; a port "
+                    f"that carries a channel or addresses a memory is "
+                    f"ip/tinytpu.py's to declare")
+        for port in r["only_derived"]:
+            if (unit, port) in accounted:
+                continue
+            if missing.pop((unit, port), None) is None:
+                fails.append(
+                    f"the composed region gives {unit} a port {port!r} that "
+                    f"no action spends, no alias stands for and UNMODELLED "
+                    f"does not account for")
+    for unit, port in sorted(missing):
+        fails.append(f"UNMODELLED claims {unit}.{port} is composed and it is "
+                     f"not; the region no longer has it")
+    print(f"  ports against the composed region: {structural} of the spec's "
+          f"ports ARE ip/tinytpu.py's own channels and memories and "
+          f"{aliased} more stand for them; {arithmetic} are arithmetic no "
+          f"composition carries and {len(INVENTED)} carries nothing at all; "
+          f"{len(UNMODELLED)} composed ports are not modelled, each with a "
+          f"reason; and {len(AGGREGATE)} unit(s) are several composed units: "
+          + ", ".join(f"{k} = {' + '.join(v)}"
+                      for k, v in sorted(AGGREGATE.items())))
 
     # 4. the memories each opcode touches, against the validator's behaviour.
     n = 0

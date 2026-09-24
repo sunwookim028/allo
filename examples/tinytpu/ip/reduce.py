@@ -23,10 +23,12 @@ every other unit in this library takes its work count.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from allo.ir.types import int16, int32
 
+from allo.actions import (
+    Action, Contract, EXACT, Instruction, Port, structure)
 from allo.compose import (
     Architecture, Channel, Memory, unit)
 from examples.tinytpu.ip.units.reduction_tree import reduce_tree
@@ -130,10 +132,15 @@ def channels():
     return (
         Channel("c_red", "UInt(64)", "QD", carries="dot_feed -> reduce_tree"),
         Channel("c_snk", "UInt(64)", "QD", carries="dot_feed -> dot_sink"),
-        Channel("red_in", "UInt(RED_LANES * RED_IN_BITS)", "QD",
+        # The width is DERIVED from the lane count and the lane width: the
+        # tree's leaf order is checked against the lane count, and the one
+        # place that count may be written is here.
+        Channel("red_in", depth="QD", lanes="RED_LANES",
+                lane_bits="RED_IN_BITS",
                 carries="one packed word of RED_LANES lanes, per output"),
         Channel("red_full", "RED_ACC", "QD", carries="the root of the tree"),
-        Channel("red_group", "UInt(RED_GROUPS * RED_ACC_BITS)", "QD",
+        Channel("red_group", depth="QD", lanes="RED_GROUPS",
+                lane_bits="RED_ACC_BITS",
                 carries="the tap: RED_GROUPS subtree roots, one level down"),
     )
 
@@ -166,3 +173,85 @@ class DotTree:
 
     def schedule(self, s):
         return self.architecture.directives(s)
+
+
+#: What ``reduce_latency_probe.py`` MEASURED on the emitted Verilog at 8:2,
+#: two-sided and value-checked: the tree is three adder levels deep and Vitis
+#: retires the whole of it in two cycles, and the tap -- one level above the
+#: root -- arrives in the SAME cycle as the root. A number derived from the
+#: geometry would be wrong in the direction a ``>=`` check accepts, which is
+#: why a declared latency is a measurement and not an estimate.
+MEASURED = {"red_full": 2, "red_group": 2}
+
+
+def machine(params=None, arithmetic=EXACT, leaves=None, name=None):
+    """DotTree as an ``allo.actions.Machine`` -- the same region, asked what
+    it MEANS rather than what it is wired to.
+
+    The units, their channel and memory ports, the states they own and the
+    lane count of the packed word are not declared here: they are
+    ``structure(architecture(...))``, read off the composition above. What
+    this function adds is the part no structural declaration carries --
+
+    * two COMPUTE ports and their widths (``RED_LANES`` multipliers, and a
+      tree of ``RED_LANES - 1`` adders), which is arithmetic;
+    * two MEASURED latencies, from the probe;
+    * the leaf order, which is a permutation of the operands and the one
+      thing MiniTPU's owner said an interface must be able to say;
+    * the contract the accumulator width rests on.
+
+    Every one of those is a fact about behaviour, and every fact about
+    structure comes from the architecture. That is the whole of E1's positive
+    half, on the architecture where the two models' grain agrees.
+    """
+    p = params or ReduceParams()
+    arch = architecture(p, name or "dot_tree")
+    leaves = leaves or (f"(i % {p.RED_GROUPS}) * {p.RED_GROUP_SIZE} "
+                        f"+ (i // {p.RED_GROUPS})")
+    skeleton = structure(arch)
+    # The arithmetic, added to the units the composition already named.
+    adds = {"dot_feed": (Port("mul", physical=p.RED_LANES),),
+            "reduce_tree": (Port("adder", physical=p.RED_LANES - 1),)}
+    units = tuple(
+        u if u.name not in adds else replace(u, ports=u.ports + adds[u.name])
+        for u in skeleton.units)
+    return replace(
+        skeleton, units=units, arithmetic=arithmetic,
+        contracts=(Contract(
+            "accumulator_is_wide_enough",
+            "RED_ACC_BITS >= RED_IN_BITS + RED_DEPTH, so no level rounds and "
+            "the leaf order is unobservable",
+            discharged_by="reduction_tree_legality, at composition time"),),
+        instructions=(Instruction("dot", rows="m * n", actions=(
+            Action("dot_feed", "read", "A.read", state="A", base="a_s",
+                   into="a", role="one row of A"),
+            Action("dot_feed", "read", "B.read", state="B", base="b_s",
+                   into="b", role="one column of B"),
+            Action("dot_feed", "compute", "mul", compute="mul",
+                   args=("a", "b"), into="prod",
+                   role="RED_LANES lane products, packed"),
+            Action("dot_feed", "emit", "red_in", args=("prod",), into="word"),
+            Action("reduce_tree", "receive", "red_in", into="word"),
+            # ONE fold, TWO taps off it. The tree is not run twice: the group
+            # sums are the level the root is built from. The lane count the
+            # leaf order is checked against comes from the CHANNEL the word
+            # arrived on -- `red_in` declares `lanes="RED_LANES"` -- and not
+            # from a one-row memory invented to carry it.
+            Action("reduce_tree", "compute", "adder", compute="reduce_add",
+                   args=("word",), into="full", lanes=leaves,
+                   at=MEASURED["red_full"], role="the root: every lane"),
+            Action("reduce_tree", "compute", "adder",
+                   compute="reduce_add_group", args=("word",), into="groups",
+                   lanes=leaves, at=MEASURED["red_group"],
+                   role="the tap: RED_GROUPS subtree roots"),
+            Action("reduce_tree", "emit", "red_full", args=("full",),
+                   into="full_w", at=MEASURED["red_full"]),
+            Action("reduce_tree", "emit", "red_group", args=("groups",),
+                   into="group_w", at=MEASURED["red_group"]),
+            Action("dot_sink", "receive", "red_full", into="full_w"),
+            Action("dot_sink", "receive", "red_group", into="group_w"),
+            Action("dot_sink", "write", "C.write", state="C", base="c_d",
+                   args=("full_w",)),
+            Action("dot_sink", "write", "G.write", state="G", base="g_d",
+                   args=("group_w",)),
+        )),))
