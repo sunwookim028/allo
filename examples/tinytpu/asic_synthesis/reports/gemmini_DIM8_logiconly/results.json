@@ -67,8 +67,10 @@
         "tileRows / tileColumns": "1",
         "tlb_size": "4 entries"
       },
+      "content_md5": "881733b6c900b77c7faf901b939dac34",
       "dir": "/scratch/users/sk3463/gemmini_DIM8",
       "files": 136,
+      "files_hashed": 136,
       "manifest": "sv2v_manifest_nomem_stubbed.f",
       "manifest_md5": "33e39f6f0ef6a66c724dff878d10d3a1",
       "top": "Gemmini"

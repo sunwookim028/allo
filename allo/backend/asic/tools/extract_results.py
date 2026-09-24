@@ -128,7 +128,7 @@ def parse_qor(path):
     return out
 
 
-def capture_settings(build_dir):
+def capture_settings(build_dir, reports):
     """The run's settings snapshot, read out of a build tree that still exists."""
     step = build_dir
     if not os.path.isdir(os.path.join(step, "inputs")):
@@ -183,11 +183,44 @@ def capture_settings(build_dir):
     design_path = params.get("design_path", "")
     manifest = params.get("manifest", "")
     rtl_dir = design_path if os.path.isdir(design_path) else os.path.dirname(manifest)
-    if os.path.isdir(rtl_dir):
+    if rtl_dir and not os.path.isdir(rtl_dir):
+        # Deliberately NOT relocated to a same-named directory elsewhere: an
+        # export can be re-emitted in place, so hashing whatever is there now
+        # would stamp this run's area with RTL it never read. A content digest
+        # cannot be recovered after the fact; it must be captured while the
+        # build tree and its RTL are both still present.
+        out["rtl"] = {"dir": rtl_dir, "manifest": os.path.basename(manifest) or None,
+                      "unresolved": "the recorded RTL directory no longer exists, "
+                                    "so no digest could be computed now"}
+    elif os.path.isdir(rtl_dir):
         rtl = {"dir": rtl_dir, "manifest": os.path.basename(manifest) or None}
         if os.path.isfile(manifest):
             with open(manifest, "rb") as fh:
                 rtl["manifest_md5"] = hashlib.md5(fh.read()).hexdigest()
+            # manifest_md5 hashes the FILE LIST, which is not an identity: the
+            # shipped baseline and the MAXDIM=64 export list the same filenames
+            # and so share a checksum. This hashes the listed files' CONTENTS in
+            # list order, which does identify the export a run consumed.
+            digest, listed, absent = hashlib.md5(), 0, []
+            with open(manifest, errors="replace") as fh:
+                entries = [l.strip() for l in fh
+                           if l.strip() and not l.startswith("#")]
+            for entry in entries:
+                path = os.path.join(rtl_dir, entry.lstrip("!"))
+                if not os.path.isfile(path):
+                    absent.append(entry)
+                    continue
+                digest.update(entry.encode())
+                with open(path, "rb") as src:
+                    for chunk in iter(lambda: src.read(1 << 20), b""):
+                        digest.update(chunk)
+                listed += 1
+            rtl["content_md5"] = digest.hexdigest()
+            rtl["files_hashed"] = listed
+            if absent:
+                # Recorded, not skipped: a list naming files that are not there
+                # means the digest covers less than the run did.
+                rtl["files_listed_but_absent"] = absent[:10]
         mf = os.path.join(rtl_dir, "MANIFEST.json")
         if os.path.isfile(mf):
             with open(mf) as fh:
@@ -301,8 +334,27 @@ def main():
         if not os.path.isdir(target):
             sys.exit(f"no committed reports for {variant}")
         path = os.path.join(target, "settings.json")
+        fresh = capture_settings(build, reports)
+        # A re-capture must never replace a recorded fact with a blank. The RTL
+        # a run consumed can become unreadable later -- a directory renamed by a
+        # reorganisation, an export re-emitted in place -- and the snapshot taken
+        # while it was still there is the better evidence. Keep it, and record
+        # that this capture could not confirm it.
+        if os.path.isfile(path):
+            with open(path) as fh:
+                previous = json.load(fh)
+            old_rtl, new_rtl = previous.get("rtl"), fresh.get("rtl")
+            if old_rtl and new_rtl and "unresolved" in new_rtl \
+                    and "unresolved" not in old_rtl:
+                old_rtl = dict(old_rtl)
+                old_rtl["recaptured"] = (
+                    f"a later capture could not read {new_rtl['dir']}; the fields "
+                    "here are from the capture taken while it existed")
+                fresh["rtl"] = old_rtl
+                print(f"  kept the earlier rtl record for {variant}: "
+                      "its directory is no longer readable")
         with open(path, "w") as fh:
-            fh.write(dump(capture_settings(build)))
+            fh.write(dump(fresh))
         print(f"wrote {path}")
 
     variants = [v for v in sorted(os.listdir(reports))
