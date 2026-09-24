@@ -1,0 +1,87 @@
+diff --git a/allo/customize.py b/allo/customize.py
+index ecb88deb..6bbb5a8e 100644
+--- a/allo/customize.py
++++ b/allo/customize.py
+@@ -942,6 +942,82 @@ class Schedule:
+         )
+         loop.attributes["dependence"] = ArrayAttr.get(old + [DictAttr.get(entry)])
+ 
++    @wrapped_apply
++    def memory_ports(self, target, write_ports):
++        """
++        Declares the number of write ports a memory has, and statically checks whether
++        the design's access pattern needs more than it has.
++
++        The compiler verifies this claim by counting the number of statically visible
++        write operations in an innermost loop against the product of `write_ports` and
++        the number of partitioned banks. This is an unchecked premise for exact bank
++        assignment: if multiple writes alias to the same bank, a false declaration
++        would produce wrong hardware while every software simulation stays exact.
++        For it to be sound, the parallel writes must map to distinct banks.
++
++        Parameters
++        ----------
++        target: str | MockBuffer
++            The array buffer to set the ports for.
++        write_ports: int
++            The maximum number of concurrent writes supported by the memory.
++        """
++        if not isinstance(write_ports, int) or write_ports < 1:
++            raise AlloValueError(f"memory_ports: write_ports {write_ports!r} must be an integer >= 1")
++
++        if isinstance(target, str):
++            if ":" in target:
++                func_name, buf_name = target.split(":")
++            else:
++                func_name, buf_name = self.top_func_name, target
++            target = MockBuffer(func_name, buf_name)
++
++        func, _, mlir_target = find_buffer(self.module, target, self.func_args)
++        
++        if hasattr(mlir_target, "result"):
++            target_val = mlir_target.result
++            target_op = mlir_target.operation
++        elif hasattr(mlir_target, "op"):
++            target_val = mlir_target.op.result if hasattr(mlir_target.op, "result") else mlir_target.op
++            target_op = mlir_target.op
++        else:
++            target_val = mlir_target
++            target_op = mlir_target.owner
++
++        target_key = f"{target.func}:{target.name}"
++        banks = 1
++        if target_key in getattr(self, "partitioned_arrays", {}):
++            for p_type, dim, factor in self.partitioned_arrays[target_key]:
++                if p_type in (Partition.Block, Partition.Cyclic):
++                    banks *= factor
++                elif p_type == Partition.Complete:
++                    banks = 999999
++
++        def get_max_stores(operations):
++            max_stores_inner = 0
++            stores_in_this_block = 0
++            for op in operations:
++                if op.name in ("affine.store", "memref.store"):
++                    if op.operands[1] == target_val:
++                        stores_in_this_block += 1
++                elif op.name in ("affine.for", "scf.for"):
++                    max_stores_inner = max(max_stores_inner, get_max_stores(op.regions[0].blocks[0].operations))
++                elif op.name in ("affine.if", "scf.if"):
++                    max_stores_inner = max(max_stores_inner, get_max_stores(op.regions[0].blocks[0].operations))
++                    if len(op.regions) > 1 and len(op.regions[1].blocks) > 0:
++                        max_stores_inner = max(max_stores_inner, get_max_stores(op.regions[1].blocks[0].operations))
++            return max(max_stores_inner, stores_in_this_block)
++
++        max_stores = get_max_stores(func.entry_block.operations)
++        if max_stores > write_ports * banks:
++            raise AlloValueError(
++                f"memory_ports: target {target.name} has {max_stores} stores in a loop, "
++                f"which exceeds declared write_ports ({write_ports}) * banks ({banks})"
++            )
++
++        if hasattr(target_op, "attributes"):
++            target_op.attributes["memory_ports"] = IntegerAttr.get(IntegerType.get_signless(32), write_ports)
++
+     @wrapped_apply
+     def parallel(self, axis):
+         """

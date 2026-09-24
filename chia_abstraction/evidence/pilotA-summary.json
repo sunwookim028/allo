@@ -1,0 +1,276 @@
+{
+ "disposition": "maintaining",
+ "workload": "gemm_int8_16",
+ "angle": "find, from the measurements alone, one architectural property of this machine Allo cannot express",
+ "model": "google-vertex/gemini-3.1-pro-preview",
+ "ref": "03e426f90f3d32d96bfc78184d54541f74965c3d",
+ "heldout": null,
+ "pilot": "A",
+ "seeded": [
+  "the shared frame: IR, the five-place pattern, s.dependence as the pattern and align_value as the counter-example, what may be edited",
+  "the four kinds of refusal, as method, with NO worked example",
+  "the architectural-not-tooling instruction",
+  "the state-your-unchecked-premise instruction",
+  "machine parameters: T, MAXDIM, PC, 4-deep loop stack, AGU_TERMS=3, 9 opcodes, 7-bit nr, ar, AR_RAW_DIST=4",
+  "M1 census by first cause (acc-split 897, acc-position 253, ar-distance 55, agu-terms 13, loop-depth 3), the 930 overlap, 5 encodable / 3 RTL-confirmed",
+  "M2 AGU 3->4 raises encodable, chosen nest unchanged, budget masks the accumulate limit",
+  "M3 the rbA widening table incl. 'names it _1R1W, two writing always-blocks, DC refuses ELAB-366, banked synthesises'",
+  "M4 K=128 overflows the 7-bit nr on the shipped layout; split load fits",
+  "NOT seeded: any cause, any interpretation, the five-target list, the limitations register, the probes' ground truth",
+  "POSSIBLE NUDGES, recorded rather than removed because removing them would distort the frame: (a) the frame's pattern exemplar is s.dependence, described as a claim that 'if false, produces wrong RTL while every software simulation passes' -- adjacent to the dependence-distance-as-contract target; (b) the design-case list says systolic_1d does not synthesise because several kernel instances read one top-level array (issue #27) -- adjacent to the memory-port target, though it is about READ ownership"
+ ],
+ "iterations": 3,
+ "rungs_reached": {
+  "none": 3,
+  "proposed": 3,
+  "policy": 3,
+  "built": 3,
+  "cheap": 3,
+  "correct": 3,
+  "resourced": 3,
+  "improved": 3
+ },
+ "rates": {
+  "none": 1.0,
+  "proposed": 1.0,
+  "policy": 1.0,
+  "built": 1.0,
+  "cheap": 1.0,
+  "correct": 1.0,
+  "resourced": 1.0,
+  "improved": 1.0
+ },
+ "llm_usd": 2.3252,
+ "llm_calls": 3,
+ "spend_from_db_usd": 2.3252,
+ "best": {
+  "WARNING": "baseline measured at 2359f8506d8798e894134360d0789c1ec6f63238, candidate at 5df130605faae48cb3149b5994662daadeb64522",
+  "cases": {
+   "blocks_stream": {
+    "cycles_baseline": 295,
+    "cycles_delta": 0,
+    "cycles_now": 295,
+    "cycles_per_shape": {
+     "interval": {
+      "baseline": 89,
+      "delta": 0,
+      "now": 89
+     },
+     "latency": {
+      "baseline": 206,
+      "delta": 0,
+      "now": 206
+     }
+    },
+    "cycles_verdict": "same",
+    "estimated_ns": {
+     "baseline": 2.68,
+     "now": 2.68
+    },
+    "resources": {
+     "ok": true,
+     "over_budget": [],
+     "per_resource": {
+      "bram_18k": {
+       "baseline": 4,
+       "delta": 0,
+       "limit": 6,
+       "now": 4,
+       "ok": true,
+       "ratio": 1.0
+      },
+      "dsp": {
+       "baseline": 0,
+       "delta": 0,
+       "limit": 2,
+       "now": 0,
+       "ok": true,
+       "ratio": null
+      },
+      "ff": {
+       "baseline": 4873,
+       "delta": 0,
+       "limit": 5360,
+       "now": 4873,
+       "ok": true,
+       "ratio": 1.0
+      },
+      "lut": {
+       "baseline": 7029,
+       "delta": 0,
+       "limit": 7731,
+       "now": 7029,
+       "ok": true,
+       "ratio": 1.0
+      },
+      "uram": {
+       "baseline": 0,
+       "delta": 0,
+       "limit": 1,
+       "now": 0,
+       "ok": true,
+       "ratio": null
+      }
+     }
+    }
+   },
+   "mlp_layered": {
+    "cycles_baseline": 8292,
+    "cycles_delta": 0,
+    "cycles_now": 8292,
+    "cycles_per_shape": {
+     "interval": {
+      "baseline": 4109,
+      "delta": 0,
+      "now": 4109
+     },
+     "latency": {
+      "baseline": 4183,
+      "delta": 0,
+      "now": 4183
+     }
+    },
+    "cycles_verdict": "same",
+    "estimated_ns": {
+     "baseline": 3.064,
+     "now": 3.064
+    },
+    "resources": {
+     "ok": true,
+     "over_budget": [],
+     "per_resource": {
+      "bram_18k": {
+       "baseline": 5,
+       "delta": 0,
+       "limit": 7,
+       "now": 5,
+       "ok": true,
+       "ratio": 1.0
+      },
+      "dsp": {
+       "baseline": 48,
+       "delta": 0,
+       "limit": 52,
+       "now": 48,
+       "ok": true,
+       "ratio": 1.0
+      },
+      "ff": {
+       "baseline": 10397,
+       "delta": 0,
+       "limit": 11436,
+       "now": 10397,
+       "ok": true,
+       "ratio": 1.0
+      },
+      "lut": {
+       "baseline": 9069,
+       "delta": 0,
+       "limit": 9975,
+       "now": 9069,
+       "ok": true,
+       "ratio": 1.0
+      },
+      "uram": {
+       "baseline": 0,
+       "delta": 0,
+       "limit": 1,
+       "now": 0,
+       "ok": true,
+       "ratio": null
+      }
+     }
+    }
+   },
+   "tinytpu_isa": {
+    "cycles_baseline": 858,
+    "cycles_delta": 0,
+    "cycles_now": 858,
+    "cycles_per_shape": {
+     "16x16x16": {
+      "baseline": 686,
+      "delta": 0,
+      "now": 686
+     },
+     "4x4x4": {
+      "baseline": 172,
+      "delta": 0,
+      "now": 172
+     }
+    },
+    "cycles_verdict": "same",
+    "estimated_ns": {
+     "baseline": 2.431,
+     "now": 2.431
+    },
+    "resources": {
+     "ok": true,
+     "over_budget": [],
+     "per_resource": {
+      "bram_18k": {
+       "baseline": 42,
+       "delta": 0,
+       "limit": 46,
+       "now": 42,
+       "ok": true,
+       "ratio": 1.0
+      },
+      "dsp": {
+       "baseline": 14,
+       "delta": 0,
+       "limit": 16,
+       "now": 14,
+       "ok": true,
+       "ratio": 1.0
+      },
+      "ff": {
+       "baseline": 17481,
+       "delta": 0,
+       "limit": 19229,
+       "now": 17481,
+       "ok": true,
+       "ratio": 1.0
+      },
+      "lut": {
+       "baseline": 26583,
+       "delta": 0,
+       "limit": 29241,
+       "now": 26583,
+       "ok": true,
+       "ratio": 1.0
+      },
+      "uram": {
+       "baseline": 0,
+       "delta": 0,
+       "limit": 1,
+       "now": 0,
+       "ok": true,
+       "ratio": null
+      }
+     }
+    }
+   }
+  },
+  "gained": [],
+  "limits_fixed": [],
+  "lost": [],
+  "newly_expressible": [
+   "ports:write-port-declaration"
+  ],
+  "over_budget": [],
+  "resource_summary": "no resource change",
+  "summary": "blocks_stream: 295 -> 295 cycles (+0); mlp_layered: 8292 -> 8292 cycles (+0); tinytpu_isa: 858 -> 858 cycles (+0)",
+  "verdict": "expressive"
+ },
+ "best_diff_lines": 191,
+ "stages_failed": [],
+ "objectives": [
+  "expressive",
+  "win",
+  "expressive"
+ ],
+ "newly_expressible": [
+  "ports:write-port-declaration"
+ ],
+ "limits_fixed": []
+}
