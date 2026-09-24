@@ -203,9 +203,23 @@ The evaluator
   TPU_MAXDIM=32`` (below). Negative control:
   an int16 partial sum passes ``bench_isa.py`` and every cosim testbench, and
   ``stress_isa`` rejects it (251/492 exact).
-- **score**: the sum of RTL cosim cycles (Vitis HLS 2023.2 csynth + xsim) at
-  4x4x4 and 16x16x16, each testbench bit-exact, the 3.33 ns clock met. About
-  2-3 min per candidate. Area is recorded, not scored.
+- **score**: a THREE-TERM objective, reported per term and never summed.
+  See :ref:`chia-objective` for why each term is there and what it replaced.
+
+  1. ``model`` -- RTL cosim cycles for ``mlp_tiny`` and ``mlp_deep``, the two
+     workload-suite models whose every layer fits one build, over one csynth
+     shared by all six layers. **The primary**, and measured at
+     ``evaluate.SCORED_MODEL_ENV`` --- ``MAXDIM=64``, **not** the GEMM term's
+     16, for the measured reason below.
+  2. ``gemm`` -- RTL cosim cycles at 4x4x4 and 16x16x16, unchanged. **The
+     control**, kept so that a change which helps models and hurts GEMM shapes
+     has to be stated rather than hidden.
+  3. ``area`` -- a standard-cell area ESTIMATE from the candidate's own
+     structural bit census (``chia_agent/area_proxy.py``), in milliseconds.
+     csynth's FPGA resource table is still reported beside it and no longer
+     decides anything.
+
+  Each testbench bit-exact, the 3.33 ns clock met.
 - **acceptance**: ``accept.py`` is the only way a win is claimed. On a clean
   ``git worktree`` with its own ``mlir/`` build it runs ``bench_isa``,
   ``stress_isa``, ``param_check``, cosim at all five shapes, and the
@@ -218,6 +232,127 @@ The evaluator
   that measurement was cross-checked against. Measuring the control per run is
   exactly why the published row having moved twice since -- most recently to
   175 / 265 / 421 / 482 / 674 -- does not invalidate the run.
+
+.. _chia-objective:
+
+The objective, and the two axes it replaced
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Until 2026-09-24 the loop scored on **GEMM shapes** against **csynth's FPGA
+resource table**, and this project had measured both to be misleading.
+
+**The workload class changes the answer by four to eight times.** The same
+optimisation -- widening the operand burst -- is worth **4.3-7.0 %** of runtime
+on GEMM shapes and **25-34 %** on multi-layer models
+(:doc:`/designs/workload_suite`). A model does not make the problem bigger, it
+makes it *longer*, so a fixed per-call cost is repaid at every layer instead of
+amortised by one large problem. A loop ranking changes on GEMM shapes ranks
+them on the workload class **least** sensitive to the cost they remove. So the
+model term is the primary and the GEMM shapes are kept as the control: a
+control that is dropped cannot catch a change that buys models with shapes.
+
+**...but only at MAXDIM=64, and that had to be measured.** Every one of those
+figures was taken at ``TPU_MAXDIM=64``, and the loop scores at 16, where a DRAM
+row is 4 packed words instead of 16 and every operand burst is four times
+shorter. Asked directly --- both models, every layer, one csynth per burst
+width, at ``T=4 MAXDIM=16 QD=16`` --- the widening is worth **zero cycles**:
+861 -> 861 and 1,530 -> 1,530, layer by layer, to the cycle
+(``dev/records/tinytpu/model-term-maxdim-20260924.rst``).
+
+Worse than insensitive: at MAXDIM=16 the relationship **inverts**. The GEMM
+shapes there *do* see the widening --- CHIA run 1 measured
+``0 / 0 / -42 / -59 / -59`` on exactly that configuration --- and the models do
+not. A model term at MAXDIM=16 would be the *less* burst-sensitive of the two
+terms, which is the opposite of the reason for having one. So the model term is
+measured at MAXDIM=64 and the GEMM control stays at 16 because that is the
+published row: **two configurations, two csynths per candidate**, and that is
+what the term costs.
+
+**The FPGA table understates silicon in the components a search most wants to
+change.** The burst widening is +43 % flip-flops and +92 % block RAM on FPGA
+and **+74.4 % cell area** in 45 nm, of which **99.1 % is two AXI master ports**
+that grow 13x when widened. The arithmetic array is **under 4 %** of our
+standard-cell logic while the memory-interface adapters are **40.9 %**
+(:doc:`/paper`). A Design Compiler run is ~70 minutes on another host with a
+licence, so the fix cannot be "run DC in the loop"; it is
+``chia_agent/area_proxy.py``, which **counts the bits the design declares** --
+every array a unit declares, every channel the architecture wires, at the
+candidate's own parameter set -- and prices them, plus the AXI adapters, at
+coefficients fitted to the committed DC runs.
+
+It reports itself as an estimate everywhere, and it states its error:
+
+- **0.33 % mean / 0.91 % worst** in-sample over the seven committed TinyTPU DC
+  runs, **0.62 % / 1.39 %** leave-one-out;
+- its channel census reproduces, **to the bit**, a hand count taken off the
+  emitted RTL's instance list (16,640 bits of queue at ``QD=8``, 33,280 at 16);
+- ``python examples/tinytpu/chia_agent/area_proxy.py --selfcheck`` re-derives
+  every one of those numbers from the committed reports and fails if any moved.
+
+What it is **not**: it is a model of this design and this flow (flip-flop
+memories, ``sram_mode='none'``); the four Gemmini runs are not fitted and not
+predicted by it; it prices *structure*, not synthesis, so a construct Vitis
+renders as a multi-write-port RAM is invisible to it; and the configuration the
+loop scores at, T=4 MAXDIM=16, has exactly **one** committed DC run and is the
+worst-predicted of the seven. That wants a twelfth DC run, not a better fit.
+
+Whether the new objective is better: the re-score
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Asserting it would be worthless, so ``chia_agent/rescore.py`` hands both
+objectives the four changes this project has already measured and prints how
+each ranks them::
+
+    python examples/tinytpu/chia_agent/rescore.py
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 38 42
+
+   * - change
+     - old objective
+     - new objective
+   * - burst widening
+     - **could not see it** -- never measured at either search shape
+     - ``trade``: -25 to -34 % on models, **+73.3 % area (est.)**, 99.6 % of
+       it in the adapters
+   * - channel depth ``QD`` 8 -> 16
+     - ``trade``, **kept** on a -7 total over the two scored shapes
+     - ``regression``: the five-shape total is **zero** (+4+4+4-1-11), and
+       +6.8 % area
+   * - operand mirror removal
+     - ``regression`` (+16)
+     - ``regression``; no area measurement of it exists on either axis
+   * - CHIA run 1's burst win
+     - ``trade``, **kept** on -59
+     - ``trade``, kept -- and now **priced**: +24.3 % area (est.), 99.6 % of it
+       in the AXI master ports
+
+**Nothing is reversed**, which is the first thing to check. What changes is
+the classification of the two that matter, and one of them *indicts the old
+objective directly*: the channel-depth change sums to **zero** over the five
+shapes, so no cycle objective over the five can prefer it, and over the two the
+loop actually scored it sums to -7, so the old objective would have kept it for
+the wrong reason. What it really buys is three legal programs going from never
+completing to completing, and **neither objective has a term for that**. That
+gap is open.
+
+Two honest limits on this evidence:
+
+- **Model cycles exist for exactly one of the four changes.** On the other
+  three the new objective is running on its GEMM control, and is the old
+  objective with a better resource axis. The resource axis is supported
+  strongly; the model axis on a single point.
+- And that single point is the one the MAXDIM measurement above qualifies: the
+  model term earns its place at MAXDIM=64 and demonstrably does not at 16. The
+  objective is better *because the term is measured where the effect is*, and
+  the honest form of that sentence names the configuration.
+- The proxy's attribution of run 1's win -- +24.3 % area, 99.6 % in the AXI
+  master ports -- is the same attribution Design Compiler made for the
+  MAXDIM=64 widening (99.1 % in two adapters), reached in milliseconds instead
+  of 56 minutes. It is a *prediction*, and the way to settle it is a DC run on
+  that export.
+
 
 Reference
 ---------

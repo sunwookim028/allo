@@ -181,6 +181,13 @@ DESIGN_EVALUATOR = [f"{PKG}/{f}" for f in (
     "shapes.py", "isa_spec.json", "isa_encoding.py", "gen_isa.py")]
 GATE_RUNNER = f"{PKG}/chia_agent/gate_runner.py"
 PARAM_CHECK = f"{PKG}/chia_agent/param_check.py"
+#: The area proxy, and the workload suite that supplies the model term of the
+#: objective. Frozen for the same reason the mapper is: a candidate may move
+#: the design, never the thing that prices it or the workload it is priced on.
+AREA_PROXY = f"{PKG}/chia_agent/area_proxy.py"
+WORKLOAD_SUITE = [f"{PKG}/workloads/{f}" for f in
+                  ("__init__.py", "models.py", "extract.py", "run.py",
+                   "burst.py", "gate.py", "claims.json")]
 #: The co-design loop's frozen half: the mapper (its enumerator, its selection
 #: rule and its objective), the mapspace gate, and the cosim driver that binds
 #: the mapper's chosen program into main's frozen `cosim.py`. The agent edits
@@ -192,6 +199,8 @@ CODESIGN = [f"{PKG}/chia_agent/{f}" for f in
 FROZEN = [
     "examples/__init__.py",
     *DESIGN_EVALUATOR,
+    AREA_PROXY,
+    *WORKLOAD_SUITE,
     *[f"{PKG}/{rel}" for rel in FROZEN_DESIGN],
     GATE_RUNNER,
     PARAM_CHECK,
@@ -218,6 +227,46 @@ PARAM_CONFIGS = [{"TPU_MAXDIM": "8"}, {"TPU_MAXDIM": "12"},
 #: `invariant` -- a pin on someone else's default is not a pin. `reproduce.sh`
 #: exports the same point for the same reason.
 SCORED = {"TPU_T": "4", "TPU_MAXDIM": "16"}
+#: The model term of the objective: PyTorch MLPs, layer by layer, through the
+#: same one csynth as the GEMM shapes.
+#:
+#: Why a model at all. The same optimisation is worth 4.3-7.0 % on GEMM shapes
+#: and 25-34 % on multi-layer models (docs/source/designs/workload_suite.rst):
+#: a model does not make the problem bigger, it makes it LONGER, so every layer
+#: repays a fixed cost that one large GEMM amortises away. A loop scored only
+#: on GEMM shapes ranks changes on the workload class least sensitive to the
+#: cost they remove.
+#:
+#: Why these two. Cost. Every model costs one cosim PER LAYER, so these two are
+#: six, and `mlp_small` -- `confirmed` on RTL at this configuration, and the
+#: model with the LARGEST measured divergence from the GEMM table (34.5 %
+#: against 4.3-7.0 %) -- would be two more. It is the first thing to add if the
+#: term earns its cost. `mlp_wide` cannot be added: it is `correct` and not
+#: `confirmed` precisely because no RTL run of it has ever completed
+#: (limitations item 24). `mlp_bias` is in the suite to NOT map.
+#:
+#: Their published cycles -- 1,150 and 2,117 -- are MAXDIM=64 measurements and
+#: are NOT the control here. The control is measured per run, like the GEMM
+#: one: `accept.py` takes the measurement, it does not look it up.
+SCORED_MODELS = ("mlp_tiny", "mlp_deep")
+#: The configuration the MODEL term is measured at -- MAXDIM=64, not `SCORED`'s
+#: 16. MEASURED, not assumed: at T=4 MAXDIM=16 QD=16 the burst widening is
+#: worth 0 cycles on every layer of both models (861 -> 861, 1,530 -> 1,530,
+#: layer by layer, to the cycle), against 287 and 583 on the same two models at
+#: MAXDIM=64. `dev/records/tinytpu/model-term-maxdim-20260924.rst`.
+#:
+#: At MAXDIM=16 a DRAM row is 4 packed words instead of 16, so every operand
+#: burst is four times shorter and the per-layer prologue covers all of it. The
+#: relationship the model term exists for does not just weaken there, it
+#: INVERTS: at MAXDIM=16 the GEMM shapes see the widening (run 1 measured
+#: 0/0/-42/-59/-59) and the models do not. A model term at MAXDIM=16 would be
+#: the LESS burst-sensitive of the two terms, which is the opposite of the
+#: reason for adding it.
+#:
+#: The GEMM control stays at `SCORED` because that is the published row. Two
+#: configurations means TWO csynths per candidate, and that is the price of the
+#: term being worth anything.
+SCORED_MODEL_ENV = {"TPU_T": "4", "TPU_MAXDIM": "64", "TPU_QD": "16"}
 #: What in the checkout itself the evaluation depends on: the `allo` package
 #: (on PYTHONPATH), and this directory's evaluator, policy and design.
 CHECKOUT_WATCH = ["allo", "examples/__init__.py", PKG]
@@ -242,6 +291,10 @@ TARGET_NS = 3.33
 #: gate fails it in minutes rather than the quarter-hour the smoke run lost.
 GATE_TIMEOUT = 240
 COSIM_TIMEOUT = 1800
+#: Per-layer bound inside the model measurement. A layer that does not complete
+#: is limitations item 24 (`Kt >= QD` deadlocks legal programs), and the run
+#: refuses rather than reporting the model short by a layer.
+MODEL_TIMEOUT = 600
 #: xsim's transaction window runs a few cycles past HLS's latency count.
 SIMTIME_SLACK = 12
 
@@ -398,6 +451,27 @@ def run(cmd, cwd, env, timeout, work=None, tree=None, stdin=None):
         out, _ = p.communicate()
         out, rc = (out or "") + f"\nTIMEOUT after {timeout}s (deadlock?)", 124
     return rc, out, time.time() - t
+
+
+def area_estimate(tree, env, work):
+    """The candidate's own structural bit census, priced by the frozen model.
+
+    The census is taken INSIDE the tree, from the candidate's composed
+    architecture, so a unit that declares a bigger array or a channel wired
+    deeper is seen. The coefficients are in the frozen `area_proxy`, so the
+    candidate cannot move the price it is charged.
+
+    It is an ESTIMATE and says so in every field it returns. csynth's resource
+    table is still reported beside it, because the two disagree and the
+    disagreement is the finding, not an error to resolve.
+    """
+    code = ("import json, sys; sys.path.insert(0, %r); import area_proxy as p; "
+            "print(json.dumps(p.estimate(p.live_census())))"
+            % str(tree / PKG / "chia_agent"))
+    rc, out, _ = run([ALLO_PYTHON, "-c", code], tree, env, 300, work, tree)
+    if rc:
+        raise Reject("area-proxy", out[-3000:])
+    return json.loads(out.strip().splitlines()[-1])
 
 
 def check_invariants(tree, env, work):
@@ -592,6 +666,42 @@ def score(tree, env, work: Path, shapes, verify_now):
     return _cosim("cosim", tree, env, work, shapes, verify_now)
 
 
+def model_score(tree, env, work: Path, models, verify_now):
+    """The model term: each model's layers, in order, on one csynth of the
+    candidate's own RTL.
+
+    Measured the same way as the GEMM term and held to the same evidence: a
+    vouched runner, the tree re-verified afterwards, and a layer that does not
+    complete is a refusal rather than a missing row. It costs one csynth plus
+    one cosim per LAYER -- six for the two scored models against two for the
+    GEMM shapes -- which is what the model term is worth paying, because it is
+    the workload class the measured 25-34 %/4.3-7.0 % split says the GEMM
+    shapes cannot rank.
+    """
+    if not models:
+        return {}, 0.0
+    out_json = work / "models.json"
+    # The model term's OWN configuration (SCORED_MODEL_ENV), not the GEMM
+    # term's: measured, and the reason is in that constant's comment.
+    ok, rc, out, sec = vouched(
+        "workloads", tree,
+        dict(env, **SCORED_MODEL_ENV, TPU_PRJ=str(work / "workload.prj")),
+        work, work, COSIM_TIMEOUT,
+        args=("--cosim", *models, "--project", str(work / "workload.prj"),
+              "--json", str(out_json), "--timeout", str(MODEL_TIMEOUT)))
+    verify_now("workloads")
+    if not ok or not out_json.exists():
+        raise Reject("model", out[-4000:])
+    measured = json.loads(out_json.read_text()).get("cycles", {})
+    missing = [m for m in models
+               if not isinstance(measured.get(m), int) or measured[m] <= 0]
+    if missing:
+        raise Reject("model", f"no measured cycles for {missing}; a layer that "
+                              f"does not complete is limitations item 24, not "
+                              f"a zero\n{out[-3000:]}")
+    return {m: measured[m] for m in models}, round(sec, 1)
+
+
 def _cosim(check, tree, env, work: Path, shapes, verify_now):
     prj = work / "isa_sweep.prj"
     # cosim.py (main since e620576d) puts its project next to itself by default,
@@ -640,6 +750,8 @@ def main():
     ap.add_argument("--spec-dir", type=Path, required=True)
     ap.add_argument("--work", type=Path, required=True)
     ap.add_argument("--shapes", default=",".join(SEARCH_SHAPES))
+    ap.add_argument("--models", default=",".join(SCORED_MODELS),
+                    help="the model term's workloads; empty measures none")
     ap.add_argument("--gate-only", action="store_true")
     ap.add_argument("--codesign", action="store_true",
                     help="run the co-design stages: the exhaustive mapspace "
@@ -692,6 +804,14 @@ def main():
             cyc, synth, sec, chosen = runner(tree, env, work, shapes, verify_now)
             result.update(cycles=cyc, total_cycles=sum(cyc.values()),
                           synth=synth, cosim_seconds=sec)
+            models = [m for m in a.models.split(",") if m]
+            mcyc, msec = model_score(tree, env, work, models, verify_now)
+            result.update(model_cycles=mcyc, total_model_cycles=sum(mcyc.values()),
+                          model_seconds=msec, model_env=dict(SCORED_MODEL_ENV))
+            # The area ESTIMATE, from the candidate's own bit census. It costs
+            # milliseconds, so it is taken on every scored candidate; a DC run
+            # is ~70 minutes on another host and cannot be.
+            result["area"] = area_estimate(tree, env, work)
             if chosen:
                 result["scored_nest"] = chosen
                 # The nest the mapspace gate chose and the nest that was
@@ -708,16 +828,30 @@ def main():
                     raise Reject("nondeterministic",
                                  f"the mapper chose a different nest in the gate "
                                  f"and in the scorer: {bad}")
-            # The objective is a PAIR and is never collapsed: cycles per shape,
-            # and the csynth resource estimate for the one RTL build. A
-            # candidate that buys cycles with block RAM is a trade, not a win;
-            # `loop.py` classifies it and reports both terms.
+            # The objective is a TRIPLE and is never collapsed:
+            #
+            #   gemm     cosim cycles per GEMM shape   -- the CONTROL
+            #   model    cosim cycles per model        -- the workload term
+            #   area     the standard-cell ESTIMATE    -- silicon, not FPGA
+            #
+            # Two of the three are new, and each replaces an axis this project
+            # measured to be misleading. `gemm` stays, unchanged and unweighted:
+            # a change that helps models and hurts GEMM shapes is a real trade,
+            # and the search should be made to STATE it rather than hide it,
+            # which needs the control kept. csynth's resource table is still
+            # reported -- it is the FPGA answer, and where it disagrees with
+            # `area` that disagreement is a result.
             result["objective"] = {
-                "cycles": cyc,
+                "gemm": cyc,
+                "model": result.get("model_cycles", {}),
+                "model_env": result.get("model_env"),
+                "area": result.get("area"),
                 "resources": dict(synth.get("area", {}),
                                   estimated_ns=synth.get("estimated_ns")),
-                "note": "two terms, reported as a pair per shape; not summed "
-                        "into one score",
+                "note": "three terms, reported per shape and per model; never "
+                        "summed into one score. `area` is an ESTIMATE "
+                        "(chia_agent/area_proxy.py), `resources` is csynth's "
+                        "FPGA table, and the two disagree by design",
             }
         result["ok"] = True
     except Reject as r:

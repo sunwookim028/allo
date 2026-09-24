@@ -630,8 +630,24 @@ against ``isa_ref`` over all 4096 bytes of ``C`` at both settings.
      - *960*
      - *4.3 %*
 
+.. warning::
+
+   **Everything in this section is a MAXDIM=64 measurement, and the split does
+   not survive MAXDIM=16.** Asked the same question at ``T=4 MAXDIM=16
+   QD=16`` --- both models, every layer, one ``csynth`` per burst width --- the
+   widening is worth **zero cycles**: 861 -> 861 and 1 530 -> 1 530, layer by
+   layer, to the cycle. At MAXDIM=16 a DRAM row is 4 packed words instead of
+   16, the weight burst is four times shorter, and the per-layer prologue
+   covers all of it.
+
+   The relationship also **inverts**: at MAXDIM=16 the GEMM shapes *do* see the
+   widening (CHIA run 1 measured ``0 / 0 / -42 / -59 / -59`` on that
+   configuration) and the models do not. So "models are more burst-sensitive
+   than shapes" is a statement about MAXDIM=64, not about models.
+   ``dev/records/tinytpu/model-term-maxdim-20260924.rst``.
+
 **The answer is that the widening is worth four to eight times more on a model
-than the shape table says.** 25 to 34 per cent of a model's cycles against 4.3
+than the shape table says, at MAXDIM=64.** 25 to 34 per cent of a model's cycles against 4.3
 to 7.0 per cent of a big GEMM's. Read only as a GEMM table, ``TPU_DMA_WIDEN``
 is a few per cent that shrinks as the shape grows; read on a model, it is a
 quarter to a third of the whole runtime and it does not shrink, because a

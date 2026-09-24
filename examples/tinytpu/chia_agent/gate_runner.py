@@ -61,6 +61,11 @@ CHECKS = {
     # directory because the agent may not edit them.
     "codesign": os.path.join(HERE, "codesign_gate.py"),
     "codesign_cosim": os.path.join(HERE, "codesign_cosim.py"),
+    # The model term of the objective: the PyTorch workload suite, layer by
+    # layer, through one csynth of the candidate's own hardware. Frozen and run
+    # from here for the same reason cosim.py is -- the candidate supplies the
+    # machine, never the workload it is measured on.
+    "workloads": os.path.join(DESIGN, "workloads", "run.py"),
 }
 #: Module-name prefixes whose attributes the checks compute with.
 WATCHED = ("numpy", "allo", "builtins")
