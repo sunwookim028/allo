@@ -87,3 +87,30 @@ read the archived `.cpp`, which is the honest thing for a record to do.
 `tiled_systolic.py` is untouched and still asserts `AlloMem<` / `AlloMemW<`
 against an emitter that writes `AlloMemPins<`. That one really is a design
 change, as this file already said.
+
+## The EVA reference, and what the A/B pair had to be (2026-09-24)
+
+`reports/zhang21_2026-09-24/` asked for `cosim_eva_systemc.py` at NSTEP=215
+emitted with the old and the new emitter. The pair is in
+`eva_nstep215_ab_2026-09-24/`, but **the emitter is not the axis**, which took a
+rebuild to find out rather than a reading:
+
+- The committed reference was regenerated at `72c70dcb`. Reverting all of
+  `mlir/lib/Translation/` and `mlir/include/allo/Translation/` to `72c70dcb`
+  (five files, 546 lines) and rebuilding the bindings changes the EVA emission in
+  **zero** lines after SSA-name normalisation.
+- The signed → unsigned difference comes from `allo/ir/builder.py`: `3de74846`
+  and `094ab413` (#612), which attach the `unsigned` `UnitAttr` to
+  `GetIntSliceOp`. Removing just that reproduces the reference's types exactly.
+
+A second, independent difference the handoff did not have: the region's MLIR
+argument order is now the **declared** order, not a discovery order, so
+`prime_cfg` moved from first to last and every `input<k>.data` index moved with
+it. `cosim_eva_systemc.py` still passed the old order, which does not raise —
+the arity matches, so each array is written to the wrong slot. Fixed in the
+script, with an assertion against the module's signature.
+
+Neither side of the pair was run: this host has no Catapult, so there are no
+`output*.data`. The `*.data` in `eva_nstep215_ab_2026-09-24/` are ordinary
+tracked files — the ignore rule that made `git add -f` necessary lives in
+`examples/eva/generated/.gitignore` and does not reach `dev/records/`.

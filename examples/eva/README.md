@@ -36,12 +36,24 @@ cd generated && ./csim.sh
 
 ## Status
 - **Emits** cleanly, **compiles** with 0 g++ errors, **runs**.
-- **Functional cosim: PASS (bit-exact).** `cosim_eva_systemc.py` drives the 1x1
-  passthrough workload and gets `out_e = [1,2,3,4,5,6]` == the ramp golden.
+- The committed `generated/` is the `build_eva_systemc.py` emission at NSTEP=55.
+  Its `*.data` are gitignored, so its csim runs with no inputs and outputs all
+  zeros, and rtprime does not drain at 55 anyway — it is a reference for the
+  *shape* of the emission, not a golden.
+- **Functional cosim: PASS (bit-exact)**, as of the run that recorded it.
+  `cosim_eva_systemc.py` drives the 1x1 passthrough workload and gets
+  `out_e = [1,2,3,4,5,6]` == the ramp golden. Not re-run since; see the argument
+  order note below, and `dev/records/systemc/eva_nstep215_ab_2026-09-24/`.
 
 ### Notes / gotchas
-- `prime_cfg` (runtime prime) is the **first** positional arg (the `node` kernel
-  is discovered first); pass `int32[M,N]` all = `PRIME_TOKENS` (6).
+- **Argument order is the region's declared order**, so `prime_cfg` is the
+  **last** positional arg; pass `int32[M,N]` all = `PRIME_TOKENS` (6). It used to
+  be a *discovery* order that put `prime_cfg` first, and `run_eva()` in
+  `eva_sb_syscredit_rtprime.py` still documents that older order. Getting this
+  wrong does not raise: the arity still matches, so each array is written to the
+  wrong `input<k>.data` and the csim silently reads the wrong vectors.
+  `cosim_eva_systemc.py` asserts each argument's dtype and shape against the
+  module's signature so the next reordering fails loudly.
 - rtprime's runtime-prime credit flow needs a **generous NSTEP margin** (>=160).
   At NSTEP=55 the tokens never drain and every output is zero; at ~215 the ramp
   passes through cleanly. (The compile-time-prime archive variant drained at 55.)

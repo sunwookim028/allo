@@ -71,12 +71,33 @@ for t in range(K):
     in_w[0, pc + t] = ramp[t]; iv_w[0, pc + t] = 1
 rin_s[:] = rin_s_pkts
 
-# arg order: prime_cfg FIRST (node discovered first), then the systolic/router args
-mod(prime_cfg,
-    in_w, iv_w, in_e, iv_e, in_n, iv_n, in_s, iv_s,
-    out_w, out_e, out_n, out_s,
-    rin_w, rin_e, rin_n, rin_s,
-    rout_w, rout_e, rout_n, rout_s)
+# Arg order is the region's DECLARED parameter order, which is what the built
+# module's MLIR signature now is. It used to be a "discovery" order -- args
+# pulled forward in the order the kernels that declare them were visited, which
+# put `prime_cfg` first -- and the call below said so until 2026-09-24. Under the
+# declared order `prime_cfg` is LAST. Passing the old order does not raise: the
+# arity still matches, so `write_tensor_to_file` just pairs each array with the
+# wrong `input<k>.data` slot and the csim reads a 1-value file where the
+# testbench wants 215 halfs. Hence the assertion: it costs nothing and turns the
+# next reordering into a failure instead of a silent all-zero run.
+ARGS = (in_w, in_e, in_n, in_s,
+        out_w, out_e, out_n, out_s,
+        rin_w, rin_e, rin_n, rin_s,
+        rout_w, rout_e, rout_n, rout_s,
+        iv_w, iv_e, iv_n, iv_s,
+        prime_cfg)
+
+from allo.backend.hls import find_func_in_module, get_func_inputs_outputs
+_sig, _ = get_func_inputs_outputs(find_func_in_module(mod.module, mod.top_func_name))
+assert len(_sig) == len(ARGS), f"arity: module wants {len(_sig)}, call passes {len(ARGS)}"
+_NP = {"f16": np.float16, "f32": np.float32, "i32": np.int32, "i64": np.int64}
+for _k, ((_dt, _sh), _a) in enumerate(zip(_sig, ARGS)):
+    assert list(_sh) == list(_a.shape) and _NP.get(_dt, _a.dtype) == _a.dtype, (
+        f"arg {_k}: module expects {_dt}{_sh}, call passes {_a.dtype}{list(_a.shape)}. "
+        "The region's argument order changed -- fix ARGS, do not reorder the module."
+    )
+
+mod(*ARGS)
 
 got = out_e[0, :K]
 print("EXPECT ramp    :", ramp.astype(np.float32).tolist())

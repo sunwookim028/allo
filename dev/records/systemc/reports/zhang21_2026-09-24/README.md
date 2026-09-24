@@ -44,3 +44,12 @@ reachable). `pe_wire` has the same hash at `779e4350^`.
 - **`cosim_tb_producer_consumer.v` and `cosim_tb_mem_port_reverse.v` were not run.**
   They need RTL from `df.build(..., mode="csyn")`, which requires an `allo` import, and
   no such RTL is committed.
+
+---
+
+*Addendum, same day, from the host without licences:* the three items above that
+asked for work — the netlist provenance, the `LOCKSTEP` gap, and the NSTEP=215
+EVA pair — are answered in `../../README.md` ("The emission finding, settled" and
+"The EVA reference, and what the A/B pair had to be") and in
+`../../eva_nstep215_ab_2026-09-24/`. The run record itself is left as it was
+written.

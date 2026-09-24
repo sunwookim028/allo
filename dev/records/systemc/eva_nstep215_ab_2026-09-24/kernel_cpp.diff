@@ -1,0 +1,550 @@
+623c623
+<       ac_int<26, true> v65 = zpkt;	// L160
+---
+>       ac_int<26, false> v65 = zpkt;	// L160
+625c625
+<       ac_int<26, true> v66 = zpkt;	// L162
+---
+>       ac_int<26, false> v66 = zpkt;	// L162
+627c627
+<       ac_int<26, true> v67 = zpkt;	// L164
+---
+>       ac_int<26, false> v67 = zpkt;	// L164
+629c629
+<       ac_int<26, true> v68 = zpkt;	// L166
+---
+>       ac_int<26, false> v68 = zpkt;	// L166
+631c631
+<       ac_int<17, true> v69 = zsys;	// L168
+---
+>       ac_int<17, false> v69 = zsys;	// L168
+633c633
+<       ac_int<17, true> v70 = zsys;	// L170
+---
+>       ac_int<17, false> v70 = zsys;	// L170
+635c635
+<       ac_int<17, true> v71 = zsys;	// L172
+---
+>       ac_int<17, false> v71 = zsys;	// L172
+637c637
+<       ac_int<17, true> v72 = zsys;	// L174
+---
+>       ac_int<17, false> v72 = zsys;	// L174
+656c656
+<     ac_int<26, true> v81 = oe_r;	// L193
+---
+>     ac_int<26, false> v81 = oe_r;	// L193
+658c658
+<     ac_int<26, true> v82 = ow_r;	// L195
+---
+>     ac_int<26, false> v82 = ow_r;	// L195
+660c660
+<     ac_int<26, true> v83 = os_r;	// L197
+---
+>     ac_int<26, false> v83 = os_r;	// L197
+662c662
+<     ac_int<26, true> v84 = on_r;	// L199
+---
+>     ac_int<26, false> v84 = on_r;	// L199
+664c664
+<     ac_int<17, true> v85 = txe_r;	// L201
+---
+>     ac_int<17, false> v85 = txe_r;	// L201
+666c666
+<     ac_int<17, true> v86 = txw_r;	// L203
+---
+>     ac_int<17, false> v86 = txw_r;	// L203
+668c668
+<     ac_int<17, true> v87 = txs_r;	// L205
+---
+>     ac_int<17, false> v87 = txs_r;	// L205
+670c670
+<     ac_int<17, true> v88 = txn_r;	// L207
+---
+>     ac_int<17, false> v88 = txn_r;	// L207
+672c672
+<     int8_t v89 = cre_r;	// L209
+---
+>     uint8_t v89 = cre_r;	// L209
+674c674
+<     int8_t v90 = crw_r;	// L211
+---
+>     uint8_t v90 = crw_r;	// L211
+676c676
+<     int8_t v91 = crs_r;	// L213
+---
+>     uint8_t v91 = crs_r;	// L213
+678c678
+<     int8_t v92 = crn_r;	// L215
+---
+>     uint8_t v92 = crn_r;	// L215
+766c766
+<       ac_int<26, true> v150 = p_w;	// L296
+---
+>       ac_int<26, false> v150 = p_w;	// L296
+768c768
+<       ac_int<26, true> v151 = p_e;	// L298
+---
+>       ac_int<26, false> v151 = p_e;	// L298
+770c770
+<       ac_int<26, true> v152 = p_n;	// L300
+---
+>       ac_int<26, false> v152 = p_n;	// L300
+772c772
+<       ac_int<26, true> v153 = p_s;	// L302
+---
+>       ac_int<26, false> v153 = p_s;	// L302
+830c830
+<           ac_int<4, true> v182;
+---
+>           ac_int<4, false> v182;
+888c888
+<       ac_int<26, true> v200 = csd_pkt;	// L402
+---
+>       ac_int<26, false> v200 = csd_pkt;	// L402
+911c911
+<             ac_int<26, true> v215 = csd_pkt;	// L423
+---
+>             ac_int<26, false> v215 = csd_pkt;	// L423
+990c990
+<       ac_int<26, true> v256 = o_crv;	// L500
+---
+>       ac_int<26, false> v256 = o_crv;	// L500
+996,997c996,997
+<       ac_int<26, true> v259 = o_crv;	// L504
+<       int16_t v260;
+---
+>       ac_int<26, false> v259 = o_crv;	// L504
+>       uint16_t v260;
+1002,1003c1002,1003
+<       ac_int<26, true> v262 = o_crv;	// L508
+<       ac_int<4, true> v263;
+---
+>       ac_int<26, false> v262 = o_crv;	// L508
+>       ac_int<4, false> v263;
+1008c1008
+<       ac_int<26, true> v265 = o_crv;	// L512
+---
+>       ac_int<26, false> v265 = o_crv;	// L512
+1014,1015c1014,1015
+<       ac_int<26, true> v268 = o_crv;	// L516
+<       int16_t v269;
+---
+>       ac_int<26, false> v268 = o_crv;	// L516
+>       uint16_t v269;
+1040,1041c1040,1041
+<       ac_int<17, true> v277 = rx_n;	// L536
+<       int16_t v278;
+---
+>       ac_int<17, false> v277 = rx_n;	// L536
+>       uint16_t v278;
+1046c1046
+<       ac_int<17, true> v280 = rx_n;	// L540
+---
+>       ac_int<17, false> v280 = rx_n;	// L540
+1052,1053c1052,1053
+<       ac_int<17, true> v283 = rx_s;	// L544
+<       int16_t v284;
+---
+>       ac_int<17, false> v283 = rx_s;	// L544
+>       uint16_t v284;
+1058c1058
+<       ac_int<17, true> v286 = rx_s;	// L548
+---
+>       ac_int<17, false> v286 = rx_s;	// L548
+1064,1065c1064,1065
+<       ac_int<17, true> v289 = rx_w;	// L552
+<       int16_t v290;
+---
+>       ac_int<17, false> v289 = rx_w;	// L552
+>       uint16_t v290;
+1070c1070
+<       ac_int<17, true> v292 = rx_w;	// L556
+---
+>       ac_int<17, false> v292 = rx_w;	// L556
+1076,1077c1076,1077
+<       ac_int<17, true> v295 = rx_e;	// L560
+<       int16_t v296;
+---
+>       ac_int<17, false> v295 = rx_e;	// L560
+>       uint16_t v296;
+1082c1082
+<       ac_int<17, true> v298 = rx_e;	// L564
+---
+>       ac_int<17, false> v298 = rx_e;	// L564
+1163c1163
+<           ac_int<26, true> v356 = csd_pkt;	// L643
+---
+>           ac_int<26, false> v356 = csd_pkt;	// L643
+1173c1173
+<             ac_int<26, true> v363 = csd_pkt;	// L651
+---
+>             ac_int<26, false> v363 = csd_pkt;	// L651
+1181c1181
+<             ac_int<26, true> v367 = csd_pkt;	// L656
+---
+>             ac_int<26, false> v367 = csd_pkt;	// L656
+1189c1189
+<             ac_int<26, true> v371 = csd_pkt;	// L661
+---
+>             ac_int<26, false> v371 = csd_pkt;	// L661
+1197c1197
+<             ac_int<26, true> v375 = csd_pkt;	// L666
+---
+>             ac_int<26, false> v375 = csd_pkt;	// L666
+1274c1274
+<       int8_t v423 = fetch_en;	// L742
+---
+>       uint8_t v423 = fetch_en;	// L742
+1278c1278
+<         int8_t v426 = instr_cnt;	// L746
+---
+>         uint8_t v426 = instr_cnt;	// L746
+1632c1632
+<         int8_t v631 = instr_cnt;	// L1115
+---
+>         uint8_t v631 = instr_cnt;	// L1115
+1638c1638
+<           int8_t v635 = iter_cnt;	// L1121
+---
+>           uint8_t v635 = iter_cnt;	// L1121
+1647c1647
+<             int8_t v641 = iter_cnt;	// L1130
+---
+>             uint8_t v641 = iter_cnt;	// L1130
+1654c1654
+<           int8_t v645 = instr_cnt;	// L1137
+---
+>           uint8_t v645 = instr_cnt;	// L1137
+1893c1893
+<         int8_t v788 = resq_wr;	// L1393
+---
+>         uint8_t v788 = resq_wr;	// L1393
+1920c1920
+<         int8_t v802 = resq_wr;	// L1420
+---
+>         uint8_t v802 = resq_wr;	// L1420
+1927c1927
+<         int8_t v806 = resq_wr;	// L1427
+---
+>         uint8_t v806 = resq_wr;	// L1427
+1956c1956
+<         int8_t v821 = condition_reg;	// L1457
+---
+>         uint8_t v821 = condition_reg;	// L1457
+1976c1976
+<         int8_t v834 = resq_wr;	// L1477
+---
+>         uint8_t v834 = resq_wr;	// L1477
+1995c1995
+<         ac_int<17, true> v844 = twn;	// L1496
+---
+>         ac_int<17, false> v844 = twn;	// L1496
+2003c2003
+<         ac_int<17, true> v848 = twn;	// L1501
+---
+>         ac_int<17, false> v848 = twn;	// L1501
+2009c2009
+<         ac_int<17, true> v850 = twn;	// L1504
+---
+>         ac_int<17, false> v850 = twn;	// L1504
+2026c2026
+<         ac_int<17, true> v860 = tws;	// L1521
+---
+>         ac_int<17, false> v860 = tws;	// L1521
+2034c2034
+<         ac_int<17, true> v864 = tws;	// L1526
+---
+>         ac_int<17, false> v864 = tws;	// L1526
+2040c2040
+<         ac_int<17, true> v866 = tws;	// L1529
+---
+>         ac_int<17, false> v866 = tws;	// L1529
+2057c2057
+<         ac_int<17, true> v876 = tww;	// L1546
+---
+>         ac_int<17, false> v876 = tww;	// L1546
+2065c2065
+<         ac_int<17, true> v880 = tww;	// L1551
+---
+>         ac_int<17, false> v880 = tww;	// L1551
+2071c2071
+<         ac_int<17, true> v882 = tww;	// L1554
+---
+>         ac_int<17, false> v882 = tww;	// L1554
+2088c2088
+<         ac_int<17, true> v892 = twe;	// L1571
+---
+>         ac_int<17, false> v892 = twe;	// L1571
+2096c2096
+<         ac_int<17, true> v896 = twe;	// L1576
+---
+>         ac_int<17, false> v896 = twe;	// L1576
+2102c2102
+<         ac_int<17, true> v898 = twe;	// L1579
+---
+>         ac_int<17, false> v898 = twe;	// L1579
+2207c2207
+<       ac_int<26, true> v963 = oe_r;	// L1685
+---
+>       ac_int<26, false> v963 = oe_r;	// L1685
+2209c2209
+<       ac_int<26, true> v964 = ow_r;	// L1687
+---
+>       ac_int<26, false> v964 = ow_r;	// L1687
+2211c2211
+<       ac_int<26, true> v965 = os_r;	// L1689
+---
+>       ac_int<26, false> v965 = os_r;	// L1689
+2213c2213
+<       ac_int<26, true> v966 = on_r;	// L1691
+---
+>       ac_int<26, false> v966 = on_r;	// L1691
+2215c2215
+<       ac_int<17, true> v967 = txe_r;	// L1693
+---
+>       ac_int<17, false> v967 = txe_r;	// L1693
+2217c2217
+<       ac_int<17, true> v968 = txw_r;	// L1695
+---
+>       ac_int<17, false> v968 = txw_r;	// L1695
+2219c2219
+<       ac_int<17, true> v969 = txs_r;	// L1697
+---
+>       ac_int<17, false> v969 = txs_r;	// L1697
+2221c2221
+<       ac_int<17, true> v970 = txn_r;	// L1699
+---
+>       ac_int<17, false> v970 = txn_r;	// L1699
+2223c2223
+<       int8_t v971 = cre_r;	// L1701
+---
+>       uint8_t v971 = cre_r;	// L1701
+2225c2225
+<       int8_t v972 = crw_r;	// L1703
+---
+>       uint8_t v972 = crw_r;	// L1703
+2227c2227
+<       int8_t v973 = crs_r;	// L1705
+---
+>       uint8_t v973 = crs_r;	// L1705
+2229c2229
+<       int8_t v974 = crn_r;	// L1707
+---
+>       uint8_t v974 = crn_r;	// L1707
+2326c2326
+<       ac_int<17, true> v991 = zw;	// L1740
+---
+>       ac_int<17, false> v991 = zw;	// L1740
+2361c2361
+<             ac_int<17, true> v1014 = w;	// L1775
+---
+>             ac_int<17, false> v1014 = w;	// L1775
+2372c2372
+<             ac_int<17, true> v1020 = w;	// L1782
+---
+>             ac_int<17, false> v1020 = w;	// L1782
+2391c2391
+<       ac_int<17, true> v1030 = w;	// L1798
+---
+>       ac_int<17, false> v1030 = w;	// L1798
+2477c2477
+<       ac_int<17, true> v1043 = zw1;	// L1823
+---
+>       ac_int<17, false> v1043 = zw1;	// L1823
+2512c2512
+<             ac_int<17, true> v1066 = w1;	// L1858
+---
+>             ac_int<17, false> v1066 = w1;	// L1858
+2523c2523
+<             ac_int<17, true> v1072 = w1;	// L1865
+---
+>             ac_int<17, false> v1072 = w1;	// L1865
+2542c2542
+<       ac_int<17, true> v1082 = w1;	// L1881
+---
+>       ac_int<17, false> v1082 = w1;	// L1881
+2628c2628
+<       ac_int<17, true> v1095 = zw2;	// L1906
+---
+>       ac_int<17, false> v1095 = zw2;	// L1906
+2663c2663
+<             ac_int<17, true> v1118 = w2;	// L1941
+---
+>             ac_int<17, false> v1118 = w2;	// L1941
+2674c2674
+<             ac_int<17, true> v1124 = w2;	// L1948
+---
+>             ac_int<17, false> v1124 = w2;	// L1948
+2693c2693
+<       ac_int<17, true> v1134 = w2;	// L1964
+---
+>       ac_int<17, false> v1134 = w2;	// L1964
+2779c2779
+<       ac_int<17, true> v1147 = zw3;	// L1989
+---
+>       ac_int<17, false> v1147 = zw3;	// L1989
+2814c2814
+<             ac_int<17, true> v1170 = w3;	// L2024
+---
+>             ac_int<17, false> v1170 = w3;	// L2024
+2825c2825
+<             ac_int<17, true> v1176 = w3;	// L2031
+---
+>             ac_int<17, false> v1176 = w3;	// L2031
+2844c2844
+<       ac_int<17, true> v1186 = w3;	// L2047
+---
+>       ac_int<17, false> v1186 = w3;	// L2047
+2927c2927
+<       ac_int<17, true> v1201 = w4;	// L2083
+---
+>       ac_int<17, false> v1201 = w4;	// L2083
+2938,2939c2938,2939
+<           ac_int<17, true> v1207 = w4;	// L2092
+<           int16_t v1208;
+---
+>           ac_int<17, false> v1207 = w4;	// L2092
+>           uint16_t v1208;
+3036c3036
+<       ac_int<17, true> v1231 = w5;	// L2141
+---
+>       ac_int<17, false> v1231 = w5;	// L2141
+3047,3048c3047,3048
+<           ac_int<17, true> v1237 = w5;	// L2150
+<           int16_t v1238;
+---
+>           ac_int<17, false> v1237 = w5;	// L2150
+>           uint16_t v1238;
+3145c3145
+<       ac_int<17, true> v1261 = w6;	// L2199
+---
+>       ac_int<17, false> v1261 = w6;	// L2199
+3156,3157c3156,3157
+<           ac_int<17, true> v1267 = w6;	// L2208
+<           int16_t v1268;
+---
+>           ac_int<17, false> v1267 = w6;	// L2208
+>           uint16_t v1268;
+3254c3254
+<       ac_int<17, true> v1291 = w7;	// L2257
+---
+>       ac_int<17, false> v1291 = w7;	// L2257
+3265,3266c3265,3266
+<           ac_int<17, true> v1297 = w7;	// L2266
+<           int16_t v1298;
+---
+>           ac_int<17, false> v1297 = w7;	// L2266
+>           uint16_t v1298;
+3352c3352
+<       ac_int<26, true> v1318 = zp;	// L2303
+---
+>       ac_int<26, false> v1318 = zp;	// L2303
+3375c3375
+<         ac_int<26, true> v1331 = cand;	// L2325
+---
+>         ac_int<26, false> v1331 = cand;	// L2325
+3381c3381
+<         ac_int<26, true> v1333 = cand;	// L2328
+---
+>         ac_int<26, false> v1333 = cand;	// L2328
+3397c3397
+<             ac_int<26, true> v1343 = cand;	// L2342
+---
+>             ac_int<26, false> v1343 = cand;	// L2342
+3412c3412
+<       ac_int<26, true> v1352 = pw;	// L2357
+---
+>       ac_int<26, false> v1352 = pw;	// L2357
+3484c3484
+<       ac_int<26, true> v1364 = zp1;	// L2381
+---
+>       ac_int<26, false> v1364 = zp1;	// L2381
+3507c3507
+<         ac_int<26, true> v1377 = cand1;	// L2403
+---
+>         ac_int<26, false> v1377 = cand1;	// L2403
+3513c3513
+<         ac_int<26, true> v1379 = cand1;	// L2406
+---
+>         ac_int<26, false> v1379 = cand1;	// L2406
+3529c3529
+<             ac_int<26, true> v1389 = cand1;	// L2420
+---
+>             ac_int<26, false> v1389 = cand1;	// L2420
+3544c3544
+<       ac_int<26, true> v1398 = pw1;	// L2435
+---
+>       ac_int<26, false> v1398 = pw1;	// L2435
+3616c3616
+<       ac_int<26, true> v1410 = zp2;	// L2459
+---
+>       ac_int<26, false> v1410 = zp2;	// L2459
+3639c3639
+<         ac_int<26, true> v1423 = cand2;	// L2481
+---
+>         ac_int<26, false> v1423 = cand2;	// L2481
+3645c3645
+<         ac_int<26, true> v1425 = cand2;	// L2484
+---
+>         ac_int<26, false> v1425 = cand2;	// L2484
+3661c3661
+<             ac_int<26, true> v1435 = cand2;	// L2498
+---
+>             ac_int<26, false> v1435 = cand2;	// L2498
+3676c3676
+<       ac_int<26, true> v1444 = pw2;	// L2513
+---
+>       ac_int<26, false> v1444 = pw2;	// L2513
+3748c3748
+<       ac_int<26, true> v1456 = zp3;	// L2537
+---
+>       ac_int<26, false> v1456 = zp3;	// L2537
+3771c3771
+<         ac_int<26, true> v1469 = cand3;	// L2559
+---
+>         ac_int<26, false> v1469 = cand3;	// L2559
+3777c3777
+<         ac_int<26, true> v1471 = cand3;	// L2562
+---
+>         ac_int<26, false> v1471 = cand3;	// L2562
+3793c3793
+<             ac_int<26, true> v1481 = cand3;	// L2576
+---
+>             ac_int<26, false> v1481 = cand3;	// L2576
+3808c3808
+<       ac_int<26, true> v1490 = pw3;	// L2591
+---
+>       ac_int<26, false> v1490 = pw3;	// L2591
+3891c3891
+<       ac_int<26, true> v1505 = pw4;	// L2628
+---
+>       ac_int<26, false> v1505 = pw4;	// L2628
+3902c3902
+<           ac_int<26, true> v1511 = pw4;	// L2637
+---
+>           ac_int<26, false> v1511 = pw4;	// L2637
+3998c3998
+<       ac_int<26, true> v1535 = pw5;	// L2687
+---
+>       ac_int<26, false> v1535 = pw5;	// L2687
+4009c4009
+<           ac_int<26, true> v1541 = pw5;	// L2696
+---
+>           ac_int<26, false> v1541 = pw5;	// L2696
+4105c4105
+<       ac_int<26, true> v1565 = pw6;	// L2746
+---
+>       ac_int<26, false> v1565 = pw6;	// L2746
+4116c4116
+<           ac_int<26, true> v1571 = pw6;	// L2755
+---
+>           ac_int<26, false> v1571 = pw6;	// L2755
+4212c4212
+<       ac_int<26, true> v1595 = pw7;	// L2805
+---
+>       ac_int<26, false> v1595 = pw7;	// L2805
+4223c4223
+<           ac_int<26, true> v1601 = pw7;	// L2814
+---
+>           ac_int<26, false> v1601 = pw7;	// L2814

@@ -1,0 +1,28 @@
+diff --git a/allo/ir/builder.py b/allo/ir/builder.py
+index e7a813e3..8d3d79f4 100644
+--- a/allo/ir/builder.py
++++ b/allo/ir/builder.py
+@@ -285,14 +285,11 @@ class ASTTransformer(ASTBuilder):
+             res = tensor_d.ExtractOp(tensor=res, indices=[], ip=ctx.get_ip())
+         else:
+             res_result = ASTTransformer.get_mlir_op_result(ctx, res)
+-            is_unsigned = hasattr(res, "attributes") and "unsigned" in res.attributes
+             affine_map = AffineMap.get_identity(0)
+             affine_attr = AffineMapAttr.get(affine_map)
+             res = affine_d.AffineLoadOp(
+                 res_result.type.element_type, res, [], affine_attr, ip=ctx.get_ip()
+             )
+-            if is_unsigned:
+-                res.attributes["unsigned"] = UnitAttr.get()
+         return res
+ 
+     @staticmethod
+@@ -1821,8 +1818,6 @@ class ASTTransformer(ASTBuilder):
+                     lower.result,
+                     ip=ctx.get_ip(),
+                 )
+-                # every integer bit slice is unsigned
+-                op.attributes["unsigned"] = UnitAttr.get()
+                 return op
+             else:  # ast.Store
+                 set_slice_op = allo_d.SetIntSliceOp(
