@@ -7,7 +7,19 @@
 set -eo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-ROOT=$(cd "$HERE/../.." && pwd)
+# The checkout root, found by searching upward for pyproject.toml -- the file
+# that DEFINES the root. Not by counting levels up from $HERE: the tree has
+# been reorganised under these files and a path encoding tree shape is a
+# latent break. See dev/repo_layout.md.
+ROOT=$HERE
+while [ ! -f "$ROOT/pyproject.toml" ] || [ ! -d "$ROOT/allo" ]; do
+    parent=$(dirname "$ROOT")
+    if [ "$parent" = "$ROOT" ]; then
+        echo "not inside an allo checkout (no pyproject.toml above $HERE)" >&2
+        exit 1
+    fi
+    ROOT=$parent
+done
 # At TPU_MAXDIM=16 (pinned below), which is where these were measured.
 #
 # WHY THEY MOVED BY ONE CYCLE on 2026-09-22, isolated to one variable rather

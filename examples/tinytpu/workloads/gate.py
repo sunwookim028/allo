@@ -66,8 +66,8 @@ def _repo_root(start=None):
     """
     d = os.path.dirname(os.path.abspath(start or __file__))
     while True:
-        if (os.path.isdir(os.path.join(d, "examples", "tinytpu"))
-                and os.path.isdir(os.path.join(d, "allo", "frontend"))):
+        if (os.path.exists(os.path.join(d, "pyproject.toml"))
+                and os.path.isdir(os.path.join(d, "allo"))):
             return d
         parent = os.path.dirname(d)
         if parent == d:

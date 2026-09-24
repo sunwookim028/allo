@@ -28,8 +28,8 @@ def _repo_root():
     """Upward search for a marker, never a count of levels."""
     d = HERE
     while True:
-        if (os.path.isdir(os.path.join(d, "examples", "tinytpu"))
-                and os.path.isdir(os.path.join(d, "allo", "backend", "asic"))):
+        if (os.path.exists(os.path.join(d, "pyproject.toml"))
+                and os.path.isdir(os.path.join(d, "allo"))):
             return d
         parent = os.path.dirname(d)
         if parent == d:
