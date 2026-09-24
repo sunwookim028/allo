@@ -66,9 +66,19 @@ Target and reasoning in `dev/repo_layout.md`. Ordered by dependency:
 2. **`examples/accelerator/tinytpu_vitis/` → `examples/tinytpu/`** — one
    rename, references updated, gates re-run. **Done 2026-09-24.**
 3. **`allo/backend/asic/`** — both entry points: AAAH as the Allo-facing mode,
-   the flat flow as the control mode, kept permanently.
-4. **`examples/systemc_rtlsim/` → `examples/systemc/`** — it is a harness, not
-   a design.
+   the flat flow as the control mode, kept permanently. **Done** (`fdb262cc`):
+   the four tools live in `allo/backend/asic/tools/`, each taking the design as
+   a required argument; reports stay with the design. The ADK directories were
+   verified **configuration only** -- seven files, 28 KB, no library data, and
+   every blob that ever existed under that path across the imported history is
+   one of those seven, so the payload was stripped from history rather than
+   deleted in a later commit.
+4. **`examples/systemc_rtlsim/` split by kind** — **Done 2026-09-24.** Neither
+   SystemC directory was a design directory. The Allo designs (including
+   `pe_split.py`) are now `examples/systemc/`; the testbenches, shims and run
+   scripts are `tests/systemc/` (with the cross-check under
+   `tests/systemc/rtlsim/`); the logs and archived emitter output are
+   `dev/records/systemc/`.
 5. `chia_runs/` leaves the repository root.
 
 **Blocked until the agents working inside `examples/tinytpu/` finish** — the re-measure, the T8 re-export and the `ip-gap` verification all
@@ -96,7 +106,7 @@ it. Today three of eight are enforced.
 | RTL | cycles bit-exact | inside `reproduce.sh` | **enforced** |
 | CHIA | the loop runs, guards hold, $0 | `test_harness.py` | exists; **repair unfinished** |
 | workloads | real models map and run | `workloads/run.py` | runs, **no gate** |
-| ASIC | area + timing floor, one flow both sides | preflight + sequence | **preflight owed** |
+| ASIC | area + timing floor, one flow both sides | preflight + sequence | preflight **landed**; a run still needs a licence |
 | **end-to-end** | **PyTorch → cycles → area in one command** | — | **does not exist** |
 
 **The end-to-end gate is the highest-value missing piece.** Every error in this
@@ -104,8 +114,14 @@ work has lived in the seams *between* flows — a configuration claimed but not
 run, a row measured on a different design, an area figure beside cycles from
 other RTL — and no single-flow gate can see any of them.
 
-**ETA:** workload gate, 1 session. ASIC preflight, 1 session on the synthesis
-side. End-to-end, 2 sessions, and only after §C.
+The ASIC row is **not** push-button and must not be written as though it were:
+`preflight.py` checks `dc_shell`, the pinned mflowgen, sv2v, the vendored nodes,
+the ADK definition, the variant's RTL and lists, and the fetched `stdcells.db`
+against its recorded md5 — and then prints the sequence. A run still needs a DC
+licence and ~70 minutes of a specific machine. Its value is failing in seconds
+rather than an hour in.
+
+**ETA:** workload gate, 1 session. End-to-end, 2 sessions, and only after §C.
 
 ## E. CHIA reproducible from this repository alone
 
@@ -147,6 +163,37 @@ Recorded because each cost real work today.
   allo` still worked from inside a checkout and failed everywhere else, so it
   surfaced only when an agent ran a docs build from its own worktree. Removing
   a worktree is not free if anything outside git references it.
+- **Test a check's failure path, not only its pass path.** A check that has
+  only ever said ok proves nothing. The ASIC preflight's library-checksum
+  branch was confirmed by copying a real `stdcells.db`, appending one null
+  byte, and pointing the preflight at it: it reported the mismatch, named both
+  digests, said the areas were not comparable with the committed set, and
+  **refused to print the run sequence**. That is discrimination; a passing run
+  alone would not have shown it. The same tool has one branch still untested --
+  what it does when committed snapshots disagree about the library -- for the
+  good reason that there is no second library to test it with, and that is
+  recorded rather than glossed.
+- **The session scratchpad is shared between concurrent agents.** Two agents
+  writing `reproduce.sh` output to the same scratchpad path truncated one
+  another's log mid-cosim; the verdict survived only because the summary block
+  happened to be contiguous at its own offset. An agent that reads a truncated
+  log sees a run that did not finish, or worse a run that appears to have
+  finished differently. Give every agent a distinct path, and prefer a
+  worktree-local file to a shared scratch directory.
+- **Never resolve a repository root by counting levels.** Search upward for a
+  marker, or take the path as an argument. Hit three times in two days: a
+  construct script counting three `dirname`s landed on `examples/` rather than
+  the root and could not find its node library from a clean checkout (and was
+  *announced fixed without being run* -- a different check was run and taken as
+  coverage); the TinyTPU rename found ~30 `ROOT`/`REPO` values derived by
+  counting, **three already wrong** and made correct only by accident of the
+  move; and the first fix was itself a re-count that happened to suit the new
+  layout. A relative path that encodes tree shape is a latent break in any
+  repository being reorganised, and this one is mid-reorganisation.
+- **A licence-free check cannot report a licensed branch as passing.** The
+  ASIC preflight's ADK-checksum branch reports as *correctly missing* without a
+  licence, which is not the same as passing. Say which branches a run could not
+  reach rather than reporting the run as green.
 - **Read a gate's output, never its exit code**, and confirm what ran is what is
   being claimed. Four instruments were caught reporting success without having
   run; three further checks ran against the wrong object and passed.

@@ -58,8 +58,13 @@ allo/
 
 chia/                     the agentic loop, at the root
 
-scripts/asic/             the PD flow: construct graph, RTL export, stubs,
-                          preflight, extractor, number checkers
+backend/asic/             the PD flow, vendored: mflowgen nodes, ADK
+                          definitions, and tools/ -- stubs, preflight,
+                          extractor, number checker. Landed 2026-09-24;
+                          `scripts/asic/` in the first draft, revised on the
+                          flow maintainer's judgement -- see 'Vendoring'.
+                          A design's construct graph stays with the design,
+                          because it names that design's top module.
 
 examples/
   feather/                (exists)
@@ -145,9 +150,14 @@ on designs, or is it a design?*
 
 - `examples/systemc_rtlsim/` is **not a design**. It is a cross-check harness
   (`mgc_shim.v`, `ref_xsim/`, `run_mulacc.sh`, `REPRO.sh`) validating SystemC
-  output against RTL simulation. It belongs with the emitter's own example
-  material, as `examples/systemc/`, matching where the upstream-of-this-work
-  repository already keeps it.
+  output against RTL simulation. *First draft said: move it beside
+  `examples/systemc/`. That was wrong for the same reason — `examples/systemc/`
+  was **also** not a design directory.* Applying the test to both (2026-09-24):
+  the Allo designs stay in `examples/systemc/`, the harness and testbenches
+  become `tests/systemc/` (cross-check under `tests/systemc/rtlsim/`), and the
+  logs, verdicts and archived emitter output become `dev/records/systemc/`. The
+  one design that was buried in the harness directory, `pe_split.py`, moved up
+  to `examples/systemc/`.
 - `rtl_export/` was a bad name for something that is not a separate tool.
   `export_rtl.py` packages a configuration's Verilog *for the ASIC handoff* —
   its own docstring says so. It is a stage of the PD flow:
@@ -187,8 +197,9 @@ flow all depend on, so it must not run concurrently with work in flight.
 ## Docs that follow from it
 
 Per `dev/docs_style.md`, each tool gets a page with a **Quick start** before any
-explanation: `tools/asic` (preflight, the documented sequence, what is committed
-and what stays on scratch), `tools/chia` (how to run it, what it costs, what the
+explanation: the ASIC flow (preflight, the documented sequence, what is
+committed and what stays on scratch) — still owed; the quick start currently
+lives in `examples/tinytpu/asic_synthesis/README.md` — `tools/chia` (how to run it, what it costs, what the
 guards are — the existing page is about what it *found*), `tools/act`, and the
 SystemC emitter, which is currently only reachable through the Catapult page.
 Each design gets a page that says what it is, how to run it, and what it
@@ -228,6 +239,15 @@ If the no-vendoring plan is ever restored for the nodes, the preflight must
 **pin and verify** the upstream commit rather than check for presence. An
 unpinned pointer is the thing that bites.
 
+**Verified 2026-09-24, not assumed.** `allo/backend/asic/adks/` holds seven
+files and 28 KB: `freepdk-45nm/` with `configure.yml`, `adk-overlay.tcl`,
+`vcs-compile.args`, `vcs-bagl.args` and a README, and `skywater-130nm/` with
+`configure.yml` and a README. No library data — no `.db`, `.lib`, `.lef`,
+`.tf`, no `pkgs/`, no view. And not only in the tree: every blob that ever
+existed under that path across the whole imported history is one of those seven
+files, so the payload was removed from the history as `PROVENANCE.md` claims,
+not merely deleted in a later commit. The decision stands as recorded.
+
 ## Two results from building the extractor
 
 Both are the kind of thing that only appears when a number is generated rather
@@ -255,9 +275,71 @@ land, that path has to match. **Resolved 2026-09-24.** The vendored flow landed
 at `allo/backend/asic/{nodes,adks}/` and the construct script was pointed at
 it — but by three `dirname` calls from `asic_synthesis/`, which under
 `examples/accelerator/tinytpu_vitis/` reached `examples/`, not the repository
-root, so it still could not find the nodes. The design move removes exactly one
-level, so the same three `dirname` calls now land on the repository root; the
-levels are named in a comment there so the next move does not silently break
-it again. Note also that the construct graph and
-`make_stubs.py` were committed by a different session than the one that
-produced the reports; attribute them accordingly when moving.
+root, so it still could not find the nodes. **A re-count was then tried and was
+also wrong** — the same defect class twice in a row — and the fix that holds
+is `a34e1346`: **search upward for `allo/backend/asic/nodes`** rather than
+count directories at all. It works at any depth and survived the design rename
+with no edit. Note also that the construct graph and `make_stubs.py` were
+committed by a different session than the one that produced the reports;
+attribute them accordingly when moving.
+
+**The rule, because this has now cost three fixes in two days.** Never derive a
+repository root by counting `..` or `parents[n]`. Search upward for a marker,
+or take the path as an argument. The TinyTPU rename turned up roughly thirty
+`ROOT`/`REPO` values derived by counting, **three of them already wrong** and
+made correct only by accident of the move — a count is a latent break in any
+tree being reorganised, and this one is mid-reorganisation.
+
+**The same defect, second instance, fixed 2026-09-24.** `reduce_asic.py`
+generates its own construct graph, and that template hardcoded
+`~/allo-asic` — a path that exists on the synthesis host and nowhere else, so
+the committed `asic_reduce/reduce_8_2/construct-reduce.py` could not run from a
+checkout at all. It now finds the flow the way `construct-commercial.py` does,
+by searching upward, with `ALLO_ASIC_FLOW` for the case the generated file is
+copied outside the tree — which is exactly what the `/scratch` builds on
+zhang-21 are. Both the template and the committed generated file were changed
+together and are byte-identical.
+
+Both graphs were **built**, not merely read: against a stub `mflowgen`, each
+resolves its four nodes and the `freepdk-45nm` ADK and returns a graph. A copy
+of `construct-reduce.py` placed outside any checkout fails with its own message
+and builds once `ALLO_ASIC_FLOW` is set. The tools follow the same rule: their
+`REPO` — which only feeds the `--docs` default and printed paths — is found by
+the same upward search.
+
+## The tools folded in, 2026-09-24
+
+`check_numbers.py`, `extract_results.py`, `make_stubs.py` and `preflight.py`
+moved from `examples/tinytpu/asic_synthesis/tools/` to
+`allo/backend/asic/tools/`. **Results stayed**: `asic_synthesis/reports/` is
+TinyTPU's, and so is `construct-commercial.py`, which names its top module.
+
+Each tool now takes the design on the command line instead of deriving it from
+its own location — `--reports` for the number checker and the extractor,
+`--design` for the preflight — which is the same "could MiniTPU call this
+without editing it?" test applied one piece at a time. The extractor's
+`--check` reproduces all eight committed `results.json` byte-for-byte from the
+new home, which is the evidence that the move changed nothing about what the
+numbers are.
+
+The preflight came with them and is **not push-button**, so nothing here should
+describe it as such: it needs a DC licence and roughly 70 minutes of a specific
+machine. What it removes is the hour spent discovering that.
+
+**Which of its branches a licence-free run reached, named rather than glossed.**
+On this machine it exercised the node library, the ADK definition, the
+variant's RTL and file lists, and the agreement of `stdcells_db_md5` across the
+committed snapshots, and correctly reported `dc_shell`, mflowgen and sv2v as
+absent. It did **not** exercise the `--build` branch that hashes a fetched
+`stdcells.db` and compares it with `f5560259`: without a licence there is no
+build tree to hash, so that branch reports as *correctly missing*, which is not
+passing. It needs one run on the licensed machine, which the synthesis session
+has offered.
+
+**Not done, and deliberately.** `results.json` now carries `QD` per run, so a
+checker could in principle refuse an area quoted beside cycles from a different
+`QD`. That is not a cheap addition to `check_numbers.py`: today it matches
+area-shaped figures against a set of totals, and associating a figure with the
+cycle counts near it in prose is a different and much larger job. It is also a
+change of what that tool decides, which belongs to the session that wrote it,
+not to a move.

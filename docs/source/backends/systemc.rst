@@ -210,11 +210,15 @@ Where things live
    * - ``allo/backend/catapult.py``
      - the TCL generator both Catapult flows share
    * - ``examples/systemc/``
-     - runnable examples, ``VERDICTS.md``, and ``reports/`` for what was measured
+     - the designs, in Allo, and nothing else
    * - ``examples/eva/``
      - the EVA design and its emitted project
-   * - ``examples/systemc_rtlsim/``
-     - this fork's SystemC-vs-RTL cross-check harness (:ref:`limitation-22`)
+   * - ``tests/systemc/``
+     - what acts on those designs: RTL cosim testbenches, the Catapult ``csyn``
+       driver, and ``rtlsim/`` — this fork's SystemC-vs-RTL cross-check harness
+       (:ref:`limitation-22`)
+   * - ``dev/records/systemc/``
+     - what was measured: ``VERDICTS.md``, ``reports/``, and the archived emitter output
    * - ``tests/dataflow/test_systemc_backend.py``
      - the suite; emit cases run anywhere, csim/cosim cases skip without ``MGC_HOME``
    * - ``dev/systemc/``
@@ -226,16 +230,16 @@ Limits and known failures
 - **Neither Catapult nor Xcelium is installed on this fork's development host**
   (``dev/toolchains.rst``). Everything past emission is therefore unverified here: the
   emit-only tests pass, and every ``csim``/``csyn``/``cosim`` case skips. The evidence that
-  they pass elsewhere is in ``examples/systemc/reports/`` and ``tests/dataflow/COSIM_REGRESSION.md``.
+  they pass elsewhere is in ``dev/records/systemc/reports/`` and ``tests/dataflow/COSIM_REGRESSION.md``.
 - **A ``Wire`` is not a cheap ``Channel``.** With no storage and no alignment it reads garbage
-  unless the producer and consumer are cycle-locked; ``examples/systemc_rtlsim/`` reproduces
+  unless the producer and consumer are cycle-locked; ``tests/systemc/rtlsim/`` reproduces
   that on two simulators, and :ref:`limitation-22` records it.
 - **Bit-slicing a packed value wider than 64 bits** works in csim and can fail at ``csyn``:
   Catapult rejects subclassing its builtin ``ac_int`` (CIN-15), and the emitted ``ap_int`` shim
   is such a subclass.
 - **``csyn`` needs a build subdirectory.** Running Catapult in the directory holding
   ``kernel.cpp`` degrades ``Connections::In``/``Out`` ports to raw ``sc_signal``\ s (CIN-124,
-  SCHD-30). ``examples/systemc/csyn_subdir.py`` works around it.
+  SCHD-30). ``tests/systemc/csyn_subdir.py`` works around it.
 - **``cosim`` does not work against a ``synth_top`` submodule.** SCVerify wraps the design top,
   and the stimulus path into the region's memories disappears. Measure and verify separately.
 - **The timed dataflow simulator is not here.** ``SystemC-emitter`` also carries a per-PE

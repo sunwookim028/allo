@@ -84,7 +84,7 @@ credit limit before its first tool call.
   accumulator, nothing else. A structural array-of-reg rule was rejected
   because it would also take Gemmini's queue RAMs.
 - Omitting a module does **not** black-box it — it makes the reference
-  unresolvable (LINK-5). Stubs come from `asic_synthesis/tools/make_stubs.py`,
+  unresolvable (LINK-5). Stubs come from `allo/backend/asic/tools/make_stubs.py`,
   and with them the boundary is "everything that drives the memories, nothing
   inside them", identically on both sides.
 - Frequency is a DC topographical estimate at 3.33 ns, reported as a **floor**,
@@ -267,10 +267,19 @@ only then runs the sequence. **It must not be called push-button**, and its
 header should state that the licensed machine time is part of the cost. Failing
 in seconds rather than an hour in is the whole value.
 
-`check_numbers.py` already exists (`asic_synthesis/tools/check_numbers.py`) and
-needs no licence, environment or machine. What is still owed is **the extractor
-that generates `results.json` from the reports** — generated, never
-hand-written, or it just moves the retyping one file earlier.
+`check_numbers.py` needs no licence, environment or machine. The extractor
+**that generates `results.json` from the reports** — generated, never
+hand-written, or it just moves the retyping one file earlier — landed with it,
+and so did the preflight.
+
+**Both now live in the flow, not in the design** (`allo/backend/asic/tools/`,
+2026-09-24), and each takes the design's reports directory as an argument
+rather than deriving it from its own location. The reports themselves did not
+move: they are TinyTPU's results, and results stay with the design.
+
+    python allo/backend/asic/tools/preflight.py --design examples/tinytpu/asic_synthesis
+    python allo/backend/asic/tools/extract_results.py --reports examples/tinytpu/asic_synthesis/reports
+    python allo/backend/asic/tools/check_numbers.py   --reports examples/tinytpu/asic_synthesis/reports
 
 ## DECIDED: the flow moves into this repo, and the prose moves into the docs
 

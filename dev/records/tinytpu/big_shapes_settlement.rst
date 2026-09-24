@@ -168,3 +168,58 @@ Reproducing
        ACT_COSIM_TIMEOUT=3600 python cosim.py  # the tiled shape, bounded
 
 The branch is preserved as the tag ``archive/big-shapes``.
+
+Re-litigated 2026-09-24: ``bs-settle`` is this branch, and adds nothing
+-----------------------------------------------------------------------
+
+``origin/bs-settle`` was proposed for landing on ``main`` a second time, on the
+premise that it was blocked only by the ``examples/accelerator/tinytpu_vitis``
+-> ``examples/tinytpu`` rename (``fb2cc78b``). It is not, and it is not a
+second branch:
+
+.. code-block:: text
+
+   git log --oneline archive/big-shapes..origin/bs-settle   -> 9bbb1ad4 only
+   git log --oneline origin/bs-settle..archive/big-shapes   -> empty
+
+``bs-settle`` is ``archive/big-shapes`` plus ``9bbb1ad4``, the ``cosim.py``
+timeout -- **and that commit's content is already on** ``main``
+(``cosim.py``, ``COSIM_TIMEOUT``/``ACT_COSIM_TIMEOUT``, ``start_new_session``
+and ``os.killpg``). So is the II=1 correction, in
+``ip/units/dma_load.py``. Both are the two items "What survives regardless"
+above already names. **Nothing on the branch is unlanded except the design
+change, which that section explains cannot be rebased.**
+
+A rebase also cannot pass the gate it would be held to. The branch's own
+``reproduce.sh`` carries ``EXPECTED="4x4x4=178 ... 16x16x16=696"`` at MAXDIM=64
+with *no* ``TPU_MAXDIM`` pin, because removing the mirror is what let the pin
+go; ``main``'s gate is ``175 / 265 / 421 / 482 / 674`` at ``TPU_MAXDIM=16``.
+Landing the branch moves that row by construction, so "rebase it and keep the
+published row" is not a reachable state -- one or the other, never both.
+
+The one commit worth salvaging separately, and its trap
+--------------------------------------------------------
+
+``118a4910`` makes the AGU term layout a build parameter
+(``AGU_TERMS = int(os.environ.get("TPU_AGU_TERMS", 3))``,
+``AGU_TERM_BITS = min(19, 64 // AGU_TERMS)``) so that what a fourth address
+term costs is measured rather than argued. It is the only branch commit whose
+substance does not depend on the DRAM geometry. It is still not a lift-and-drop:
+
+* ``main`` hardcodes the value in three places that must agree --
+  ``isa_encoding.py:39``, ``ip/isa.py:39``, and ``isa_spec.json`` -- and
+  ``gen_isa.py --check`` re-derives every literal bit slice in ``ip/units/``
+  from the spec, so the 19-bit term literals cannot simply become expressions;
+* **the trap**: ``chia_agent/histogram.py:71`` and
+  ``chia_agent/test_codesign.py:143`` mutate the AGU width by *textual*
+  substitution on the exact line
+  ``"AGU_TERMS = 3                  # address terms per instruction\n"``.
+  ``118a4910`` rewrites that line. A port that does not update both call sites
+  leaves the co-design mutation harness silently substituting nothing.
+
+``impact/shape_margins.py`` (``f618ed05``) is not salvageable on its own: it
+probes ``isa_dsl.gemm_tiled``, ``TPU_NR_BITS``, ``TPU_DRAM`` and
+``assemble(prog, dram)``, none of which exist on ``main``.
+
+``origin/bs-settle`` can be deleted; ``archive/big-shapes`` already preserves
+the tree.

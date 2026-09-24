@@ -1,8 +1,15 @@
+# Copyright Allo authors. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
 """Emit empty black-box stubs for modules excluded from a logic-only file list.
 
 Takes each excluded module's port list verbatim from its own source file and
 writes a module with the same header and no body, so DC links and reports it as
-a black box of zero area. Mechanical: the header is copied, never retyped.
+a black box of zero area. Mechanical: the header is copied, never retyped, and
+a module with no source or no findable header is an error, not an omission --
+leaving the module out entirely does not black-box it, it makes the reference
+unresolvable and DC treats that as fatal.
+
+Run: python allo/backend/asic/tools/make_stubs.py SRC_DIR OUT_DIR MODULE...
 """
 import re, sys, pathlib
 

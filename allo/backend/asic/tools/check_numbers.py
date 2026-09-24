@@ -10,8 +10,10 @@ benchmarks page -- and nothing in the tree could see it.
 
 What it does, in one pass and at zero cost:
 
-1. Reads every ``reports/<variant>/area_summary.rpt`` and extracts its total cell
-   area. That set is the ground truth.
+1. Reads every ``<reports>/<variant>/area_summary.rpt`` and extracts its total
+   cell area. That set is the ground truth. The reports directory is given on
+   the command line: the results belong to a design, this checker does not, so
+   it must not know which design it is checking.
 2. Scans the docs for anything shaped like an area figure (a 6-or-more-digit
    number with thousands separators, or one followed by a um2 unit).
 3. Reports any such figure that is neither in the ground-truth set nor in the
@@ -22,7 +24,13 @@ published numbers, and derived quantities we state deliberately. Every entry
 needs a reason, because an allow-list without reasons becomes a place to hide
 failures.
 
-Run: python asic_synthesis/tools/check_numbers.py [--docs DIR]
+Run: python allo/backend/asic/tools/check_numbers.py --reports DIR [--docs DIR]
+
+For the TinyTPU design, from the repository root::
+
+    python allo/backend/asic/tools/check_numbers.py \
+        --reports examples/tinytpu/asic_synthesis/reports
+
 Exit 0 if clean, 1 if any figure is unaccounted for.
 """
 
@@ -32,8 +40,28 @@ import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ASIC = os.path.dirname(HERE)
-REPO = os.path.abspath(os.path.join(ASIC, "..", "..", ".."))
+
+
+def _repo_root():
+    """The checkout root, found by searching upward for the vendored flow.
+
+    Not by counting directories up from ``__file__``: that has been wrong here
+    three times in two days, including in a fix for itself, and the repository
+    is mid-reorganisation. A path that encodes tree shape is a latent break.
+    """
+    d = os.path.dirname(os.path.abspath(__file__))
+    while True:
+        if os.path.isdir(os.path.join(d, "allo", "backend", "asic", "nodes")):
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            # Not in a checkout (an installed copy, say). Only defaults and
+            # printed paths depend on this, so degrade rather than refuse.
+            return os.path.dirname(os.path.abspath(__file__))
+        d = parent
+
+
+REPO = _repo_root()
 
 # Figures that are deliberately not from our own reports. Each needs a reason.
 ALLOWED = {
@@ -65,10 +93,9 @@ AREA_LINE = re.compile(r"cell area", re.I)
 GROUPED = re.compile(r"\b(\d{1,3}(?:,\d{3}){1,3})\b")
 
 
-def ground_truth():
+def ground_truth(reports):
     """Total cell area from every committed area_summary.rpt."""
     out = {}
-    reports = os.path.join(ASIC, "reports")
     if not os.path.isdir(reports):
         sys.exit(f"no reports directory at {reports}")
     for variant in sorted(os.listdir(reports)):
@@ -90,13 +117,17 @@ def ground_truth():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--reports", required=True,
+                    help="a design's committed reports directory, holding "
+                         "<variant>/area_summary.rpt")
     ap.add_argument("--docs", default=os.path.join(REPO, "docs", "source"))
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args()
 
-    truth = ground_truth()
+    truth = ground_truth(args.reports)
     if not truth:
-        sys.exit("no area figures found in reports/ -- has anything been committed?")
+        sys.exit(f"no area figures found under {args.reports}"
+                 " -- has anything been committed?")
 
     unaccounted = {}
     for root, _, files in os.walk(args.docs):

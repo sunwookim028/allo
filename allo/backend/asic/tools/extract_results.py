@@ -9,7 +9,10 @@ nothing here is written by hand -- every field is parsed out of the reports the
 synthesis run produced, and re-running this tool on unchanged reports must
 produce byte-identical output.
 
-What it reads, per ``reports/<variant>/``:
+The reports directory is given on the command line: the results belong to a
+design, this tool does not, so it must not know which design it is extracting.
+
+What it reads, per ``<reports>/<variant>/``:
 
 * ``area_summary.rpt``    -- the area split, and the cell counts DC prints there
 * ``*.mapped.qor.rpt``    -- design WNS/TNS, violating paths, worst path slack
@@ -23,7 +26,13 @@ agree on every parameter and still resolve a different library, and because
 Gemmini is constrained on ``clock`` where our designs use ``ap_clk`` -- a real
 difference that reads as a discrepancy to anything comparing settings blindly.
 
-Run: python asic_synthesis/tools/extract_results.py [--check]
+Run: python allo/backend/asic/tools/extract_results.py --reports DIR [--check]
+
+For the TinyTPU design, from the repository root::
+
+    python allo/backend/asic/tools/extract_results.py \
+        --reports examples/tinytpu/asic_synthesis/reports
+
 ``--check`` writes nothing and exits 1 if any results.json is missing or stale,
 which is what CI should run.
 """
@@ -37,8 +46,6 @@ import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ASIC = os.path.dirname(HERE)
-REPORTS = os.path.join(ASIC, "reports")
 
 # "Combinational area:   499371.386185"
 AREA_FIELDS = {
@@ -214,14 +221,14 @@ def capture_settings(build_dir):
     return out
 
 
-def results_for(variant, problems):
+def results_for(reports, variant, problems):
     """Everything known about one run, from its committed reports alone.
 
     Anything missing or unparseable is recorded in ``problems`` and aborts the
     run rather than being skipped: a results.json that quietly omits a variant
     is an instrument failing open, which is the one failure mode nobody notices.
     """
-    d = os.path.join(REPORTS, variant)
+    d = os.path.join(reports, variant)
     area = os.path.join(d, "area_summary.rpt")
     if not os.path.isfile(area):
         problems.append(f"{variant}: no area_summary.rpt")
@@ -266,33 +273,45 @@ def dump(obj):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--reports", required=True,
+                    help="a design's committed reports directory, holding one "
+                         "directory per run; the index results.json is written "
+                         "beside it")
     ap.add_argument("--check", action="store_true",
                     help="write nothing; exit 1 if any results.json is missing "
                          "or does not match its reports")
     ap.add_argument("--capture-settings", metavar="VARIANT=BUILD_DIR",
                     action="append", default=[],
-                    help="write reports/VARIANT/settings.json from a build tree")
+                    help="write <reports>/VARIANT/settings.json from a build "
+                         "tree")
     args = ap.parse_args()
+
+    reports = os.path.abspath(args.reports)
+    if not os.path.isdir(reports):
+        sys.exit(f"no reports directory at {reports}")
+    # The index sits beside the per-run directories, with the design, because
+    # the whole point is that a design's numbers travel with that design.
+    index_path = os.path.join(os.path.dirname(reports), "results.json")
 
     for spec in args.capture_settings:
         if "=" not in spec:
             sys.exit(f"--capture-settings wants VARIANT=BUILD_DIR, got {spec}")
         variant, build = spec.split("=", 1)
-        target = os.path.join(REPORTS, variant)
+        target = os.path.join(reports, variant)
         if not os.path.isdir(target):
             sys.exit(f"no committed reports for {variant}")
         path = os.path.join(target, "settings.json")
         with open(path, "w") as fh:
             fh.write(dump(capture_settings(build)))
-        print(f"wrote {os.path.relpath(path, ASIC)}")
+        print(f"wrote {path}")
 
-    variants = [v for v in sorted(os.listdir(REPORTS))
-                if os.path.isdir(os.path.join(REPORTS, v))]
+    variants = [v for v in sorted(os.listdir(reports))
+                if os.path.isdir(os.path.join(reports, v))]
     if not variants:
-        sys.exit(f"no run directories under {REPORTS}")
+        sys.exit(f"no run directories under {reports}")
 
     problems = []
-    parsed = {v: results_for(v, problems) for v in variants}
+    parsed = {v: results_for(reports, v, problems) for v in variants}
     if problems:
         print("REPORTS INCOMPLETE -- nothing written:")
         for line in problems:
@@ -305,7 +324,7 @@ def main():
     for variant in variants:
         res = parsed[variant]
         text = dump(res)
-        path = os.path.join(REPORTS, variant, "results.json")
+        path = os.path.join(reports, variant, "results.json")
         if args.check:
             current = open(path).read() if os.path.isfile(path) else None
             if current != text:
@@ -341,7 +360,6 @@ def main():
         }
 
     index_text = dump({"runs": index})
-    index_path = os.path.join(ASIC, "results.json")
     if args.check:
         current = open(index_path).read() if os.path.isfile(index_path) else None
         if current != index_text:

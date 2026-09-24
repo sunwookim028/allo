@@ -32,7 +32,7 @@ emitted RTL is still *functionally* equal to csim on real stimulus. A green A + 
 
 **Idea.** For a set of tiny canonical designs (one per emitter feature), emit the SystemC
 **without synthesizing** and diff against a checked‑in golden `.cpp`. Emitting is cheap:
-`csyn_subdir.py` already shows `df.build(region, target="systemc", mode="csyn", project=prj)`
+`tests/systemc/csyn_subdir.py` already shows `df.build(region, target="systemc", mode="csyn", project=prj)`
 **writes `kernel.cpp` without launching Catapult** (you just don't call the returned module).
 
 **Canonical corpus** — one minimal kernel per construct, so a diff pinpoints the feature:

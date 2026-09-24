@@ -26,8 +26,10 @@ Both are the SAME RTL, so the tree's own area appears twice -- once alone and
 once as a line of the region's hierarchical area report -- and the two must
 agree. They are a cross-check on the export, not two measurements.
 
-The flow itself lives on zhang-21 (`~/allo-asic`, mflowgen 0.8.0); ace-01 has
-neither DC nor the ADK. Builds go in `/scratch` there, never on NFS.
+The flow itself is vendored at `allo/backend/asic/`, which the generated
+construct graph finds by searching upward from its own location (override with
+`ALLO_ASIC_FLOW` when it is run from a copy outside the checkout). Running it needs zhang-21: DC W-2024.09 and mflowgen 0.8.0
+live there and ace-01 has neither. Builds go in `/scratch` there, never on NFS.
 
     python reduce_asic.py --export            # RTL + manifests from a kept prj
     python reduce_asic.py --launch tree       # rsync and start DC remotely
@@ -206,8 +208,31 @@ def construct():
     'sram_mode': 'none',
   }
 
-  asic_dir = os.path.expanduser('~/allo-asic')
+  # The vendored flow is allo/backend/asic/{nodes,adks}. Search upward for it
+  # rather than counting directories up from here -- the same rule
+  # construct-commercial.py follows, and for the same reason: a count encodes
+  # tree shape, and this tree is being reorganised. ALLO_ASIC_FLOW is for when
+  # this generated file is run from a copy outside the checkout, which is what
+  # the /scratch build trees on the synthesis host are.
+  asic_dir = os.environ.get('ALLO_ASIC_FLOW')
+  if not asic_dir:
+    d = os.path.dirname(os.path.abspath(__file__))
+    while True:
+      candidate = os.path.join(d, 'allo', 'backend', 'asic')
+      if os.path.isdir(os.path.join(candidate, 'nodes')):
+        asic_dir = candidate
+        break
+      parent = os.path.dirname(d)
+      if parent == d:
+        raise SystemExit(
+          'no allo/backend/asic/nodes in any parent of '
+          f'{os.path.dirname(os.path.abspath(__file__))}. Set ALLO_ASIC_FLOW to '
+          'a checkout of the flow, or run '
+          'allo/backend/asic/tools/preflight.py to see what is missing.')
+      d = parent
   nodes_dir = os.path.join(asic_dir, 'nodes')
+  if not os.path.isdir(nodes_dir):
+    raise SystemExit(f'ALLO_ASIC_FLOW={asic_dir} has no nodes/ directory.')
   graph.sys_path.append(os.path.join(asic_dir, 'adks'))
   graph.set_adk(adk_name)
   adk = graph.get_adk_node()

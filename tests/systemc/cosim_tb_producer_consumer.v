@@ -17,7 +17,7 @@
 //        unset LD_PRELOAD; export LD_LIBRARY_PATH=""
 //        xrun -q -sv -timescale 1ns/1ps \
 //             pc.prj/Catapult/top.v1/concat_sim_rtl.v \
-//             examples/systemc/cosim_tb_producer_consumer.v
+//             tests/systemc/cosim_tb_producer_consumer.v
 //   expect: "sent A=0 got B=1 ... A=7 B=8" then ">>> RTL COSIM PASS".
 //
 // GOTCHAS (see memory allo-interconnect-extension-research):

@@ -215,7 +215,7 @@ Open
      - none (Vitis target); blocks a MiniTPU-class delay line on the SystemC
        path
      - the ``SC_METHOD`` comb mode scoped in ``c7402f9f`` (five phases)
-     - ``examples/systemc_rtlsim/REPRO.sh``
+     - ``tests/systemc/rtlsim/REPRO.sh``
    * - :ref:`23 <limitation-23>`
      - REPRODUCES (on probes)
      - HLS driver, emitter
@@ -1087,7 +1087,7 @@ only pragmas it generates are the ``m_axi`` / ``s_axilite`` interface lines in
    induction variable is unused) made ``acc`` run unthrottled, and that
    ``72c70dcb``'s guard missed it because ``acc`` has no memory port. The guard was
    extended to any loop body containing a ``WireGetOp`` (``guard_experiment/`` under
-   ``examples/systemc_rtlsim/``), ``pe_split.py`` was re-emitted from
+   ``tests/systemc/rtlsim/``), ``examples/systemc/pe_split.py`` was re-emitted from
    ``choonsik1/SystemC-emitter`` with and without it, synthesised with Catapult
    2024.2, and simulated under Xcelium 24.03:
 
