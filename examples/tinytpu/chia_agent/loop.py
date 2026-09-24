@@ -357,37 +357,66 @@ def summarize(v: dict) -> str:
     return text
 
 
-#: Resource terms of the objective. Reported per candidate, never summed with
-#: cycles: "2.3x the block RAM for 9% of the cycles" is a trade, not a win, and
-#: it has already happened once on this design (run 1's dma_ld widening took
-#: BRAM18K from 42 to 98 for -59 cycles at the largest shape).
+#: csynth's FPGA resource terms. Still reported on every candidate, and no
+#: longer the resource AXIS: this project measured the FPGA table to understate
+#: standard cells in exactly the components a search would most want to change
+#: (+0.9 % flip-flops against +14.2 % cell area on one pair; +43 % FF / +92 %
+#: block RAM against +74.4 % cell area on another, of which 99.1 % was two AXI
+#: adapters). `area` -- `chia_agent/area_proxy.py`'s ESTIMATE from the
+#: candidate's own bit census -- is the axis; these stay beside it because
+#: where the two disagree the disagreement is a result.
 RESOURCES = ("bram_18k", "dsp", "ff", "lut", "uram")
 
 
 def classify(base: dict, cand: dict) -> tuple[str, dict]:
-    """win / trade / regression, on the TWO-term objective. Frozen rule.
+    """win / trade / regression, on the THREE-term objective. Frozen rule.
 
-    A `win` is a Pareto improvement: no shape's cosim cycle count is higher, at
-    least one is lower, and no resource term grew. A `trade` lowers the total
-    cycles but pays for it somewhere -- more of some resource, or a regression
-    at another shape. `regression` does not lower the total at all.
+    The terms, and why each is there:
 
-    The loop still tracks its best by total cycles, so the search can move; the
-    classification is what gets reported, because collapsing the pair into one
-    number is exactly the mistake this loop is supposed to avoid.
+    * **model** -- cosim cycles per scored PyTorch model. The primary. The
+      same optimisation is worth 4.3-7.0 % on GEMM shapes and 25-34 % on
+      multi-layer models, because a model does not make the problem bigger, it
+      makes it longer, so every layer repays a fixed cost one large GEMM
+      amortises away. Ranking on GEMM shapes ranked changes on the workload
+      class least sensitive to the cost they remove.
+    * **gemm** -- cosim cycles per GEMM shape. The CONTROL, kept unchanged and
+      unweighted. A change that helps models and hurts GEMM shapes is a real
+      trade, and the point of keeping the control is to make the search STATE
+      it instead of hiding it.
+    * **area** -- the standard-cell estimate. Not csynth's resource table.
+
+    A `win` is a Pareto improvement across all three: no model and no shape is
+    slower, at least one model is faster, and the area estimate did not grow.
+    A `trade` lowers the model total and pays for it -- a shape that regressed,
+    or area. `regression` does not lower the model total at all.
+
+    Collapsing three terms into one number is exactly the mistake this loop
+    exists to avoid, so the classification is reported and never summed.
     """
-    cyc_b, cyc_c = base.get("cycles", {}), cand.get("cycles", {})
-    shapes = sorted(set(cyc_b) & set(cyc_c))
-    dcyc = {s: cyc_c[s] - cyc_b[s] for s in shapes}
-    ab = base.get("synth", {}).get("area", {})
-    ac = cand.get("synth", {}).get("area", {})
+    def deltas(key):
+        b, c = base.get(key) or {}, cand.get(key) or {}
+        return {k: c[k] - b[k] for k in sorted(set(b) & set(c))}
+
+    dmod, dgemm = deltas("model_cycles"), deltas("cycles")
+    ab = (base.get("synth", {}) or {}).get("area", {})
+    ac = (cand.get("synth", {}) or {}).get("area", {})
     dres = {r: ac.get(r, 0) - ab.get(r, 0) for r in RESOURCES
             if r in ab or r in ac}
-    detail = {"delta_cycles": dcyc, "delta_resources": dres,
-              "delta_total_cycles": sum(dcyc.values())}
-    if sum(dcyc.values()) >= 0:
+    darea = round((cand.get("area") or {}).get("um2", 0.0)
+                  - (base.get("area") or {}).get("um2", 0.0), 1)
+    detail = {"delta_model": dmod, "delta_gemm": dgemm, "delta_area_um2": darea,
+              "delta_resources": dres,
+              "delta_total_model": sum(dmod.values()),
+              "delta_total_gemm": sum(dgemm.values())}
+    # No model term measured (an evaluator run with --models empty): fall back
+    # to the GEMM control rather than calling everything a regression, and say
+    # so, because a verdict taken on the control alone is the OLD objective.
+    primary = dmod or dgemm
+    detail["primary"] = "model" if dmod else "gemm (NO MODEL TERM MEASURED)"
+    if not primary or sum(primary.values()) >= 0:
         return "regression", detail
-    if all(d <= 0 for d in dcyc.values()) and all(d <= 0 for d in dres.values()):
+    if all(d <= 0 for d in dmod.values()) and all(d <= 0 for d in dgemm.values()) \
+            and darea <= 0:
         return "win", detail
     return "trade", detail
 
@@ -621,17 +650,26 @@ it relies on anything the tests happen not to exercise.
                 history.append(f"iteration {iteration}: no change was made")
                 _record(log_path, {**entry, "accepted": False, "reason": "no diff"})
                 continue
-            delta = verdict["total_cycles"] - best["total_cycles"]
+            # What moves the search is the PRIMARY term -- total model cycles
+            # -- and the GEMM control moves it only when no model term was
+            # measured. `classify` names which was used, in `primary`.
+            key = ("total_model_cycles" if verdict.get("model_cycles")
+                   and best.get("model_cycles") else "total_cycles")
+            delta = verdict[key] - best[key]
             improved = delta < 0
             # The two-term verdict, uncollapsed. `improved` is what moves the
             # search; `kind` is what gets reported, and a `trade` is not a win.
             kind, pair = classify(best, verdict)
             print(f"  {summarize(verdict)}")
-            print(f"  objective: cycles {pair['delta_cycles']} resources "
-                  f"{pair['delta_resources']}  ->  {kind.upper()}")
-            print(f"  {'KEPT' if improved else 'REWOUND'} ({delta:+d} cosim "
-                  f"cycles vs best) after {elapsed:.0f}s", flush=True)
-            _record(log_path, {**entry, "accepted": improved, "delta_cycles": delta,
+            print(f"  objective: model {pair['delta_model']} gemm "
+                  f"{pair['delta_gemm']} area {pair['delta_area_um2']:+,.0f} um2 "
+                  f"(est) | csynth {pair['delta_resources']}  ->  "
+                  f"{kind.upper()}")
+            print(f"  {'KEPT' if improved else 'REWOUND'} ({delta:+d} {key} "
+                  f"vs best; primary {pair['primary']}) after {elapsed:.0f}s",
+                  flush=True)
+            _record(log_path, {**entry, "accepted": improved, "delta_primary": delta,
+                               "primary": key,
                                "classification": kind, "objective_delta": pair})
             history.append(f"iteration {iteration}: {kind}"
                            f", {verdict['cycles']} ({delta:+d}), resources "

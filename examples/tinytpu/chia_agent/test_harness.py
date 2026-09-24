@@ -988,9 +988,10 @@ class Suite:
         e2 = by.get(("candidate", 2), {})
         v2 = e2.get("verdict") or {}   # None when the iteration made no diff
         check("b.spad_zero via loop", "bit-exact, delta > 0, REJECTED (not better)",
-              f"ok={v2.get('ok')} {v2.get('cycles')} delta={e2.get('delta_cycles')} "
+              f"ok={v2.get('ok')} {v2.get('cycles')} "
+              f"delta={e2.get('delta_primary')} ({e2.get('primary')}) "
               f"accepted={e2.get('accepted')}",
-              v2.get("ok") and (e2.get("delta_cycles") or 0) > 0
+              v2.get("ok") and (e2.get("delta_primary") or 0) > 0
               and e2.get("accepted") is False)
         e3 = by.get(("candidate", 3), {})
         v3 = e3.get("verdict") or {}
