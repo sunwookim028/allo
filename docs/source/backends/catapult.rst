@@ -195,12 +195,24 @@ the loud skip into a failure, which is what CI and any script that produces a
 handoff should set. ``ALLO_SKIP_CATAPULT_GATE=1`` disables the gate entirely
 and says so on stderr.
 
+Switching it on immediately found a third defect nobody had reported: an
+``f16`` operand is emitted as a bare ``half``, and no ``ac_types`` header
+defines that name (Catapult's own float support is ``ac_ieee_float<binary16>``
+/ ``ac::bfloat16`` in ``ac_std_float.h``). ``f32`` is fine --
+``getCatapultTypeName`` already maps it to ``ac_ieee_float<binary32>`` -- so
+this is one line in that function, left alone here only because another change
+was in flight in it. ``tests/dataflow/test_bf16_dataflow.py`` records the
+current behaviour: f16 **emits** a ``kernel.cpp`` and the gate then rejects it,
+while bf16 still aborts inside ``getCatapultTypeName`` before any
+``kernel.cpp`` exists.
+
 What the gate does **not** cover: it is Catapult's *front end*, not Catapult.
 It says the C++ parses and type-checks; it says nothing about whether the
 design schedules, whether a loop meets its II, or whether a directive names a
 loop that exists. Those still fail on the licence host. It is also
-``ac_types`` only -- a project that additionally needs ``matchlib_connections``
-(the SystemC flow) is checked by the SystemC emitter's own path, not this one.
+``catapult`` only: ``target="systemc"`` emits a ``kernel.cpp`` that needs
+``matchlib_connections`` and a SystemC library as well as ``ac_types``, and
+nothing gates it -- that flow is still checked by hand.
 
 Project Structure
 -----------------

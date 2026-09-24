@@ -1082,13 +1082,24 @@ def check_emitted_cpp(path, extra_includes=(), std="c++11", strict=None):
     for e in extra_includes:
         cmd += ["-I", e]
     cmd.append(os.path.basename(path))
-    cp = subprocess.run(
-        cmd,
-        cwd=os.path.dirname(os.path.abspath(path)),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        cp = subprocess.run(
+            cmd,
+            cwd=os.path.dirname(os.path.abspath(path)),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as exc:  # no g++ on this host
+        msg = (
+            "\n"
+            "!! Catapult emit gate SKIPPED: g++ is not runnable here.        !!\n"
+            f"!! {os.path.basename(path)} was NOT compiled ({exc}).\n"
+        )
+        if strict:
+            raise CatapultEmitError(msg) from exc
+        print(msg, file=sys.stderr)
+        return False
     if cp.returncode:
         # Catapult's front end reports 100 of these and stops; g++ reports a
         # few and stops. Either way the first ones name the defect.
