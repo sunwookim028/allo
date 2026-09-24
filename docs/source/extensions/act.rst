@@ -26,7 +26,10 @@ ACT and the TinyTPU-isa Mapper
 spec and a shape it enumerates the mapspace, lowers each nest to the machine's
 instruction words, prices what it lowered, and prints the ranked mappings with a
 census of why the rest were refused. It is target-independent pure python whose
-own imports are numpy only, and it is a rebuild of the core of **ACT**
+own imports are numpy only --- though it moved from ``act/`` at the repository
+root to ``allo/act/`` on 2026-09-24, so importing it now runs
+``allo/__init__.py`` and **does** need this checkout's compiled MLIR bindings,
+which it did not before. It is a rebuild of the core of **ACT**
 -- Kai Shao's accelerator-compilation work -- against this fork's abstractions,
 using ACT's algorithms as the reference and copying none of its code. The corpus
 it compiles and the judge that grades the result are on :doc:`act_specs`; the

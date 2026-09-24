@@ -129,7 +129,7 @@ therefore needs this checkout's bindings); the TinyTPU-isa target is
 
 ```bash
 python examples/tinytpu/act_compile.py gemm.relu 16x16x16
-python examples/tinytpu/act_compile.py --gate   # ~1.3 s
+python examples/tinytpu/act_compile.py --gate   # ~4.2 s, 3 s of it import allo
 pytest tests/act/                              # needs this checkout's bindings
 ```
 
