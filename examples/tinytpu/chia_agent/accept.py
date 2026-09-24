@@ -404,7 +404,7 @@ def main():
             cos2 = wt / ".cosim_stress"
             cos2.mkdir()
             ok4, rc4, o4, sec4 = vouched(
-                check, wt, cos2,
+                driver, wt, cos2,
                 dict(env, TPU_PRJ=str(cos2 / "isa_sweep.prj"), TPU_TB="stress"),
                 out / "cosim_stress.log", cos2)
             untouched("cosim stress")
