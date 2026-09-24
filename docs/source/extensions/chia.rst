@@ -412,6 +412,22 @@ with ``git show origin/chia-codesign:CODESIGN.md``.
 Guards
 ~~~~~~
 
+Two of these are **derived rather than listed**, because the same defect has
+now broken the loop twice: a value copied into several files with nothing
+comparing the copies to its source. The frozen set is the import closure of
+the evaluation's entry points, computed from the ref (``evaluate.import_closure``),
+and ``compose`` refuses a tree that is not closed under its own imports. The
+published five-shape row is parsed out of ``reproduce.sh``'s ``EXPECTED``
+(``control.reproduced``), and the copies that cannot be derived are gated by
+``control.check_pins``. Both run in ``test_harness.py``'s guard phases, in
+under a minute, rather than after a candidate's evaluation.
+
+What each cost before it was derived: a hand-written ``WORKLOAD_SUITE`` that
+omitted its own runner's imports failed **every** candidate at stage ``model``,
+so the loop could complete no run; and four literal copies of the pre-``TPU_QD=16``
+row in ``swarm.py`` meant every worker a run launched was handed a baseline the
+design had not produced for days.
+
 Mechanical enforcement, not instructions:
 
 1. **Tool surface.** opencode's own file and shell tools are denied; the MCP
