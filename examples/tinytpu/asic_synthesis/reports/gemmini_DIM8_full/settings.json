@@ -1,0 +1,52 @@
+{
+  "build_dir": "/scratch/users/sk3463/builds/gemmini-dim8-full",
+  "constrained_clock": {
+    "period_ns": 3.33,
+    "port": "clock"
+  },
+  "parameters": {
+    "adk": "freepdk-45nm",
+    "adk_view": "view-standard",
+    "clock_period": "3.33",
+    "clock_port": "clock",
+    "clock_uncertainty": "0.0",
+    "design_name": "Gemmini",
+    "design_path": "/scratch/users/sk3463/gemmini_DIM8",
+    "flatten_effort": "3",
+    "gate_clock": "true",
+    "high_effort_area_opt": "false",
+    "input_delay_fraction": "0.5",
+    "manifest": "/scratch/users/sk3463/gemmini_DIM8/sv2v_manifest.f",
+    "max_fanout": "20",
+    "max_transition_fraction": "0.25",
+    "normalize_rtl": "true",
+    "nthreads": "16",
+    "output_delay_fraction": "0.0",
+    "sram_mode": "none",
+    "sv2v_defines": "SYNTHESIS",
+    "top_module": "Gemmini",
+    "topographical": "true",
+    "uniquify_with_design_name": "false",
+    "write_svsim_wrapper": "false"
+  },
+  "rtl": {
+    "config": {
+      "accType": "SInt(32.W)",
+      "acc_capacity": "4 KiB in 2 banks (stock: 64 KiB)",
+      "dataflow": "BOTH (weight- and output-stationary; only WS is exercised)",
+      "dma_buswidth / dma_maxbytes": "128 bits / 64 bytes",
+      "inputType": "SInt(8.W)",
+      "meshRows / meshColumns": "8 (DIM = 8)",
+      "sp_capacity": "8 KiB in 4 banks (stock: 256 KiB)",
+      "spatialArrayOutputType": "SInt(20.W)",
+      "tileRows / tileColumns": "1",
+      "tlb_size": "4 entries"
+    },
+    "dir": "/scratch/users/sk3463/gemmini_DIM8",
+    "files": 136,
+    "manifest": "sv2v_manifest.f",
+    "manifest_md5": "f15bdf4416d0caa60410a1618bbed224",
+    "top": "Gemmini"
+  },
+  "stdcells_db_md5": "f5560259ca91a4b67336b715b729f94d"
+}

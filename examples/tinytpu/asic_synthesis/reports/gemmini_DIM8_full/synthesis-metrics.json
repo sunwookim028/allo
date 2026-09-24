@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "node": "synopsys-dc-synthesis",
+  "status": "passed",
+  "returncode": 0,
+  "wall_seconds": 6380.0,
+  "started_at": "2026-09-24T07:23:44Z",
+  "finished_at": "2026-09-24T09:10:04Z"
+}

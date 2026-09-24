@@ -1,0 +1,38 @@
+Gemmini DIM=8, int8, capacity-matched export, FULL (memories as flip-flops)
+
+Run by session allo-zhang-21 on 2026-09-24, build /scratch/users/sk3463/builds/gemmini-dim8-full.
+RTL: gemmini_rtl/DIM8_int8_capmatched on main, full sv2v_manifest.f. Settings
+identical to every run in the set, recorded in settings.json beside this file;
+library md5 f5560259; constrained on get_ports clock at 3.33 ns.
+
+  Total cell area        1,138,578.67
+    combinational          447,224.47   (buf/inv 37,250.37)
+    noncombinational       691,354.19   (60.7%)
+    macro/black box              0.00
+  Cells                    491,512 leaf: 154,396 sequential, 337,116 combinational
+  Wall                     6,380 s (106 min), 07:23:44Z to 09:10:04Z
+
+TIMING: MISSED. This is the only run in the set that does not close.
+  ideal_clock   worst slack -0.01 ns, TNS -0.79 ns, 80 violating paths
+  REGIN         +0.10 ns, zero violating
+  REGOUT        +1.50 ns, zero violating
+  hold          WNS 0.00, zero violations
+The DC node reports status "passed" because its postconditions check that
+synthesis completed, not that timing closed -- so the miss is visible only in
+the qor report and in results.json, where violating_paths is 80. Worth knowing
+about the instrument: a green node is not a closed design.
+
+How to state it: **Gemmini's RTL was not targeted at this constraint.** Not
+"Gemmini is slower". The miss is -0.01 ns against a 3.33 ns target, 0.3% and
+80 paths out of a 491,512-cell design, which any of a longer period, a higher
+effort or a synthesis retarget would absorb. Nothing here supports a frequency
+claim in either direction, and a DC topographical estimate is a floor rather
+than an achieved Fmax in the first place.
+
+Read beside its logic-only twin (524,401.97): the stubbed scratchpad and
+accumulator account for 53.9% of this figure. And beside DIM=4 full
+(990,938.03): +14.9% for doubling DIM, against +37.3% on the logic-only pair --
+the full-design delta is smaller because the flip-flop memories are a fixed
+cost at both sizes and they dominate. That is the clearest case in the set for
+why the logic-only pair is the one to quote: the same design change reads as
++14.9% or +37.3% depending only on how the memories were treated.

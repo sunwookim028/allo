@@ -85,6 +85,16 @@
       "wall_seconds": 1771.0,
       "worst_path_group_slack": 0.0
     },
+    "gemmini_DIM8_full": {
+      "allo_commit": null,
+      "design_params": null,
+      "manifest": "sv2v_manifest.f",
+      "noncombinational": 691354.192921,
+      "total_cell_area": 1138578.667822,
+      "violating_paths": 80,
+      "wall_seconds": 6380.0,
+      "worst_path_group_slack": -0.01
+    },
     "gemmini_DIM8_logiconly": {
       "allo_commit": null,
       "design_params": null,

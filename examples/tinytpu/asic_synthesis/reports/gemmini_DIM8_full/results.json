@@ -1,0 +1,103 @@
+{
+  "area": {
+    "buf_inv": 37250.373904,
+    "combinational": 447224.474901,
+    "macro_black_box": 0.0,
+    "noncombinational": 691354.192921,
+    "total_cell": 1138578.667822
+  },
+  "counts": {
+    "buf_inv_cells": 56693,
+    "cells": 504456,
+    "combinational_cells": 337116,
+    "macros": 0,
+    "nets": 563199,
+    "ports": 57743,
+    "references": 12644,
+    "sequential_cells": 154396
+  },
+  "run": {
+    "finished_at": "2026-09-24T09:10:04Z",
+    "returncode": 0,
+    "started_at": "2026-09-24T07:23:44Z",
+    "status": "passed",
+    "wall_seconds": 6380.0
+  },
+  "settings": {
+    "build_dir": "/scratch/users/sk3463/builds/gemmini-dim8-full",
+    "constrained_clock": {
+      "period_ns": 3.33,
+      "port": "clock"
+    },
+    "parameters": {
+      "adk": "freepdk-45nm",
+      "adk_view": "view-standard",
+      "clock_period": "3.33",
+      "clock_port": "clock",
+      "clock_uncertainty": "0.0",
+      "design_name": "Gemmini",
+      "design_path": "/scratch/users/sk3463/gemmini_DIM8",
+      "flatten_effort": "3",
+      "gate_clock": "true",
+      "high_effort_area_opt": "false",
+      "input_delay_fraction": "0.5",
+      "manifest": "/scratch/users/sk3463/gemmini_DIM8/sv2v_manifest.f",
+      "max_fanout": "20",
+      "max_transition_fraction": "0.25",
+      "normalize_rtl": "true",
+      "nthreads": "16",
+      "output_delay_fraction": "0.0",
+      "sram_mode": "none",
+      "sv2v_defines": "SYNTHESIS",
+      "top_module": "Gemmini",
+      "topographical": "true",
+      "uniquify_with_design_name": "false",
+      "write_svsim_wrapper": "false"
+    },
+    "rtl": {
+      "config": {
+        "accType": "SInt(32.W)",
+        "acc_capacity": "4 KiB in 2 banks (stock: 64 KiB)",
+        "dataflow": "BOTH (weight- and output-stationary; only WS is exercised)",
+        "dma_buswidth / dma_maxbytes": "128 bits / 64 bytes",
+        "inputType": "SInt(8.W)",
+        "meshRows / meshColumns": "8 (DIM = 8)",
+        "sp_capacity": "8 KiB in 4 banks (stock: 256 KiB)",
+        "spatialArrayOutputType": "SInt(20.W)",
+        "tileRows / tileColumns": "1",
+        "tlb_size": "4 entries"
+      },
+      "dir": "/scratch/users/sk3463/gemmini_DIM8",
+      "files": 136,
+      "manifest": "sv2v_manifest.f",
+      "manifest_md5": "f15bdf4416d0caa60410a1618bbed224",
+      "top": "Gemmini"
+    },
+    "stdcells_db_md5": "f5560259ca91a4b67336b715b729f94d"
+  },
+  "timing": {
+    "counts": {
+      "combinational_cell_count": 337116,
+      "leaf_cell_count": 491512,
+      "macro_count": 0,
+      "sequential_cell_count": 154396
+    },
+    "hold": {
+      "tns": 0.0,
+      "violating_paths": 0,
+      "wns": 0.0
+    },
+    "path_group_slacks": [
+      0.1,
+      1.5,
+      -0.01
+    ],
+    "setup": {
+      "tns": 0.79,
+      "violating_paths": 80,
+      "wns": 0.01
+    },
+    "worst_path_group_slack": -0.01
+  },
+  "variant": "gemmini_DIM8_full"
+}

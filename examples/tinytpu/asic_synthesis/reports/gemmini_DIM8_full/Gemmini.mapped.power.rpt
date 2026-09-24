@@ -1,0 +1,43 @@
+Information: Propagating switching activity (low effort zero delay simulation). (PWR-6)
+Warning: Design has unannotated primary inputs. (PWR-414)
+Warning: Design has unannotated sequential cell outputs. (PWR-415)
+ 
+****************************************
+Report : power
+        -hier
+        -analysis_effort low
+Design : Gemmini
+Version: W-2024.09
+Date   : Thu Sep 24 05:09:48 2026
+****************************************
+
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/builds/gemmini-dim8-full/4-synopsys-dc-synthesis/inputs/adk/stdcells.db)
+
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: Inactive.
+
+
+Global Operating Voltage = 1.1  
+Power-specific unit information :
+    Voltage Units = 1V
+    Capacitance Units = 1.000000ff
+    Time Units = 1ns
+    Dynamic Power Units = 1uW    (derived from V,C,T units)
+    Leakage Power Units = 1nW
+
+
+--------------------------------------------------------------------------------
+                                       Switch   Int      Leak     Total
+Hierarchy                              Power    Power    Power    Power    %
+--------------------------------------------------------------------------------
+Gemmini                                3.11e+03 4.34e+04 2.13e+07 6.79e+04 100.0
+  ex_controller (ExecuteController)     117.055 4.52e+03 2.49e+06 7.13e+03  10.5
+  mod_1 (LoopMatmul)                     54.815  263.468 6.44e+05  962.175   1.4
+  mod (LoopConv)                        312.902 1.58e+03 2.05e+06 3.94e+03   5.8
+  reservation_station (ReservationStation)  259.899  704.237 6.82e+05 1.65e+03   2.4
+  counters (CounterController)          247.737 1.21e+03 2.26e+05 1.68e+03   2.5
+1
