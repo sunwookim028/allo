@@ -12,7 +12,7 @@ things that cannot be generated:
       isa_encoding.py                       the spec as Python: constants,
         encoder, decoder (operands by NAME), control-flow/AGU resolver, header
         builder, numerics.
-      docs/source/designs/tinytpu_isa.rst   the ISA tables, between the
+      docs/source/designs/tinytpu_isa_spec.rst  the ISA tables, between the
         GENERATED markers. The prose around them is hand-written and untouched.
 
     checked, not generated
@@ -62,7 +62,7 @@ DESIGN = os.path.join(HERE, "microarch_isa.py")
 HARDWARE = sorted(os.path.join(HERE, "ip", "units", f)
                   for f in os.listdir(os.path.join(HERE, "ip", "units"))
                   if f.endswith(".py"))
-DOC = os.path.join(REPO, "docs", "source", "designs", "tinytpu_isa.rst")
+DOC = os.path.join(REPO, "docs", "source", "designs", "tinytpu_isa_spec.rst")
 
 BEGIN = ".. BEGIN GENERATED: examples/accelerator/tinytpu_vitis/gen_isa.py"
 END = ".. END GENERATED"
