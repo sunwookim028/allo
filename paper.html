@@ -492,6 +492,18 @@ clearing the comparison’s spread by 4.8×. A second team measuring an unrelate
 design independently found the same <em>shape</em> of loss, supporting the joint
 conclusion that the advantage at these sizes is software, not array. Our
 cosimulation is deterministic; the spread in the tables is the comparison’s.</p>
+<figure class="align-default" id="fig-gemmini-cycles">
+<a class="reference internal image-reference" href="_images/gemmini_cycle_ratio.svg"><img alt="Our cycles divided by Gemmini's, across ten shapes at T=4 and eight at T=8, with Gemmini's min-max spread drawn as a grey bar at each shape. At T=4 the ratio rises to 1.27x at 16 cubed and then falls to 1.09x at 64 cubed; at T=8 it is flat near 1.17x at steady state, with 16x16x8 at 0.85x, below parity and clear of the spread." src="_images/gemmini_cycle_ratio.svg" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-text"><strong>The deficit converges at one matched size and does not at the other.</strong>
+Cycles, not seconds: ours from Vitis cosim, bit-exact and deterministic;
+Gemmini the median of five Verilator trials, with the grey bar spanning the
+ratio implied by that spread. Drawn by <code class="docutils literal notranslate"><span class="pre">docs/figures/gemmini_figures.py</span></code>
+from the tables in <a class="reference internal" href="designs/benchmarks.html"><span class="doc">The Benchmark Set</span></a>, cross-checked against the
+copy in <code class="docutils literal notranslate"><span class="pre">examples/tinytpu/parity_sweep.py</span></code>.</span><a class="headerlink" href="#fig-gemmini-cycles" title="Link to this image"><span>¶</span></a></p>
+</figcaption>
+</figure>
 <p><strong>6.2 The substrates disagree, and the FPGA is the misleading one.</strong> An
 optimisation that recovers much of the deficit appears inexpensive on FPGA. In
 45 nm it costs <strong>+74.4% cell area</strong>, and hierarchical attribution places
@@ -599,6 +611,18 @@ constraint”</strong>, not as “it is slower”: 0.3% of the period is what a 
 period, a higher effort or a retarget would absorb, and a synthesis-stage
 estimate is a floor rather than an achieved frequency. The miss is stated and
 the inference refused.</p>
+<figure class="align-default" id="fig-gemmini-memory">
+<a class="reference internal image-reference" href="_images/gemmini_memory_treatment.svg"><img alt="Panel a, two stacked bars for Gemmini at DIM=4 and DIM=8: the logic segment grows 37.3 per cent while the stubbed memory arrays grow 0.9 per cent, so the full totals differ by only 14.9 per cent, and the DIM=8 full run is flagged as missing timing. Panel b, the non-combinational share of all eleven runs: ours between 79.6 and 80.8 per cent whether the memories are in or out, Gemmini between 37.2 and 38.3 per cent logic-only and between 60.7 and 64.7 per cent with them." src="_images/gemmini_memory_treatment.svg" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-text"><strong>The memory treatment decides the answer, and it decides it for their
+design more than for ours.</strong> The stubbed mass barely moves with the mesh, so
+it dilutes the full-design delta; and it moves their non-combinational share
+by more than twenty points while leaving ours where it was. The run that
+misses timing is drawn missing it — a DC topographical estimate is a floor,
+not an achieved frequency, so no speed follows in either direction.</span><a class="headerlink" href="#fig-gemmini-memory" title="Link to this image"><span>¶</span></a></p>
+</figcaption>
+</figure>
 <p><strong>6.2f The matched pair, and where the difference goes.</strong> Eleven runs under one
 flow — DC W-2024.09, FreePDK45, 3.33 ns, topographical, flatten effort 3 —
 give the comparison this section was built for. Our T=8/MAXDIM=64 at QD=16
@@ -644,11 +668,28 @@ same clock, same exclusion rule, both closing timing</strong>:</p>
 </table>
 <p><strong>The four memory-interface adapters are 40.9% of our logic, 57.3% with the DMA
 unit; the array that does the arithmetic is under 4%.</strong> Gemmini’s entire
-reader/writer/transaction path is 23,885 µm² — <strong>6.3%</strong> of its logic. So the
-4.33× is memory-interface mass that TileLink at this width does not produce,
+reader/writer/transaction path is 23,885 µm² — <strong>6.3%</strong> of its logic <em>at
+DIM=4</em>, which is the design point that attribution was measured on; the
+matched-capacity totals above are ours against DIM=8, so the two are not the
+same run and the share is quoted as the order it establishes rather than as a
+paired figure. So the 4.33× is memory-interface mass that TileLink at this
+width does not produce,
 measured at matched capacity with both sides’ cycles taken from the RTL that
 was synthesised. It is §6.2’s finding at a second design point, and this time
 it is the headline rather than an inference.</p>
+<figure class="align-default" id="fig-gemmini-area">
+<a class="reference internal image-reference" href="_images/gemmini_area_breakdown.svg"><img alt="Two horizontal bars, each the whole of one design's logic area. Ours is 30.7 per cent instruction-fetch adapter, 16.4 per cent DMA load unit, 9.0 per cent operand adapters and 1.2 per cent output adapter -- 40.9 per cent in adapters alone -- with the 64-PE arithmetic array an estimated 3.7 per cent. Gemmini's whole reader, writer and transaction path is 6.3 per cent of its logic, and the rest of its bar is left unattributed." src="_images/gemmini_area_breakdown.svg" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-text"><strong>The 4.33× is not compute.</strong> Shares of each design’s own logic, both runs
+logic-only under the same flow and the same stub rule. Our segments are
+hierarchy instances of the run; the array has no hierarchy line at this
+flatten effort, so it is an estimate from the measured per-PE area and is
+drawn hatched. Gemmini’s segment is a name-prefix sum over flattened cells —
+a magnitude, not a budget — so the remainder of its bar is left
+unattributed, and its DIM=4 run is the one that carries that attribution.</span><a class="headerlink" href="#fig-gemmini-area" title="Link to this image"><span>¶</span></a></p>
+</figcaption>
+</figure>
 <p><strong>Why the logic-only pair and not the full one, as a measurement rather than an
 argument.</strong> The stubbed arrays are <strong>19.8% of our full figure and 53.9% of
 theirs</strong> — their design is far more memory-dominated once memories become
