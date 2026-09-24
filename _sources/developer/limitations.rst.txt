@@ -1088,7 +1088,7 @@ only pragmas it generates are the ``m_axi`` / ``s_axilite`` interface lines in
    ``72c70dcb``'s guard missed it because ``acc`` has no memory port. The guard was
    extended to any loop body containing a ``WireGetOp`` (``guard_experiment/`` under
    ``tests/systemc/rtlsim/``), ``examples/systemc/pe_split.py`` was re-emitted from
-   ``choonsik1/SystemC-emitter`` with and without it, synthesised with Catapult
+   ``choonsik1/allo:SystemC-emitter`` with and without it, synthesised with Catapult
    2024.2, and simulated under Xcelium 24.03:
 
    - The emitted code changed exactly as intended. ``acc_0`` lost its
@@ -1154,7 +1154,7 @@ one per step, so ``acc`` runs the entire loop before ``mul`` produces anything.
   delay line is. That is scoped, in five phases, as an ``SC_METHOD`` "comb"
   emission mode, and its own top risk is whether such a model simulates as well
   as it synthesises. The scoping document is **not on** ``main`` -- it exists only
-  in commit ``c7402f9f``, on ``choonsik1/SystemC-emitter``:
+  in commit ``c7402f9f``, on ``choonsik1/allo:SystemC-emitter``:
   ``git show c7402f9f:notes/archive/SYSTEMC_COMB_MODE.md``. Deliberately left
   there rather than restored into ``notes/archive/`` (now retired into this documentation): it plans work on a branch
   that is not in this checkout, and its repro anchors are ``/tmp`` paths that no

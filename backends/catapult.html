@@ -473,7 +473,7 @@ a module to <code class="docutils literal notranslate"><span class="pre">$finish
 (<code class="docutils literal notranslate"><span class="pre">67559cad</span></code>) says some login environments do set it.</p>
 <p>Provenance, for when these stop working: both exports were recovered from the commits that
 produced the Catapult synthesis and Xcelium cosim results on record (<code class="docutils literal notranslate"><span class="pre">c7402f9f</span></code>, <code class="docutils literal notranslate"><span class="pre">0eff4888</span></code>,
-<code class="docutils literal notranslate"><span class="pre">67559cad</span></code> on <code class="docutils literal notranslate"><span class="pre">choonsik1/SystemC-emitter</span></code>; <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">log</span> <span class="pre">--all</span> <span class="pre">-S&quot;MGLS_LICENSE_FILE&quot;</span></code> finds them).</p>
+<code class="docutils literal notranslate"><span class="pre">67559cad</span></code> on <code class="docutils literal notranslate"><span class="pre">choonsik1/allo:SystemC-emitter</span></code>; <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">log</span> <span class="pre">--all</span> <span class="pre">-S&quot;MGLS_LICENSE_FILE&quot;</span></code> finds them).</p>
 <p><strong>Both tools run</strong> <code class="docutils literal notranslate"><span class="pre">-version</span></code> <strong>without checking a licence out</strong>, so a successful <code class="docutils literal notranslate"><span class="pre">-version</span></code>
 proves nothing. Check a real checkout before concluding the host is ready. Failure modes observed
 on zhang-21 on 2026-09-18, all with the <em>wrong</em> server:</p>
@@ -560,7 +560,7 @@ required settings, in <code class="docutils literal notranslate"><span class="pr
 structural-conflict / <code class="docutils literal notranslate"><span class="pre">SC_METHOD</span></code>-emitter path that was the wrong remedy for a correctly
 identified mechanism. If a Connections design will not schedule, open
 <code class="docutils literal notranslate"><span class="pre">run_hls_global_setup.tcl</span></code> first.</p>
-<p>Provenance: measured on the <code class="docutils literal notranslate"><span class="pre">choonsik1/SystemC-emitter</span></code> fork, on the <strong>SystemC/Connections</strong>
+<p>Provenance: measured on the <code class="docutils literal notranslate"><span class="pre">choonsik1/allo:SystemC-emitter</span></code> fork, on the <strong>SystemC/Connections</strong>
 flow; <code class="docutils literal notranslate"><span class="pre">dev/systemc/noc/FINDINGS_wire_channel.md</span></code> §7 carries the numbers. The directives are
 solution-level and apply to any Catapult run; the 2/32 -&gt; 22/32 figure is specific to that
 Connections corpus and has not been re-measured for <code class="docutils literal notranslate"><span class="pre">ac_channel</span></code> designs.</p>

@@ -283,7 +283,7 @@ under <code class="docutils literal notranslate"><span class="pre">#pragma</span
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">AlloMemPins</span></code> <strong>is</strong> an unarbitrated 1R1W dual-port RAM, and it synthesizes. It is <strong>not</strong> in
 this checkout’s working tree; it lives in <code class="docutils literal notranslate"><span class="pre">mlir/lib/Translation/EmitSystemC.cpp</span></code> on
-<code class="docutils literal notranslate"><span class="pre">choonsik1/SystemC-emitter</span></code>. Read there (verified 2026-09-18), the module has separate read and
+<code class="docutils literal notranslate"><span class="pre">choonsik1/allo:SystemC-emitter</span></code>. Read there (verified 2026-09-18), the module has separate read and
 write pin bundles (<code class="docutils literal notranslate"><span class="pre">radr</span></code>/<code class="docutils literal notranslate"><span class="pre">re</span></code>/<code class="docutils literal notranslate"><span class="pre">q</span></code> and <code class="docutils literal notranslate"><span class="pre">wadr</span></code>/<code class="docutils literal notranslate"><span class="pre">d</span></code>/<code class="docutils literal notranslate"><span class="pre">we</span></code>) over one <code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">mem[SIZE]</span></code>, with
 both accesses serviced in a single <code class="docutils literal notranslate"><span class="pre">wait()</span></code>-delimited cycle and both ready lines tied high; its
 own comment says “single-cycle, unarbitrated, no bank conflicts”. It is instantiated on both sides
@@ -453,8 +453,10 @@ that only ever passes proves nothing; these are why the passes above count.</p>
 <section id="running-it">
 <h3>Running it<a class="headerlink" href="#running-it" title="Link to this heading"><span>¶</span></a></h3>
 <p>Needs Vivado’s xsim on <code class="docutils literal notranslate"><span class="pre">PATH</span></code> (<code class="docutils literal notranslate"><span class="pre">/opt/xilinx/Vivado/2023.2/settings64.sh</span></code>) and the netlists,
-which are <strong>not</strong> in this repository – they are Catapult output from the
-<code class="docutils literal notranslate"><span class="pre">choonsik1/SystemC-emitter</span></code> fork, and <code class="docutils literal notranslate"><span class="pre">REPRO.sh</span></code> documents where they came from. The scripts
+which are <strong>not</strong> in this repository – they are Catapult output from
+<code class="docutils literal notranslate"><span class="pre">choonsik1/allo</span></code> (branch <code class="docutils literal notranslate"><span class="pre">SystemC-emitter</span></code>; there is no
+<code class="docutils literal notranslate"><span class="pre">choonsik1/SystemC-emitter</span></code> repository) at
+<code class="docutils literal notranslate"><span class="pre">0eff4888:agents/noc/rtl/&lt;design&gt;/rtl.v</span></code>, and <code class="docutils literal notranslate"><span class="pre">REPRO.sh</span></code> documents where they came from. The scripts
 look for them under <code class="docutils literal notranslate"><span class="pre">../noc/rtl/&lt;design&gt;/rtl.v</span></code> relative to <code class="docutils literal notranslate"><span class="pre">tests/systemc/rtlsim/</span></code> (the
 Xcelium runner takes <code class="docutils literal notranslate"><span class="pre">RTLDIR</span></code> to override). <code class="docutils literal notranslate"><span class="pre">mgc_shim.v</span></code> supplies the Mentor primitives the
 netlists instantiate. No SystemC is needed; each case takes about 6 s.</p>
@@ -532,7 +534,7 @@ hang or a truncated run; the failing one is a complete run with wrong data.</p>
 </section>
 <section id="is-it-the-free-running-loop-rewrite-no">
 <h3>Is it the free-running-loop rewrite? No<a class="headerlink" href="#is-it-the-free-running-loop-rewrite-no" title="Link to this heading"><span>¶</span></a></h3>
-<p><strong>The hypothesis (2026-09-18,</strong> <code class="docutils literal notranslate"><span class="pre">64b0ca86</span></code> <strong>).</strong> <code class="docutils literal notranslate"><span class="pre">choonsik1/SystemC-emitter</span></code> carries
+<p><strong>The hypothesis (2026-09-18,</strong> <code class="docutils literal notranslate"><span class="pre">64b0ca86</span></code> <strong>).</strong> <code class="docutils literal notranslate"><span class="pre">choonsik1/allo:SystemC-emitter</span></code> carries
 <code class="docutils literal notranslate"><span class="pre">72c70dcb</span></code> (2026-08-20), “SystemC: do not make a port-reading driver loop free-running”.
 <code class="docutils literal notranslate"><span class="pre">isSteadyStateLoop</span></code> treated an unused induction variable as proof a kernel runs forever and
 rewrote its outermost loop to <code class="docutils literal notranslate"><span class="pre">while</span> <span class="pre">(1)</span></code> <strong>under</strong> <code class="docutils literal notranslate"><span class="pre">__SYNTHESIS__</span></code> – precisely a bug that
@@ -546,7 +548,7 @@ body counts as evidence of finite streaming. This was stated as a hypothesis fro
 not a measurement.</p>
 <p><strong>The test (2026-09-18,</strong> <code class="docutils literal notranslate"><span class="pre">6b84f7b1</span></code> <strong>): a negative result.</strong> <code class="docutils literal notranslate"><span class="pre">guard_experiment/guard.patch</span></code>
 stops the rewrite for any loop that reads a <code class="docutils literal notranslate"><span class="pre">Wire</span></code>. <code class="docutils literal notranslate"><span class="pre">pe_split.py</span></code> was re-emitted from
-<code class="docutils literal notranslate"><span class="pre">choonsik1/SystemC-emitter</span></code> with and without it, synthesised with Catapult 2024.2, and simulated
+<code class="docutils literal notranslate"><span class="pre">choonsik1/allo:SystemC-emitter</span></code> with and without it, synthesised with Catapult 2024.2, and simulated
 under Xcelium 24.03:</p>
 <table class="docutils align-default">
 <thead>
@@ -591,7 +593,10 @@ supply a usable non-handshaked edge.</p>
 </pre></div>
 </div>
 <p>The lockstep positive control (<code class="docutils literal notranslate"><span class="pre">-d</span> <span class="pre">LOCKSTEP</span></code>) is for the August netlists only, because it taps an
-internal signal (<code class="docutils literal notranslate"><span class="pre">v8_and_cse</span></code>) that these netlists do not have.</p>
+internal signal (<code class="docutils literal notranslate"><span class="pre">v8_and_cse</span></code>) that these netlists do not have. So <code class="docutils literal notranslate"><span class="pre">REPRO.sh</span></code> section 3 and the
+<code class="docutils literal notranslate"><span class="pre">BREAK_WIRE</span></code> fault cannot be replayed this way: <code class="docutils literal notranslate"><span class="pre">RTLDIR</span></code> does pass through <code class="docutils literal notranslate"><span class="pre">REPRO.sh</span></code>, but
+those rows die in elaboration and print <code class="docutils literal notranslate"><span class="pre">NO</span> <span class="pre">VERDICT</span></code>. The shipped netlists cover the three
+boundaries and <code class="docutils literal notranslate"><span class="pre">BREAK_DATA</span></code>, and nothing else.</p>
 <p>Regenerating the netlists:</p>
 <ol class="arabic simple">
 <li><p>Build <code class="docutils literal notranslate"><span class="pre">choonsik1/allo:SystemC-emitter</span></code> (<code class="docutils literal notranslate"><span class="pre">72c70dcb</span></code> or later, LLVM <code class="docutils literal notranslate"><span class="pre">6b09f739</span></code>).</p></li>

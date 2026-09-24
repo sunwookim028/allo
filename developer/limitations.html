@@ -1297,7 +1297,7 @@ induction variable is unused) made <code class="docutils literal notranslate"><s
 <code class="docutils literal notranslate"><span class="pre">72c70dcb</span></code>’s guard missed it because <code class="docutils literal notranslate"><span class="pre">acc</span></code> has no memory port. The guard was
 extended to any loop body containing a <code class="docutils literal notranslate"><span class="pre">WireGetOp</span></code> (<code class="docutils literal notranslate"><span class="pre">guard_experiment/</span></code> under
 <code class="docutils literal notranslate"><span class="pre">tests/systemc/rtlsim/</span></code>), <code class="docutils literal notranslate"><span class="pre">examples/systemc/pe_split.py</span></code> was re-emitted from
-<code class="docutils literal notranslate"><span class="pre">choonsik1/SystemC-emitter</span></code> with and without it, synthesised with Catapult
+<code class="docutils literal notranslate"><span class="pre">choonsik1/allo:SystemC-emitter</span></code> with and without it, synthesised with Catapult
 2024.2, and simulated under Xcelium 24.03:</p>
 <ul class="simple">
 <li><p>The emitted code changed exactly as intended. <code class="docutils literal notranslate"><span class="pre">acc_0</span></code> lost its
@@ -1359,7 +1359,7 @@ advance – one enable driving every stage’s counter, which is what a VLIW
 delay line is. That is scoped, in five phases, as an <code class="docutils literal notranslate"><span class="pre">SC_METHOD</span></code> “comb”
 emission mode, and its own top risk is whether such a model simulates as well
 as it synthesises. The scoping document is <strong>not on</strong> <code class="docutils literal notranslate"><span class="pre">main</span></code> – it exists only
-in commit <code class="docutils literal notranslate"><span class="pre">c7402f9f</span></code>, on <code class="docutils literal notranslate"><span class="pre">choonsik1/SystemC-emitter</span></code>:
+in commit <code class="docutils literal notranslate"><span class="pre">c7402f9f</span></code>, on <code class="docutils literal notranslate"><span class="pre">choonsik1/allo:SystemC-emitter</span></code>:
 <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">show</span> <span class="pre">c7402f9f:notes/archive/SYSTEMC_COMB_MODE.md</span></code>. Deliberately left
 there rather than restored into <code class="docutils literal notranslate"><span class="pre">notes/archive/</span></code> (now retired into this documentation): it plans work on a branch
 that is not in this checkout, and its repro anchors are <code class="docutils literal notranslate"><span class="pre">/tmp</span></code> paths that no
