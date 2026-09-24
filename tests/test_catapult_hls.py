@@ -97,8 +97,15 @@ def test_catapult_float():
     with tempfile.TemporaryDirectory() as tmpdir:
         mod = s.build(target="catapult", mode="csyn", project=tmpdir)
 
-        # Check float type is used
-        assert "float " in mod.hls_code
+        # F32 must come out as ac_ieee_float<binary32>, NOT native `float`.
+        # nangate-45nm_beh does not synthesize native C++ float -- Catapult
+        # stops with CIN-291 ("Type 'float' is not synthesizable with library
+        # 'nangate-45nm_beh'"), which docs/source/backends/catapult.rst has
+        # described as the emitter's behaviour since before it was true. The
+        # SystemC-emitter merge makes it true; this assertion used to accept
+        # the unsynthesizable spelling.
+        assert "ac_ieee_float<binary32>" in mod.hls_code
+        assert "float " not in mod.hls_code
         print("test_catapult_float passed!")
 
 
