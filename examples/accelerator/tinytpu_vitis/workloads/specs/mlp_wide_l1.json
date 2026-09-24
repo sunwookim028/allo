@@ -1,0 +1,55 @@
+{
+  "name": "mlp_wide_l1",
+  "stresses": "mlp_wide layer 2 of 2: nn.Linear(64, 64, bias=False) on a batch of 64 with no epilogue",
+  "einsum": "mk,kn->mn",
+  "dims": {
+    "m": 64,
+    "k": 64,
+    "n": 64
+  },
+  "inputs": [
+    {
+      "name": "X",
+      "subscript": "mk",
+      "dtype": "int8",
+      "buffer": "A",
+      "origin": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "W",
+      "subscript": "kn",
+      "dtype": "int8",
+      "buffer": "B",
+      "origin": [
+        0,
+        0
+      ]
+    }
+  ],
+  "constants": [],
+  "output": {
+    "name": "Y",
+    "subscript": "mn",
+    "dtype": "int8",
+    "buffer": "C",
+    "origin": [
+      0,
+      0
+    ],
+    "write_window": "exact"
+  },
+  "accumulator": "int32",
+  "epilogue": [
+    "saturate"
+  ],
+  "operand_pad": "arbitrary",
+  "known_gap": null,
+  "source": {
+    "model": "mlp_wide",
+    "module": "fc2",
+    "index": 1
+  }
+}
