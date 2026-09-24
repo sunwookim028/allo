@@ -960,3 +960,153 @@ def parse_catapult_hierarchical_report(project_path, top):
 
     result["summary"] = "\n".join(lines)
     return result
+# ---------------------------------------------------------------------------
+# Pre-handoff gate: does the emitted kernel.cpp actually compile?
+#
+# WHY THIS EXISTS. On 2026-09-24 a TinyTPU `mode="ppa"` handoff died in
+# Catapult's C++ front end after 7 s with 100 errors -- no schedule, no
+# simulation, no power -- because the emitter wrote Vitis `ap_int` bit slices
+# (CRD-20) and implicitly narrowed >64-bit `ac_int` to `int` (CRD-413).
+# `ppa_catapult.py` DID have a compile check, but it compiled the TESTBENCH
+# against an EMPTY `ac_int.h` shim and a stub kernel, so it could not see the
+# kernel at all. Both defects reproduce in plain g++ against the open-source
+# hlslibs `ac_types`, i.e. they were catchable on the emitting host, with no
+# licence, in under a second. See
+# dev/records/catapult_handoff/ppa_tinytpu/zhang21_run_2026-09-24/.
+#
+# The gate therefore runs at EMISSION, not in the handoff script: an emitter
+# that can emit uncompilable code should fail where it emits.
+# ---------------------------------------------------------------------------
+
+# Where ac_types is looked for, in order. First hit wins.
+#   ALLO_AC_TYPES_INCLUDE -- explicit override (the directory holding ac_int.h)
+#   $MGC_HOME/shared/include -- Catapult's own copy, on a licence host
+#   ~/.cache/allo/ac_types/include -- an hlslibs checkout cached per host
+#   $ALLO_AC_TYPES_HOME/include -- an hlslibs checkout somewhere else
+# hlslibs/ac_types is Apache-2.0 and ~1 MB:
+#   git clone --depth 1 https://github.com/hlslibs/ac_types ~/.cache/allo/ac_types
+AC_TYPES_SEARCH_DOC = (
+    "Set ALLO_AC_TYPES_INCLUDE to the directory containing ac_int.h, or run\n"
+    "  git clone --depth 1 https://github.com/hlslibs/ac_types "
+    "~/.cache/allo/ac_types\n"
+    "(on a licence host $MGC_HOME/shared/include is found automatically)."
+)
+
+
+def find_ac_types_include():
+    """Return the include directory holding ac_int.h, or None."""
+    candidates = []
+    if os.environ.get("ALLO_AC_TYPES_INCLUDE"):
+        candidates.append(os.environ["ALLO_AC_TYPES_INCLUDE"])
+    if os.environ.get("MGC_HOME"):
+        candidates.append(os.path.join(os.environ["MGC_HOME"], "shared", "include"))
+    candidates.append(
+        os.path.join(os.path.expanduser("~"), ".cache", "allo", "ac_types", "include")
+    )
+    if os.environ.get("ALLO_AC_TYPES_HOME"):
+        candidates.append(os.path.join(os.environ["ALLO_AC_TYPES_HOME"], "include"))
+    for c in candidates:
+        if os.path.isfile(os.path.join(c, "ac_int.h")):
+            return c
+    return None
+
+
+# Constructs that Catapult's front end rejects outright. Checked on the text
+# before g++ is even tried, so the gate still says something useful when
+# ac_types is missing, and so the error names the defect rather than a line of
+# header noise.
+#   ap_int/ap_uint   -- Vitis only; Catapult has no such type (CRD-20)
+#   <wide> -> int    -- no implicit conversion above 64 bits (CRD-413); caught
+#                       by g++ rather than by regex, which cannot see widths
+_FORBIDDEN_TEXT = [
+    (re.compile(r"\bap_u?int\s*<"), "ap_int/ap_uint (Vitis only; Catapult CRD-20)"),
+    (re.compile(r"\bap_u?fixed\s*<"), "ap_fixed/ap_ufixed (Vitis only)"),
+    (re.compile(r"#include\s*[<\"]ap_int\.h"), "#include <ap_int.h> (Vitis only)"),
+    (re.compile(r"\bhls::stream\b"), "hls::stream (Vitis only; use ac_channel)"),
+]
+
+
+class CatapultEmitError(RuntimeError):
+    """The emitted Catapult project will not compile."""
+
+
+def check_emitted_cpp(path, extra_includes=(), std="c++11", strict=None):
+    """Gate one emitted Catapult C++ file.
+
+    Two stages. The text stage rejects Vitis-only constructs by name and needs
+    nothing installed. The compile stage runs `g++ -fsyntax-only` against
+    hlslibs ac_types and catches everything else -- notably the implicit
+    >64-bit narrowing, which no regex can see because it depends on widths.
+
+    With no ac_types on the host the compile stage SKIPS LOUDLY (a banner on
+    stderr), because a silent skip is how this class of bug survived a whole
+    handoff. Set ALLO_REQUIRE_AC_TYPES=1 to turn that skip into a failure --
+    what CI and a handoff script should do.
+    """
+    import subprocess
+    import sys
+
+    if strict is None:
+        strict = os.environ.get("ALLO_REQUIRE_AC_TYPES", "") not in ("", "0")
+
+    with open(path, "r", encoding="utf-8") as f:
+        text = f.read()
+    bad = []
+    for rx, what in _FORBIDDEN_TEXT:
+        hits = [i + 1 for i, ln in enumerate(text.splitlines()) if rx.search(ln)]
+        if hits:
+            bad.append(
+                f"  {what}: {len(hits)} line(s), first at {os.path.basename(path)}"
+                f":{hits[0]}"
+            )
+    if bad:
+        raise CatapultEmitError(
+            f"the emitted {path} contains constructs Catapult's C++ front end "
+            "rejects:\n" + "\n".join(bad)
+        )
+
+    inc = find_ac_types_include()
+    if inc is None:
+        msg = (
+            "\n"
+            "!! Catapult emit gate SKIPPED: no ac_types on this host.         !!\n"
+            f"!! {os.path.basename(path)} was NOT compiled; only the text check ran. !!\n"
+            + AC_TYPES_SEARCH_DOC
+        )
+        if strict:
+            raise CatapultEmitError(msg)
+        print(msg, file=sys.stderr)
+        return False
+
+    cmd = ["g++", f"-std={std}", "-fsyntax-only", "-I", inc]
+    for e in extra_includes:
+        cmd += ["-I", e]
+    cmd.append(os.path.basename(path))
+    try:
+        cp = subprocess.run(
+            cmd,
+            cwd=os.path.dirname(os.path.abspath(path)),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as exc:  # no g++ on this host
+        msg = (
+            "\n"
+            "!! Catapult emit gate SKIPPED: g++ is not runnable here.        !!\n"
+            f"!! {os.path.basename(path)} was NOT compiled ({exc}).\n"
+        )
+        if strict:
+            raise CatapultEmitError(msg) from exc
+        print(msg, file=sys.stderr)
+        return False
+    if cp.returncode:
+        # Catapult's front end reports 100 of these and stops; g++ reports a
+        # few and stops. Either way the first ones name the defect.
+        head = "\n".join((cp.stderr or cp.stdout).splitlines()[:40])
+        raise CatapultEmitError(
+            f"the emitted {path} does not compile against ac_types ({inc}).\n"
+            "Catapult's front end would reject it the same way, after a licence\n"
+            "checkout and a project setup. First errors:\n" + head
+        )
+    return True

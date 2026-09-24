@@ -51,6 +51,14 @@ public:
   void emitArrayDirectives(Value memref) override;
   void emitArrayDirectivesPreheader(Value memref) override;
   void emitFunction(func::FuncOp func) override;
+  // Bit ops in the native ac_int spelling: Catapult has no ap_int, which is
+  // what VhlsModuleEmitter's inherited versions emit. See EmitCatapultHLS.cpp.
+  void emitGetBit(allo::GetIntBitOp op) override;
+  void emitSetBit(allo::SetIntBitOp op) override;
+  void emitGetSlice(allo::GetIntSliceOp op) override;
+  void emitSetSlice(allo::SetIntSliceOp op) override;
+  // >64-bit ac_int -> native int/index needs an explicit .to_int64().
+  void emitNarrowCastSuffix(Value src, Value dst) override;
 
 protected:
   void emitValue(Value val, unsigned rank = 0, bool isPtr = false,

@@ -127,7 +127,21 @@ _EMIT_SRC = textwrap.dedent(
             for i in range(4):
                 b[i] = pipe.get()
 
-    df.build(top, target=sys.argv[1], project=sys.argv[2])
+    import os
+
+    try:
+        df.build(top, target=sys.argv[1], project=sys.argv[2])
+    except Exception as exc:  # noqa: BLE001
+        # EMITTED is a question about the EMITTER, and the Catapult emit gate
+        # runs after the emitter, compiling what it wrote. f16 emits a bare
+        # `half`, which no ac_types header defines, so the gate rejects a
+        # kernel.cpp that was nonetheless emitted. A type the emitter cannot
+        # name at all never reaches the gate: it fails inside
+        # getCatapultTypeName, before any kernel.cpp exists.
+        if not os.path.exists(os.path.join(sys.argv[2], "kernel.cpp")):
+            raise
+        print("EMITTED (but does not compile: %s)" % type(exc).__name__)
+        sys.exit(0)
     print("EMITTED")
     """
 )
@@ -151,6 +165,13 @@ def test_float16_emits_but_bfloat16_aborts(target, tmp_path):
 
     This is a characterisation test, not a wish: it fails the day an emitter
     learns ``bf16``, which is the day to delete it and emit the MiniTPU model.
+
+    "Emits" means the emitter wrote a ``kernel.cpp``. On Catapult that is now
+    a weaker claim than "compiles": the emit gate compiles what was written,
+    and f16 emits a bare ``half``, which no ac_types header defines -- a
+    separate defect in ``getCatapultTypeName``, which the gate is what made
+    visible. The control arm therefore accepts "emitted, then rejected by the
+    gate"; it is still the emitter that is being asked about.
     """
     ok = _emit("float16", target, tmp_path)
     assert (

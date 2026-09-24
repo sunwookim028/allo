@@ -634,6 +634,144 @@ void CatapultModuleEmitter::emitFunction(func::FuncOp func) {
   os << "\n";
 }
 
+//===----------------------------------------------------------------------===//
+// Native ac_int bit ops (replacing the inherited Vitis ap_int proxy forms)
+//
+// VhlsModuleEmitter emits bit indexing and slicing in the Vitis idiom:
+//     ap_int<64> v16_tmp = v15;   v16 = v16_tmp(15, 0);
+// Catapult has no ap_int at all -- `go analyze` stops at CRD-20 ("identifier
+// ap_int is undefined"), 88 times on TinyTPU. ac_int spells the same thing as
+// a member call: `t.slc<W>(lo)` reads W bits starting at lo, `t.set_slc(lo, v)`
+// writes them. The wrapper temp is still needed because the emitted `num` may
+// be a plain C int (int32_t) with no .slc/.set_slc/operator[] at all.
+//
+// The temp's SIGNEDNESS is taken from the source type, not fixed to signed:
+// slc<W>(lo) returns ac_int<W, S> with S inherited from the object, so a
+// signed temp over an unsigned source would sign-extend a slice whose result
+// is wider than W. That failure is silent -- wrong numbers, not a compile
+// error -- which is why it is worth spelling out here.
+//
+// Widths: GetIntSliceOp's result type is built as UInt(upper - lower) by the
+// frontend (allo/ir/infer.py) and the emitted hi/lo are upper-1/lower, so the
+// result's own width IS hi-lo+1 and can be used as the compile-time W that
+// slc<> requires. (hi and lo are Values and need not be constants, so W cannot
+// be recovered from them.)
+//===----------------------------------------------------------------------===//
+
+// "ac_int<W, S>" for the bit-op temp wrapping `val`, S from val's own type.
+static std::string acIntTempType(Value val) {
+  unsigned w = val.getType().getIntOrFloatBitWidth();
+  bool isSigned = true;
+  if (auto it = llvm::dyn_cast<IntegerType>(val.getType()))
+    isSigned = it.getSignedness() != IntegerType::SignednessSemantics::Unsigned;
+  return "ac_int<" + std::to_string(w) + ", " + (isSigned ? "true" : "false") +
+         ">";
+}
+
+void CatapultModuleEmitter::emitGetBit(allo::GetIntBitOp op) {
+  Value result = op.getResult();
+  fixUnsignedType(result, op->hasAttr("unsigned"));
+  indent();
+  emitValue(result); // declares "<T> <res>"
+  os << ";\n";
+  std::string rn = std::string(getName(result).str());
+  indent();
+  os << acIntTempType(op.getNum()) << " _bs_" << rn << " = ";
+  emitValue(op.getNum());
+  os << ";\n";
+  indent();
+  os << rn << " = _bs_" << rn << "[";
+  emitValue(op.getIndex());
+  os << "];";
+  emitInfoAndNewLine(op);
+}
+
+void CatapultModuleEmitter::emitSetBit(allo::SetIntBitOp op) {
+  Value result = op.getResult();
+  indent();
+  emitValue(result);
+  os << ";\n";
+  std::string rn = std::string(getName(result).str());
+  indent();
+  os << acIntTempType(op.getNum()) << " _bs_" << rn << " = ";
+  emitValue(op.getNum());
+  os << ";\n";
+  indent();
+  os << "_bs_" << rn << "[";
+  emitValue(op.getIndex());
+  os << "] = ";
+  emitValue(op.getVal());
+  os << ";\n";
+  indent();
+  os << rn << " = _bs_" << rn << ";";
+  emitInfoAndNewLine(op);
+}
+
+void CatapultModuleEmitter::emitGetSlice(allo::GetIntSliceOp op) {
+  Value result = op.getResult();
+  fixUnsignedType(result, op->hasAttr("unsigned"));
+  unsigned w = result.getType().getIntOrFloatBitWidth();
+  indent();
+  emitValue(result);
+  os << ";\n";
+  std::string rn = std::string(getName(result).str());
+  indent();
+  os << acIntTempType(op.getNum()) << " _bs_" << rn << " = ";
+  emitValue(op.getNum());
+  os << ";\n";
+  indent();
+  os << rn << " = _bs_" << rn << ".slc<" << w << ">(";
+  emitValue(op.getLo());
+  os << ");";
+  emitInfoAndNewLine(op);
+}
+
+void CatapultModuleEmitter::emitSetSlice(allo::SetIntSliceOp op) {
+  Value result = op.getResult();
+  // set_slc(lo, v) writes exactly v's width, so the value has to be wrapped in
+  // an ac_int of the VALUE's width -- a plain C int would write 32 bits.
+  unsigned vw = op.getVal().getType().getIntOrFloatBitWidth();
+  indent();
+  emitValue(result);
+  os << ";\n";
+  std::string rn = std::string(getName(result).str());
+  indent();
+  os << acIntTempType(op.getNum()) << " _bs_" << rn << " = ";
+  emitValue(op.getNum());
+  os << ";\n";
+  indent();
+  os << "_bs_" << rn << ".set_slc(";
+  emitValue(op.getLo());
+  os << ", ac_int<" << vw << ", false>(";
+  emitValue(op.getVal());
+  os << "));\n";
+  indent();
+  os << rn << " = _bs_" << rn << ";";
+  emitInfoAndNewLine(op);
+}
+
+// Narrowing a >64-bit ac_int to a native int/index needs an EXPLICIT
+// .to_int64()/.to_uint64(): ac_int defines no implicit conversion to a C
+// integer beyond 64 bits, so `int v36 = v35;` with v35 an ac_int<65, true>
+// is Catapult CRD-413 ("no suitable conversion function ... exists"), 12
+// times on TinyTPU. It also fails in plain g++ against hlslibs ac_types,
+// which is what makes the pre-handoff gate possible without a licence.
+// `index` is emitted as `int`, so it takes the signed form.
+void CatapultModuleEmitter::emitNarrowCastSuffix(Value src, Value dst) {
+  auto si = llvm::dyn_cast<IntegerType>(src.getType());
+  if (!si || si.getWidth() <= 64)
+    return;
+  Type dt = dst.getType();
+  if (auto di = llvm::dyn_cast<IntegerType>(dt)) {
+    if (di.getWidth() <= 64)
+      os << (di.getSignedness() == IntegerType::SignednessSemantics::Unsigned
+                 ? ".to_uint64()"
+                 : ".to_int64()");
+  } else if (llvm::isa<IndexType>(dt)) {
+    os << ".to_int64()";
+  }
+}
+
 void CatapultModuleEmitter::emitModule(ModuleOp module) {
   std::string device_header = R"XXX(
 //===------------------------------------------------------------*- C++ -*-===//
