@@ -771,7 +771,7 @@ of them hard-coded constants masquerading as design limits:
 * The set a run sweeps is ``bench_isa.SWEEP``, **not** ``bench_isa.SHAPES``.
   ``SHAPES`` is re-exported from ``shapes.py`` (the one definition) and is
   read *positionally* by ``act_compile``, ``kpn_model``, ``isa_dsl``,
-  ``tests/act/test_tinytpu.py`` and --- through ``accept.BASELINES`` against
+  ``tests/act/test_tinytpu.py`` and --- through ``control.RECORDED`` against
   ``shapes.NAMES`` --- the CHIA harness. [#sweepknobs]_
 
 

@@ -63,6 +63,8 @@ REPO = AGENT_DIR.parents[2]
 PKG = "examples/tinytpu"
 sys.path.insert(0, str(AGENT_DIR))
 
+import control  # noqa: E402
+
 ALLO_PYTHON = os.environ.setdefault(
     "TINYTPU_ALLO_PYTHON", "/home/sk3463/miniconda3/envs/allo/bin/python")
 os.environ.setdefault("LLVM_BUILD_DIR",
@@ -74,8 +76,11 @@ os.environ.setdefault("OMP_NUM_THREADS", "8")
 #: co-design control -- the co-design control is measured in the same run (k1
 #: below, and `loop.py`'s iteration 0), because `control.RECORDED` is keyed on
 #: the git blobs of the editable design files and a prose-only edit moves them.
-PUBLISHED_CYCLES = {"4x4x4": 172, "8x8x8": 262, "12x12x12": 418,
-                    "16x16x8": 484, "16x16x16": 686}
+#: Derived from `reproduce.sh`'s EXPECTED, via `control`, never a literal:
+#: this dict said 172 / 262 / 418 / 484 / 686 for two days after the design
+#: shipped 175 / 265 / 421 / 482 / 674. `control.check_pins` is the backstop
+#: for the copies that cannot be derived.
+PUBLISHED_CYCLES = dict(control.PUBLISHED["cosim"])
 #: The CO-DESIGN baseline: the same hardware, running the best nest the frozen
 #: mapper can encode on it. It is not the published number at every shape, and
 #: the difference is understood:
@@ -97,6 +102,10 @@ PUBLISHED_CYCLES = {"4x4x4": 172, "8x8x8": 262, "12x12x12": 418,
 #: 169 / 262 / 418 / 484 / 686. Four of the five ARE the published numbers,
 #: because at 8x8x8, 12x12x12 and 16x16x8 the mapper's pick (`N2>K2 rows=8`,
 #: `N3>K3 rows=12`, `N2>K4 rows=16`) is bit-identical to the canonical nest.
+#: This is the mapper's pick, measured, and it is fitted to the design as it
+#: was at 476a70d8. Whether the pick still equals the shipped nest after the
+#: memory sizing moved the row is a measurement, not an edit.
+#: not-the-published-row
 CODESIGN_CONTROL_ALL = {"4x4x4": 169, "8x8x8": 262, "12x12x12": 418,
                         "16x16x8": 484, "16x16x16": 686}
 BASELINE_CYCLES = {"4x4x4": 169, "16x16x16": 686}

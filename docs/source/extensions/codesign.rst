@@ -223,10 +223,12 @@ rebinding, and only then prints the line the evaluator requires.
 The control
 ===========
 
-``accept.py``'s ``BASELINES`` table is keyed on the git blob of the two spec
-files, so prose-only edits invalidate it. The co-design loop therefore
-**measures its control in the same run**: ``loop.py`` iteration 0, and
-``test_codesign.py`` case k1.
+``control.RECORDED`` is keyed on the git blobs of the editable design files
+--- fourteen paths since the unit library landed, not the two it was when this
+was written --- so prose-only edits invalidate it. (``accept.py`` has no
+baseline table at all and no cycle literal: it measures its control per run.)
+The co-design loop therefore **measures its control in the same run**:
+``loop.py`` iteration 0, and ``test_codesign.py`` case k1.
 
 Measured 2026-09-22, unmodified design, same environment and tool state:
 

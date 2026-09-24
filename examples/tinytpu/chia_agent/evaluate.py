@@ -107,6 +107,7 @@ Prints one JSON line (last line of stdout) and exits 0 iff the candidate passed.
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import importlib.util
 import json
@@ -119,7 +120,7 @@ import subprocess
 import sys
 import time
 import xml.etree.ElementTree as ET
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 AGENT_DIR = Path(__file__).resolve().parent
 REPO = AGENT_DIR.parents[2]
@@ -196,7 +197,16 @@ CODESIGN = [f"{PKG}/chia_agent/{f}" for f in
             ("mapspace.py", "codesign_gate.py", "codesign_cosim.py")]
 #: The design's own frozen machinery -- `design.FROZEN_DESIGN`, the one
 #: definition -- taken from git like every other frozen file.
-FROZEN = [
+#: Entry points the evaluation actually executes. Everything they import,
+#: transitively and first-party, is measurement apparatus and is frozen with
+#: them -- see `import_closure`.
+ENTRY_POINTS = [*DESIGN_EVALUATOR, AREA_PROXY, *WORKLOAD_SUITE, GATE_RUNNER,
+                PARAM_CHECK, *CODESIGN]
+#: First-party roots: a module under one of these is OURS, so it must be in
+#: the tree. Anything else (numpy, torch, allo) comes from the environment the
+#: gate runs in and is not the candidate's to influence.
+FIRST_PARTY = ("examples", "act")
+FROZEN_LITERAL = [
     "examples/__init__.py",
     *DESIGN_EVALUATOR,
     AREA_PROXY,
@@ -322,6 +332,80 @@ def git_show(ref, path):
     return out.stdout
 
 
+def _imported_modules(src: bytes, rel: str) -> set[str]:
+    """First-party dotted module names `rel` imports, relative ones resolved."""
+    pkg = (rel[: -len("/__init__.py")] if rel.endswith("/__init__.py")
+           else str(PurePosixPath(rel).parent)).replace("/", ".")
+    out: set[str] = set()
+    for node in ast.walk(ast.parse(src, rel)):
+        if isinstance(node, ast.Import):
+            out.update(a.name for a in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            if node.level:
+                base = pkg.split(".")
+                base = base[: len(base) - node.level + 1]
+                mod = ".".join(base + ([node.module] if node.module else []))
+            else:
+                mod = node.module or ""
+            out.add(mod)
+            # `from pkg import submodule` names a module, not an attribute.
+            out.update(f"{mod}.{a.name}" if mod else a.name for a in node.names)
+    return {m for m in out if m and m.split(".")[0] in FIRST_PARTY}
+
+
+def _walk_imports(entries, exists, read):
+    """(files reached, first-party modules that did not resolve)."""
+    seen: set[str] = set()
+    unresolved: set[str] = set()
+    todo = list(entries)
+    while todo:
+        rel = todo.pop()
+        if rel in seen or not exists(rel):
+            continue
+        seen.add(rel)
+        if not rel.endswith(".py"):
+            continue
+        for mod in _imported_modules(read(rel), rel):
+            stem = mod.replace(".", "/")
+            for cand in (f"{stem}.py", f"{stem}/__init__.py"):
+                if exists(cand):
+                    if cand not in seen:
+                        todo.append(cand)
+                    break
+            else:
+                # A dotted name can also be `from module import name`, where
+                # `name` is an attribute and not a module. Only the prefix
+                # failing to resolve is a real miss.
+                if not any(exists(f"{'/'.join(mod.split('.')[:n])}{suffix}")
+                           for n in range(1, len(mod.split(".")) + 1)
+                           for suffix in (".py", "/__init__.py")):
+                    unresolved.add(mod)
+    return sorted(seen), sorted(unresolved)
+
+
+def import_closure(ref, entries=None, exists=None, read=None) -> list[str]:
+    """Every first-party file the evaluation imports, transitively.
+
+    Derived, never listed. A hand-written frozen set has broken the loop twice
+    the same way -- `EDITABLE` naming two files after the design became a
+    package, then `WORKLOAD_SUITE` missing the import closure of its own
+    runner, which failed every candidate at stage `model`. A list cannot stay
+    right for longer than the layout holds still; this is a property of the
+    code instead. A file is frozen if the evaluation imports it. Read from the
+    REF, not from disk, so a dirty working tree cannot change what is frozen.
+    """
+    files, _ = _walk_imports(
+        entries if entries is not None else ENTRY_POINTS,
+        exists or (lambda rel: _in_ref(ref, rel)),
+        read or (lambda rel: git_show(ref, rel)))
+    return files
+
+
+def _in_ref(ref, rel) -> bool:
+    return not subprocess.run(["git", "cat-file", "-e", f"{ref}:{rel}"],
+                              cwd=REPO, capture_output=True).returncode
+
+
 def resolve_ref(ref):
     out = subprocess.run(["git", "rev-parse", "--verify", f"{ref}^{{commit}}"],
                          cwd=REPO, capture_output=True, text=True)
@@ -343,7 +427,15 @@ def compose(spec_dir: Path, tree: Path, ref: str):
     exec(compile(git_show(ref, f"{PKG}/chia_agent/spec_policy.py"),
                  "spec_policy.py", "exec"), policy)
     policy_violations = policy["policy_violations"]
-    for rel in FROZEN:
+    # Frozen = the literal seed plus everything the entry points import,
+    # transitively, minus what the candidate supplies. Derived from the ref so
+    # that a file moving in the repository cannot silently drop out of the
+    # tree -- which is how the workload runner shipped without `act_target`.
+    editable = {f"{PKG}/{rel}" for rel in EDITABLE}
+    frozen = [rel for rel in
+              sorted(set(FROZEN_LITERAL) | set(import_closure(ref)))
+              if rel not in editable]
+    for rel in frozen:
         dst = tree / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_bytes(git_show(ref, rel))
@@ -376,6 +468,17 @@ def compose(spec_dir: Path, tree: Path, ref: str):
     total = policy["doc_violations_total"](doc_losses)
     if total:
         raise Reject("policy", "; ".join(total))
+    # Now that the candidate's own files are in it, the tree must be closed
+    # under its imports: every first-party module the evaluation reaches has
+    # to BE here. A tree that reaches outside itself has an input nobody
+    # audited, which is the whole reason the files come from git. This also
+    # catches a candidate that adds an import of something not frozen.
+    _, dangling = _walk_imports(
+        [rel for rel in ENTRY_POINTS if (tree / rel).is_file()],
+        lambda r: (tree / r).is_file(), lambda r: (tree / r).read_bytes())
+    if dangling:
+        raise Reject("setup", "the evaluation tree is not closed under its "
+                              f"imports; cannot resolve {dangling}")
     # Anything else in the spec dir is ignored, not merged: only the files
     # `design.EDITABLE` names are the candidate.
     manifest = tree_manifest(tree)

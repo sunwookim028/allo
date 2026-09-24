@@ -33,6 +33,7 @@ import sys
 import time
 from pathlib import Path
 
+import control
 import preflight
 from spend import of_run, run_spend, spent_since
 
@@ -41,8 +42,18 @@ DEFAULT_CALL_USD = 3.5  # as loop.py
 AGENT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = AGENT_DIR.parents[2]
 
+#: The published row, DERIVED from `reproduce.sh`'s EXPECTED via
+#: `control.reproduced()` -- never a literal here. Four copies of it in this
+#: file said 172 / 262 / 418 / 484 / 686 for two days after the design shipped
+#: 175 / 265 / 421 / 482 / 674, so every worker a run launched was told a
+#: baseline the design had not produced since `63ee6ec7`. A number a model is
+#: given has to come from the thing that prints it.
+PUBLISHED_ROW = control.PUBLISHED["cosim"]
+ROW_EQUALS = ", ".join(f"{s}={c}" for s, c in PUBLISHED_ROW.items())
+ROW_SLASHED = " / ".join(str(c) for c in PUBLISHED_ROW.values())
+
 #: Framings of the same objective, each grounded in something MEASURED on the
-#: design as shipped at main @ 476a70d8 (172 / 262 / 418 / 484 / 686). The
+#: design as shipped (see PUBLISHED_ROW, derived). The
 #: previous angles -- the vru tier, the per-mm weight prologue, accu at II=2 --
 #: are exactly what e24e433b landed, so they are gone. The facts come from
 #: dev/records/tinytpu/chia-evidence/timeline-476a70d8-16x16x16/ (per-process cosim timeline, measured)
@@ -74,8 +85,9 @@ that could already have finished?""",
     (
         "small-shape",
         """The fixed cost. Least squares over the five shapes gives a fixed
-74.5 cycles plus 21.70 per dynamic instruction; at 4x4x4 the design takes 172
-against Gemmini's 144-161 (docs: tinytpu_isa.rst, gemmini_comparison.rst).
+74.5 cycles plus 21.70 per dynamic instruction; at 4x4x4 the design takes
+{four} against Gemmini's 144-161 (docs: tinytpu_isa.rst,
+gemmini_comparison.rst).
 Region start (s_axilite programming) sits inside the cosim window. Which part
 of the fixed cost is the design's?""",
     ),
@@ -170,7 +182,7 @@ mapspace and cosims the best nest your hardware can encode. Neither the mapper
 nor its selection rule nor any test is reachable from your tools.
 
 The design you start from, measured (RTL cosim, bit-exact, all five shapes):
-4x4x4=172, 8x8x8=262, 12x12x12=418, 16x16x8=484, 16x16x16=686 cycles; the
+{row} cycles; the
 search scores 4x4x4 and 16x16x16. A matched 4x4 int8 Gemmini takes
 144-161/220/347/391/593 over the same window. Resources at that build, csynth:
 see the pair in the prompt. A winner is re-verified bit-exact at all five
@@ -193,8 +205,8 @@ Your starting angle:
 """
 
 BASE_TASK = """Lower TinyTPU-isa's RTL cosim cycle count on tiled int8 GEMM.
-Current cosim cycles (all five shapes, bit-exact, main @ 476a70d8):
-4x4x4=172, 8x8x8=262, 12x12x12=418, 16x16x8=484, 16x16x16=686. A matched 4x4
+Current cosim cycles (all five shapes, bit-exact, the published row):
+{row}. A matched 4x4
 int8 Gemmini, measured over the same window, takes 144-161/220/347/391/593, so
 this design is 1.07-1.24x slower. The search scores 4x4x4 + 16x16x16; a winner
 is re-verified bit-exact at all five shapes, by stress_isa, and by the RTL
@@ -210,6 +222,24 @@ show), sequencer-precomputed row counts.
 Your starting angle:
 {angle}
 """
+
+
+def _pin(text: str) -> str:
+    """Substitute the derived published row into a prompt, once, at import.
+
+    `.format(angle=...)` runs later and only knows `angle`, so these cannot be
+    format fields; and the angles are substituted INTO the template, so a
+    field left in one would survive into the prompt unexpanded.
+    """
+    return (text.replace("{row}", ROW_EQUALS)
+                .replace("{slashed}", ROW_SLASHED)
+                .replace("{four}", str(PUBLISHED_ROW["4x4x4"])))
+
+
+BASE_TASK = _pin(BASE_TASK)
+CODESIGN_TASK = _pin(CODESIGN_TASK)
+STRATEGIES = tuple((n, _pin(a)) for n, a in STRATEGIES)
+CODESIGN_STRATEGIES = tuple((n, _pin(a)) for n, a in CODESIGN_STRATEGIES)
 
 
 def run_tag(run_dir: Path, t0_ms: int) -> str:
@@ -247,6 +277,18 @@ def read_variants(log_dir: Path) -> list[dict]:
     return [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
 
 
+def primary_key(entry: dict, verdict: dict) -> str:
+    """Which term the loop ranked this candidate on.
+
+    `loop.py` records it in `primary`; evidence written before the model term
+    has no such field and was ranked on the GEMM total. Both are read, because
+    reading old runs back is the point of `--status`.
+    """
+    return entry.get("primary") or ("total_model_cycles"
+                                    if verdict.get("total_model_cycles")
+                                    else "total_cycles")
+
+
 def report(run_dir: Path, workers: list[str], t0_ms: int, started: float) -> dict:
     print("=" * 78)
     print("Swarm results (all cycle counts are RTL cosim)")
@@ -262,20 +304,26 @@ def report(run_dir: Path, workers: list[str], t0_ms: int, started: float) -> dic
             if e["kind"] != "candidate":
                 continue
             v = e.get("verdict") or {}   # None: no change was made, not scored
+            # Rank by the term the LOOP accepted on, not by the GEMM total.
+            # They diverged when the objective gained its model term, and a
+            # report that names a different winner from the one the run kept
+            # is worse than no report: a later reader trusts this file.
+            key = primary_key(e, v)
             rows.append({"iteration": e["iteration"], "accepted": e["accepted"],
                          "ok": v.get("ok"), "stage": v.get("stage"),
-                         "cycles": v.get("cycles"), "total": v.get("total_cycles"),
-                         "llm_usd": e.get("llm_usd")})
+                         "cycles": v.get("cycles"), "total": v.get(key),
+                         "primary": key, "llm_usd": e.get("llm_usd")})
             print(f"  {worker:<16} iter {e['iteration']}: "
-                  + (f"cosim {v['cycles']} total {v['total_cycles']}"
+                  + (f"cosim {v['cycles']} {key} {v.get(key)}"
                      if v.get("ok") else f"FAILED at {v.get('stage')}"
                      if v else f"not scored ({e.get('reason')})")
                   + f"  {'ACCEPTED' if e['accepted'] else 'rejected'}"
                   + f"  ${e.get('llm_usd', 0):.2f}")
             if e["accepted"] and (summary["best"] is None
-                                  or v["total_cycles"] < summary["best"]["total"]):
+                                  or v[key] < summary["best"]["total"]):
                 summary["best"] = {"worker": worker, "iteration": e["iteration"],
-                                   "total": v["total_cycles"], "cycles": v["cycles"]}
+                                   "total": v[key], "primary": key,
+                                   "cycles": v["cycles"]}
         summary["workers"][worker] = rows
     spend = run_spend(run_tag(run_dir, t0_ms) + " ", t0_ms)
     window = spent_since(t0_ms)
@@ -339,9 +387,7 @@ def status(run_dir: Path) -> None:
             # from `delta_cycles` to `delta_primary`. Evidence directories on
             # disk carry the old spelling, and reading those back is the point
             # of this command, so both are accepted.
-            key = e.get("primary") or ("total_model_cycles"
-                                       if v.get("total_model_cycles")
-                                       else "total_cycles")
+            key = primary_key(e, v)
             delta = e.get("delta_primary", e.get("delta_cycles"))
             print(f"    iter {e['iteration']}: "
                   + (f"cosim {v['cycles']} {key} {v.get(key, v.get('total_cycles'))}"

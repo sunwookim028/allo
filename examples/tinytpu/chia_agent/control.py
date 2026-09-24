@@ -187,3 +187,93 @@ def banner(cc: dict) -> str:
                "! result from this run is trustworthy until a person has said",
                "! which, and recorded the new numbers in control.RECORDED."]
     return "\n".join(["!" * 78, *why, "!" * 78])
+
+
+#: Files that quote the published five-shape row as a literal AND are meant to
+#: track it. A pin here must equal `reproduced()`; `check_pins` fails loudly
+#: otherwise. This is the same failure the frozen-file lists had twice: a value
+#: copied into several places with nothing comparing the copies to the source.
+#: `swarm.py` is absent because it no longer holds a literal at all -- it
+#: derives the row from here, which is the fix this list is only the backstop
+#: for.
+PINNED = (f"{PKG}/reproduce.sh",
+          f"{PKG}/chia_agent/swarm.py", f"{PKG}/chia_agent/test_harness.py",
+          f"{PKG}/chia_agent/test_codesign.py")
+#: Literals fitted to the old row that a find-and-replace would FALSIFY: they
+#: are the outputs of a fit or a calibration, not quotations of the row, and
+#: they need re-measuring rather than editing. Named here so the gate reports
+#: them instead of passing over them in silence.
+NEEDS_REFIT = {
+    f"{PKG}/reproduce_codesign.sh":
+        "its control expects 4x4x4=169 / 16x16x16=686, which was the mapper's "
+        "pick against the OLD row; whether the pick still equals the shipped "
+        "nest is a measurement, not an edit",
+    f"{PKG}/act/cycles.py": "PUBLISHED_CYCLES / CRITICAL_WORK_FIT",
+    f"{PKG}/act_machine.py": "CALIBRATION / RANKING_EVIDENCE",
+    "tests/act/test_tinytpu.py": "asserts worst <= 40 against that fit",
+}
+#: A five-shape row that NAMES its shapes: `4x4x4=175, 8x8x8=265, ...`.
+#: Deliberately not the bare `175 / 265 / ...` form, which cannot be told
+#: apart from Gemmini's row, the mapper's row, or a sentence about what the
+#: numbers used to be -- all three of which are legitimately not the published
+#: row, and all three of which a looser pattern flagged. A shape-keyed row is
+#: always a claim about this design, so matching it has no false positives.
+_ROW_EQ = re.compile(r"4x4x4=(\d+)\D+8x8x8=(\d+)\D+12x12x12=(\d+)"
+                     r"\D+16x16x8=(\d+)\D+16x16x16=(\d+)")
+#: The same row as a dict literal, which is how `PUBLISHED_CYCLES` went stale.
+_ROW_DICT = re.compile(r'"4x4x4":\s*(\d+)\D+"8x8x8":\s*(\d+)\D+'
+                       r'"12x12x12":\s*(\d+)\D+"16x16x8":\s*(\d+)\D+'
+                       r'"16x16x16":\s*(\d+)')
+
+
+#: A row that is deliberately NOT the published one -- the co-design mapper's
+#: pick, a comparison machine, a sentence about history -- says so on its own
+#: first line or the ONE line above it. Deliberately that tight: at a six-line
+#: lookback an exemption leaked onto the next unrelated row down, and a probe
+#: row with the stale numbers went through the gate unflagged.
+EXEMPT = "not-the-published-row"
+
+
+def check_pins() -> list[str]:
+    """Every tracked pin of the published row, against `reproduce.sh`."""
+    want = tuple(reproduced()[s] for s in ALL_SHAPES)
+    problems = []
+    for rel in PINNED:
+        path = REPO / rel
+        if not path.is_file():
+            problems.append(f"{rel}: PINNED names a file that does not exist")
+            continue
+        text = path.read_text()
+        # The dict form is often written over several lines.
+        lines = text.splitlines()
+        for m in _ROW_DICT.finditer(text):
+            if tuple(int(g) for g in m.groups()) != want:
+                n = text[: m.start()].count("\n") + 1
+                if any(EXEMPT in l for l in lines[max(0, n - 2): n]):
+                    continue
+                problems.append(
+                    f"{rel}:{n} has a dict of {' / '.join(m.groups())}, "
+                    f"published is {' / '.join(str(c) for c in want)}")
+        for n, line in enumerate(lines, 1):
+            m = _ROW_EQ.search(line)
+            if m and tuple(int(g) for g in m.groups()) != want:
+                if any(EXEMPT in l for l in lines[max(0, n - 2): n]):
+                    continue
+                problems.append(
+                    f"{rel}:{n} quotes {' / '.join(m.groups())}, "
+                    f"published is {' / '.join(str(c) for c in want)}")
+    return problems
+
+
+if __name__ == "__main__":
+    import sys
+    bad = check_pins()
+    print(f"published row (from {PKG}/reproduce.sh): "
+          + " ".join(f"{s}={c}" for s, c in reproduced().items()))
+    for rel, what in sorted(NEEDS_REFIT.items()):
+        print(f"  ACKNOWLEDGED, fitted to the superseded row: {rel} -- {what}")
+    for p in bad:
+        print(f"  STALE PIN: {p}")
+    print("PINS OK: every tracked quotation of the published row matches it"
+          if not bad else f"PINS STALE: {len(bad)}")
+    sys.exit(1 if bad else 0)

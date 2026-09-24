@@ -13,7 +13,8 @@ Nothing here calls a real model. Two scripted "agents" drive the real harness:
 
 Cases, each with an expected verdict:
 
-  a  no-op (re-save the unmodified design)   scores exactly 172 / 686 (main @ 476a70d8)
+  a  no-op (re-save the unmodified design)   scores exactly the published row
+                                             (derived per run, not pinned here)
   b  `spad ... = 0` (part of b4be2b10 reverted) bit-exact, scored WORSE
   c  PE partial sum narrowed to int16          passes bench_isa, REJECTED by
                                                stress_isa
@@ -363,6 +364,47 @@ def phase_s():
     import tempfile
     import evaluate as ev
     import spec_policy as sp
+    import control as ctl
+    # Two classes of defect that have each broken this loop twice, both of the
+    # same shape -- a value copied into several files with nothing comparing
+    # the copies to the source -- and both decidable in milliseconds here
+    # rather than after a candidate's evaluation.
+    #
+    # 1. The frozen set must be closed under the evaluation's imports. It was
+    #    not: `WORKLOAD_SUITE` shipped without `act_target` and every
+    #    candidate died at stage `model`.
+    #    Asking whether the imports resolve in GIT would prove nothing: they
+    #    always did. The property is that the COMPOSED TREE is closed, which
+    #    is what `compose` now derives and what this re-checks independently.
+    closure_tmp = Path(tempfile.mkdtemp(prefix="closure-"))
+    try:
+        spec = closure_tmp / "spec"
+        for rel in EDITABLE:
+            dst = spec / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_bytes(ev.git_show("HEAD", f"{ev.PKG}/{rel}"))
+        tree = closure_tmp / "tree"
+        ev.compose(spec, tree, "HEAD")      # raises Reject if not closed
+        _, unresolved = ev._walk_imports(
+            [rel for rel in ev.ENTRY_POINTS if (tree / rel).is_file()],
+            lambda r: (tree / r).is_file(), lambda r: (tree / r).read_bytes())
+        note = (sorted(unresolved) or
+                f"closed, {len(list(tree.rglob('*.py')))} modules")
+    except ev.Reject as exc:
+        unresolved, note = [str(exc)], str(exc)
+    finally:
+        shutil.rmtree(closure_tmp, ignore_errors=True)
+    check("s.composed tree is closed under its imports",
+          "every first-party module the evaluation reaches is IN the tree",
+          note, not unresolved)
+    # 2. Every tracked quotation of the published five-shape row must equal
+    #    what `reproduce.sh` prints. Four copies in `swarm.py` did not, so
+    #    every worker a run launched was handed a baseline the design had not
+    #    produced for days.
+    stale = ctl.check_pins()
+    check("s.published row is quoted consistently",
+          f"every pin equals reproduce.sh's {ctl.reproduced()}",
+          stale or "all pins match", not stale)
     # The policy passes the shipped design, as the evaluator runs it -- except
     # for the standing exception, which must be exactly the recorded set.
     failing = {rel for rel in EDITABLE if sp.policy_violations(rel, head(rel))}
