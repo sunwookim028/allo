@@ -1801,7 +1801,20 @@ because of SRL16, and the ASIC cost is linear.
 25. ``bfloat16`` runs in the simulator and aborts the process in every HLS emitter
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. admonition:: Status (2026-09-24): OPEN, simulator-only
+.. admonition:: Status (2026-09-24): CLOSED -- see item I, which supersedes this
+
+   Fixed the same day it was written. The account below is kept because it is
+   the state a reader of ``examples/minitpu`` would have found, and because two
+   of its three guesses about the C++ spelling were wrong in ways worth
+   recording: ``ap_bfloat16`` and ``hls::bfloat16`` **do not exist** -- Vitis
+   HLS 2023.2 ships no bf16 type at all, and its one arbitrary-precision float,
+   ``ap_float``, segfaults ``csynth`` at every width -- so Vitis needed an
+   emitted shim rather than a vendor type. ``ac_std_float<16, 8>`` was right,
+   and is what Catapult and SystemC now use. SystemC turned out to be the
+   *cheapest* of the three, not a design decision: ``ac_marshaller.h`` already
+   carries a wrapper for it.
+
+.. admonition:: The original entry (2026-09-24): OPEN, simulator-only
 
    ``bfloat16`` is a complete arithmetic type in the dataflow simulator -- as a
    ``Stream`` element, as an operand, widened to ``float32`` and rounded back --
