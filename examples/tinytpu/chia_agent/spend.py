@@ -122,13 +122,21 @@ def of_run(run_dir: Path) -> dict:
     that started it, and never the `usage` field (which reports $0.00 for a
     call that timed out and was billed in full -- every large call of run 3 did
     exactly that, so the run read $0.00 on `usage` and $20.72 here)."""
-    run = json.loads((Path(run_dir) / "run.json").read_text())
-    spend = run_spend(run["run_tag"] + " ", run["t0_ms"])
+    run_dir = Path(run_dir)
+    run = json.loads((run_dir / "run.json").read_text())
+    # Runs before the tag was recorded (run 1, the smoke run) have no
+    # `run_tag`; it is derivable, and if their sessions were never titled the
+    # derived tag simply finds nothing, which is reported rather than raised.
+    tag = run.get("run_tag") or f"chia-run {run_dir.name}@{run['t0_ms']}"
+    spend = run_spend(tag + " ", run["t0_ms"])
     cumulative = chia2026_spend()
     cumulative.pop("rows", None)
     cap = float(os.environ.get("CHIA_TOTAL_CAP_USD", DEFAULT_TOTAL_CAP_USD))
-    return {"run_dir": str(Path(run_dir).resolve()),
-            "run_tag": run["run_tag"], "t0_ms": run["t0_ms"],
+    out = {"run_dir": str(run_dir.resolve()),
+            "run_tag": tag,
+            "run_tag_source": "run.json" if run.get("run_tag") else
+                              "derived: this run.json predates the field",
+            "t0_ms": run["t0_ms"],
             "source": "opencode's own database (spend.run_spend), "
                       "NEVER the `usage` field",
             "run_usd": spend["usd"],
@@ -139,6 +147,17 @@ def of_run(run_dir: Path) -> dict:
             "cumulative_chia2026_usd_after": cumulative["usd"],
             "cumulative_sessions_after": cumulative["sessions"],
             "total_cap_usd": cap}
+    if not spend["usd"]:
+        summary = run_dir / "summary.json"
+        recorded = (json.loads(summary.read_text()).get("spend", {}).get("usd")
+                    if summary.exists() else None)
+        out["note"] = ("no session carries this tag -- the run predates the "
+                       "titling, or its sessions are gone. "
+                       + (f"summary.json recorded ${recorded}. "
+                          if recorded is not None else "")
+                       + "`spend.py report <repo>` attributes by time window "
+                         "instead.")
+    return out
 
 
 def billing() -> dict:

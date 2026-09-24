@@ -302,11 +302,15 @@ def status(run_dir: Path) -> None:
     `run.json`, the workers' logs and opencode's DB."""
     run_dir = run_dir.resolve()
     run = json.loads((run_dir / "run.json").read_text())
+    # Older run.json files (run 1, the smoke run) predate `run_tag`; it is
+    # derivable, so a committed evidence directory reads back too.
+    tag = run.get("run_tag") or run_tag(run_dir, run["t0_ms"])
     done = run_dir / "summary.json"
     alive = subprocess.run(["pgrep", "-f", f"--log-dir {run_dir}"],
                            capture_output=True, text=True).stdout.split()
     print(f"run      {run_dir}")
-    print(f"  tag    {run['run_tag']}")
+    print(f"  tag    {tag}"
+          + ("" if run.get("run_tag") else "   (derived; run.json predates it)"))
     print(f"  began  {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(run['t0_ms'] / 1000))}"
           f"  ({(time.time() - run['t0_ms'] / 1000) / 60:.1f} min ago)")
     print(f"  head   {run['head']}   model {run['model']}")
@@ -339,10 +343,16 @@ def status(run_dir: Path) -> None:
         if log.exists() and not done.exists():
             tail = log.read_text(errors="replace").splitlines()[-1:]
             print(f"    log tail: {tail[0][:100] if tail else '(empty)'}")
-    spend = run_spend(run["run_tag"] + " ", run["t0_ms"])
+    spend = run_spend(tag + " ", run["t0_ms"])
     print(f"\n  spend  ${spend['usd']:.2f} of ${run['budget_usd']:.2f} over "
           f"{len(spend['sessions'])} session(s), {spend['messages']} model "
           f"messages -- from opencode's DB, never the `usage` field")
+    if not spend["usd"]:
+        recorded = (json.loads(done.read_text()).get("spend", {}).get("usd")
+                    if done.exists() else None)
+        print("         no session carries that tag"
+              + (f"; summary.json recorded ${recorded:.2f}" if recorded else "")
+              + ". `python3 spend.py report <repo>` attributes by time window.")
     print(f"  the full question: python3 -c \"import json;r=json.load("
           f"open('{run_dir}/run.json'));print(r['task_template'].format("
           f"angle=r['strategies']['{run['workers'][0]}']))\"")
