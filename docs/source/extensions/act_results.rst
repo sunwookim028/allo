@@ -32,7 +32,7 @@ Why the core was rebuilt rather than ported
 ===========================================
 
 **Rebuild the core against this fork's abstractions, using ACT's algorithms as
-the reference; cite ACT, copy nothing.** That is what ``act/`` is. The decision
+the reference; cite ACT, copy nothing.** That is what ``allo/act/`` is. The decision
 was forced rather than preferred, and the reasoning is worth keeping because it
 is the argument any future port has to answer:
 
@@ -60,7 +60,7 @@ What is given up by not porting, stated plainly: ACT's pattern matcher (TOSA DAG
 to instruction, a memoized tree DP that is globally optimal because multi-use
 values are forced cut points), its residence and layout solvers, its Belady
 spiller, and its MLIR emission. Those are the parts of ACT that are genuinely
-hard and genuinely good, and ``act/`` has none of them. ``act/`` is a mapper, a
+hard and genuinely good, and ``allo/act/`` has none of them. ``allo/act/`` is a mapper, a
 cost model and a lowering, and it stops where ACT's interesting work begins.
 When the bindings for the chia lineage can be built, the matcher is the piece to
 revisit first -- not the mapper.

@@ -5,7 +5,7 @@
 
 import itertools
 
-from act.nest import INTRINSIC, OUTER, Loop
+from allo.act.nest import INTRINSIC, OUTER, Loop
 
 
 def divisors(n):

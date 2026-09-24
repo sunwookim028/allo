@@ -66,7 +66,7 @@ def _repo_root(start=None):
     """
     d = os.path.dirname(os.path.abspath(start or __file__))
     while True:
-        if (os.path.isdir(os.path.join(d, "act"))
+        if (os.path.isdir(os.path.join(d, "examples", "tinytpu"))
                 and os.path.isdir(os.path.join(d, "allo", "frontend"))):
             return d
         parent = os.path.dirname(d)

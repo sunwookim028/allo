@@ -26,9 +26,9 @@ import torch
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..", "..")))
-from act.target import get as machine_for  # noqa: E402
-from act import workloads  # noqa: E402
-from act.search import Problem, search  # noqa: E402
+from allo.act.target import get as machine_for  # noqa: E402
+from allo.act import workloads  # noqa: E402
+from allo.act.search import Problem, search  # noqa: E402
 from examples.tinytpu import act_target  # noqa: E402,F401  -- registers tinytpu-isa
 from examples.tinytpu import isa_ref  # noqa: E402
 from examples.tinytpu.act import correctness, cycles  # noqa: E402

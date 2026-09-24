@@ -22,11 +22,11 @@
 ACT and the TinyTPU-isa Mapper
 ##############################
 
-``act/`` is a loop-nest mapper for :doc:`/designs/tinytpu_isa`. Given a workload
+``allo/act/`` is a loop-nest mapper for :doc:`/designs/tinytpu_isa`. Given a workload
 spec and a shape it enumerates the mapspace, lowers each nest to the machine's
 instruction words, prices what it lowered, and prints the ranked mappings with a
-census of why the rest were refused. It is target-independent pure python that
-needs no build of the MLIR bindings, and it is a rebuild of the core of **ACT**
+census of why the rest were refused. It is target-independent pure python whose
+own imports are numpy only, and it is a rebuild of the core of **ACT**
 -- Kai Shao's accelerator-compilation work -- against this fork's abstractions,
 using ACT's algorithms as the reference and copying none of its code. The corpus
 it compiles and the judge that grades the result are on :doc:`act_specs`; the
@@ -125,32 +125,32 @@ has to stay testable without a build of the bindings:
 
    * - module
      - what it is
-   * - ``act/workload.py``
+   * - ``allo/act/workload.py``
      - an einsum over named ranks plus a pointwise epilogue. It evaluates itself
        with ``np.einsum`` over subscripts derived from the rank tuples, so **a
        spec is its own gold** -- one object drives the mapspace, the lowering
        and the correctness check.
-   * - ``act/workloads.py``
+   * - ``allo/act/workloads.py``
      - the registry. Adding a workload is adding one entry.
-   * - ``act/nest.py``
+   * - ``allo/act/nest.py``
      - ACT's four-field ``Loop``, exact coverage, the intrinsic peel, and
        ``Refused(cause, detail, also)``. A refusal carries **every** cause the
        nest violates, so the census does not depend on the order the checks
        happen to run in.
-   * - ``act/mapspace.py``
+   * - ``allo/act/mapspace.py``
      - factorings x permutations over any rank set, with the innermost band
        supplied by the target. ACT's ``mapspace.py`` is dead code, so this is
        written fresh rather than revived.
-   * - ``act/machine.py``
+   * - ``allo/act/machine.py``
      - a machine as data: spaces, units, and one opcode row per instruction
        kind, giving the work each unit does per issue and the regions it reads
        and writes.
-   * - ``act/schedule.py``
+   * - ``allo/act/schedule.py``
      - concurrent units, each sequential and in program order. ``Priced.cost``
        is ACT's ``(makespan, emits)``.
-   * - ``act/search.py``
+   * - ``allo/act/search.py``
      - enumerate, lower, price, rank, and count the refusals by cause.
-   * - ``act/target.py``
+   * - ``allo/act/target.py``
      - the five questions a machine must answer: its intrinsics, how to lower a
        nest, its steps, its emit count, and how to verify a program.
 
@@ -239,7 +239,7 @@ incomparable with an independently built one. Together they are still 1,150.
 What this flow should emit next
 -------------------------------
 
-Today ``act/`` chooses a mapping for a **fixed** design and emits instructions
+Today ``allo/act/`` chooses a mapping for a **fixed** design and emits instructions
 for it. The stated end state is the other direction: a library of parametrized,
 modular IPs that compose into different architectures. The useful fact, from the
 same branch, is that **the composable IR already exists** -- ``df.customize``
@@ -255,7 +255,7 @@ So the emission target for a generated design is that IR form, not the
 closure-nested source form this design uses -- where all seven units are
 ``@df.kernel`` closures inside one ``@df.region`` sharing about fifteen
 region-scope streams by capture, so no unit is separable, importable or testable
-on its own. ``act/machine.py`` is deliberately the same information a generator
+on its own. ``allo/act/machine.py`` is deliberately the same information a generator
 for that form would need: units, the work each does per issue, and the spaces
 they read and write. Turning that declaration into ``func.func`` units is the
 next piece of work, and nothing here forecloses it.

@@ -8,9 +8,9 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..")))
-from act.machine import Machine, Opcode, Space  # noqa: E402
-from act.schedule import Region  # noqa: E402
-from act.schedule import Step  # noqa: E402
+from allo.act.machine import Machine, Opcode, Space  # noqa: E402
+from allo.act.schedule import Region  # noqa: E402
+from allo.act.schedule import Step  # noqa: E402
 from examples.tinytpu.microarch_isa import (  # noqa: E402
     AGU_TERMS, DMA_SRC_B, DMA_TO_VR, LOOP_DEPTH, NAR, NVR, OP_DMA_LD,
     OP_ENDLOOP, OP_LOOP, OP_MM, OP_MVOUT, OP_VADD, OP_VLD, OP_VRELU,

@@ -276,9 +276,10 @@ produced a cycle count (:ref:`why <workload-suite-widening>`).
 
 Two provenance facts that belong with the claims rather than under them:
 
-* **The bit-exactness claims need no bindings.** ``isa_ref`` is numpy and the
-  ``act/`` core imports numpy only, so "correct" is established by code that
-  is entirely this checkout's.
+* **The bit-exactness claims are pure numpy.** ``isa_ref`` is numpy and the
+  ``allo/act/`` core imports numpy only, so "correct" is established by code that
+  is entirely this checkout's --- the MLIR bindings are not part of that claim,
+  even though importing ``allo.act`` loads them.
 * **The compiled half is borrowed.** This worktree has no ``mlir/build``, so
   ``allo._mlir`` resolves to ``/home/sk3463/allo-bench`` at ``ff7beaf1`` ---
   ``tests/act/test_bindings.py`` fails here and names both paths, which is

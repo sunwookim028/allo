@@ -11,11 +11,11 @@ import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..")))
-from act.mapspace import divisors  # noqa: E402
-from act.nest import (  # noqa: E402
+from allo.act.mapspace import divisors  # noqa: E402
+from allo.act.nest import (  # noqa: E402
     Refused, check_coverage, check_sequential, order, peel_intrinsic, refuse,
 )
-from act.target import Target, register  # noqa: E402
+from allo.act.target import Target, register  # noqa: E402
 from examples.tinytpu import isa_ref  # noqa: E402
 from examples.tinytpu.act_machine import (  # noqa: E402
     MACHINE, steps_of,

@@ -3,7 +3,7 @@
 
 """The registry. One entry per workload -- adding one is adding one entry."""
 
-from act.workload import Tensor, Workload
+from allo.act.workload import Tensor, Workload
 
 MKN = ("M", "K", "N")
 A = Tensor("A", ("M", "K"))

@@ -11,8 +11,8 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..")))
-from act import mapspace  # noqa: E402
-from act.nest import (  # noqa: E402
+from allo.act import mapspace  # noqa: E402
+from allo.act.nest import (  # noqa: E402
     INTRINSIC, Refused, check_coverage, covered, peel_intrinsic,
 )
 

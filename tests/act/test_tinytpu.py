@@ -10,9 +10,9 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..")))
-from act import workloads  # noqa: E402
-from act.nest import INTRINSIC, OUTER, Loop, Refused  # noqa: E402
-from act.search import Problem, price, search  # noqa: E402
+from allo.act import workloads  # noqa: E402
+from allo.act.nest import INTRINSIC, OUTER, Loop, Refused  # noqa: E402
+from allo.act.search import Problem, price, search  # noqa: E402
 
 pytest.importorskip("allo._mlir", reason="the target needs the bindings")
 

@@ -28,7 +28,7 @@ from examples.tinytpu.isa_dsl import (  # noqa: E402
 from examples.tinytpu.microarch_isa import (  # noqa: E402
     expand, schedule, tinytpu_isa,
 )
-from act import target, workloads  # noqa: E402
+from allo.act import target, workloads  # noqa: E402
 from examples.tinytpu import act_target  # noqa: E402,F401
 
 

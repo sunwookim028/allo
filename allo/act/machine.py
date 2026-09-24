@@ -5,7 +5,7 @@
 
 from dataclasses import dataclass
 
-from act.schedule import Region, Step
+from allo.act.schedule import Region, Step
 
 
 class MachineError(Exception):

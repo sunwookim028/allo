@@ -89,9 +89,11 @@ and say so in whatever you report:
 
 ``tests/act/test_bindings.py`` asserts this rather than leaving it to be
 noticed: it fails naming both paths when the extension comes from another
-checkout, and skips when no bindings are reachable at all. The ``act/`` core
-imports numpy only, so ``pytest tests/act`` still exercises the workload,
-mapspace and scheduler layers in a worktree with no build.
+checkout, and skips when no bindings are reachable at all. The ``allo/act/``
+core itself imports numpy only, but it moved under ``allo/`` on 2026-09-24, so
+``import allo.act`` runs ``allo/__init__.py``: ``pytest tests/act`` now needs
+this checkout's bindings like everything else, where ``act/`` at the root used
+to run in a worktree with no build.
 
 Golden test for dataflow simulator
 ----------------------------------

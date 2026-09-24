@@ -15,8 +15,8 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..")))
-from act import mapspace, target, workloads  # noqa: E402
-from act.search import Problem, search  # noqa: E402
+from allo.act import mapspace, target, workloads  # noqa: E402
+from allo.act.search import Problem, search  # noqa: E402
 from examples.tinytpu.act_machine import (  # noqa: E402
     CALIBRATION, fit, orders_checked,
 )

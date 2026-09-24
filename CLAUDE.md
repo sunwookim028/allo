@@ -122,17 +122,18 @@ and `kpn_model` all accept orders the RTL deadlocks on.
 
 ## ACT (the mapper/compiler flow on `main`)
 
-`act/` is the target-independent core (pure python, importable without the MLIR
-bindings -- `import allo` is not); the TinyTPU-isa target is
+`allo/act/` is the target-independent core (numpy only, no MLIR of its own --
+but it is a subpackage of `allo`, so importing it runs `allo/__init__.py` and
+therefore needs this checkout's bindings); the TinyTPU-isa target is
 `examples/tinytpu/act_{machine,target,compile,cosim}.py`.
 
 ```bash
 python examples/tinytpu/act_compile.py gemm.relu 16x16x16
 python examples/tinytpu/act_compile.py --gate   # ~1.3 s
-pytest tests/act/                              # core needs no bindings
+pytest tests/act/                              # needs this checkout's bindings
 ```
 
-Add a workload in one place (`act/workloads.py`); a spec evaluates itself to
+Add a workload in one place (`allo/act/workloads.py`); a spec evaluates itself to
 numpy, so it is its own gold. `makespan` is a MODEL over the units
 `assemble()`'s header promises -- only `cosim.py` / `act_cosim.py` measure.
 Kai Shao's ACT is cited, not copied: `docs/source/extensions/act.rst`.

@@ -19,7 +19,7 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..")))
-from act.schedule import Region, Step, StepError, predecessors, run  # noqa: E402
+from allo.act.schedule import Region, Step, StepError, predecessors, run  # noqa: E402
 
 UNITS = ("alpha", "beta", "gamma")
 

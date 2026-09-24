@@ -5,8 +5,8 @@
 
 from dataclasses import dataclass, field
 
-from act import mapspace, schedule
-from act.nest import Refused, emitted_order, order
+from allo.act import mapspace, schedule
+from allo.act.nest import Refused, emitted_order, order
 
 
 @dataclass(frozen=True)

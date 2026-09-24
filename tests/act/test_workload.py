@@ -11,8 +11,8 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..")))
-from act import workloads  # noqa: E402
-from act.workload import SpecError, Tensor, Workload  # noqa: E402
+from allo.act import workloads  # noqa: E402
+from allo.act.workload import SpecError, Tensor, Workload  # noqa: E402
 
 EXTENTS = {"M": 8, "K": 4, "N": 4}
 
