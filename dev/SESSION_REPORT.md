@@ -26,7 +26,14 @@ correction is stated rather than the sentence quietly replaced.
 
 At T=8 against a matched DIM=8 build: **16x16x8 is 424 against 500 ±16 — a 1.18x win, clearing the spread by 4.8x.** The only shape where this design beats Gemmini on a supportable margin.
 
-### The shipped design, current
+### The shipped design, as of this session
+
+**Superseded on 2026-09-24**, after this session: `63ee6ec7` made `QD=16` the
+default channel depth, moving the row to **175 / 265 / 421 / 482 / 674**
+(+4/+4/+4/−1/−11) at a price of +9.3 % flip-flops on FPGA and an ASIC price
+that is still unmeasured. Every figure in this table is therefore a `QD=8`
+measurement, including the FPGA and ASIC rows; per this report's convention
+the correction is stated rather than the numbers quietly replaced.
 
 | | |
 | --- | --- |

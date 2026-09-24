@@ -67,7 +67,14 @@ transfer to any design with SRAM macros.
 
 ### Cycles these areas belong beside
 
-Re-verified bit-exact on the current design: T=4 at MAXDIM=16 is
+**Every export here, and therefore every area in this file, is the `QD=8`
+design** — the default channel depth until `63ee6ec7` (2026-09-24). Read the
+cycles below as belonging to that RTL, which is the point of stating them:
+they are the pair, and re-quoting them next to today's row would mismatch the
+two. The shipped row is now **175 / 265 / 421 / 482 / 674**; re-pricing the
+areas against it needs a fresh DC run, which has not been done.
+
+Re-verified bit-exact on the design as exported: T=4 at MAXDIM=16 is
 **171 / 261 / 417 / 483 / 685**; T=8 at MAXDIM=64 is **285 / 424 / 493** at
 8x8x8, 16x16x8 and 16x16x16, and **7083** at 64x64x64.
 

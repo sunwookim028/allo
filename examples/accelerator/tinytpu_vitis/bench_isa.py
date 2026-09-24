@@ -47,7 +47,7 @@ from examples.accelerator.tinytpu_vitis.shapes import SHAPES  # noqa: E402
 # They answer different questions and are never mixed into one verdict; the
 # accounting is in `docs/source/designs/benchmarks.rst`.
 #
-#   LATENCY   the five shapes the published 171/261/417/483/685 come from --
+#   LATENCY   the five shapes the published 175/265/421/482/674 come from --
 #             `SHAPES` itself, aliased so the two sets read symmetrically.
 #             At 16x16x16 this 4x4 array does 16 tile-matmuls and 256
 #             wavefront rows while a 16x16 array does ONE weight load and one

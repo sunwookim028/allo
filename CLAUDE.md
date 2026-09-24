@@ -80,7 +80,8 @@ does not build the fork's site; build locally.
 region by `ip/compose.py`); `microarch_isa.py` is only the shipped parameter
 set and the names the harness imports. From a clean checkout, one command
 builds the checkout's bindings, runs the functional gates, runs cosim, and
-checks the published cycle counts (171/261/417/483/685; 252/383/591/667/919
+checks the published cycle counts (175/265/421/482/674 since `63ee6ec7` made
+`QD=16` the default; 171/261/417/483/685 before that, 252/383/591/667/919
 before `e24e433b`):
 
 ```bash

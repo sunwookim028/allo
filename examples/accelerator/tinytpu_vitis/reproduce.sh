@@ -10,10 +10,10 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(cd "$HERE/../../.." && pwd)
 # At TPU_MAXDIM=16 (pinned below), which is where these were measured.
 #
-# WHY THEY MOVED BY ONE CYCLE, isolated to one variable rather than inferred.
-# They were 172 / 262 / 418 / 484 / 686 while the scratchpad and vreg files
-# were the literals 512 and 256; they are 171 / 261 / 417 / 483 / 685 now that
-# both are DERIVED as MAXDIM^2/T, which is 64 rows each at MAXDIM=16.
+# WHY THEY MOVED BY ONE CYCLE on 2026-09-22, isolated to one variable rather
+# than inferred. They were 172 / 262 / 418 / 484 / 686 while the scratchpad and
+# vreg files were the literals 512 and 256; they became 171 / 261 / 417 / 483 /
+# 685 once both are DERIVED as MAXDIM^2/T, 64 rows each at MAXDIM=16.
 # Rebuilding THIS configuration with `TPU_SPAD=512 TPU_NVR=256 TPU_NAR=128`
 # and nothing else reverted -- the derived-size expression, both ceiling
 # assertions, the test-window floor and the parametric burst loop all still
@@ -26,6 +26,15 @@ ROOT=$(cd "$HERE/../../.." && pwd)
 # BRAM 42 -> 40 says two memories left block RAM -- and the shorter operand
 # read path takes one cycle out of the FIXED term, which is why the delta is
 # the same at every shape regardless of work. It is a small improvement.
+#
+# THEN QD=16 MOVED THEM AGAIN on 2026-09-24 (63ee6ec7), and NOT uniformly:
+# +4 / +4 / +4 / -1 / -11, to the EXPECTED below. Depth 8 leaves three legal
+# tiled programs unable to complete in cosim (limitations item 24); at 16 all
+# ten of that family complete bit-exact. The three smallest shapes pay deeper-
+# FIFO pipeline skew and the two largest get FASTER, because a deeper queue
+# lets the sequencer run ahead of the units it dispatches to. The same deltas
+# reproduce at MAXDIM=64 (218/357/563/677/879 -> 222/361/567/676/868). Price:
+# +9.3% FF on FPGA; the ASIC price is unmeasured.
 EXPECTED="4x4x4=175 8x8x8=265 12x12x12=421 16x16x8=482 16x16x16=674"
 
 usage() {
@@ -51,7 +60,7 @@ Stages, in order:
   3b. mutate.py -- ONLY with --with-mutants; must print MUTATE OK;
   4. cosim.py with the DEFAULT testbench and every TPU_* knob unset -- one
      csynth, one cosim per shape -- and compares the cycle counts with the
-     published 171 / 261 / 417 / 483 / 685. Skipped by --no-cosim.
+     published 175 / 265 / 421 / 482 / 674. Skipped by --no-cosim.
 
 WHAT THE DEFAULT SKIPS. Stage 3b is off unless --with-mutants is given.
 bench_isa.py and stress_isa.py both cite mutate.py as the evidence that they
@@ -102,7 +111,7 @@ for v in $(env | grep -o '^TPU_[A-Z_]*' || true); do unset "$v"; done
 # measurement, and the shipped default moved to MAXDIM=64 so that shapes which
 # reach steady state can run at all (docs/source/designs/benchmarks.rst).
 # MAXDIM is the DRAM row stride of every operand, so the same shape costs more
-# on a bigger build -- 4x4x4 is 218 cycles at MAXDIM=64 against 171 at 16 --
+# on a bigger build -- 4x4x4 is 222 cycles at MAXDIM=64 against 175 at 16 --
 # and this script reproduces the published numbers, which means pinning the
 # configuration they were taken on. The MAXDIM=64 sweep is
 # `TPU_SET=all cosim.py`, and its numbers are on the benchmarks page.
@@ -161,7 +170,7 @@ fi
 
 echo "== cosim.py, default testbench (csynth once, then one cosim per shape)"
 "$PY" cosim.py | tee "$LOGS/cosim-reproduce.log"
-# The summary table: "  16x16x16   685", shape fields space-padded.
+# The summary table: "  16x16x16   674", shape fields space-padded.
 got=$(awk '/^  shape +cycles/{t=1; next} t && /^ +[0-9]/ {c=$NF; $NF=""; s=$0;
       gsub(/ /,"",s); printf "%s=%s ", s, c}' "$LOGS/cosim-reproduce.log" | sed 's/ $//')
 echo "   expected: $EXPECTED"

@@ -81,7 +81,8 @@ giving up synthesizability or performance.
 **Evidence.** *measured*. `examples/accelerator/tinytpu_vitis/ip/` — eight
 units in 672 lines, composed by `compose.py` into one `Architecture`;
 `microarch_isa.py` fell to ~100 lines of instantiation. The composed design
-reproduces the published cycle row exactly (171 / 261 / 417 / 483 / 685) and
+reproduces the published cycle row exactly (175 / 265 / 421 / 482 / 674 since
+`QD=16` landed; it was 171 / 261 / 417 / 483 / 685 when this was measured) and
 synthesizes through the ASIC flow. `Unit.check` recomputes free names from the
 AST and requires equality with the declaration, so a unit cannot silently
 acquire a dependency.
@@ -299,11 +300,12 @@ exist**, so they cannot be bent afterwards by whatever comes back:
 
 **Gap.** DC has not run.
 
-**The channel-depth decision is measured, and the answer is adopt.** `QD=16`
-takes three legal tiled programs from *never completing* to completing
-bit-exact, and the five published shapes move like this, paired against a
-`QD=8` control in the same tree that reproduced `171 / 261 / 417 / 483 / 685`
-exactly:
+**The channel-depth decision is measured, and it landed** (`63ee6ec7`,
+2026-09-24 — `QD=16` is the default and the right-hand column below is the
+published row). `QD=16` takes three legal tiled programs from *never
+completing* to completing bit-exact, and the five published shapes move like
+this, paired against a `QD=8` control in the same tree that reproduced the
+then-published `171 / 261 / 417 / 483 / 685` exactly:
 
 | shape | QD=8 | QD=16 | delta |
 | --- | --- | --- | --- |
