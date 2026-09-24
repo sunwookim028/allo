@@ -1,0 +1,14 @@
+{
+  "clock_ns": 3.33,
+  "files": 23,
+  "groups": 2,
+  "lanes": 8,
+  "manifest_files": {
+    "region": 23,
+    "tree": 2
+  },
+  "tops": {
+    "region": "dot_tree_8_2",
+    "tree": "dot_tree_8_2_reduce_tree_0_Pipeline_VITIS_LOOP_272_1"
+  }
+}

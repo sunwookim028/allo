@@ -1,0 +1,151 @@
+# Roadmap to the end state
+
+The end state, as the owner stated it on 2026-09-24:
+
+> one branch; every tool integrated; Julian's `allo-asic`, choonsik1's EVA and
+> the SystemC backend all integrated; repo layout upstream-consistent; headline
+> numbers for the example designs and flows — including the ACT track —
+> reproducible push-button; CHIA experiments reproducible from this repository
+> alone; licensing consistent with upstream practice.
+
+This file tracks what closes each of those and what it is waiting on. It is the
+durable record: anything not written here is lost when a session ends.
+
+**On the ETAs.** They are given in *agent-sessions* (one focused agent, working
+to a written brief) plus wall-clock where an external tool dominates. They
+assume no usage limit interrupts — an assumption that failed roughly six times
+on 2026-09-22/23, each costing a partial re-run. Treat them as ordering
+information, not as promises.
+
+---
+
+## A. One branch
+
+**Done.** `main` plus three deliberate exceptions, each with a stated reason:
+
+| branch | why it exists |
+| --- | --- |
+| `big-shapes` | pending the `QD=16` re-measure — **in flight** |
+| `upstream-omp-team-size` | an upstream contribution candidate, kept separate on purpose |
+| `wip-snapshot-20260922` | holds a prompt-audit finding that exists nowhere else |
+
+Nine branches were merged or archived as annotated tags; nine more that were
+fully merged were deleted. Feature branches created by the agents below are
+expected to land and disappear.
+
+**Remaining:** `big-shapes` lands or is archived when its re-measure returns.
+`wip-snapshot-20260922` is deletable once the docs restyle lands its finding in
+the CHIA page. `upstream-omp-team-size` stays until it is contributed upstream.
+
+**ETA:** both closable within the two agent-sessions already running.
+
+## B. Integration
+
+| component | state | ETA |
+| --- | --- | --- |
+| SystemC emitter + EVA | agent running: merge `SystemC-emitter`, then evaluate 10 divergent commits from `systemc-ip-integration` | 1–2 sessions; the C++ may need a rebuild to verify |
+| Julian's `allo-asic` | requested from the synthesis session, which has the checkout and a standing budget | 1 session on their side |
+| ACT | already in-tree; moves in §C | with the layout move |
+| CHIA loop | already in-tree; see §E | — |
+
+**The one real unknown is the EVA merge**: two candidate branches diverge by 10
+commits each in the emitter and the IR builder, so some cherry-picks will be
+left for the author to confirm. That is the designed outcome, not a failure.
+
+**A month of divergence in `mlir/`** means the emitter may not be verifiable
+without a rebuild. If so, the honest report is what could and could not be
+checked.
+
+## C. Layout, upstream-consistent
+
+Target and reasoning in `dev/repo_layout.md`. Ordered by dependency:
+
+1. **Split `ip/compose.py`** — `Unit`, `Channel`, `Memory`, `Architecture` are
+   generic and go to `allo/`; `ip/tinytpu.py` stays with the design. *This is
+   first because it is what makes §B's manifest emitter possible.*
+2. **`examples/accelerator/tinytpu_vitis/` → `examples/tinytpu/`** — one rename,
+   references updated, gates re-run.
+3. **`allo/backend/asic/`** — both entry points: AAAH as the Allo-facing mode,
+   the flat flow as the control mode, kept permanently.
+4. **`examples/systemc_rtlsim/` → `examples/systemc/`** — it is a harness, not
+   a design.
+5. `chia_runs/` leaves the repository root.
+
+**Blocked until the agents working inside `examples/accelerator/tinytpu_vitis/`
+finish** — the re-measure, the T8 re-export and the `ip-gap` verification all
+write there, and renaming under them would destroy their work. This is the one
+genuinely sequential dependency in the whole plan.
+
+**ETA:** 2 agent-sessions once that tree is quiet.
+
+**Known defect to fix during the move:** `construct-commercial.py` resolves its
+nodes and ADK at `examples/accelerator/{nodes,adks}/`, which do not exist, so it
+cannot run from a clean checkout.
+
+## D. Push-button headline numbers
+
+A headline claim counts only when **a gate enforces it**, not when a page states
+it. Today three of eight are enforced.
+
+| flow | claim | gate | state |
+| --- | --- | --- | --- |
+| design | reproduces the published row | `reproduce.sh` | **enforced** |
+| ACT | every encodable mapping verified, 12/12 | `act_compile.py --gate` | **enforced** |
+| numbers | every published area figure traces to a report | `check_numbers.py` | **enforced** |
+| RTL | cycles bit-exact | inside `reproduce.sh` | **enforced** |
+| CHIA | the loop runs, guards hold, $0 | `test_harness.py` | exists; **repair unfinished** |
+| workloads | real models map and run | `workloads/run.py` | runs, **no gate** |
+| ASIC | area + timing floor, one flow both sides | preflight + sequence | **preflight owed** |
+| **end-to-end** | **PyTorch → cycles → area in one command** | — | **does not exist** |
+
+**The end-to-end gate is the highest-value missing piece.** Every error in this
+work has lived in the seams *between* flows — a configuration claimed but not
+run, a row measured on a different design, an area figure beside cycles from
+other RTL — and no single-flow gate can see any of them.
+
+**ETA:** workload gate, 1 session. ASIC preflight, 1 session on the synthesis
+side. End-to-end, 2 sessions, and only after §C.
+
+## E. CHIA reproducible from this repository alone
+
+**Blocked on the harness repair**, which was killed twice by usage limits. Four
+known blockers, from `dev/`:
+
+1. `MAIN_BASE` in `evaluate.py` goes stale — wrong three times in two days.
+   Derive it, or make staleness fail loudly.
+2. `isa_dsl.py` fails its own spec policy. **Do not widen the dunder allowlist
+   unilaterally** — it is a security guard on agent-authored code; this needs a
+   human decision.
+3. `check_invariants` is pinned to `MAXDIM=16`.
+4. `evaluate.FROZEN` needs the ISA spec artefacts.
+
+The bar is not that the harness's own tests pass — it is that **the loop runs
+end to end on current `main`**, or that every step short of a paid call is
+verified with the unverified step named.
+
+**ETA:** 1–2 sessions. Blocker 2 needs an answer first.
+
+---
+
+## Standing hazards
+
+Recorded because each cost real work today.
+
+- **Never run a tree-wide git operation in a checkout another agent is writing
+  to.** This destroyed an agent's work once and nearly a second time.
+- **Remove a worktree when its agent finishes, not when the disk fills.** Each
+  costs 0.6–1.9 GB; five live agents accrue ~2 GB.
+- **`/tmp` is 15 GB and shared.** When it fills, the harness cannot create its
+  output-capture file, so *every* command fails including the escape hatch, and
+  the only way out is a terminal outside the tool.
+- **The configuration trap**: the worktree default is not `MAXDIM=16`, and
+  `TPU_QD` now defaults to 16. State the variables beside every number. This
+  produced two published mistakes and two near-misses in two days.
+- **The `allo` conda env's editable install pointed at a removed worktree.**
+  Repointed to `/home/sk3463/allo` on 2026-09-24. It broke silently: `import
+  allo` still worked from inside a checkout and failed everywhere else, so it
+  surfaced only when an agent ran a docs build from its own worktree. Removing
+  a worktree is not free if anything outside git references it.
+- **Read a gate's output, never its exit code**, and confirm what ran is what is
+  being claimed. Four instruments were caught reporting success without having
+  run; three further checks ran against the wrong object and passed.
