@@ -1,0 +1,22 @@
+--- a/microarch_isa.py
++++ b/microarch_isa.py
+@@ -54,7 +54,7 @@
+ # Operand-burst width in packed words per loop iteration. 1 is the shipped
+ # design; `TPU_DMA_WIDEN=1` selects the widest beat the 64-byte bus holds, and
+ # `TPU_DMA_WORDS` names one directly.
+-_WIDEN = TpuParams.widest_burst(T, MAXDIM) if os.environ.get("TPU_DMA_WIDEN") == "1" else 1
++_WIDEN = TpuParams.widest_burst(T, MAXDIM)
+ DMA_WORDS = int(os.environ.get("TPU_DMA_WORDS", _WIDEN))
+ 
+ 
+--- a/ip/tinytpu.py
++++ b/ip/tinytpu.py
+@@ -36,7 +36,7 @@
+         Channel("dma2sp", "UInt(VW)", "QD", carries="dma_ld -> scratchpad"),
+         Channel("dma2vr", "UInt(VW)", "QD", carries="dma_ld -> operand vregs"),
+         Channel("sp2vr", "UInt(VW)", "QD", carries="scratchpad -> vregs (vld)"),
+-        Channel("ac2sp", "UInt(VW)", "QD", carries="accumulator -> dma_st"),
++        Channel("ac2sp", "UInt(VW)", "32", carries="accumulator -> dma_st"),
+         Channel("wcol", "UInt(VW)", "QD", ("T",),
+                 "header + weight words, down column 0"),
+         Channel("wrow", "UInt(VW)", "QD", ("T", "T"), "... then east along row i"),
