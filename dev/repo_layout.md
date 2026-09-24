@@ -372,9 +372,37 @@ What has not moved, worst first:
    `chia_abstraction/test_abs_harness.py` and
    `examples/tinytpu/chia_agent/test_{harness,codesign}.py` are tests.
 2. **ACT's generic core is an unjustified new root.** ***Done 2026-09-24,
-   second pass.*** `act/` -> `allo/act/`, on the `allo/autoscheduler/`
-   precedent. It cost the "importable without the MLIR bindings" property,
-   which four pages claimed and which is now false; they say so instead. The
+   second pass, at the owner's direction*** ("maybe `act/` can be under
+   `allo/`"). `act/` -> `allo/act/`, on the `allo/autoscheduler/` precedent.
+
+   **The price, measured and recorded rather than absorbed.** `allo/act/` is a
+   subpackage of `allo`, so importing it runs `allo/__init__.py`, which imports
+   the compiled MLIR bindings. `act/` at the root did not. Two consequences,
+   both real:
+
+   * **`pytest tests/act` no longer runs in a worktree with no build.** It
+     errors at collection instead. `dev/toolchains.rst` used to offer this as
+     the thing you could still exercise in an unbuilt tree; it now says the
+     property is gone rather than simply not mentioning it.
+   * **`act_compile.py --gate` went from ~1.3 s to 4.2 s**, all of it the
+     `import allo`. **This matters for CHIA**, where that gate runs once per
+     candidate: a three-second constant on every candidate of every sweep.
+
+   Four pages claimed the old property and now state the new truth explicitly:
+   `CLAUDE.md`, `dev/toolchains.rst`, `docs/source/extensions/act.rst` and
+   `docs/source/designs/workload_suite.rst`. A reader who relied on it needs to
+   be told it is gone, not to stop seeing it mentioned.
+
+   **A root named `act` was also three tools' marker for "this is a checkout".**
+   `tests/act/test_gates_negative.py`, `examples/tinytpu/workloads/gate.py` and
+   `examples/tinytpu/e2e_gate.sh` each searched upward for a directory named
+   `act` beside `allo/`. All three now look for `examples/tinytpu`. The first
+   two failed loudly and were caught the same hour; `e2e_gate.sh` is not in the
+   required gate set, so it failed only when someone ran it, with an error
+   message naming the *other* marker in its condition. **A marker directory is
+   a reference like any other, and it does not show up in a grep for imports.**
+
+   The
    TinyTPU binding (`examples/tinytpu/act_*.py`, `act/corpus/`) correctly
    stays with the design, but `examples/tinytpu/act/{judge,spec,legality,
    submission,calibrate,cycles,correctness,measure,variants,baseline}.py` is
@@ -391,8 +419,23 @@ What has not moved, worst first:
    `reduce_asic.py` are PD-flow stages the doc already names
    (`allo/backend/asic/`, since that is where the flow actually landed -- the
    doc's `scripts/asic/export.py` is now stale).
-4. **Generated output and raw dumps sit in `examples/`.**
-   `examples/tinytpu/rtl_handoff/` and `gemmini_rtl/` are exporter output;
+
+   **PREREQUISITE for the harness half, recorded so it is not rediscovered.**
+   The gates cannot move by moving, because the *design* imports them:
+   `cosim.py` imports `stress_isa` for the `TPU_TB=stress` testbench, and
+   `gen_isa.py` imports it "only for its random-program generator". Moving
+   `stress_isa.py` to `tests/` makes two design entry points import from
+   `tests/`, which is worse than leaving it. **The prerequisite is extracting
+   those two pieces -- the random-program generator and the stress testbench --
+   out of the gate and into modules the design can own.** Only then is the
+   remainder a move. (`isa_dsl.py` and `act_compile.py` import
+   `bench_isa.SHAPES`; that one is free, being a redirect to the `shapes.py`
+   that already exists.) It is a refactor with a real risk of changing
+   behaviour, and it must not ride along on a placement pass.
+4. **Generated output and raw dumps sit in `examples/`.** ***`rtl_handoff/`,
+   `gemmini_rtl/` and `csynth_reports/` done 2026-09-24, second pass; the
+   `impact/probe_shared/` and `examples/eva/generated/` halves remain.***
+   `examples/tinytpu/rtl_handoff/` and `gemmini_rtl/` were exporter output;
    `csynth_reports/` is 21 raw Vitis `.rpt` files of the same class as
    `dev/records/tinytpu/logs/csynth_isa_*.rpt`; `impact/probe_shared/` is half
    of an experiment whose other half is already in
@@ -454,6 +497,8 @@ pages in `docs/source/`, and a file's name says which it is.
 | `agents/README.md` | `dev/records/agent_interconnect_2026-08-15.md` | a dated working note |
 | `devtools/` | `scripts/devtools/` | standalone scripts acting on the compiler; nothing imports them |
 | `examples/tinytpu/csynth_reports/` | `dev/records/tinytpu/csynth_reports/` | 21 raw Vitis `.rpt` dumps, the class `dev/records/tinytpu/logs/` already holds |
+| `examples/tinytpu/rtl_handoff/` | `dev/records/tinytpu/rtl_handoff/` | 13 MB of generated Verilog: a record of what was synthesised, not a design |
+| `examples/tinytpu/gemmini_rtl/` | `dev/records/tinytpu/gemmini_rtl/` | the same for the opponent's RTL |
 
 `tests/systemc/test_emit.py` is new: the claims the moved programs make about
 the emitted SystemC, collected by pytest. `tiled_systolic.py` was asserting
@@ -506,13 +551,28 @@ found by trying.
    `reduce_asic.py`'s launch/collect and `export_rtl.py`'s `compile_order`
    would go.
 
-3. **`rtl_handoff/` and `gemmini_rtl/` are generated, but moving them changes a
-   tool's interface.** `allo/backend/asic/tools/preflight.py` resolves
-   `<--design>/rtl_handoff/<variant>` and `<--design>/gemmini_rtl/<variant>`;
-   if the exports leave the design, `--design` stops being sufficient and the
-   tool needs an `--exports` of its own, the way `check_pairing.py` already
-   has one. That is an interface change, not a placement change. **Owner's
-   call** -- the two options and their costs are in the session report.
+3. **`rtl_handoff/` and `gemmini_rtl/` are generated. Moved, with the
+   interface change made deliberately.** ***Done 2026-09-24, second pass.***
+   `preflight.py` used to resolve `<--design>/rtl_handoff/<variant>` and
+   `<--design>/gemmini_rtl/<variant>`: the exports' location and their two
+   possible names were both tree shape encoded in a tool. It takes
+   **`--exports`** now -- the same flag, with the same meaning, that
+   `check_pairing.py` already required -- so the two sibling tools agree
+   instead of one of them guessing.
+
+   **The integrity property was the constraint, and it holds.** `check_pairing.py`
+   admits an area figure only against an export whose `sv2v_manifest.f` md5
+   matches what the run recorded. That manifest is a list of bare filenames --
+   its own header says "paths are relative to THIS FILE's directory" -- so it
+   carries no repository path and **its md5 is invariant under the move**: the
+   digest over all 18 committed manifests is `17501fdf` before and after.
+   `check_pairing.py`'s full output is byte-identical across the move, and
+   `check_numbers.py` still prints `AREA NUMBERS OK`.
+
+   The historical absolute paths inside `reports/*/settings.json`,
+   `results.json` and `RUN.rpt` are **not** rewritten. They record where a run
+   actually read its RTL, on a machine that is not this one; editing them to
+   match today's tree would be falsifying the evidence.
 
 4. **CHIA is still in two places, and neither is `chia/`.** Unchanged: this is
    the audit's worst item and the one this pass was least able to gate. It is
