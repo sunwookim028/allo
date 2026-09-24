@@ -1,0 +1,8 @@
+   power: 272.69 uW total = 252.19 dynamic + 20.50 static
+   annotation: 100.00% flops / 100.00% user nets
+   cycle.rpt: latency 16, throughput 18 (informative)
+   rtl.rpt: total area 1180.529 score units (informative)
+   instance mac16_core_inst: 272.09 uW (informative)
+   instance mac16_core_inst.mac16_core_core_fsm_inst: 4.07 uW (informative)
+   instance mac16_core_inst.v2_triosy_obj: 0.00 uW (informative)
+PASS
