@@ -270,22 +270,37 @@ land, that path has to match. **Resolved 2026-09-24.** The vendored flow landed
 at `allo/backend/asic/{nodes,adks}/` and the construct script was pointed at
 it — but by three `dirname` calls from `asic_synthesis/`, which under
 `examples/accelerator/tinytpu_vitis/` reached `examples/`, not the repository
-root, so it still could not find the nodes. The design move removes exactly one
-level, so the same three `dirname` calls now land on the repository root; the
-levels are named in a comment there so the next move does not silently break
-it again. Note also that the construct graph and
-`make_stubs.py` were committed by a different session than the one that
-produced the reports; attribute them accordingly when moving.
+root, so it still could not find the nodes. **A re-count was then tried and was
+also wrong** — the same defect class twice in a row — and the fix that holds
+is `a34e1346`: **search upward for `allo/backend/asic/nodes`** rather than
+count directories at all. It works at any depth and survived the design rename
+with no edit. Note also that the construct graph and `make_stubs.py` were
+committed by a different session than the one that produced the reports;
+attribute them accordingly when moving.
+
+**The rule, because this has now cost three fixes in two days.** Never derive a
+repository root by counting `..` or `parents[n]`. Search upward for a marker,
+or take the path as an argument. The TinyTPU rename turned up roughly thirty
+`ROOT`/`REPO` values derived by counting, **three of them already wrong** and
+made correct only by accident of the move — a count is a latent break in any
+tree being reorganised, and this one is mid-reorganisation.
 
 **The same defect, second instance, fixed 2026-09-24.** `reduce_asic.py`
 generates its own construct graph, and that template hardcoded
 `~/allo-asic` — a path that exists on the synthesis host and nowhere else, so
 the committed `asic_reduce/reduce_8_2/construct-reduce.py` could not run from a
-checkout at all. It now resolves the vendored flow the way
-`construct-commercial.py` does, with the level count named in a comment and
-`ALLO_ASIC_FLOW` for the case the generated file is copied outside the tree,
-which is exactly what the `/scratch` builds on zhang-21 do. Both the template
-and the committed generated file were changed together and are byte-identical.
+checkout at all. It now finds the flow the way `construct-commercial.py` does,
+by searching upward, with `ALLO_ASIC_FLOW` for the case the generated file is
+copied outside the tree — which is exactly what the `/scratch` builds on
+zhang-21 are. Both the template and the committed generated file were changed
+together and are byte-identical.
+
+Both graphs were **built**, not merely read: against a stub `mflowgen`, each
+resolves its four nodes and the `freepdk-45nm` ADK and returns a graph. A copy
+of `construct-reduce.py` placed outside any checkout fails with its own message
+and builds once `ALLO_ASIC_FLOW` is set. The tools follow the same rule: their
+`REPO` — which only feeds the `--docs` default and printed paths — is found by
+the same upward search.
 
 ## The tools folded in, 2026-09-24
 
@@ -305,3 +320,21 @@ numbers are.
 The preflight came with them and is **not push-button**, so nothing here should
 describe it as such: it needs a DC licence and roughly 70 minutes of a specific
 machine. What it removes is the hour spent discovering that.
+
+**Which of its branches a licence-free run reached, named rather than glossed.**
+On this machine it exercised the node library, the ADK definition, the
+variant's RTL and file lists, and the agreement of `stdcells_db_md5` across the
+committed snapshots, and correctly reported `dc_shell`, mflowgen and sv2v as
+absent. It did **not** exercise the `--build` branch that hashes a fetched
+`stdcells.db` and compares it with `f5560259`: without a licence there is no
+build tree to hash, so that branch reports as *correctly missing*, which is not
+passing. It needs one run on the licensed machine, which the synthesis session
+has offered.
+
+**Not done, and deliberately.** `results.json` now carries `QD` per run, so a
+checker could in principle refuse an area quoted beside cycles from a different
+`QD`. That is not a cheap addition to `check_numbers.py`: today it matches
+area-shaped figures against a set of totals, and associating a figure with the
+cycle counts near it in prose is a different and much larger job. It is also a
+change of what that tool decides, which belongs to the session that wrote it,
+not to a move.

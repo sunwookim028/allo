@@ -40,8 +40,28 @@ import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-# allo/backend/asic/tools -> allo/backend/asic -> allo/backend -> allo -> repo.
-REPO = os.path.abspath(os.path.join(HERE, "..", "..", "..", ".."))
+
+
+def _repo_root():
+    """The checkout root, found by searching upward for the vendored flow.
+
+    Not by counting directories up from ``__file__``: that has been wrong here
+    three times in two days, including in a fix for itself, and the repository
+    is mid-reorganisation. A path that encodes tree shape is a latent break.
+    """
+    d = os.path.dirname(os.path.abspath(__file__))
+    while True:
+        if os.path.isdir(os.path.join(d, "allo", "backend", "asic", "nodes")):
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            # Not in a checkout (an installed copy, say). Only defaults and
+            # printed paths depend on this, so degrade rather than refuse.
+            return os.path.dirname(os.path.abspath(__file__))
+        d = parent
+
+
+REPO = _repo_root()
 
 # Figures that are deliberately not from our own reports. Each needs a reason.
 ALLOWED = {
