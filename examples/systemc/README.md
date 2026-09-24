@@ -1,8 +1,23 @@
 # SystemC / Catapult examples
 
-Runnable Allo dataflow designs that go through `target="systemc"`. Every file here
-is a design expressed in Allo; the testbenches, run scripts and recorded results
-that used to sit beside them live elsewhere now — see [Where the rest went](#where-the-rest-went).
+Runnable Allo dataflow designs that go through `target="systemc"`. The
+testbenches, run scripts and recorded results that used to sit beside them live
+elsewhere now — see [Where the rest went](#where-the-rest-went).
+
+**Two of these are experiments rather than examples**, and the difference
+matters because one of them is the evidence behind a published limitation. Both
+are expressed as Allo designs, which is why they are here rather than under
+`tests/`, but neither is a pattern to copy:
+
+- **`demos/nb_nondeterminism.py`** empirically demonstrates that non-blocking
+  stream operations are non-deterministic under the current simulator — it
+  exists to establish a finding, and its output is the finding.
+- **`pe_split.py`** asks whether a `Wire` removes the modularity tax, by
+  expressing one dot product four ways (fused, `Wire`, `Stream`, `Channel`).
+  The comparison is the point; no single one of the four is *the* design.
+
+Everything else here is an example in the ordinary sense: a design you can read
+and copy.
 
 ## Start here
 
