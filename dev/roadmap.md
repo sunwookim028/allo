@@ -181,6 +181,19 @@ Recorded because each cost real work today.
   what it does when committed snapshots disagree about the library -- for the
   good reason that there is no second library to test it with, and that is
   recorded rather than glossed.
+- **A refactor can silently remove an agentic loop's reach, and nothing fails.**
+  The CHIA loop's editable set was `("microarch_isa.py", "isa_dsl.py")`. The
+  decomposition that made the design a composable library moved the hardware
+  into eight `ip/units/` modules, so **the editable set no longer contained the
+  machine** — the loop could still run, still build, still be graded, and could
+  no longer change the thing it was searching over. Both of run 1's wins landed
+  in files that are now `dma_load.py` and `sequencer.py`, so that run is not
+  reproducible against today's tree. Nothing in the harness noticed, because
+  every gate still passed on a candidate that had edited nothing that mattered.
+  The fix is one definition of the editable paths (`chia_agent/design.py`)
+  rather than a literal list that a refactor can orphan. **Generalise: when a
+  harness names the files it may touch, a refactor must move that list too, and
+  the list should be derived rather than written.**
 - **Subagents do not reliably have `ListAgents`.** An agent told to announce
   its path claim to its peers could not see them, and guessing at names
   returned "no agent reachable". Pass peer agent IDs explicitly in a brief
