@@ -38,7 +38,8 @@ Only then is `CHIA-GATE <check> OK <nonce>` printed; the evaluator requires
 that exact line. The check's own output passes through unchanged, for the log.
 
     printf '%s\\n' NONCE | python gate_runner.py \\
-        {bench_isa|stress_isa|cosim|param_check|codesign|codesign_cosim} [args...]
+        {bench_isa|stress_isa|cosim|param_check|codesign|codesign_cosim|
+         workloads|gen_isa} [args...]
 """
 
 import importlib
@@ -66,6 +67,11 @@ CHECKS = {
     # from here for the same reason cosim.py is -- the candidate supplies the
     # machine, never the workload it is measured on.
     "workloads": os.path.join(DESIGN, "workloads", "run.py"),
+    # The ISA's own conformance check, run on the CANDIDATE's spec. The spec,
+    # the module generated from it and the reference model built on that are
+    # the candidate's to edit; this script, which holds all three to each other
+    # and to the design's bit slices, is not.
+    "gen_isa": os.path.join(DESIGN, "gen_isa.py"),
 }
 #: Module-name prefixes whose attributes the checks compute with.
 WATCHED = ("numpy", "allo", "builtins")

@@ -1310,7 +1310,10 @@ strengthened, since the interface pragma set is one line narrower than claimed.
    (:ref:`limitation-24-price`). The item still reproduces at ``TPU_QD=8``,
    which is now an override rather than the shipped configuration, and the
    *predicate* -- which programs need which depth -- remains open, so this is
-   a cure and not a characterisation. Cheap half:
+   a cure and not a characterisation. Because the predicate is open, the CHIA
+   loop does not let a candidate choose the depth: ``QD`` is proposable so that
+   the refusal can name this item, and 16 is the only value
+   ``evaluate.config_refusals`` accepts (:ref:`chia-configuration`). Cheap half:
    ``python tests/limits/item24_cosim_hang.py`` (seconds, no Vitis). RTL half:
    ``ALLO_LIMITS_COSIM=1`` on the same file (one csynth, ten cosims, tens of
    minutes). Family and bisection:

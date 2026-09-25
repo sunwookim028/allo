@@ -177,9 +177,11 @@ Editable vs. frozen
      - files
      - how it is enforced
    * - **editable**
-     - the fourteen paths ``chia_agent/design.py`` names: ``microarch_isa.py``
-       (the parameter set), ``isa_dsl.py`` (the program generator),
-       ``ip/isa.py``, ``ip/tinytpu.py``, ``ip/assembler.py``,
+     - the seventeen paths ``chia_agent/design.py`` names: the instruction set
+       (``isa_spec.json``, the ``isa_encoding.py`` generated from it and the
+       ``isa_ref.py`` built on that), ``microarch_isa.py`` (the parameter set,
+       and the ``CHIA_CONFIG`` declaration below), ``isa_dsl.py`` (the program
+       generator), ``ip/isa.py``, ``ip/tinytpu.py``, ``ip/assembler.py``,
        ``ip/programs.py``, and the eight units under ``ip/units/``
      - The agent edits a private copy in ``<run>/<worker>/spec/``, which
        mirrors the package, never the repository. The hardware left
@@ -187,11 +189,15 @@ Editable vs. frozen
        library, so an editable set that stopped at the two old file names
        would no longer contain the machine -- both wins of run 1 landed in
        what is now ``ip/units/dma_load.py`` and ``ip/units/sequencer.py``.
+       ``isa_encoding.py`` is generated: the ``regenerate_isa`` tool runs the
+       frozen generator on the candidate's own spec, because an agent cannot
+       keep a 700-line generated file byte-identical by hand.
    * - **frozen**
      - main's ``cosim.py`` (testbench, ``SHAPES``, golden reference, every
        Vitis/TCL setting), ``bench_isa.py``, ``stress_isa.py``,
-       ``isa_ref.py``, ``kpn_model.py``, ``shapes.py``, ``isa_spec.json``,
-       ``isa_encoding.py``, ``gen_isa.py``; the design's own machinery
+       ``kpn_model.py``, ``shapes.py``, ``gen_isa.py``; the workload suite
+       (``workloads/``) and ``chia_agent/area_proxy.py`` -- what prices the
+       design and what it is priced *on*; the design's own machinery
        (``ip/params.py``, the package ``__init__``\ s, and the reduce IP they
        import); and ``chia_agent/``'s ``evaluate.py``, ``gate_runner.py``,
        ``param_check.py``, ``spec_policy.py``, ``mapspace.py``,
@@ -203,22 +209,75 @@ Editable vs. frozen
        each time refusing every candidate at stage ``setup`` with a message
        that blamed the design rather than the pin.
 
-Because ``isa_ref.py`` is frozen and ``stress_isa.py`` checks programs against
-it, **what each instruction means is part of the contract**: the agent may
-change how the hardware executes the ISA and which instructions the generator
-emits, not an instruction's semantics.
+.. _chia-isa-editable:
+
+Why the ISA can move, and what the oracle is
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``isa_spec.json``, ``isa_encoding.py`` and ``isa_ref.py`` were frozen until
+2026-09-25, and the reason was sound: ``isa_ref.py`` is what ``stress_isa.py``
+checks random programs against, so a candidate that could rewrite its own
+reference model could weaken the rule and score strictly better. The cost was
+that the loop could not change the instruction set at all, which is half of a
+co-design space.
+
+**The referee cannot be the editable surface, so the referee moved outside the
+repository.** ``workloads/run.py --verify`` is the one check with something
+this project did not write on one side: ``torch.nn.Linear``'s own forward on
+the model's real weights, with the machine's epilogue applied in torch. It is
+now the FIRST gate, it costs 4 s at MAXDIM=16, and a byte that differs is
+``gate:pytorch``. ``allo/actions.py`` is not the answer to this and was not
+used for it: it is another model of the same ISA *inside* the repository, with
+the same failure mode ``isa_ref`` has.
+
+Two other things carry the weight the freeze used to:
+
+* ``gen_isa.py --conform`` (frozen) is a gate on the candidate's **own** spec:
+  ``isa_encoding.py`` byte-identical to what that spec generates, every
+  software constant and bit slice of the design at the spec's positions, the
+  assembler and generator through the same encoder, the reference model
+  structurally forbidden from importing an opcode number or a field position
+  from the design, and the bit ranges the *emitted HLS* reads. 36 s.
+* **The GEMM goldens were never** ``isa_ref``. ``bench_isa.py``,
+  ``stress_isa.py`` and ``cosim.py``'s testbench each compute their own numpy
+  gold, and all three are frozen. ``isa_ref`` is the reference for *random
+  programs* only.
+
+**What the oracle is worth, stated rather than implied.** 8,912 bytes across
+four MLPs at MAXDIM=64, 92 % of it ``mlp_wide``; ``mlp_bias`` contributes none,
+because it is the probe that must not map. At the scored MAXDIM=16 only two
+models fit, and ``--verify`` draws each eight times (the mapping depends only
+on the shapes, so extra draws are nearly free) for 2,688 bytes over six layers.
+That is an oracle, not a corpus: it adds a reference nobody here can edit, and
+it adds no shape the GEMM sweep does not already cover. Widening it means more
+models that fit a small build, and that is the next thing to do to this gate.
+
+Because the spec is editable and ``isa_ref`` *evaluates* the expressions its
+actions carry, those expressions are held to an expression language -- a name,
+an integer, arithmetic, bitwise and comparison operators -- in two independent
+places: ``spec_policy.expression_violations`` at edit time, and
+``isa_ref.expression``, an AST walk that replaced ``eval``, at run time. An
+``eval`` with emptied builtins still reaches ``().__class__.__bases__[0]`` and
+from there the frame holding ``gate_runner.py``'s nonce.
 
 The evaluator
 ~~~~~~~~~~~~~
 
-- **gate** (functional, Allo simulator, ~30 s): ``bench_isa.py`` (the published
+- **gate** (functional, Allo simulator, ~110 s): ``run.py --verify`` (the
+  PyTorch oracle, first and cheapest -- 4 s), ``gen_isa.py --conform`` (the
+  candidate's own spec against its own generated artefacts and the design's bit
+  slices -- 36 s), ``bench_isa.py`` (the published
   [-4, 4] setup), main's ``stress_isa.py`` (492 runs: full-range, corner and
   boundary int8 at all 64 shapes, ``C`` prefilled and compared in full, vector
   and random programs against ``isa_ref``, many calls on one build), and
-  ``param_check.py`` at ``TPU_MAXDIM=8``, ``12`` and ``TPU_T=8
-  TPU_MAXDIM=32`` (below). Negative control:
-  an int16 partial sum passes ``bench_isa.py`` and every cosim testbench, and
-  ``stress_isa`` rejects it (251/492 exact).
+  ``param_check.py`` at three configurations ``evaluate.param_configs``
+  derives from the candidate's own (below). Negative controls, all in
+  ``test_harness.py``: an int16 partial sum passes ``bench_isa.py`` and every
+  cosim testbench and ``stress_isa`` rejects it (251/492 exact); a spec edit
+  without ``regenerate_isa`` is refused at ``gate:isa`` for a stale artefact;
+  and ``isa_ref``'s ReLU primitive weakened to the identity -- a candidate
+  rewriting what used to judge it -- is refused at ``gate:pytorch`` before
+  ``bench_isa`` runs at all.
 - **score**: a THREE-TERM objective, reported per term and never summed.
   See :ref:`chia-objective` for why each term is there and what it replaced.
 
@@ -320,6 +379,98 @@ predicted by it; it prices *structure*, not synthesis, so a construct Vitis
 renders as a multi-write-port RAM is invisible to it; and the configuration the
 loop scores at, T=4 MAXDIM=16, has exactly **one** committed DC run and is the
 worst-predicted of the seven. That wants a twelfth DC run, not a better fit.
+
+.. _chia-configuration:
+
+The configuration is a candidate's to propose, inside a stated envelope
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Until 2026-09-25 ``evaluate.SCORED`` pinned T=4 MAXDIM=16 and
+``check_invariants`` refused any candidate whose build disagreed, so the loop
+searched the implementation of eight units at one architecture. A candidate now
+declares, at module level in its own ``microarch_isa.py``::
+
+    CHIA_CONFIG = {"T": 8, "MAXDIM": 32}
+
+``evaluate.resolve_config`` reads it with ``ast.literal_eval`` -- no import, no
+candidate code -- before the tree is composed, and every stage then runs pinned
+to it; ``check_invariants`` still requires the build to *report* what was
+declared, so the declaration is a claim with a check on it. A candidate that
+declares nothing is scored at T=4 MAXDIM=16 QD=16, the published row, so no
+existing candidate, control or published number moves.
+
+Four things refuse a proposal, all of them before anything is built, and all of
+them naming what would lift the refusal:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 76
+
+   * - refusal
+     - why
+   * - outside the fitted envelope
+     - ``area_proxy.envelope_refusals``. The coefficients are fitted to five
+       committed DC runs (the two logic-only ones are stubs, not design
+       points), which span T in [4, 8], MAXDIM in [16, 64], QD in [8, 16],
+       DMA_WORDS in [1, 16]. Outside that span the area term would be an
+       extrapolation with no error bar, so ``estimate`` **raises**
+       (``OutsideEnvelope``) instead of returning a number. A missing figure a
+       search must work around is recoverable; a confident wrong one is not.
+       The envelope is derived from ``COMMITTED``, so a twelfth DC run widens
+       it by being added to that dict.
+   * - past a MAXDIM ceiling
+     - ``(MAXDIM // T) * MAXDIM <= 2048`` for the operand layout's addressing
+       and ``MAXDIM**3 // T**2 + MAXDIM**2 // T <= 32767`` for a cubic GEMM's
+       header count: **88 and 76 at T=4, 128 and 120 at T=8**. Computed from
+       the frozen ``isa_encoding.MAXDIM_CEILINGS`` and never typed into the
+       evaluator -- this project has already written one of them down wrong in
+       three documents ("MAXDIM <= 90" against an answer of 88). The refusal
+       names the ceiling and its value.
+   * - ``QD`` other than 16
+     - depth 8 deadlocks legal programs -- three of the ten tiled programs
+       never complete in cosim (:doc:`/developer/limitations` item 24) -- so it
+       is refused rather than left to hang for the 1,800 s cosim timeout.
+   * - ``T < 4`` or ``MAXDIM % T``
+     - ``ip/params.py``'s invariants.
+
+**Inside the envelope is still thin, and the loop should be told so.** The
+(T, MAXDIM) box has one interior point -- MAXDIM=16 at T=4, the
+worst-predicted of the seven runs. The DC runs that would earn the box, in
+order: **T=4 MAXDIM=32** and **T=8 MAXDIM=16** (the corners a co-design loop
+reaches for first), then **T=4 at a ceiling (88 or 76)**, then **a clean QD
+pair at the scored point** -- two exports of one commit, which is the only way
+to replace the +6.8 %-against-+6.6 % agreement of two estimates with a
+measurement. The priority list lives in ``area_proxy.py``'s docstring, beside
+the model it would correct.
+
+**Cost, measured rather than estimated**
+(``dev/records/tinytpu/codesign-space-20260925.rst``). One whole candidate is
+**623.9 s** at the published row and **1050.5 s** at ``T=8 MAXDIM=32`` --
+**1.68x** -- on the unmodified design, same host, both ``ok: true``. The two
+new gates are 37.8 s of the first figure (6.1 %), and ``gen_isa.py --conform``
+is 34.9 s of that because it builds the design down the HLS path to read the
+bit ranges the emitted C++ takes. A candidate was ~578 s before this work. A
+spend ceiling for a search that may propose T=8 should use the T=8 figure, not
+an average.
+
+That T=8 run is also the first co-design point this loop could produce:
+16x16x16 falls from **674 to 426 cycles** (-36.8 %) and ``mlp_tiny`` from
+**1,150 to 783** (-31.9 %) for an area estimate up from **1.20 to 2.23 mm^2**
+(+85.6 %), clock met at 2.431 ns. A trade the objective can now state.
+
+**Two things a T=8 candidate cannot measure, and both are frozen machinery
+rather than the candidate.** ``cosim.py`` asserts every scored dimension is a
+multiple of T, and ``4x4x4`` and ``12x12x12`` are not multiples of 8, so the
+GEMM term at T=8 is ``16x16x16`` alone (``shapes_skipped`` says so). The frozen
+mapper refuses ``mlp_deep``'s 16x16x12 layer for the same reason, so the model
+term is ``mlp_tiny`` alone (``model_skipped``) and the oracle's corpus becomes
+``mlp_tiny`` + ``mlp_small``. Either could have been made a refusal; both were
+made SCOPE, because refusing a candidate for the shape list's choice of numbers
+would leave every T but 4 unreachable and the loop searching one architecture
+again. The consequence is real and is reported per run: **a T=8 candidate is
+measured on a narrower workload than a T=4 one.** Widening it means shapes and
+models legal at more than one T, which is a person's edit to ``shapes.py`` and
+``workloads/models.py``.
 
 Whether the new objective is better: the re-score
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -458,10 +609,12 @@ Mechanical enforcement, not instructions:
    check's *return value*, and ``numpy``/``allo`` are frozen against
    monkeypatching for the duration; only then is ``CHIA-GATE <check> OK
    <nonce>`` printed, and the evaluator requires that line.
-6. **Parametricity.** The scored configuration is T=4, MAXDIM=16, so a design
-   specialised to it would pass everything. ``param_check.py`` rebuilds the
-   candidate at ``TPU_MAXDIM=8``, ``TPU_MAXDIM=12`` and
-   ``TPU_T=8 TPU_MAXDIM=32``, requires the build to report that configuration,
+6. **Parametricity.** A design specialised to the one configuration it is
+   scored at would pass everything else. ``param_check.py`` rebuilds the
+   candidate at three other configurations -- at the published row,
+   ``TPU_MAXDIM=8``, ``TPU_MAXDIM=12`` and ``TPU_T=8 TPU_MAXDIM=32``, and
+   ``evaluate.param_configs`` moves that list onto whatever configuration the
+   candidate proposed -- requires the build to report that configuration,
    and requires every GEMM shape of it (full-range, corner and boundary
    operands, ``C`` compared in full) and random programs to be exact
    (``gate:param``). The policy requires ``T`` and ``MAXDIM`` to stay
@@ -480,9 +633,10 @@ Mechanical enforcement, not instructions:
 7. **Documentation.** A candidate may not remove, net, more than 15 lines of
    comments and docstrings against the frozen file; rewording is free.
 8. **Memory model and premises.** Every ``TPU_*`` variable but the project path
-   is scrubbed before cosim (``m_axi_latency`` 0, as Gemmini's harness), T == 4,
-   MAXDIM == 16, the 3.33 ns target, and each shape's own cosim log and
-   simulated time must agree with the reported cycles.
+   is scrubbed before cosim (``m_axi_latency`` 0, as Gemmini's harness); the
+   build must report the configuration it is scored at (``check_invariants``,
+   T, MAXDIM and QD); the 3.33 ns target must be met; and each shape's own
+   cosim log and simulated time must agree with the reported cycles.
 9. **Loopback.** The MCP tool servers bind 127.0.0.1 by default; a multi-host
    swarm must opt in with ``TINYTPU_TOOL_HOST=node`` and bring its own
    authentication.
@@ -645,7 +799,11 @@ cross-check; **e** frozen-file and import-time attacks, forged verdicts,
 sandbox, and that a candidate can neither write nor fake a control record;
 **c** an int16 partial sum rejected by stress; **g** the
 parametricity and documentation guards; **d** a deadlock killed at 240 s;
-**abf** no-op and a slower design scored concurrently; **loop** the real
+**i** the co-design space -- every configuration refusal (envelope, both
+ceilings, ``QD=8``, the parameter invariants), a spec edit refused at
+``gate:isa`` until ``regenerate_isa`` runs, and a weakened ``isa_ref`` refused
+at ``gate:pytorch``; **abf** no-op and a slower design scored concurrently;
+**loop** the real
 ``swarm -> loop -> opencode -> MCP`` path; **accept** ``accept.py`` on a
 correct-but-slower diff, against a control measured in that same run. 57/57
 at landing (``dev/records/tinytpu/chia-evidence/harness-test-20260919-190240/``).

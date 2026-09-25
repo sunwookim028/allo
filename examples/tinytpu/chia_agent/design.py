@@ -13,10 +13,11 @@ that can drift in six places is a list that will.
 The split is the point of the decomposition
 (`docs/source/designs/tinytpu_library.rst`), not an accident of it:
 
-* **EDITABLE** is the design under search -- the instruction encoding, the
-  eight units, the wiring that composes them into an architecture, the
-  assembler that must agree with them, the programs, and the instantiation
-  that chooses the parameters. A CHIA agent editing one 60-line unit is a
+* **EDITABLE** is the design under search -- the INSTRUCTION SET (the spec, the
+  encoding generated from it, and the reference model built on that), the eight
+  units, the wiring that composes them into an architecture, the assembler that
+  must agree with them, the programs, and the instantiation that chooses the
+  parameters and declares the configuration it wants to be scored at. A CHIA agent editing one 60-line unit is a
   better-scoped experiment than one editing a 1,582-line file. Both wins of
   run 1 (the front-end rewrite and the operand burst) landed inside what is
   now `ip/units/dma_load.py` and `ip/units/sequencer.py`; a version of this
@@ -42,6 +43,17 @@ from __future__ import annotations
 EDITABLE = (
     "microarch_isa.py",
     "isa_dsl.py",
+    # The ISA. `isa_spec.json` is the source of truth, `isa_encoding.py` is
+    # GENERATED from it by the frozen `gen_isa.py` (regenerate with the
+    # `regenerate_isa` tool, never by hand -- `gen_isa.py --conform` compares
+    # them byte for byte), and `isa_ref.py` is the reference model built on the
+    # generated module. All three were frozen until the loop was allowed to
+    # co-design the instruction set; what replaced the freeze is the PyTorch
+    # oracle and `gen_isa.py --conform`, and `chia_agent/evaluate.py`'s
+    # docstring is where that argument is written down.
+    "isa_spec.json",
+    "isa_encoding.py",
+    "isa_ref.py",
     "ip/isa.py",
     "ip/tinytpu.py",
     "ip/assembler.py",
@@ -86,6 +98,10 @@ def module_name(rel: str) -> str:
     return f"{MODULE_PREFIX}." + rel.removesuffix(".py").replace("/", ".")
 
 
+#: Editable files that are DATA rather than modules: nothing imports them, and
+#: `module_name` would turn `isa_spec.json` into a dotted name that is not one.
+DATA = tuple(rel for rel in EDITABLE if not rel.endswith(".py"))
+
 IMPORTABLE_MODULES = frozenset(
     module_name(rel) for rel in EDITABLE + FROZEN_DESIGN
-    if not rel.endswith("__init__.py"))
+    if rel.endswith(".py") and not rel.endswith("__init__.py"))

@@ -41,8 +41,9 @@ PUBLISHED = {"cosim": reproduced()}
 #: Controls measured by earlier no-diff runs: `key(driver, blobs)` -> cycles.
 #: Cross-check only; a design whose cycles deliberately move gets its entry in
 #: the same commit. The pre-decomposition entries are two-file designs, which
-#: is what the design WAS at those commits (`design.EDITABLE` is fourteen
-#: paths since the unit library landed), so they key on the two blobs they had.
+#: is what the design WAS at those commits (`design.EDITABLE` is seventeen
+#: paths: fourteen since the unit library landed, and the three ISA files since
+#: the instruction set became editable), so they key on the two blobs they had.
 
 
 def _two(driver, micro, dsl):
