@@ -199,6 +199,29 @@ Vitis 2023.2 ships binutils 2.37, which cannot read this system's glibc:
 ``unknown type [0x13] section '.relr.dyn'``, then ``cannot find libm.so.6``. Both
 the csim and the cosim link fail without it.
 
+.. warning::
+
+   **Do not source ``settings64.sh`` in a shell you then build the bindings in.**
+   Vitis prepends its own libraries, which shadow the system ones, and
+   ``cmake`` dies before configuring anything:
+
+   .. code-block:: text
+
+      cmake: error while loading shared libraries: libidn.so.11:
+      cannot open shared object file: No such file or directory
+
+   You do not need to source it at all -- the scripts do it themselves (row
+   above; ``cosim.py`` hardcodes the path in its ``VITIS`` constant). Observed
+   2026-09-25 while verifying the published cycle counts with cosim in a fresh
+   worktree: sourcing it broke the build, and running ``reproduce.sh`` with the
+   Vitis environment untouched works. Putting only
+   ``/opt/xilinx/Vitis_HLS/2023.2/bin`` on ``PATH`` also works, but it is
+   redundant rather than required.
+
+   This is worth a warning because the obvious way to make ``vitis_hls``
+   available is the one that makes the build fail first, and the failure names
+   a library rather than the cause.
+
 The fix in tree is **not** a ``PATH`` override — it is a compiler-driver flag.
 ``examples/tinytpu/cosim.py`` sets ``LDFLAGS = "-B/usr/bin"`` and
 splices it into the generated Vitis script, pointing the driver at the system
