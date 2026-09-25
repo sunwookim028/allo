@@ -133,23 +133,52 @@ def steps_of(prog):
     return tuple(out)
 
 
-# Model makespan against RTL cosim, measured 2026-09-22 on this host with
-# `cosim.py` (TPU_TB=default, one synthesis per sweep) and `act_cosim.py`. Each
-# row is `isa_dsl.gemm_program`, which is also the search's choice at every
-# shape but 4x4x4. The cosim column is the only measurement here.
+# Model makespan against RTL cosim. The MODEL column is recomputed from the
+# design on every test run (`tests/act/test_tinytpu.py`,
+# `test_the_stored_calibration_still_matches_what_the_model_says`) and is
+# unchanged since 2026-09-22: 50 / 115 / 227 / 261 / 453 / 517. The COSIM column
+# is the only measurement here, and it was RE-MEASURED 2026-09-25 on this host:
+# the five `gemm` rows are `reproduce.sh`'s published row, re-derived the same
+# day (`REPRODUCED` 175 / 265 / 421 / 482 / 674), and `gemm.relu 16x16x16` is a
+# fresh cosim at `TPU_T=4 TPU_MAXDIM=16` through `act_cosim.py --baseline`, 738
+# cycles, `exact`. It was 172 / 262 / 418 / 484 / 686 / 750.
+#
+# 738 - 674 = 64, exactly the four `vrelu` instructions' 64 `accu` rows -- the
+# same accounting that held at 750 - 686. The relu delta is the one thing in
+# this table that is accounted for to the cycle, and it survived `QD=16`
+# untouched, which is evidence that the per-unit work counts are the right model
+# of this machine even where the fit below is poor.
+#
+# Each row is `isa_dsl.gemm_program`, which is also the search's choice at every
+# shape but 4x4x4.
 CALIBRATION = (
-    ("gemm 4x4x4", 50, 172),
-    ("gemm 8x8x8", 115, 262),
-    ("gemm 12x12x12", 227, 418),
-    ("gemm 16x16x8", 261, 484),
-    ("gemm 16x16x16", 453, 686),
-    ("gemm.relu 16x16x16", 517, 750),
+    ("gemm 4x4x4", 50, 175),
+    ("gemm 8x8x8", 115, 265),
+    ("gemm 12x12x12", 227, 421),
+    ("gemm 16x16x8", 261, 482),
+    ("gemm 16x16x16", 453, 674),
+    ("gemm.relu 16x16x16", 517, 738),
 )
-
+# `fit(CALIBRATION)` over those points is `cosim = 135.19 + 1.1977 x makespan`,
+# worst residual **34.21 cycles** at `gemm 16x16x8` -- the shape the model
+# underestimates most, and it did so before the re-measurement too (+33.74).
+# The refit barely moved the fit's quality (worst 33.74 -> 34.21, rms
+# 17.70 -> 18.77) because `QD=16` shifted the three small shapes up and the two
+# large ones down, and a two-parameter fit absorbs most of a tilt. That is the
+# opposite of what happened to `act/cycles.py`'s one-variable fit over critical
+# work, which got materially worse; the difference is that makespan already
+# carries the sequencer term, so it is closer to being monotone in the thing
+# `QD` changed.
+#
 # Two mappings of ONE shape, which is the only kind of pair a ranking rests on.
-# The model put them 1.25x apart and the machine 1.02x apart, same order.
+# Re-measured 2026-09-25: the model puts them 1.25x apart and the machine
+# 1.017x apart, same order -- 175 for the hand-written program (the published
+# row) against 172 for the searched one (cosim of the mapper's pick, all five
+# shapes in one build, bit-exact). Both numbers moved by +3 from 172 / 169, so
+# **the mapping-side gain is still exactly 3 cycles** and the model still
+# overstates it by an order of magnitude.
 RANKING_EVIDENCE = (
-    ("gemm 4x4x4", ("hand-written", 50, 172), ("searched", 40, 169)),
+    ("gemm 4x4x4", ("hand-written", 50, 175), ("searched", 40, 172)),
 )
 
 

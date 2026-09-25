@@ -409,7 +409,7 @@ is a tie broken on the label and not a disagreement about which is better.
      - ``N4>K4``
      - 32
      - ``spm`` 144
-     - 407
+     - 406
      - bit-exact
    * - ``mlp_tiny_l1``
      - 4x16x16
@@ -417,7 +417,7 @@ is a tie broken on the label and not a disagreement about which is better.
      - ``N4>K4``
      - 28
      - ``spm`` 144
-     - 407
+     - 406
      - bit-exact
    * - ``mlp_deep_l0``
      - 4x16x16
@@ -425,7 +425,7 @@ is a tie broken on the label and not a disagreement about which is better.
      - ``N4>K4``
      - 32
      - ``spm`` 144
-     - 407
+     - 406
      - bit-exact
    * - ``mlp_deep_l1``
      - 4x16x16
@@ -433,7 +433,7 @@ is a tie broken on the label and not a disagreement about which is better.
      - ``N4>K4``
      - 32
      - ``spm`` 144
-     - 407
+     - 406
      - bit-exact
    * - ``mlp_deep_l2``
      - 4x16x12
@@ -441,7 +441,7 @@ is a tie broken on the label and not a disagreement about which is better.
      - ``N3>K4``
      - 25
      - ``spm`` 108
-     - 348
+     - 349
      - bit-exact
    * - ``mlp_deep_l3``
      - 4x12x8
@@ -449,7 +449,7 @@ is a tie broken on the label and not a disagreement about which is better.
      - ``N2>K3``
      - 13
      - ``spm`` 54
-     - 261
+     - 264
      - bit-exact
    * - ``mlp_small_l0``
      - 8x32x32
@@ -457,7 +457,7 @@ is a tie broken on the label and not a disagreement about which is better.
      - ``N8>K8``
      - 96
      - ``accu`` 640
-     - 1 211
+     - 1 186
      - bit-exact
    * - ``mlp_small_l1``
      - 8x32x16
@@ -465,7 +465,7 @@ is a tie broken on the label and not a disagreement about which is better.
      - ``N4>K8``
      - 48
      - ``vru`` 320
-     - 692
+     - 682
      - bit-exact
    * - ``mlp_wide_l0``
      - 64x64x64
@@ -473,7 +473,7 @@ is a tie broken on the label and not a disagreement about which is better.
      - ``M2>N16>K16``
      - 624
      - ``accu`` 18 432
-     - 30 051
+     - 29 173
      - bit-exact
    * - ``mlp_wide_l1``
      - 64x64x64
@@ -481,14 +481,19 @@ is a tie broken on the label and not a disagreement about which is better.
      - ``M2>N16>K16``
      - 592
      - ``vru`` 17 408
-     - 28 392
+     - 27 562
      - bit-exact
 
 .. warning::
 
    **These are estimates and one of them is structurally blind.**
-   ``act.cycles.estimate`` is ``173.2 + 1.621 x critical work``, fitted to the
-   five published ``MAXDIM=16`` cosim points, and its per-unit work counts come
+   ``act.cycles.estimate`` is ``179.0 + 1.573 x critical work``, refitted on
+   2026-09-25 to the five published ``MAXDIM=16`` cosim points, which
+   ``act/cycles.py`` now derives from ``reproduce.sh`` rather than holding as a
+   literal. Every estimate in the table above moved with it, and the
+   **refit made the fit worse** (worst residual 15.8 to 18.2 cycles on the five
+   points, because ``TPU_QD=16`` moved the small shapes up and the large ones
+   down). Its per-unit work counts come
    from the header ``assemble`` writes --- where ``dma_ld``'s entry is the
    number of instruction *rows*, not the number of burst *iterations*. So the
    estimate cannot see the DMA burst at all. At ``MAXDIM=64`` the burst is a
@@ -515,22 +520,22 @@ estimate, for scale.
      - the estimate is
    * - ``mlp_tiny``
      - 584 + 566
-     - 813
+     - 811
      - **1 150**
      - 29 % low
    * - ``mlp_deep``
      - 584 + 584 + 542 + 407
-     - 1 422
+     - 1 424
      - **2 117**
      - 33 % low
    * - ``mlp_small``
      - 1 636 + 1 145
-     - 1 903
+     - 1 868
      - **2 781**
-     - 32 % low
+     - 33 % low
    * - ``mlp_wide``
      - --
-     - 58 443
+     - 56 734
      - *no completion*
      - --
 
@@ -749,13 +754,18 @@ hundred cycles of it. So ``workloads/burst.py`` is a usable screen for which
 layers the widening will help and **not** a substitute for measuring how much.
 
 **The static estimate is accidentally calibrated for a machine we do not
-ship.** ``act.cycles.estimate`` is 26 to 36 per cent *low* against the shipped
-``DMA_WORDS=1`` build and within 8 per cent of the *widened* one --- it fits
-the widened machine better than the real one. That is not a coincidence: the
-fit was taken at ``MAXDIM=16``, where ``WPR`` is 4 instead of 16 and the burst
-is four times shorter, so the constant absorbed a burst term that no longer
-matches. An estimate carries its calibration regime with it, and this one's
-regime is not the shipped build.
+ship.** Per model, ``act.cycles.estimate`` is 29 / 33 / 33 per cent *low*
+against the shipped ``DMA_WORDS=1`` build (811, 1 424 and 1 868 against 1 150,
+2 117 and 2 781) and 6.0 per cent low, 7.2 per cent low and 2.6 per cent *high*
+against the *widened* one (863, 1 534, 1 821) --- it fits the widened machine
+better than the real one. Per layer the shortfall spreads from 27.5 per cent
+(``mlp_small_l0``) to 40.4 per cent (``mlp_small_l1``). That is not a
+coincidence: the fit was taken at ``MAXDIM=16``, where ``WPR`` is 4 instead of
+16 and the burst is four times shorter, so the constant absorbed a burst term
+that no longer matches. An estimate carries its calibration regime with it, and
+this one's regime is not the shipped build. Refitting it on 2026-09-25 did not
+change that and was not expected to: a refit within the ``MAXDIM=16`` regime
+cannot fix a regime error (the per-model shortfall moved by under one point).
 
 The 64x64x64 point is missing, and why
 --------------------------------------

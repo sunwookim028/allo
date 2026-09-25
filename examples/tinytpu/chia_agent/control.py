@@ -199,18 +199,47 @@ def banner(cc: dict) -> str:
 PINNED = (f"{PKG}/reproduce.sh",
           f"{PKG}/chia_agent/swarm.py", f"{PKG}/chia_agent/test_harness.py",
           f"{PKG}/chia_agent/test_codesign.py")
-#: Literals fitted to the old row that a find-and-replace would FALSIFY: they
-#: are the outputs of a fit or a calibration, not quotations of the row, and
+#: Literals fitted to a SUPERSEDED row that a find-and-replace would FALSIFY:
+#: they are the outputs of a fit or a calibration, not quotations of the row, so
 #: they need re-measuring rather than editing. Named here so the gate reports
 #: them instead of passing over them in silence.
+#:
+#: Every entry it held on 2026-09-25 was fitted to 172 / 262 / 418 / 484 / 686
+#: and has been re-derived against the shipped row;
+#: `dev/records/tinytpu/refit-20260925.rst` records each derivation and its new
+#: residual. What was cleared then:
+#:
+#:   `act/cycles.py`             PUBLISHED_CYCLES is now DERIVED from
+#:                               reproduce.sh, so it is no longer a pin at all;
+#:                               CRITICAL_WORK_FIT re-fitted to (179.0, 1.573)
+#:                               and checked against `refit()` in __main__.
+#:   `act_machine.py`            CALIBRATION's cosim column re-measured (the
+#:                               five gemm rows from the published row,
+#:                               gemm.relu 16x16x16 by fresh cosim: 738);
+#:                               RANKING_EVIDENCE re-measured (175 vs 172).
+#:   `tests/act/test_tinytpu.py` the residual bound re-derived from the refitted
+#:                               fit: 40 -> 35 against a worst of 34.21.
+#:   `reproduce_codesign.sh`     its control re-measured: 172 / 674, and the
+#:                               mapper's pick still equals the shipped nest at
+#:                               four of five shapes (checked in python).
+#:
+#: Add an entry the moment a new constant is fitted to a measurement, with what
+#: it would take to re-measure it; the `__main__` below reports whatever is
+#: here, and says so when nothing is.
 NEEDS_REFIT = {
-    f"{PKG}/reproduce_codesign.sh":
-        "its control expects 4x4x4=169 / 16x16x16=686, which was the mapper's "
-        "pick against the OLD row; whether the pick still equals the shipped "
-        "nest is a measurement, not an edit",
-    f"{PKG}/act/cycles.py": "PUBLISHED_CYCLES / CRITICAL_WORK_FIT",
-    f"{PKG}/act_machine.py": "CALIBRATION / RANKING_EVIDENCE",
-    "tests/act/test_tinytpu.py": "asserts worst <= 40 against that fit",
+    "docs/source/extensions/act_results.rst":
+        "the out-of-sample table under `act-specs-gate-measured` (twelve specs: "
+        "critical work, estimate, cosim, error) is a TPU_QD=8 corpus sweep of "
+        "the design at e24e433b. Its cosim column is that design's and its "
+        "estimate column the (173.2, 1.621) fit, so the 9.2% in-sample / 13.9% "
+        "out-of-sample / 6.0% mean claims are statistics of that PAIRING. "
+        "Recomputing the estimate column under the shipped (179.0, 1.573) fit "
+        "while leaving the old cosim column would make the error column a "
+        "comparison between two designs, which is why it was left alone rather "
+        "than edited. It needs `act/calibrate.py specs` and `act/calibrate.py "
+        "variants` re-run at TPU_T=4 TPU_MAXDIM=16 -- one csynth plus twelve "
+        "cosims, one of which (relu_16x16) is expected not to complete "
+        "(limitations item 24). The page carries the same warning.",
 }
 #: A five-shape row that NAMES its shapes: `4x4x4=175, 8x8x8=265, ...`.
 #: Deliberately not the bare `175 / 265 / ...` form, which cannot be told
@@ -272,6 +301,11 @@ if __name__ == "__main__":
           + " ".join(f"{s}={c}" for s, c in reproduced().items()))
     for rel, what in sorted(NEEDS_REFIT.items()):
         print(f"  ACKNOWLEDGED, fitted to the superseded row: {rel} -- {what}")
+    if not NEEDS_REFIT:
+        print("  NEEDS_REFIT is empty: no constant in the tree is known to be "
+              "fitted to a superseded row (see this module's NEEDS_REFIT "
+              "comment for what was cleared, and add an entry when a new "
+              "fitted constant lands)")
     for p in bad:
         print(f"  STALE PIN: {p}")
     print("PINS OK: every tracked quotation of the published row matches it"

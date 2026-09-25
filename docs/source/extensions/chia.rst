@@ -660,8 +660,9 @@ Limits and known failures
   opens is titled with the run's tag (``--title``), and ``spend.run_spend``
   sums those and the ids the loop saw returned. Nothing else on the account
   is counted against a run's cap.
-- **The $0 guard suite passes: 98 cases, 46.9 minutes** (2026-09-24,
-  ``dev/records/tinytpu/chia-evidence/isa-run3-20260924/harness-test-20260924-results.json``).
+- **The $0 guard suite passes: 101 cases, 74.5 minutes** (2026-09-25, all nine
+  phases, ``dev/records/tinytpu/chia-evidence/harness-test-20260925-033220/results.json``;
+  it was 98 cases in 46.9 minutes on 2026-09-24).
   It was 57 at landing and did not pass; the repair that restored it also
   added phase ``s``, which checks the static guards -- the derived main base,
   the pinned scored configuration, the spend attribution and the policy's
@@ -712,6 +713,23 @@ Limits and known failures
   running; follow it with ``kill -9``.
 - **The tool servers bind fixed ports from 8000 up**, so two ``chia_agent``
   processes on one host collide. Serialise them.
+- **A checkout under ``/tmp`` cannot run the harness at all**, and it fails in a
+  way that blames the candidate. ``evaluate.sandboxed`` gives every gate
+  ``--tmpfs /tmp`` and then re-binds only the work directory and the composed
+  tree, so a worktree living anywhere else under ``/tmp`` --- an agent
+  scratchpad, for instance --- is **masked inside the sandbox**. ``allo`` is not
+  composed into the tree (``CHECKOUT_WATCH`` guards it instead), so it is looked
+  up on ``PYTHONPATH``, which points at the invisible checkout; the import then
+  falls through to the ``allo`` env's editable install, which resolves to
+  whatever tree last ran ``pip install -e`` --- on this host
+  ``/home/sk3463/allo``, whose HEAD had no ``allo/compose.py``. Every candidate
+  dies at stage ``import`` with ``ModuleNotFoundError: No module named
+  'allo.compose'``, which reads exactly like a broken design. Measured
+  2026-09-25 over two full harness runs. **Put the worktree under ``/home``.**
+  Copying a prebuilt ``mlir/build`` there is not enough either: the bindings
+  carry an RPATH into the old build directory, so inside the sandbox they raise
+  ``ImportError: libAlloMLIRAggregateCAPI.so.22.0git``. Build ``mlir/`` in the
+  worktree that will run the harness.
 
 Running two tracks on one host: ``ray stop`` is global
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
