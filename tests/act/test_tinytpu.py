@@ -210,9 +210,26 @@ def test_the_stored_calibration_still_matches_what_the_model_says():
 
 
 def test_the_model_tracks_the_measured_points():
+    """The stored points still fit as well as the refit says they do.
+
+    `worst <= 35`, not `<= 40`. The bound was 40 against a worst residual of
+    33.74, and nothing chose the 6 cycles of slack; after the 2026-09-25
+    re-measurement (`gemm.relu 16x16x16` 750 -> 738, the five `gemm` rows to
+    `reproduce.sh`'s published row) the refit gives **34.21** cycles at
+    `gemm 16x16x8`, and 35 is the tightest integer bound it passes. That is the
+    honest bound for this assertion, because `fit()` is deterministic in
+    `CALIBRATION`: nothing but a person editing those points can move this
+    number, so slack above it buys no robustness and only lets an edit that
+    degrades the fit pass in silence. If this fails, re-derive the fit and move
+    the bound with a reason -- do not widen it to make the failure go away."""
     intercept, slope, worst = fit()
     assert 1.0 <= slope <= 1.5, f"slope {slope}"
-    assert worst <= 40, f"worst residual {worst} cycles over {len(CALIBRATION)}"
+    assert worst <= 35, (
+        f"worst residual {worst:.2f} cycles over {len(CALIBRATION)} points "
+        f"(was 34.21 when this bound was set). The fit is "
+        f"{intercept:.2f} + {slope:.4f} x makespan. Re-derive it from the "
+        f"measured points and re-justify the bound; act_machine.CALIBRATION "
+        f"says where each cosim number came from.")
 
 
 def test_the_one_validated_pair_got_the_order_right():

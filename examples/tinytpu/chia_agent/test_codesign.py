@@ -85,30 +85,40 @@ PUBLISHED_CYCLES = dict(control.PUBLISHED["cosim"])
 #: mapper can encode on it. It is not the published number at every shape, and
 #: the difference is understood:
 #:
-#:   16x16x16  686 == published. The mapper's pick IS the canonical nest, so
-#:             the program under the RTL is `gemm_program` word for word.
-#:   4x4x4     169 vs 172. At this shape N/T = K/T = 1, so the enumerator
-#:             offers a nest with no emitted loops at all, while the
+#:   8x8x8, 12x12x12, 16x16x8, 16x16x16 == published, and not by coincidence:
+#:             at those four shapes the mapper's pick (`N2>K2 rows=8`,
+#:             `N3>K3 rows=12`, `N2>K4 rows=16`, `N4>K4 rows=16`) lowers to a
+#:             program BYTE-IDENTICAL to `isa_dsl.gemm_program` -- checked in
+#:             python, `tuple(gemm_from_nest(select(*shape), *shape, False)) ==
+#:             tuple(gemm_program(*shape))`, before any Vitis ran. So the RTL is
+#:             running the published program word for word and cannot give
+#:             anything but the published cycles; those four entries are a
+#:             derivation that a measurement then confirmed, not four
+#:             independent measurements. (`codesign_gate.py`'s SEAM check is the
+#:             neighbouring, weaker statement: that the CANONICAL nest re-emits
+#:             `gemm_program`. That the mapper's SELECTED nest is the canonical
+#:             one at these four shapes is what was checked here.)
+#:   4x4x4     172 vs the published 175. At this shape N/T = K/T = 1, so the
+#:             enumerator offers a nest with no emitted loops at all, while the
 #:             hand-written program keeps a trip-count-1 `loop`/`endloop` pair
 #:             around the output body. Same 4 dynamic issues, two fewer static
 #:             instructions (24 words against 28), three fewer cycles. It is a
 #:             real mapping-side find and it is bit-exact; it is also the whole
 #:             of what the mapping search alone buys on this hardware.
 #:
-#: Measured 2026-09-22 by this suite (k1) at codesign-loop; bit-exact, csynth
-#: 2.431 ns, BRAM18K 42 / DSP 14 / FF 17481 / LUT 26583.
-#:
-#: All five shapes, measured in one run the same day (272 s of cosim):
-#: 169 / 262 / 418 / 484 / 686. Four of the five ARE the published numbers,
-#: because at 8x8x8, 12x12x12 and 16x16x8 the mapper's pick (`N2>K2 rows=8`,
-#: `N3>K3 rows=12`, `N2>K4 rows=16`) is bit-identical to the canonical nest.
-#: This is the mapper's pick, measured, and it is fitted to the design as it
-#: was at 476a70d8. Whether the pick still equals the shipped nest after the
-#: memory sizing moved the row is a measurement, not an edit.
+#: RE-MEASURED 2026-09-25, all five shapes in one build, `TPU_T=4
+#: TPU_MAXDIM=16`, every testbench `mismatches = 0`:
+#: **172 / 265 / 421 / 482 / 674**. The previous pin was
+#: 169 / 262 / 418 / 484 / 686, fitted to the design at `476a70d8`; the memory
+#: sizing and then `TPU_QD=16` moved the published row, and this row moved with
+#: it shape for shape. The mapping-side gain at 4x4x4 is **still exactly 3
+#: cycles** (175 - 172, was 172 - 169), which is the substantive result: `QD`
+#: changed the machine's fixed cost and changed nothing about what dropping a
+#: trip-1 loop is worth. That could not have been known by editing the numbers.
 #: not-the-published-row
-CODESIGN_CONTROL_ALL = {"4x4x4": 169, "8x8x8": 262, "12x12x12": 418,
-                        "16x16x8": 484, "16x16x16": 686}
-BASELINE_CYCLES = {"4x4x4": 169, "16x16x16": 686}
+CODESIGN_CONTROL_ALL = {"4x4x4": 172, "8x8x8": 265, "12x12x12": 421,
+                        "16x16x8": 482, "16x16x16": 674}
+BASELINE_CYCLES = {"4x4x4": 172, "16x16x16": 674}
 #: The whole refusal histogram at the two scored shapes on the shipped design.
 #: Pinned, not just spot-checked: the point of the loop is that these numbers
 #: move for a stated reason, so an unexplained drift is a failure.

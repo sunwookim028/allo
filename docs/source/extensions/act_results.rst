@@ -265,7 +265,8 @@ The ranking, checked against cosim
 
    TPU_PRJ=/tmp/act-cosim.prj python act_cosim.py gemm 4x4x4 --top 1 --baseline
 
-Measured 2026-09-22 on this host, one synthesis per project, default testbench:
+Re-measured 2026-09-25 on this host at ``TPU_T=4 TPU_MAXDIM=16``, one
+synthesis per project, default testbench, every row ``exact``:
 
 .. list-table::
    :header-rows: 1
@@ -280,67 +281,80 @@ Measured 2026-09-22 on this host, one synthesis per project, default testbench:
      - 10
      - 4
      - 50
-     - **172**
+     - **175**
    * - ``gemm`` 4x4x4, the search's choice
      - 8
      - 4
      - 40
-     - **169**
+     - **172**
    * - ``gemm`` 8x8x8
      - 13
      - 10
      - 115
-     - **262**
+     - **265**
    * - ``gemm`` 12x12x12
      - 13
      - 18
      - 227
-     - **418**
+     - **421**
    * - ``gemm`` 16x16x8
      - 13
      - 16
      - 261
-     - **484**
+     - **482**
    * - ``gemm`` 16x16x16
      - 13
      - 28
      - 453
-     - **686**
+     - **674**
    * - ``gemm.relu`` 16x16x16
      - 14
      - 32
      - 517
-     - **750**
+     - **738**
 
-The ``gemm`` rows reproduce **172 / 262 / 418 / 484 / 686** exactly, all five,
-so the harness is the one those figures came from. (That was the published row
-when this was measured. It moved to **171 / 261 / 417 / 483 / 685** on
-2026-09-22 when the memory sizing became derived, and to
-**175 / 265 / 421 / 482 / 674** on 2026-09-24 when ``QD=16`` became the
-default channel depth; the reproduction above is of the design as it then
-stood, and is not a disagreement.) The
+The ``gemm`` rows reproduce **175 / 265 / 421 / 482 / 674** exactly, all five,
+so the harness is the one those figures came from. (The table was first taken on
+2026-09-22 against the then-published **172 / 262 / 418 / 484 / 686**, and it
+reproduced that row exactly too. It moved to **171 / 261 / 417 / 483 / 685**
+when the memory sizing became derived and to the present row on 2026-09-24 when
+``QD=16`` became the default channel depth; the whole table was re-measured on
+2026-09-25 rather than edited, which is why the ``model`` column is unchanged and
+every ``cosim`` number moved.) The
 ``gemm.relu`` row settles what they are: **plain** ``gemm``, because
 ``cosim.py``'s ``testbench(M, K, N)`` leaves ``relu`` at its default.
-``gemm.relu`` at 16x16x16 is 750, and 750 - 686 = **64**, exactly the four
-``vrelu`` instructions' 64 ``accu`` rows. The delta is accounted for to the
-cycle, which is the best evidence available that the units' work counts are the
-right model of this machine.
+``gemm.relu`` at 16x16x16 is 738, and 738 - 674 = **64**, exactly the four
+``vrelu`` instructions' 64 ``accu`` rows --- the same 64 that 750 - 686 gave
+before ``QD=16``. The delta is accounted for to the cycle and the accounting
+survived a change that moved every other number on this page, which is the best
+evidence available that the units' work counts are the right model of this
+machine.
 
 The error bar a pick has to carry
 =================================
 
-Over those six points the model fits ``cosim = 128 + 1.24 x makespan`` with a
-worst residual of **34 cycles** -- computed from the table by
-``act_machine.fit``, not typed in, and re-checked by a test that fails if the
-model drifts from the stored points. So the model's *absolute* level is
-predictable across shapes to a few percent once the intercept is allowed.
+Over those six points the model fits ``cosim = 135 + 1.20 x makespan`` with a
+worst residual of **34 cycles** (34.21, at ``gemm`` 16x16x8) -- computed from the
+table by ``act_machine.fit``, not typed in, and re-checked by a test that fails
+if the model drifts from the stored points. The re-measurement barely moved it:
+it was ``128 + 1.24 x makespan``, worst 33.74, also at 16x16x8. A
+two-parameter fit over makespan absorbs most of what ``QD=16`` did, which is the
+opposite of what happened to ``act.cycles.estimate``'s one-variable fit over
+critical work; makespan already carries the sequencer term, so it is closer to
+monotone in the thing ``QD`` changed. So the model's *absolute* level is
+predictable across shapes to a few percent at the large shapes once the
+intercept is allowed --- and to 20 % at the smallest, which is the number a
+small-shape claim has to carry.
 
 That is the wrong statistic for ranking, and saying so matters. Ranking compares
 two mappings of **one** shape, where the intercept is common and only the
 difference matters, and there is exactly **one** such pair measured: at 4x4x4 the
-model put the two programs **1.25x** apart and the machine put them **1.02x**
+model put the two programs **1.25x** apart and the machine put them **1.017x**
 apart, same order. The model therefore overstated the gap by roughly an order of
-magnitude while getting the direction right.
+magnitude while getting the direction right. Both cycle counts moved by +3 under
+``QD=16`` (172 / 169 became 175 / 172), so the machine's margin is essentially
+unchanged and this conclusion is not an artefact of the row it was first taken
+on.
 
 ``act_compile.py`` prints this wherever it reports a pick, rather than leaving
 it on this page:
@@ -348,8 +362,8 @@ it on this page:
 .. code-block:: text
 
    chosen: N4>K4  cost (517, 32)
-   margin over the runner-up 1.24x. That margin sizes nothing: cosim ~ 128 +
-   1.24 x makespan over 6 measured points, worst residual 34 cycles, but the
+   margin over the runner-up 1.24x. That margin sizes nothing: cosim ~ 135 +
+   1.20 x makespan over 6 measured points, worst residual 34 cycles, but the
    model's ORDER is validated on 1 same-shape pair -- gemm 4x4x4: model 1.25x
    -> cosim 1.02x, same order -- so it overstated the gap by an order of
    magnitude while getting the order right. Treat the pick as a ranking
@@ -371,11 +385,14 @@ offers a single nest with no emitted loops, and the program it lowers drops a
 trip-1 hardware loop the hand-written generator keeps -- 8 static instructions
 against 10, the same 4 dynamic issues, and a model cost of 40 against 50.
 
-Cosim, in the table above: **169 cycles against 172**, both exact. The
-hand-written program reproduces the published 172 for that shape to the cycle,
+Cosim, in the table above: **172 cycles against 175**, both exact. The
+hand-written program reproduces the published 175 for that shape to the cycle,
 and the search's program is 3 cycles faster. The model predicted a 10-cycle
 saving and the machine gave 3, which is the expected direction of error for a
-model that charges a fixed ``II`` per fetch and no overlap.
+model that charges a fixed ``II`` per fetch and no overlap. It was 169 against
+172 before ``QD=16``: **the mapping-side saving is still exactly 3 cycles**, so
+what ``QD`` changed is the machine's fixed cost and not what dropping a trip-1
+loop is worth.
 
 That is the whole shape of what a mapper buys on this machine today: it
 reproduces a carefully hand-tuned choice where that choice is right, and it
@@ -492,10 +509,33 @@ What the cheap gate is worth
 ============================
 
 Measured with ``act/calibrate.py``, which runs one ``csynth_design`` and then
-one ``cosim_design`` per program on that same RTL. Everything in this section
-was measured in this session (``dev/records/tinytpu/logs/cosim_act_corpus_sweep.log`` and
-``dev/records/tinytpu/logs/cosim_act_relu_hang.log``); ``PUBLISHED_CYCLES`` in ``cycles.py`` is the
-only attributed number on the page.
+one ``cosim_design`` per program on that same RTL
+(``dev/records/tinytpu/logs/cosim_act_corpus_sweep.log`` and
+``dev/records/tinytpu/logs/cosim_act_relu_hang.log``).
+
+.. warning::
+
+   **This whole section is a measurement of the design at ``e24e433b``, at the
+   then-default ``TPU_QD=8``, and it was NOT re-measured in the 2026-09-25
+   refit.** Its ``cosim`` column is that design's (the ``gemm`` rows are
+   172 / 262 / 418 / 484 / 686) and its ``estimate`` column is the
+   ``173.2 + 1.621`` fit of that time. The shipped fit is now
+   ``179.0 + 1.573`` against 175 / 265 / 421 / 482 / 674.
+
+   The estimate column was deliberately **left alone** rather than recomputed.
+   Recomputing it under the new fit while leaving the old ``cosim`` column in
+   place would make every number in the ``error`` column a comparison between
+   two different designs, which is worse than being out of date: the in-sample
+   9.2 %, the out-of-sample 13.9 % and the 6.0 % mean below are all statistics
+   of that pairing and only of it.
+
+   **What it would take to re-derive them:** ``act/calibrate.py specs`` and
+   ``act/calibrate.py variants`` re-run on the current design at
+   ``TPU_T=4 TPU_MAXDIM=16`` --- one ``csynth`` plus a cosim per program over
+   the twelve specs, of which one (``relu_16x16``) is expected not to complete
+   (:ref:`item 24 <limitation-24>`). Until that runs, read the error column as
+   a property of the model in the ``QD=8`` regime. It is tracked in
+   ``chia_agent/control.NEEDS_REFIT``.
 
 .. code-block:: bash
 

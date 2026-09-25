@@ -1,0 +1,307 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+##############################################################
+Refitting the four constants that were pinned to the old row
+##############################################################
+
+:date: 2026-09-25
+:what: re-derivation of every constant ``chia_agent/control.NEEDS_REFIT``
+       named, against the shipped row, plus the two RTL measurements that
+       could not be derived.
+:why:  the four were least squares or residuals over
+       **172 / 262 / 418 / 484 / 686**; the shipped row has been
+       **175 / 265 / 421 / 482 / 674** since ``63ee6ec7``. Substituting the
+       new numbers without re-deriving would have produced a constant that
+       looks measured and is not, which is the failure this register exists
+       for.
+
+What was measured, and what was derived
+=======================================
+
+Two things had to be measured; everything else follows by arithmetic from
+them and from `reproduce.sh`'s row.
+
+.. list-table::
+   :header-rows: 1
+
+   * - measurement
+     - how
+     - result
+   * - the published row, re-derived on this host
+     - ``examples/tinytpu/reproduce.sh``
+     - ``REPRODUCED`` **175 / 265 / 421 / 482 / 674**, ``COSIM OK``
+   * - the co-design control (the frozen mapper's pick), all five shapes
+     - ``codesign_cosim.py`` at ``TPU_T=4 TPU_MAXDIM=16``, one csynth
+     - **172 / 265 / 421 / 482 / 674**, every testbench ``mismatches = 0``
+   * - ``gemm.relu`` 16x16x16
+     - ``act_cosim.py gemm.relu 16x16x16 --top 1 --baseline``, same config
+     - **738** for both the hand-written program and the search's pick, both ``exact``
+
+Four of the five co-design numbers are a **derivation that the measurement
+then confirmed**, not four independent measurements: at 8x8x8, 12x12x12,
+16x16x8 and 16x16x16 the mapper's pick lowers to a program byte-identical to
+``isa_dsl.gemm_program``, checked in python before any Vitis ran, so the RTL
+could only give the published cycles. Only 4x4x4 is a free measurement, and it
+is where the mapper differs.
+
+The four refits
+===============
+
+1. ``act/cycles.py`` --- ``PUBLISHED_CYCLES`` and ``CRITICAL_WORK_FIT``
+-----------------------------------------------------------------------
+
+``PUBLISHED_CYCLES`` is no longer a constant. It is **derived** from
+``reproduce.sh``'s ``EXPECTED``, the one copy of the row a gate checks on every
+run, exactly as ``control.reproduced`` does. That removes it from the class of
+thing that can go stale rather than giving it a new value.
+
+**The read is lazy, and that is not a detail.** ``act/cycles.py`` is in the
+CHIA evaluator's frozen import closure (``evaluate.import_closure``), and the
+tree it composes carries python modules and a few ``.json`` files --- not
+``reproduce.sh``. Reading the row at import time made **every candidate die at
+stage** ``import``, which ``test_harness.py`` caught on the first clean-tree run
+(``c.narrow16``, ``d.deadlock``, ``a.noop`` and five others, all at ``import``,
+none of them about what they test). ``published()`` is cached and a module
+``__getattr__`` keeps ``cycles.PUBLISHED_CYCLES`` working, so the frozen set is
+unchanged and nothing the evaluation runs touches the row at all --- it uses
+``estimate`` and ``work``. The alternative, adding ``reproduce.sh`` to
+``evaluate.FROZEN_LITERAL``, would have widened the frozen set to fix a problem
+that laziness removes.
+
+``CRITICAL_WORK_FIT`` is least squares of cosim against critical work over
+those five points, recovered by ``refit()`` and checked against the stored pair
+by the module's ``__main__``. The critical-work column comes from the header
+``assemble`` writes and **did not move**: 9 / 48 / 144 / 192 / 320, the same
+counts off the same design. So the whole change is in the measured column.
+
+.. list-table:: ``cycles = fixed + marginal x critical work``
+   :header-rows: 1
+
+   * - spec
+     - work
+     - old cosim
+     - old residual
+     - new cosim
+     - new residual
+   * - ``gemm_4x4x4``
+     - 9
+     - 172
+     - -15.79
+     - 175
+     - **-18.16**
+   * - ``gemm_8x8x8``
+     - 48
+     - 262
+     - +10.99
+     - 265
+     - +10.50
+   * - ``gemm_12x12x12``
+     - 144
+     - 418
+     - +11.38
+     - 421
+     - **+15.49**
+   * - ``gemm_16x16x8``
+     - 192
+     - 484
+     - -0.43
+     - 482
+     - +0.98
+   * - ``gemm_16x16x16``
+     - 320
+     - 686
+     - -5.92
+     - 674
+     - -8.36
+
+``(173.2, 1.621)`` becomes **``(179.0, 1.573)``**: the fixed cost up 5.8
+cycles, the marginal cost down 0.048 cycles per work item.
+
+**The refit made this fit worse, and that is a finding about the model.**
+Worst residual 15.79 to **18.16** cycles, rms 10.34 to **12.25**, on the same
+five points. The reason is visible in the deltas. Between the two rows the
+design took two steps, both documented in ``reproduce.sh``: derived memory
+sizing, **-1 at every shape**, and then ``TPU_QD=16``,
+**+4 / +4 / +4 / -1 / -11**. The second one is a term that *grows* with work
+(deeper-FIFO pipeline skew, which only the small shapes are short enough to
+be dominated by) fighting a term that *shrinks* with it (a deeper queue lets
+the sequencer run ahead of the units, which only the long shapes run long
+enough to collect). One slope over one variable cannot hold both, and the
+least-squares answer is to split the difference and fit every point slightly
+worse.
+
+The practical consequence: the gate this feeds passes a submission within
+**10 %** of the reference estimate, and 10 % of the smallest shape is 17.5
+cycles, which is now **less** than the model's own worst residual. At small
+shapes the estimate is inside its own tolerance no longer, and ``--cosim``
+is the answer there. That was nearly true before (15.79 against 17.2) and is
+now plainly true.
+
+2. ``act_machine.py`` --- ``CALIBRATION``
+-----------------------------------------
+
+The model column is **recomputed from the design on every test run**
+(``test_the_stored_calibration_still_matches_what_the_model_says``), and it is
+unchanged: 50 / 115 / 227 / 261 / 453 / 517. Only the cosim column moved. Five
+of the six rows are the published row; ``gemm.relu`` 16x16x16 was re-measured
+at **738**.
+
+.. list-table:: ``cosim = intercept + slope x makespan``
+   :header-rows: 1
+
+   * - row
+     - model
+     - old cosim
+     - old residual
+     - new cosim
+     - new residual
+   * - ``gemm`` 4x4x4
+     - 50
+     - 172
+     - -17.56
+     - 175
+     - -20.07
+   * - ``gemm`` 8x8x8
+     - 115
+     - 262
+     - -7.87
+     - 265
+     - -7.92
+   * - ``gemm`` 12x12x12
+     - 227
+     - 418
+     - +9.75
+     - 421
+     - +13.93
+   * - ``gemm`` 16x16x8
+     - 261
+     - 484
+     - **+33.74**
+     - 482
+     - **+34.21**
+   * - ``gemm`` 16x16x16
+     - 453
+     - 686
+     - -1.49
+     - 674
+     - -3.75
+   * - ``gemm.relu`` 16x16x16
+     - 517
+     - 750
+     - -16.56
+     - 738
+     - -16.40
+
+``128 + 1.24 x makespan`` becomes **``135.19 + 1.1977 x makespan``**; worst
+residual 33.74 to **34.21**, rms 17.70 to 18.77. The worst point is
+``gemm`` 16x16x8 both before and after --- the shape the model underestimates
+most, and the one whose mapping (``N2>K4 rows=16``) has the fewest output
+tiles for its reduction depth.
+
+**This fit barely got worse where the critical-work fit got materially worse,
+and the difference is informative.** Makespan already charges the sequencer at
+``SEQUENCER_II`` per fetch, so it is closer to monotone in the thing ``QD``
+changed, and a two-parameter fit over it absorbs most of a tilt that a fit over
+``max`` of the unit counts cannot see at all.
+
+``738 - 674 = 64``, exactly the four ``vrelu`` instructions' 64 ``accu``
+rows --- the same 64 that ``750 - 686`` gave before. That accounting survived
+a change which moved every other number here, and it is the strongest evidence
+on the page that the per-unit work counts are the right model of this machine
+even where the fit over them is poor.
+
+3. ``act_machine.py`` --- ``RANKING_EVIDENCE``
+----------------------------------------------
+
+The one same-shape pair, both halves re-measured:
+
+.. list-table::
+   :header-rows: 1
+
+   * - 4x4x4
+     - model
+     - old cosim
+     - new cosim
+   * - hand-written (``isa_dsl.gemm_program``)
+     - 50
+     - 172
+     - **175**
+   * - searched (the mapper's pick, ``- rows=4``)
+     - 40
+     - 169
+     - **172**
+
+Both moved by exactly +3, so the machine's margin is 1.0174x where it was
+1.0178x and the model's is 1.2500x either way. **The mapping-side saving is
+still exactly 3 cycles.** What ``QD=16`` changed is the machine's fixed cost,
+and not what dropping a trip-count-1 loop is worth --- which is the one thing
+in this refit that could not have been guessed from the new row, and the
+reason the pair was re-measured rather than shifted.
+
+The ACT search's pick at 4x4x4 and ``mapspace.select``'s are the **same
+program**, byte for byte (checked in python), so the one cosim serves both this
+row and the co-design control.
+
+4. ``tests/act/test_tinytpu.py`` --- the residual bound
+--------------------------------------------------------
+
+``worst <= 40`` becomes **``worst <= 35``**.
+
+The old bound was 40 against a worst residual of 33.74 and nothing chose the
+6.26 cycles of slack. ``fit()`` is deterministic in ``CALIBRATION``, so nothing
+but a person editing those measured points can move this number; slack above it
+buys no robustness against noise, because there is none, and only lets an edit
+that degrades the fit pass in silence. 35 is the tightest integer bound the
+refitted model passes (34.21). The assertion message now prints the fit and
+says to re-derive rather than widen.
+
+The slope band ``1.0 <= slope <= 1.5`` is left as it was: it is a sanity range,
+not a fit, and 1.1977 sits inside it as 1.2355 did.
+
+5. ``reproduce_codesign.sh`` --- the control it expects
+-------------------------------------------------------
+
+``{"4x4x4": 169, "16x16x16": 686}`` becomes
+**``{"4x4x4": 172, "16x16x16": 674}``**, and ``test_codesign.py``'s
+``CODESIGN_CONTROL_ALL`` and ``BASELINE_CYCLES`` with it. The mapper's pick
+still equals the shipped nest at four of the five shapes, which was the open
+question the register recorded; the labels are unchanged
+(``- rows=4``, ``N2>K2 rows=8``, ``N3>K3 rows=12``, ``N2>K4 rows=16``,
+``N4>K4 rows=16``) and so is the whole pinned refusal histogram
+(4x4x4: 1 of 4 encodable, ``accumulator-raw-distance`` 2, ``agu-terms`` 1;
+16x16x16: 3 of 1226, ``acc-peel`` 1150, ``emitter`` 54, ``agu-terms`` 17,
+``accumulator-raw-distance`` 2). So the mapspace side of the co-design
+baseline did not move at all, and only the cycle counts did.
+
+What was NOT refitted, and what it needs
+========================================
+
+The out-of-sample table on :ref:`act_results <act-specs-gate-measured>` ---
+twelve specs with critical work, estimate, cosim and error, and the
+**9.2 % in-sample / 13.9 % out-of-sample / 6.0 % mean** claims drawn from it.
+Its cosim column is a ``TPU_QD=8`` corpus sweep of the design at ``e24e433b``
+and its estimate column the old fit. Recomputing the estimates under the new
+fit while leaving those cosims in place would turn every entry in the error
+column into a comparison between two different designs, so the table was left
+alone and warned instead.
+
+It needs ``act/calibrate.py specs`` and ``act/calibrate.py variants`` re-run at
+``TPU_T=4 TPU_MAXDIM=16``: one ``csynth`` plus a cosim per program over the
+twelve specs, of which ``relu_16x16`` is expected not to complete
+(:ref:`limitations item 24 <limitation-24>`). It is the one entry left in
+``control.NEEDS_REFIT``.
+
+Also checked and found NOT stale
+================================
+
+* ``chia_agent/rescore.py``'s ``run1_burst`` row holds
+  ``172 / 262 / 418 / 484 / 686``. That is **history, not a pin**: its
+  ``area_config`` says ``QD=8``, and it is paired with the row that was
+  published when run 1 was measured. ``run3_burst`` beside it already carries
+  the current row.
+* ``control.RECORDED``'s pre-``QD=16`` entries, which are keyed on the git
+  blobs of the design files at the commits they were measured at, and are
+  correct for those commits.
+* ``workloads/claims.json``, which records **measurements** with their
+  configurations and holds no estimate.

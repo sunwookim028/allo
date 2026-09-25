@@ -63,10 +63,13 @@ fi
 
 if [[ "$STAGE" == all || "$STAGE" == control ]]; then
   echo "=== control: the co-design baseline, measured in this run ============"
-  # Expect cycles {"4x4x4": 169, "16x16x16": 686}. 686 is main @ 476a70d8's
-  # published number, because at 16x16x16 the mapper's pick IS the shipped
-  # nest; 169 against the published 172 is the trip-count-1 loop the mapper
-  # drops at 4x4x4 (two fewer static instructions, same dynamic issues).
+  # Expect cycles {"4x4x4": 172, "16x16x16": 674}, re-measured 2026-09-25 at
+  # TPU_T=4 TPU_MAXDIM=16 (all five shapes: 172 / 265 / 421 / 482 / 674, every
+  # testbench bit-exact). 674 is the published number, because at 16x16x16 the
+  # mapper's pick lowers to the shipped nest byte for byte; 172 against the
+  # published 175 is the trip-count-1 loop the mapper drops at 4x4x4 (two fewer
+  # static instructions, same dynamic issues) -- still worth exactly 3 cycles,
+  # as it was when the row was 169 against 172.
   python "$AGENT/evaluate.py" --spec-dir "$WORK/spec" \
       --work "$WORK/eval" --codesign
   rm -rf "$WORK/eval"
