@@ -13,31 +13,102 @@ Why the CHIA experiment rate is slow, measured 2026-09-25
    next person does not re-derive them. Work in flight at the time is named at
    the end.
 
-The time budget, and where it is not
-====================================
+The time budget: evaluation IS the lever, but not the harness's copy
+====================================================================
 
-Run 3 took **167 minutes** of wall time. Of that:
+.. warning::
+
+   **An earlier version of this page said evaluation was 7 % of the run. That
+   was wrong**, and the error is instructive: 661 s counts only
+   ``cosim_seconds`` from the harness's four verdicts. It misses everything the
+   **agent runs itself inside its session**, which is most of it. Reconstructed
+   turn by turn from opencode's own database (``part`` table, per-tool-call
+   ``state.time.start/end``) across all eight of run 3's paid sessions -- free,
+   no new run needed.
+
+Inside a model session (8 sessions, 15,269 s of span):
 
 .. list-table::
    :header-rows: 1
 
    * - what
-     - time
+     - calls
+     - seconds
      - share
-   * - all cosim evaluation, 4 candidates
-     - **661 s (11 min)**
-     - **7 %**
-   * - four large model calls, each the full ``timeout_seconds=2400``
-     - 160 min
-     - ~96 %
+   * - ``score_cycles`` (gate + csynth + cosim)
+     - 16
+     - 5,634
+     - **37 %**
+   * - ``run_functional_check`` (gate)
+     - 31
+     - 2,288
+     - **15 %**
+   * - model latency (~200 turns, ~35 s/turn)
+     - --
+     - 7,340
+     - **48 %**
+   * - ``read_spec`` / ``replace_text`` / edits
+     - 55+
+     - **6**
+     - 0.04 %
 
-Run 2: **all six** model calls hit the timeout. Run 1: three of five sessions
-timed out. So a timeout that fires on essentially every session across three
-runs is not a timeout -- **it is the schedule**.
+Whole of run 3 as worker-seconds (2 workers x 167 min ~= 20,040):
 
-The practical consequence, which is counter-intuitive and worth stating first:
-**evaluation speedups are not the lever.** Relaxing PD feedback, skipping the
-area proxy or making cosim faster all target the 7 %.
+.. list-table::
+   :header-rows: 1
+
+   * - what
+     - worker-s
+     - share
+   * - in-session ``score_cycles``
+     - 5,634
+     - 31 %
+   * - in-session gate
+     - 2,288
+     - 13 %
+   * - model latency
+     - 7,340
+     - 41 %
+   * - harness re-scoring (8 verdicts + retries)
+     - 2,657
+     - 15 %
+   * - MCP, edits, reads, composition
+     - **6**
+     - 0.03 %
+
+**Total evaluation is 10,579 worker-s -- 59 % of the run.** MCP and loop
+overhead is *six seconds*.
+
+Why a session hits 2400 s
+=========================
+
+**Because 2400 s is roughly what the work costs**: ~1,250 s of tool execution
+(4-5 cosims at 235 s, 5-7 gates at 60 s) plus ~1,150 s of model latency. The
+two sessions that did complete finished at **2,313 s and 2,342 s** -- at the
+wall, not comfortably inside it.
+
+Three things are uncapped, and this is the actual defect:
+
+* **``score_cycles`` has no cap.** The agent uses it as a hill-climbing oracle
+  2-5 times a session, although the prompt itself says the harness re-scores
+  independently. **31 % of the run re-measures what is measured again anyway.**
+* **``run_functional_check`` is prompted "until it passes"**, no cap, 4-7 calls.
+* **The agent is never told a time or turn budget.** Nothing mentions 2400 s.
+  And its one cost hint is wrong: ``run_functional_check``'s docstring says
+  **"~15 s"**; measured **52-76 s**, because it now rebuilds at MAXDIM 8, 12 and
+  T=8/MAXDIM=32. An agent trying to budget would budget 4x low.
+
+Context growth explains the model half. The smoke call is 12 s because it runs
+**zero** evaluator tools and sits at ~3 k context. A real session reaches
+~100 k -- ``read_spec`` returns **96 KB of both files whole** and is called
+**12-19 times per session** -- and per-turn latency rises from ~4 s to 35-70 s.
+
+Second order, and it costs the series more than the clock: on timeout
+``response.result`` is empty, so ``agent_summary`` is ``''`` for **5 of run 3's
+6 iterations**. The "Already attempted in this search" block handed to the next
+iteration carries cycle counts but **no rationale**. *The search has no
+memory.* The edits themselves survive -- 13-112 line diffs were scored -- so a
+timeout is not a total loss.
 
 Eliminated: the model endpoint
 ==============================
