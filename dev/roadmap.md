@@ -225,12 +225,27 @@ Recorded because each cost real work today.
   `/tmp/ray/ray_current_cluster` still named it. It cost an agent 25 minutes to
   diagnose, and it is the same fails-open shape: the service was up, the
   connection succeeded, and nothing worked.
+  **Third occurrence, 2026-09-25**, and the one that produced a check: a clean
+  worktree found `/tmp/ray/ray_current_cluster` naming `128.84.48.164:6399`
+  with no `gcs_server` and no `raylet` behind it, and the first `smoke.py` sat
+  for ten minutes printing nothing but `Failed to connect to GCS`.
+  **This is now checked.** `preflight.py` -- which `swarm.py`, `loop.py` and
+  `smoke.py` run before any worker and any model call, and which
+  `checkout_setup.sh` runs as its step 4 -- resolves the address a driver
+  would really dial (`RAY_ADDRESS`, else
+  `<RAY_TMPDIR or /tmp/ray>/ray_current_cluster`), probes it with a 3 s
+  timeout, and refuses with the address named and the fix spelled out. It also
+  refuses a head that *does* accept the connection but whose raylet's working
+  directory is deleted, which is the 2026-09-22 shape above. Run it alone with
+  `python examples/tinytpu/chia_agent/preflight.py --check-ray` ($0).
   *Do not fix this with `ray stop`* -- it matches by process name across the
   whole host and would kill every other track's raylet. Kill the orphaned
   session's PIDs, owner confirmed. To avoid it: start a head with a private
   `--temp-dir` and port and export `RAY_ADDRESS`, which overrides even an
   explicit `address="auto"`, so no code change is needed and
-  `ray_current_cluster` is left alone for everyone else.
+  `ray_current_cluster` is left alone for everyone else. The temp-dir path
+  must be **short** -- `/tmp/ray-<track>`, not one under a scratch directory:
+  Ray puts a Unix socket under it and AF_UNIX caps the path at 107 bytes.
   Related: the CHIA tool servers bind fixed ports from 8000 upward, so two
   `chia_agent` processes collide. Serialise them.
 - **Remove a worktree when its agent finishes, not when the disk fills.** Each

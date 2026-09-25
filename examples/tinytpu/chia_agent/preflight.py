@@ -9,6 +9,12 @@ reads, a file-existence check, and arithmetic. It refuses unless
       and billing is enabled on it,
   (b) `aiplatform.googleapis.com` is enabled on that project, and
   (c) a positive, finite spend cap has been given for the run, and
+  (e) the Ray address `ray.init(address="auto")` would actually use --
+      `RAY_ADDRESS`, else `<RAY_TMPDIR or /tmp/ray>/ray_current_cluster` --
+      is alive, and is not a head whose working directory has been removed.
+      This one fails by HANGING rather than erroring if it is not checked:
+      a stale `ray_current_cluster` makes every driver block in `ray.get`
+      with nothing on stdout but `Failed to connect to GCS`, and
   (d) CHIA's cumulative spend on CHIA2026 so far plus this run's cap stays
       within `CHIA_TOTAL_CAP_USD` ($500 unless chia.env says otherwise). The
       cumulative figure is opencode's own record, attributed to CHIA2026 by
@@ -31,9 +37,10 @@ ADC quota project is consulted or changed.
 
 The scripted test model (`TINYTPU_OPENCODE_BASE_URL` on loopback, set only by
 `test_harness.py`) cannot reach Vertex and costs nothing, so (a), (b) and (d)
-are skipped for it; (c) still applies.
+are skipped for it; (c) and (e) still apply.
 
     python preflight.py --budget-usd 15          # exit 0 and the summary, or 1
+    python preflight.py --check-ray              # (e) alone; no cap needed
 """
 
 from __future__ import annotations
@@ -43,6 +50,7 @@ import json
 import math
 import os
 import shutil
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -61,10 +69,114 @@ DEFAULT_BILLING_ACCOUNT = "01BF39-94AA3F-36BACB"
 #: fresh checkout does not silently get a different one.
 DEFAULT_TOTAL_CAP_USD = 500.0
 GCLOUD_TIMEOUT = 60
+#: `ray.init(address="auto")` reads RAY_ADDRESS first, then this file under
+#: Ray's temp dir. Both are read here so the probe tests the address the
+#: driver would really dial, not one we assume.
+RAY_CLUSTER_FILE = "ray_current_cluster"
+#: A live GCS answers the TCP handshake in milliseconds on the same host.
+RAY_PROBE_TIMEOUT = 3.0
 
 
 class PreflightError(RuntimeError):
     pass
+
+
+def ray_address() -> tuple[str | None, str]:
+    """The address `ray.init(address="auto")` would use, and where it came from.
+
+    `(None, source)` means nothing is configured, which is not an error:
+    `loop.py` and `smoke.py` fall back to starting a private local cluster."""
+    addr = (os.environ.get("RAY_ADDRESS") or "").strip()
+    if addr:
+        return addr, "RAY_ADDRESS"
+    path = Path(os.environ.get("RAY_TMPDIR") or "/tmp/ray") / RAY_CLUSTER_FILE
+    try:
+        addr = path.read_text().strip()
+    except OSError:
+        return None, str(path)
+    return (addr or None), str(path)
+
+
+def _ray_port_open(addr: str) -> bool:
+    host, _, port = addr.rpartition(":")
+    try:
+        sock = socket.create_connection((host or "127.0.0.1", int(port)),
+                                        RAY_PROBE_TIMEOUT)
+    except (OSError, ValueError):
+        return False
+    sock.close()
+    return True
+
+
+def _orphaned_raylet(addr: str) -> int | None:
+    """PID of a local raylet serving `addr` whose working directory is gone.
+
+    The fails-open shape the roadmap records: the head still listens and still
+    accepts the connection, but every worker dies in `setup_worker.py` at
+    `os.getcwd()`, so the driver blocks in `ray.get` forever. Best effort --
+    a head on another host has no /proc entry here, and that is not an error."""
+    for proc in Path("/proc").iterdir():
+        if not proc.name.isdigit():
+            continue
+        try:
+            cmdline = (proc / "cmdline").read_bytes().split(b"\0")
+            if not cmdline or not cmdline[0].endswith(b"raylet"):
+                continue
+            if f"--gcs-address={addr}".encode() not in cmdline:
+                continue
+            if os.readlink(proc / "cwd").endswith(" (deleted)"):
+                return int(proc.name)
+        except OSError:
+            continue
+    return None
+
+
+def check_ray(quiet: bool = False) -> dict:
+    """(e) the Ray address a driver would dial is alive. Raise, or describe it.
+
+    Costs nothing: one file read and one TCP handshake with a 3 s timeout."""
+    addr, source = ray_address()
+    shared = Path(os.environ.get("RAY_TMPDIR") or "/tmp/ray") / RAY_CLUSTER_FILE
+    info = {"address": addr, "source": source}
+    if addr is None:
+        if not quiet:
+            print(f"pre-flight: no Ray address configured ({source} is absent); "
+                  f"ray.init will start a private local cluster", flush=True)
+        return info | {"state": "none"}
+    if addr in ("local", "auto"):
+        return info | {"state": "local"}
+    fix = (
+        f"    ray start --head --temp-dir=/tmp/ray-<track> \\\n"
+        f"        --resources='{{\"opencode_creds\": 2}}' --include-dashboard=false\n"
+        f"    export RAY_ADDRESS=<the address ray start printed>\n"
+        f"Do NOT run `ray stop`: it matches Ray processes by NAME across the whole "
+        f"host and would kill every other track's raylet (that is how run 2 lost "
+        f"both its workers). Kill only your own cluster, which the private temp "
+        f"dir makes identifiable:\n"
+        f"    pgrep -f /tmp/ray-<track>/session_ | xargs -r kill\n"
+        f"Keep the temp-dir path SHORT -- /tmp/ray-<track>, never one under a "
+        f"scratch directory: Ray puts a Unix socket under it and AF_UNIX caps the "
+        f"path at 107 bytes. RAY_ADDRESS overrides even an explicit "
+        f"address=\"auto\", so no code change is needed and the shared "
+        f"{shared} is left alone for the other tracks on this host.")
+    if not _ray_port_open(addr):
+        raise PreflightError(
+            f"Ray at {addr} (from {source}) is not accepting connections: it is a "
+            f"stale address for a head that is gone. Nothing would report this -- "
+            f"ray.init(address=\"auto\") reads {source}, retries `Failed to connect "
+            f"to GCS` and blocks forever rather than failing. Start your own "
+            f"head:\n{fix}")
+    pid = _orphaned_raylet(addr)
+    if pid is not None:
+        raise PreflightError(
+            f"Ray at {addr} (from {source}) accepts connections but its raylet "
+            f"(pid {pid}) has a DELETED working directory -- an orphan left by a "
+            f"removed worktree. It can spawn no worker (each dies in "
+            f"setup_worker.py at os.getcwd()) and the driver would block in "
+            f"ray.get with no error. Start your own head:\n{fix}")
+    if not quiet:
+        print(f"pre-flight: Ray at {addr} (from {source}) is up", flush=True)
+    return info | {"state": "up"}
 
 
 def _gcloud(args: list[str], project: str) -> dict | list:
@@ -106,6 +218,9 @@ def check(budget_usd, *, run_t0_ms: int | None = None, quiet: bool = False) -> d
     if not (math.isfinite(cap) and cap > 0):
         raise PreflightError(f"no spend cap for this run (got {budget_usd!r}); pass "
                              f"--budget-usd with a positive dollar amount")
+    # (e) the Ray address, before anything that touches the network: it is
+    # local, it costs nothing, and it is the one failure that hangs.
+    ray_info = check_ray(quiet=quiet)
     model = os.environ.get("TINYTPU_OPENCODE_MODEL",
                            "google-vertex/gemini-3.1-pro-preview")
     base_url = os.environ.get("TINYTPU_OPENCODE_BASE_URL")
@@ -116,7 +231,7 @@ def check(budget_usd, *, run_t0_ms: int | None = None, quiet: bool = False) -> d
                                  f"loopback; only the local scripted test model may "
                                  f"bypass the billing checks")
         info = {"mode": "test-model", "model": model, "base_url": base_url,
-                "budget_usd": cap}
+                "budget_usd": cap, "ray": ray_info}
         if not quiet:
             print(f"pre-flight: scripted test model at {base_url}; no cloud model "
                   f"can be reached, billing checks skipped; spend cap ${cap:.2f}",
@@ -188,7 +303,7 @@ def check(budget_usd, *, run_t0_ms: int | None = None, quiet: bool = False) -> d
             "location": os.environ.get("TINYTPU_VERTEX_LOCATION", "global"),
             "budget_usd": cap, "total_cap_usd": total_cap,
             "spent_so_far_usd": so_far["usd"], "sessions_so_far": so_far["sessions"],
-            "remaining_usd": round(remaining, 4)}
+            "remaining_usd": round(remaining, 4), "ray": ray_info}
     if not quiet:
         print(f"pre-flight OK: this run will charge billing account {account} "
               f"({info['billing_account_name']}) through project {project} "
@@ -213,5 +328,15 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--budget-usd", default=os.environ.get("CHIA_BUDGET_USD"))
+    ap.add_argument("--check-ray", action="store_true",
+                    help="run (e), the Ray liveness check, alone: no cap, no "
+                         "gcloud call, no network beyond one TCP handshake")
     a = ap.parse_args()
+    if a.check_ray:
+        try:
+            print(json.dumps(check_ray()))
+        except PreflightError as e:
+            print(f"pre-flight REFUSED: {e}", file=sys.stderr, flush=True)
+            raise SystemExit(1) from None
+        raise SystemExit(0)
     print(json.dumps(require(a.budget_usd)))
