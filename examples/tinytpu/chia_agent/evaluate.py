@@ -1105,12 +1105,72 @@ def isa_gate(tree, env, work, verify_now):
 #: only tier a scoring run may use and therefore the only tier that can lead to
 #: acceptance (`main` refuses any other with `--gate-only` absent).
 #:
-#:   oracle  the PyTorch bit-exactness check alone. The one check with
+#:   oracle  ~13 s. The PyTorch bit-exactness check alone: the one check with
 #:           something outside this repository on one side.
-#:   fast    + gen_isa --conform, bench_isa, stress_isa. Every functional
-#:           property at the scored configuration; NOT parametricity.
-#:   full    + the param sweep. The tier every score and every verdict uses.
+#:   fast    ~36 s. + bench_isa, stress_isa -- everything the Allo SIMULATOR
+#:           can answer -- and the cheap staleness arm (`stale_gate`, 0.08 s).
+#:           NOT `gen_isa --conform` and NOT parametricity: those two are the
+#:           gate's whole cost (33 s and 39 s measured, against 27 s for
+#:           everything else together) and each of them REBUILDS the design.
+#:   full    ~107 s. + `gen_isa --conform` and the param sweep. The tier every
+#:           score and every verdict runs.
 GATE_TIERS = ("oracle", "fast", "full")
+
+
+def stale_gate(tree, env, work, verify_now):
+    """The STALE arm of `gen_isa.py --check`, in a TENTH OF A SECOND.
+
+    `--check` costs 32 s on this host, measured, because it imports the design
+    and holds every consumer -- the units' literal bit slices, the assembler,
+    the program generator, `allo/encoding.py` -- to the spec. `--conform` adds
+    the emitted HLS's own slices for 33 s in total. It is the single most
+    expensive thing in the gate, more than the three param rebuilds, and it was
+    never measured before this: the old `run_functional_check` docstring said
+    the whole gate was "~15 s".
+
+    But the arm a candidate trips ten times more often than any of the others
+    is the FIRST one: `isa_encoding.py` not matching the `isa_spec.json` beside
+    it, which is the state every spec edit leaves behind until `regenerate_isa`
+    runs. That arm needs no design at all -- only the FROZEN generator, on the
+    candidate's own spec, which imports nothing of the candidate and cannot run
+    its code. Measured at 0.08 s. So the fast tier can say it, and the agent
+    learns about a stale artefact in seconds instead of at the next score.
+
+    It is STRICTLY WEAKER than `--check` and never stands in for it: the full
+    gate runs `--conform` regardless, and the full gate is what every score and
+    every verdict runs. What this cannot see is a spec that generates its own
+    artefact correctly and disagrees with the design built beside it.
+    """
+    sandbox = work / "genchk"
+    if sandbox.exists():
+        shutil.rmtree(sandbox)
+    # From the composed TREE, so the generator run on is the frozen one and the
+    # spec read is the one the gate is judging -- and so nothing writes into
+    # the tree, which the tamper check compares byte for byte after every stage.
+    shutil.copytree(tree / PKG, sandbox)
+    for f in sandbox.rglob("*"):
+        if f.is_file():
+            f.chmod(0o644)
+    before = (sandbox / "isa_encoding.py").read_text(encoding="utf-8")
+    rc, out, sec = run([ALLO_PYTHON, "gen_isa.py", "--write", "--no-doc"],
+                       sandbox, env, GATE_TIMEOUT, work, tree)
+    verify_now("the staleness check")
+    if rc:
+        raise Reject("gate:isa", "the frozen generator could not read this "
+                                 "spec:\n" + out[-3000:])
+    after = (sandbox / "isa_encoding.py").read_text(encoding="utf-8")
+    if after != before:
+        raise Reject("gate:isa",
+                     "STALE: isa_encoding.py is not what your isa_spec.json "
+                     "generates. It is GENERATED -- run regenerate_isa after "
+                     "every spec edit. (This is the cheap arm of "
+                     "gen_isa.py --check; the full gate runs --conform, which "
+                     "also holds every consumer and the emitted HLS to the "
+                     "spec.)")
+    return {"stale": "isa_encoding.py is what isa_spec.json generates",
+            "note": "the cheap arm of gen_isa --check; --conform runs in the "
+                    "full gate",
+            "seconds": round(sec, 1)}
 
 
 def gate(tree, env, work, verify_now, cfg=None, tier="full"):
@@ -1128,7 +1188,8 @@ def gate(tree, env, work, verify_now, cfg=None, tier="full"):
                         "nothing whatever about cycles",
             seconds=result["pytorch"]["seconds"])
         return result
-    result["isa"] = isa_gate(tree, env, work, verify_now)
+    result["isa"] = (isa_gate(tree, env, work, verify_now) if tier == "full"
+                     else stale_gate(tree, env, work, verify_now))
     ok, rc, out, sec = vouched("bench_isa", tree, env, work, tree, GATE_TIMEOUT)
     verify_now("bench_isa")
     if not ok or not re.search(r"^  ALL EXACT$", out, re.M) or "FAILURES" in out:
@@ -1167,10 +1228,15 @@ def gate(tree, env, work, verify_now, cfg=None, tier="full"):
                       + result["isa"]["seconds"], 1))
     if tier != "full":
         result["not_checked"] = (
-            "parametricity: the design is NOT rebuilt at the other MAXDIMs or "
-            "at the second T, so a change specialised to the scored "
-            "configuration still passes here. It is refused by the full gate, "
-            "which every scored run and the harness's own verdict use")
+            "two properties, both of which REBUILD the design and are "
+            "therefore the gate's whole cost. (1) parametricity: the design is "
+            "NOT rebuilt at the other MAXDIMs or at the second T, so a change "
+            "specialised to the scored configuration still passes here. "
+            "(2) gen_isa --conform: only the cheap staleness arm ran, so the "
+            "spec's agreement with the units' bit slices, the assembler, the "
+            "program generator and the emitted HLS is unchecked here. Both are "
+            "refused by the full gate, which every scored run and the "
+            "harness's own verdict use")
     return result
 
 

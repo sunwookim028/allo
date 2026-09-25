@@ -1081,7 +1081,8 @@ class Suite:
               f"param={g.get('param')!r}",
               r.startswith("Replaced") and v.get("ok") and g.get("tier") == "fast"
               and g.get("param") == "not run at this tier"
-              and "parametricity" in (g.get("not_checked") or ""))
+              and "parametricity" in (g.get("not_checked") or "")
+              and "gen_isa --conform" in (g.get("not_checked") or ""))
         v = await self.full_gate("tpta")
         check("g.wpr_literal", "REJECTED at gate:param by the FULL gate, which is "
               "what every score and the harness verdict run",

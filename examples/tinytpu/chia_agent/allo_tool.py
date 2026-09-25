@@ -23,9 +23,11 @@ never the plumbing -- it was that the cheapest thing an agent could ask cost
 runs in seconds. So there was no tool it could call in under fifty seconds, and
 fast iteration was impossible rather than merely slow.
 
-  check_bit_exact        ~16 s   the PyTorch oracle alone
-  run_functional_check   ~30 s   + conform, bench_isa, stress_isa
-  score_cycles          ~240 s   + parametricity, csynth and RTL cosim
+  check_bit_exact        ~13 s   the PyTorch oracle alone
+  run_functional_check   ~36 s   + bench_isa and stress_isa: everything the
+                                 Allo simulator can answer
+  score_cycles          ~240 s   + gen_isa --conform, parametricity, csynth
+                                 and RTL cosim
 
 Each rung sees strictly more than the one below it. NONE of them is on the path
 to acceptance and none of them can be: the harness re-scores the final spec
@@ -127,9 +129,9 @@ TOOL_SECONDS = {
     "apply_spec_patch": 0.3,
     "insert_after": 0.2,
     "regenerate_isa": 3,
-    "check_bit_exact": 16,
-    "run_functional_check": 30,
-    "mapspace_report": 60,
+    "check_bit_exact": 13,
+    "run_functional_check": 36,
+    "mapspace_report": 66,
     "score_cycles": 240,
 }
 
@@ -680,7 +682,7 @@ class AlloSpecTool(ChiaTool):
                 f"(+{added} / -{removed} lines).")
 
     async def check_bit_exact(self) -> str:
-        """THE CHEAPEST SIGNAL, ~16 s: the PyTorch oracle alone.
+        """THE CHEAPEST SIGNAL, ~13 s: the PyTorch oracle alone.
 
         The workload suite's MLPs run on your design and are compared byte for
         byte with `torch.nn.Linear`'s own forward on the same weights. It is
@@ -699,8 +701,8 @@ class AlloSpecTool(ChiaTool):
           faster. There is no cycle count anywhere in this result and no
           proxy for one. An edit that passes here and doubles the cycle count
           passes here exactly the same.
-        * not `gen_isa --conform`, so a stale `isa_encoding.py` still passes
-          here and is refused by the gate;
+        * not the ISA's own checks at all -- not even the staleness arm -- so
+          a spec edit without `regenerate_isa` passes here;
         * not `bench_isa`, so the hand-written GEMM need not match;
         * not `stress_isa`, so full-range operands, prefilled C, the 64 shapes
           and the random programs are all unexercised;
@@ -716,24 +718,31 @@ class AlloSpecTool(ChiaTool):
         return json.dumps(verdict, indent=1)
 
     async def run_functional_check(self) -> str:
-        """CORRECTNESS AT THE SCORED CONFIGURATION, ~30 s (measured; the
-        docstring here used to say "~15 s" and the real number was 52-76 s).
+        """WHAT THE SIMULATOR CAN ANSWER, ~36 s (measured; this docstring used
+        to say "~15 s" for a call that cost 52-76 s).
 
-        The PyTorch oracle, `gen_isa.py --conform` on your own spec,
-        bench_isa.py (the published [-4, 4] setup) and stress_isa.py (492 runs:
-        full-range/corner/boundary int8, all 64 shapes, C prefilled and
-        compared in full, vector and random programs, many calls on one build)
-        must all pass. Functional (Allo simulator), not RTL. A deadlocked
-        dataflow fails after 4 minutes.
+        The PyTorch oracle; a 0.08 s check that `isa_encoding.py` is what your
+        `isa_spec.json` generates; bench_isa.py (the published [-4, 4] setup);
+        and stress_isa.py (492 runs: full-range/corner/boundary int8, all 64
+        shapes, C prefilled and compared in full, vector and random programs,
+        many calls on one build). Functional (Allo simulator), not RTL. A
+        deadlocked dataflow fails after 4 minutes.
 
-        IT COSTS HALF WHAT IT USED TO because the PARAMETRICITY SWEEP is no
-        longer here: the design is not rebuilt at the other MAXDIMs or at the
-        second T. That property is unchanged and still refuses a candidate --
-        it has simply moved to the full gate, which every scored run and the
-        harness's own independent verdict use. So a change specialised to
-        T=4/MAXDIM=16 passes HERE and is rejected at `gate:param` when it is
-        scored. Keep the design parametric; this tier will not tell you that
-        you did not.
+        IT COSTS HALF WHAT IT USED TO because the two checks that REBUILD the
+        design are no longer here. Measured on this host, they were the gate's
+        whole cost -- `gen_isa --conform` 33 s and the parametricity sweep
+        39 s, against 27 s for everything else together:
+
+        * PARAMETRICITY. The design is not rebuilt at the other MAXDIMs or at
+          the second T, so a change specialised to T=4/MAXDIM=16 passes HERE
+          and is rejected at `gate:param` when it is scored.
+        * `gen_isa --conform`. Only the staleness arm runs, so a spec that
+          generates its own artefact correctly but disagrees with the units'
+          bit slices, the assembler, the program generator or the emitted HLS
+          passes HERE and is rejected at `gate:isa` when it is scored.
+
+        Neither property weakened; each moved to the full gate, which every
+        scored run and the harness's own independent verdict use.
 
         It still says nothing about SPEED. Passing means legal, not faster."""
         verdict = await asyncio.to_thread(self.evaluate, True, None, "agent",
@@ -805,7 +814,7 @@ class AlloSpecTool(ChiaTool):
         return json.dumps(verdict, indent=1)
 
     async def mapspace_report(self) -> str:
-        """The co-design signal, ~60 s and no Vitis: the fast gate plus the
+        """The co-design signal, ~66 s and no Vitis: the fast gate plus the
         exhaustive mapspace enumeration against your hardware.
 
         Reports, per scored shape, how many of the enumerated loop nests this

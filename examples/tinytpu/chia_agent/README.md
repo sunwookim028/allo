@@ -474,10 +474,18 @@ than merely slow.
 
 | rung | cost | what it runs | what it CANNOT see |
 | --- | --- | --- | --- |
-| `check_bit_exact` | ~16 s | the PyTorch oracle alone | conform, bench_isa, stress_isa, parametricity, RTL -- and **cycles** |
-| `run_functional_check` | ~30 s | + `gen_isa --conform`, `bench_isa`, `stress_isa` | parametricity, RTL -- and **cycles** |
-| `mapspace_report` | ~60 s | + the exhaustive mapspace enumeration | a count of nests is a hypothesis about speed, not a measurement |
-| `score_cycles` | ~240 s | + parametricity, csynth, RTL cosim | (nothing; this is the measurement) |
+| `check_bit_exact` | ~13 s | the PyTorch oracle alone | the ISA checks, bench_isa, stress_isa, conform, parametricity, RTL -- and **cycles** |
+| `run_functional_check` | ~36 s | + `bench_isa`, `stress_isa`, and a 0.08 s staleness check: everything the Allo **simulator** can answer | the two checks that REBUILD the design -- `gen_isa --conform` and parametricity -- and RTL, and **cycles** |
+| `mapspace_report` | ~66 s | + the exhaustive mapspace enumeration | a count of nests is a hypothesis about speed, not a measurement |
+| `score_cycles` | ~240 s | + `gen_isa --conform`, parametricity, csynth, RTL cosim | (nothing; this is the measurement) |
+
+Measured on this host, per gate call: PyTorch oracle **2.8 s**, `bench_isa`
+**7.6 s**, `stress_isa` **16.3 s**, compose and the import check **9 s** --
+and then `gen_isa --conform` **33 s** and the param sweep **39 s**, which is
+72 of the 107 seconds. Those two are what the fast tiers drop, and both
+*rebuild the design*; everything else together is 27 s. `--conform`'s cost had
+never been measured, and it is the reason a "drop the param sweep" fix alone
+takes the gate only from 76 s to 69 s.
 
 Each rung sees strictly more than the one below. A functional check says an
 edit is **legal**, not that it is **faster**; every tool description says so,
@@ -534,15 +542,19 @@ prompt and the per-result budget line all read from.
   `gen_isa.py --conform` and the PyTorch oracle. The names `stress_isa.py`
   imports must still exist.
 - **gate**, `fast` and `oracle` -- the same frozen checks, fewer of them, and
-  **only** reachable with `--gate-only`. `fast` drops the parametricity sweep
-  (three more builds, and the whole reason a gate call cost a minute rather
-  than twenty seconds); `oracle` keeps the PyTorch check alone. Both name what
-  they did not look at, in the verdict (`gate.not_checked`) and in the tool
-  description. The property did not weaken: `param_check` still refuses a
-  candidate specialised to the scored configuration, at `gate:param`, in the
-  tier that decides acceptance. `test_harness` asserts both halves --
-  that the fast tier passes `wpr_literal` and says it did not look, and that
-  the full gate rejects it.
+  **only** reachable with `--gate-only`. `fast` drops the two checks that
+  rebuild the design (`gen_isa --conform`, 33 s, and the parametricity sweep,
+  39 s) and keeps everything the Allo simulator can answer, plus a 0.08 s run
+  of the frozen generator on the candidate's own spec -- which is the arm of
+  `--check` a candidate actually trips, `isa_encoding.py` stale after a spec
+  edit. `oracle` keeps the PyTorch check alone. Both name what they did not
+  look at, in the verdict (`gate.not_checked`) and in the tool description.
+  Neither property weakened: `param_check` still refuses a candidate
+  specialised to the scored configuration at `gate:param`, and `--conform`
+  still holds the spec to the units' bit slices and the emitted HLS, both in
+  the tier that decides acceptance. `test_harness` asserts both halves -- that
+  the fast tier passes `wpr_literal` and says it did not look, and that the
+  full gate rejects it.
 - **score**: three terms, all from **RTL cosim** (Vitis HLS 2023.2 csynth +
   xsim), each testbench bit-exact -- `loop.classify` is the frozen rule and its
   docstring is the argument for each term:
