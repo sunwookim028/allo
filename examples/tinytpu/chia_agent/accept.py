@@ -71,6 +71,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -84,7 +85,9 @@ import control  # noqa: E402
 #: security-critical primitive that can drift between two copies is the one
 #: kind of duplication this harness cannot afford.
 from design import EDITABLE  # noqa: E402
-from evaluate import PARAM_CONFIGS, SCORED, vouch  # noqa: E402
+from evaluate import (  # noqa: E402
+    ALL_SHAPES, DEFAULT_CONFIG, config_refusals, param_configs, resolve_config,
+    usable_shapes, vouch)
 ALLO_PYTHON = os.environ.get(
     "TINYTPU_ALLO_PYTHON", "/home/sk3463/miniconda3/envs/allo/bin/python")
 LLVM_BUILD_DIR = os.environ.get(
@@ -195,8 +198,17 @@ def cosim_pass(wt: Path, env, work: Path, out: Path, prefix="", driver=DRIVER):
             "seconds": sec}, text
 
 
-def five_exact(rows: dict) -> bool:
-    return len(rows) == 5 and all(
+def five_exact(rows: dict, want=None) -> bool:
+    """Every scored shape measured, and every testbench bit-exact.
+
+    `want` is the shape list this configuration can run -- all five at the
+    published row, and fewer at another T, because `cosim.py` asserts every
+    dimension is a multiple of T and two of the five are not multiples of 8.
+    The count is still checked exactly; what moved is that the number five is
+    no longer written into the check.
+    """
+    want = ALL_SHAPES if want is None else want
+    return sorted(rows) == sorted(want) and bool(want) and all(
         v["cycles"] is not None
         and v["tb"] == (f"TB {s} mismatches = 0 / "
                         f"{int(s.split('x')[0]) * int(s.split('x')[2])}")
@@ -204,7 +216,7 @@ def five_exact(rows: dict) -> bool:
 
 
 def measure_control(wt: Path, env, out: Path, ref: str, design: dict, tracked,
-                    keep: bool, driver=DRIVER) -> dict:
+                    keep: bool, driver=DRIVER, shapes=None) -> dict:
     """The committed design, measured in THIS worktree off THIS build, before
     the candidate's diff exists on disk. That ordering is what a candidate
     cannot get past: no line of it has been written, let alone run, when these
@@ -218,7 +230,7 @@ def measure_control(wt: Path, env, out: Path, ref: str, design: dict, tracked,
         raise NoControl(f"the control measurement changed tracked files:\n{tracked()}")
     if not keep:
         shutil.rmtree(work, ignore_errors=True)   # hundreds of MB, already read
-    if not (passed["vouched"] and five_exact(passed["rows"])):
+    if not (passed["vouched"] and five_exact(passed["rows"], shapes)):
         raise NoControl(f"the control did not measure: vouched="
                         f"{passed['vouched']}, rows={passed['rows']}; see "
                         f"{out / 'control-cosim.log'}")
@@ -271,22 +283,58 @@ def main():
     ref = subprocess.run(["git", "rev-parse", a.ref], cwd=REPO, capture_output=True,
                          text=True, check=True).stdout.strip()
     wt = REPO / ".chia_scratch" / f"accept-{out.name}-{int(time.time())}"
+    # The configuration the candidate asks to be scored at, read out of the
+    # DIFF before anything is measured -- because the control has to be
+    # measured at the SAME configuration or the pair is not a comparison.
+    # `git apply` onto a throwaway copy of the design, since the candidate must
+    # not be on disk in `wt` when the control runs.
+    cfg, proposed = DEFAULT_CONFIG, False
+    if a.diff:
+        with tempfile.TemporaryDirectory(prefix="accept-config-") as tmp:
+            shutil.copytree(REPO / PKG, Path(tmp) / "tinytpu",
+                            ignore=shutil.ignore_patterns("*.prj", "chia_runs"))
+            rc, o, _ = sh(["git", "apply", "--directory=tinytpu", "-p1",
+                           str(a.diff.resolve())], Path(tmp))
+            if rc:
+                raise SystemExit(f"git apply failed while reading the "
+                                 f"candidate's configuration:\n{o}")
+            cfg, proposed = resolve_config(Path(tmp) / "tinytpu")
+    refused = config_refusals(cfg, ref)
+    if refused:
+        raise SystemExit(f"refusing: the candidate's configuration cannot be "
+                         f"scored: {'; '.join(refused)}")
     result = {"ref": ref, "diff": str(a.diff) if a.diff else None, "ok": False,
               "design": control.blobs(ref),
               "driver": driver,
+              "config": dict(cfg), "config_proposed": proposed,
               "measurement": f"{driver}: Vitis HLS 2023.2 + xsim C/RTL cosim "
                              "(RTL), clean checkout, all five SHAPES, TPU_* "
-                             f"unset but {SCORED} and TPU_PRJ"}
+                             f"unset but {cfg} and TPU_PRJ"}
     subprocess.run(["git", "worktree", "add", "--detach", str(wt), ref], cwd=REPO,
                    check=True, capture_output=True)
     try:
         tracked = lambda: sh(["git", "status", "--porcelain",
                               "--untracked-files=no"], wt)[1]
-        # Every TPU_* variable is scrubbed, then the SCORED configuration is
-        # put back explicitly: the design's default is MAXDIM=64 and what is
-        # measured here is the scored 4x4 array at MAXDIM 16.
+        # Every TPU_* variable is scrubbed, then the configuration this
+        # candidate is scored at is put back explicitly -- the design's default
+        # is MAXDIM=64, and what is measured here is what the candidate asked
+        # for (`CHIA_CONFIG`), or the published 4x4 array at MAXDIM 16 when it
+        # asked for nothing. The CONTROL runs under the same `env`, so both
+        # halves of the comparison are the same machine.
         env = {k: v for k, v in os.environ.items()
-               if not k.startswith("TPU_")} | SCORED
+               if not k.startswith("TPU_")} | cfg
+        # All five shapes, except the ones this configuration cannot run:
+        # `cosim.py` asserts every dimension is a multiple of T, and two of the
+        # five are not multiples of 8. Set explicitly rather than left to
+        # cosim.py's default, so the control and the candidate measure the same
+        # list and the record says which list it was.
+        shapes, unrunnable = usable_shapes(cfg, ALL_SHAPES)
+        result["shapes"], result["shapes_skipped"] = shapes, unrunnable
+        if not shapes:
+            raise SystemExit(f"refusing: no scored shape runs at {cfg}: "
+                             f"{unrunnable}")
+        if shapes != ALL_SHAPES:
+            env["TPU_SHAPES"] = ",".join(shapes)
         env.update(PATH=f"{ENV_BIN}:{env['PATH']}", LLVM_BUILD_DIR=LLVM_BUILD_DIR,
                    OMP_NUM_THREADS="8", PYTHONPATH=str(wt),
                    PYTHONDONTWRITEBYTECODE="1")
@@ -312,7 +360,7 @@ def main():
             ctl = reuse_control(a.control, result["design"], driver)
         elif a.diff:
             ctl = measure_control(wt, env, out, ref, result["design"], tracked,
-                                  a.keep, driver)
+                                  a.keep, driver, shapes)
         if ctl:
             result["control"] = ctl
 
@@ -342,7 +390,7 @@ def main():
         # design is fourteen files, and fourteen per-file budgets would allow
         # fourteen times what the guard was written to allow.
         problems += policy["doc_violations_total"](
-            {f: policy["doc_loss"](base[f], now[f]) for f in sorted(touched)})
+            {f: policy["doc_loss"](base[f], now[f], f) for f in sorted(touched)})
         result["policy"] = problems
         if problems:
             raise SystemExit(f"refusing: spec policy: {problems}")
@@ -372,9 +420,9 @@ def main():
         # Parametricity, as in the search's gate: rebuilt at other MAXDIMs,
         # exact (param_check.py, frozen at --ref).
         result["param"], param_ok = {}, True
-        for cfg in PARAM_CONFIGS:
-            tag = ",".join(f"{k}={v}" for k, v in cfg.items())
-            okp, rcp, op, secp = vouched("param_check", wt, wt, dict(env, **cfg),
+        for pcfg in param_configs(cfg):
+            tag = ",".join(f"{k}={v}" for k, v in pcfg.items())
+            okp, rcp, op, secp = vouched("param_check", wt, wt, dict(env, **pcfg),
                                          out / f"param_check_{tag}.log", cos,
                                          timeout=GATE_TIMEOUT)
             untouched(f"param_check {tag}")
@@ -432,7 +480,7 @@ def main():
                       and "COSIM OK (testbench=stress)" in o4)
             result["cosim_rtl_stress"] = {"vouched": ok4, "ok": rtl_ok,
                                           "shapes": lines4, "seconds": sec4}
-        exact = five_exact(result["cosim"])
+        exact = five_exact(result["cosim"], shapes)
         result["ok"] = (ok1 and result["bench_isa"]["all_exact"]
                         and ok2 and ok3 and param_ok and exact
                         and result.get("estimated_ns", 99) <= 3.33
@@ -466,7 +514,24 @@ def main():
             result["control"] = ctl
         # The cross-check is on the CONTROL, so it is reported even for a
         # candidate that was rejected: the tools may have moved under both.
-        if not ctl.get("problems"):
+        if ctl.get("problems"):
+            pass
+        elif cfg != DEFAULT_CONFIG:
+            # The recorded and published rows are a T=4 MAXDIM=16 measurement.
+            # A control measured at another configuration is a different
+            # machine, and "DISAGREES" would be the wrong word for it.
+            result["crosscheck"] = {
+                "status": "NOT-COMPARABLE", "measured": dict(ctl["cycles"]),
+                "recorded": None, "delta": {}, "compared": [],
+                "driver": ctl["driver"],
+                "against": f"nothing: this candidate proposed {cfg}, and every "
+                           f"recorded and published control is a "
+                           f"{DEFAULT_CONFIG} measurement. The control here "
+                           f"was measured at the candidate's own "
+                           f"configuration, so the win/not-better claim is "
+                           f"sound; it is the cross-check against the "
+                           f"published row that does not apply"}
+        else:
             result["crosscheck"] = control.crosscheck(
                 ctl["cycles"], result["design"], ctl["driver"])
         if not result["ok"]:

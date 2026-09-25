@@ -147,12 +147,22 @@ def gen_encoding(spec) -> str:
     for p in spec["parameters"]:
         w(f'    "{p["name"]}": ({p["min"]}, {p["max"]}),')
     w('}')
+    w('#: The same parameters BY VALUE, so that `check_parameters` reads them')
+    w('#: from a name it declares rather than through `globals()`. The spec')
+    w('#: policy denies `globals` -- it is one of the ways candidate code')
+    w('#: reaches a module namespace it was not given -- and this module is')
+    w('#: editable now (`chia_agent/design.py`), so the generated form must')
+    w('#: pass the policy it is held to.')
+    w('PARAMETER_VALUES = {')
+    for p in spec["parameters"]:
+        w(f'    "{p["name"]}": {p["name"]},')
+    w('}')
     w('')
     w('def check_parameters():')
     w('    """Raise if a build parameter is outside the range the spec admits,')
     w('    or breaks one of its cross-parameter constraints."""')
     w('    for name, (lo, hi) in PARAMETER_RANGE.items():')
-    w('        v = globals()[name]')
+    w('        v = PARAMETER_VALUES[name]')
     w('        if v < lo or (hi is not None and v > hi):')
     w('            raise ValueError(f"{name}={v} outside the spec range '
       '{lo}..{hi}")')
@@ -1202,15 +1212,24 @@ def _splice(text, body):
     return text[:i] + body + text[j + len(END):]
 
 
-def artefacts(spec):
-    """{path: wanted content} for every generated artefact."""
-    with open(DOC) as f:
-        doc = f.read()
-    return {ENCODING: gen_encoding(spec), DOC: _splice(doc, gen_doc(spec))}
+def artefacts(spec, doc=True):
+    """{path: wanted content} for every generated artefact.
+
+    `doc=False` leaves the ISA tables in
+    `docs/source/designs/tinytpu_isa_spec.rst` out. The evaluator runs this
+    check inside a composed tree that has the design and no `docs/`, and the
+    documentation is not a candidate's to regenerate; `isa_encoding.py` -- the
+    artefact that decides whether the spec and the code agree -- is checked
+    byte for byte either way."""
+    out = {ENCODING: gen_encoding(spec)}
+    if doc:
+        with open(DOC) as f:
+            out[DOC] = _splice(f.read(), gen_doc(spec))
+    return out
 
 
-def write(spec):
-    for path, want in artefacts(spec).items():
+def write(spec, doc=True):
+    for path, want in artefacts(spec, doc).items():
         with open(path, "w") as f:
             f.write(want)
         print(f"  wrote {os.path.relpath(path, REPO)}")
@@ -1231,10 +1250,10 @@ def spec_module(spec):
     return m
 
 
-def check_generated(spec):
+def check_generated(spec, doc=True):
     """Every generated artefact byte-identical to what the spec produces."""
     fails = []
-    for path, want in artefacts(spec).items():
+    for path, want in artefacts(spec, doc).items():
         with open(path) as f:
             have = f.read()
         rel = os.path.relpath(path, REPO)
@@ -1683,6 +1702,38 @@ UNMODELLED = {
     ("dma_ld", "a_onchip.write"): "burst landing buffer: no field names a row",
     ("dma_ld", "b_onchip.read"): "burst landing buffer: no field names a row",
     ("dma_ld", "b_onchip.write"): "burst landing buffer: no field names a row",
+    # THREE-AND-A-HALF. The LOOP STACK. `loop_trip`, `loop_iter`, `loop_body`
+    # and `live_iv` are the sequencer's own control state for LOOP/ENDLOOP: the
+    # spec fixes its DEPTH (`loop_stack.depth`, held against
+    # `allo.encoding.TINYTPU_ISA` by `check_target_encoding`) and no
+    # instruction field names a row of it -- LOOP carries a trip count, and
+    # what the stack then holds is bookkeeping the sequencer does to itself.
+    # An action over them would have no base expression to resolve, exactly as
+    # for the staging memories above.
+    #
+    # They are here because the projection could not SEE them until 2026-09-25:
+    # `Unit.arrays()` ignored any array declared with an initialiser, and all
+    # four are. They were composed the whole time, and the spec's port table
+    # was written against a view that was missing them. Removing that blind
+    # spot is what made the arm able to refuse a candidate for adding an
+    # initialiser to `spad`, and this table is where the newly visible ports
+    # get their reason rather than the arm getting turned off.
+    ("sequencer", "loop_trip.read"): "the loop stack: sequencer control state, "
+                                     "no instruction field names a row",
+    ("sequencer", "loop_trip.write"): "the loop stack: sequencer control "
+                                      "state, no instruction field names a row",
+    ("sequencer", "loop_iter.read"): "the loop stack: sequencer control state, "
+                                     "no instruction field names a row",
+    ("sequencer", "loop_iter.write"): "the loop stack: sequencer control "
+                                      "state, no instruction field names a row",
+    ("sequencer", "loop_body.read"): "the loop stack: sequencer control state, "
+                                     "no instruction field names a row",
+    ("sequencer", "loop_body.write"): "the loop stack: sequencer control "
+                                      "state, no instruction field names a row",
+    ("sequencer", "live_iv.read"): "the loop stack: the induction variables "
+                                   "the AGU reads, no field names a row",
+    ("sequencer", "live_iv.write"): "the loop stack: the induction variables "
+                                    "the AGU reads, no field names a row",
     # THREE. The array's INTERNAL chains. `wrow`, `a_fwd`, `p_fwd` and `wq`
     # join one PE to the next; the spec's `array` is the whole mesh, so they
     # are inside it. `wcol`, `acol` and `cw` cross its boundary and ARE
@@ -2404,17 +2455,23 @@ def main(argv):
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--conform", action="store_true",
                     help="--check, plus the emitted HLS's own bit slices")
+    ap.add_argument("--no-doc", action="store_true",
+                    help="leave the generated ISA tables in docs/ out: for a "
+                         "tree that has the design and no docs/, which is how "
+                         "chia_agent/evaluate.py runs this on a candidate's "
+                         "own spec")
     a = ap.parse_args(argv)
     if not (a.write or a.check or a.conform):
         ap.error("one of --write, --check, --conform")
     spec = load()
+    doc = not a.no_doc
     if a.write:
-        return write(spec)
+        return write(spec, doc)
 
     sys.path.insert(0, HERE)
     print(f"TinyTPU-isa ISA conformance, against "
           f"{os.path.relpath(SPEC, REPO)}\n")
-    fails = check_generated(spec)
+    fails = check_generated(spec, doc)
     E = spec_module(spec)
     import microarch_isa as U
     import isa_dsl as D
@@ -2433,7 +2490,7 @@ def main(argv):
     print()
     for f in fails:
         print("  ISA FAIL", f)
-    print(f"  ISA OK: the spec, its {len(artefacts(spec))} generated "
+    print(f"  ISA OK: the spec, its {len(artefacts(spec, doc))} generated "
           f"artefacts and all "
           f"{len([c for c in spec['consumers'] if 'path' in c])} consumers agree"
           if not fails else f"  ISA FAILED: {len(fails)} disagreement(s)")

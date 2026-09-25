@@ -3,15 +3,19 @@
     "assumptions": {
       "chained_verification": {
         "bytes": 128,
-        "differ_vs_real_forward": 62,
+        "chain": false,
+        "dataflow": "not a chain: each layer's activation is ['input', 'input'], and run.py feeds it exactly that",
+        "differ_vs_real_forward": 0,
         "differ_vs_run_py_reference": 0,
         "extractor_refusals": 0,
         "layers_mapped": 2,
         "probe": "two bias-free nn.Linears off one input, returned as a pair",
-        "status": "silent-wrong",
-        "topology": "layer fanout_probe_l1 consumes 'x', which is not the previous mapped layer's result: the graph is not a chain and run.py chains it anyway, on BOTH sides of the comparison",
-        "topology_sound": false,
-        "why": "the extractor refuses nothing, both layers map, and run.py's own reference agrees on 128 of 128 bytes -- while the machine's output differs from what model(x) actually returns in 62 of 128. run.py chains the layers on BOTH sides of the comparison, so a fan-out graph is checked against a PyTorch evaluation that is not the model either."
+        "sources": [
+          -1,
+          -1
+        ],
+        "status": "sound",
+        "why": "run.py's reference and the real forward() agree, on a graph that is NOT a chain (not a chain: each layer's activation is ['input', 'input'], and run.py feeds it exactly that): both sides take each layer's activation from the fx graph, so the agreement is evidence"
       }
     },
     "config": {
@@ -62,12 +66,12 @@
         "tier": "confirmed",
         "vs_pytorch": {
           "bytes": 208,
+          "chain": true,
+          "dataflow": "the mapped Linears form one chain from the model input",
           "differ": 0,
-          "evidence_for": "the machine computes what this model's PyTorch modules compute",
+          "evidence_for": "the machine computes what this model's PyTorch modules compute, on the dataflow the fx graph declares",
           "ok": true,
-          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch",
-          "topology": "the mapped Linears form one chain from the model input",
-          "topology_sound": true
+          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch"
         },
         "vs_spec": {
           "evidence_for": "the mapper agrees with our own semantics; PyTorch is not on either side",
@@ -88,12 +92,12 @@
         "tier": "confirmed",
         "vs_pytorch": {
           "bytes": 384,
+          "chain": true,
+          "dataflow": "the mapped Linears form one chain from the model input",
           "differ": 0,
-          "evidence_for": "the machine computes what this model's PyTorch modules compute",
+          "evidence_for": "the machine computes what this model's PyTorch modules compute, on the dataflow the fx graph declares",
           "ok": true,
-          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch",
-          "topology": "the mapped Linears form one chain from the model input",
-          "topology_sound": true
+          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch"
         },
         "vs_spec": {
           "evidence_for": "the mapper agrees with our own semantics; PyTorch is not on either side",
@@ -114,12 +118,12 @@
         "tier": "confirmed",
         "vs_pytorch": {
           "bytes": 128,
+          "chain": true,
+          "dataflow": "the mapped Linears form one chain from the model input",
           "differ": 0,
-          "evidence_for": "the machine computes what this model's PyTorch modules compute",
+          "evidence_for": "the machine computes what this model's PyTorch modules compute, on the dataflow the fx graph declares",
           "ok": true,
-          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch",
-          "topology": "the mapped Linears form one chain from the model input",
-          "topology_sound": true
+          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch"
         },
         "vs_spec": {
           "evidence_for": "the mapper agrees with our own semantics; PyTorch is not on either side",
@@ -140,12 +144,12 @@
         "tier": "correct",
         "vs_pytorch": {
           "bytes": 8192,
+          "chain": true,
+          "dataflow": "the mapped Linears form one chain from the model input",
           "differ": 0,
-          "evidence_for": "the machine computes what this model's PyTorch modules compute",
+          "evidence_for": "the machine computes what this model's PyTorch modules compute, on the dataflow the fx graph declares",
           "ok": true,
-          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch",
-          "topology": "the mapped Linears form one chain from the model input",
-          "topology_sound": true
+          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch"
         },
         "vs_spec": {
           "evidence_for": "the mapper agrees with our own semantics; PyTorch is not on either side",
@@ -576,15 +580,19 @@
     "assumptions": {
       "chained_verification": {
         "bytes": 128,
-        "differ_vs_real_forward": 62,
+        "chain": false,
+        "dataflow": "not a chain: each layer's activation is ['input', 'input'], and run.py feeds it exactly that",
+        "differ_vs_real_forward": 0,
         "differ_vs_run_py_reference": 0,
         "extractor_refusals": 0,
         "layers_mapped": 2,
         "probe": "two bias-free nn.Linears off one input, returned as a pair",
-        "status": "silent-wrong",
-        "topology": "layer fanout_probe_l1 consumes 'x', which is not the previous mapped layer's result: the graph is not a chain and run.py chains it anyway, on BOTH sides of the comparison",
-        "topology_sound": false,
-        "why": "the extractor refuses nothing, both layers map, and run.py's own reference agrees on 128 of 128 bytes -- while the machine's output differs from what model(x) actually returns in 62 of 128. run.py chains the layers on BOTH sides of the comparison, so a fan-out graph is checked against a PyTorch evaluation that is not the model either."
+        "sources": [
+          -1,
+          -1
+        ],
+        "status": "sound",
+        "why": "run.py's reference and the real forward() agree, on a graph that is NOT a chain (not a chain: each layer's activation is ['input', 'input'], and run.py feeds it exactly that): both sides take each layer's activation from the fx graph, so the agreement is evidence"
       }
     },
     "config": {
@@ -657,12 +665,12 @@
         "tier": "confirmed",
         "vs_pytorch": {
           "bytes": 384,
+          "chain": true,
+          "dataflow": "the mapped Linears form one chain from the model input",
           "differ": 0,
-          "evidence_for": "the machine computes what this model's PyTorch modules compute",
+          "evidence_for": "the machine computes what this model's PyTorch modules compute, on the dataflow the fx graph declares",
           "ok": true,
-          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch",
-          "topology": "the mapped Linears form one chain from the model input",
-          "topology_sound": true
+          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch"
         },
         "vs_spec": {
           "evidence_for": "the mapper agrees with our own semantics; PyTorch is not on either side",
@@ -686,12 +694,12 @@
         "tier": "confirmed",
         "vs_pytorch": {
           "bytes": 128,
+          "chain": true,
+          "dataflow": "the mapped Linears form one chain from the model input",
           "differ": 0,
-          "evidence_for": "the machine computes what this model's PyTorch modules compute",
+          "evidence_for": "the machine computes what this model's PyTorch modules compute, on the dataflow the fx graph declares",
           "ok": true,
-          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch",
-          "topology": "the mapped Linears form one chain from the model input",
-          "topology_sound": true
+          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch"
         },
         "vs_spec": {
           "evidence_for": "the mapper agrees with our own semantics; PyTorch is not on either side",
@@ -712,12 +720,12 @@
         "tier": "correct",
         "vs_pytorch": {
           "bytes": 8192,
+          "chain": true,
+          "dataflow": "the mapped Linears form one chain from the model input",
           "differ": 0,
-          "evidence_for": "the machine computes what this model's PyTorch modules compute",
+          "evidence_for": "the machine computes what this model's PyTorch modules compute, on the dataflow the fx graph declares",
           "ok": true,
-          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch",
-          "topology": "the mapped Linears form one chain from the model input",
-          "topology_sound": true
+          "reference": "torch's own nn.Linear forward on the model's real weights, with the machine's epilogue applied in torch"
         },
         "vs_spec": {
           "evidence_for": "the mapper agrees with our own semantics; PyTorch is not on either side",

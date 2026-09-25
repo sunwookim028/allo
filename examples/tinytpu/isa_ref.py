@@ -32,6 +32,8 @@ a wrong answer, so this model never has to invent a value for an unwritten row.
 name, which is how a sentinel check falls out of comparing the whole of `C`.
 """
 
+import ast
+import operator
 import os
 import sys
 
@@ -101,16 +103,85 @@ class _State:
             self.mem[state][row, offset:offset + T] = value
 
 
-def _resolve(expression, env):
-    if expression is None:
+#: The whole expression language the spec's actions are written in: a name, an
+#: integer, and the operators below. Every `base`, `offset`, `count` and `when`
+#: in `isa_spec.json` is one of `ar_s1`, `col_block * T`, `T + 1`,
+#: `(mode & 1) == 0`, `acc == 1` -- and that is the complete list, measured off
+#: the spec rather than assumed.
+#:
+#: WHY THIS IS NOT `eval`. These strings come from `isa_spec.json`, and the
+#: spec is a candidate's to edit now (`chia_agent/design.py`). `eval` with
+#: emptied builtins still reaches `().__class__.__bases__[0].__subclasses__()`,
+#: and from there the frame of the frozen check that called it -- where
+#: `gate_runner.py`'s nonce lives. A whitelist over the AST has no such reach:
+#: an attribute, a subscript, a call or a comprehension is a ValueError naming
+#: the construct, so an expression that tries is a REFUSED program rather than
+#: an escape. `chia_agent/spec_policy.py` refuses the same constructs in the
+#: spec at edit time; this is the half that cannot be edited around.
+_BINOPS = {ast.Add: operator.add, ast.Sub: operator.sub,
+           ast.Mult: operator.mul, ast.FloorDiv: operator.floordiv,
+           ast.Mod: operator.mod, ast.BitAnd: operator.and_,
+           ast.BitOr: operator.or_, ast.BitXor: operator.xor,
+           ast.LShift: operator.lshift, ast.RShift: operator.rshift}
+_CMPOPS = {ast.Eq: operator.eq, ast.NotEq: operator.ne, ast.Lt: operator.lt,
+           ast.LtE: operator.le, ast.Gt: operator.gt, ast.GtE: operator.ge}
+_UNARYOPS = {ast.USub: operator.neg, ast.UAdd: operator.pos,
+             ast.Invert: operator.invert, ast.Not: operator.not_}
+
+
+def _arith(node, env):
+    """One node of a spec expression, evaluated. Anything else raises."""
+    if isinstance(node, ast.Expression):
+        return _arith(node.body, env)
+    if isinstance(node, ast.Constant) and isinstance(node.value, int) \
+            and not isinstance(node.value, bool):
+        return node.value
+    if isinstance(node, ast.Name):
+        if node.id not in env:
+            raise ValueError(f"the spec names {node.id!r}, which this "
+                             f"instruction's operands do not define")
+        return env[node.id]
+    if isinstance(node, ast.BinOp) and type(node.op) in _BINOPS:
+        return _BINOPS[type(node.op)](_arith(node.left, env),
+                                      _arith(node.right, env))
+    if isinstance(node, ast.UnaryOp) and type(node.op) in _UNARYOPS:
+        return _UNARYOPS[type(node.op)](_arith(node.operand, env))
+    if isinstance(node, ast.Compare) and all(
+            type(op) in _CMPOPS for op in node.ops):
+        left, out = _arith(node.left, env), True
+        for op, right in zip(node.ops, node.comparators):
+            right = _arith(right, env)
+            out = out and _CMPOPS[type(op)](left, right)
+            left = right
+        return out
+    if isinstance(node, ast.BoolOp):
+        values = [_arith(v, env) for v in node.values]
+        return (all(values) if isinstance(node.op, ast.And) else any(values))
+    raise ValueError(f"{type(node).__name__} is not in the expression language "
+                     f"the spec's actions may use (names, ints, arithmetic, "
+                     f"bitwise and comparison operators)")
+
+
+def expression(text, env):
+    """A spec expression's value. Importable, so the policy and the reference
+    model agree by construction about what an expression may be."""
+    try:
+        tree = ast.parse(text, mode="eval")
+    except SyntaxError as exc:
+        raise ValueError(f"the spec expression {text!r} does not parse: {exc}")
+    return _arith(tree, env)
+
+
+def _resolve(expr, env):
+    if expr is None:
         return None
-    return int(eval(expression, {"__builtins__": {}}, env))  # noqa: S307
+    return int(expression(expr, env))
 
 
 def _live(action, env):
     if action.when is None:
         return True
-    return bool(eval(action.when, {"__builtins__": {}}, env))  # noqa: S307
+    return bool(expression(action.when, env))
 
 
 def _apply(action, values, state, env, row):

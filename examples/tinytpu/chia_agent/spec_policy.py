@@ -3,10 +3,11 @@
 
 """What a TinyTPU-isa spec file may contain.
 
-The agent's two writable files, `microarch_isa.py` and `isa_dsl.py`, are Python
-modules that the evaluator *imports*: `cosim.py`, `bench_isa.py` and
-`stress_isa.py` all import them, so anything at their import path runs inside the
-process that produces the score. That makes "which edits are allowed" a
+The agent's writable files are Python modules that the evaluator *imports*:
+`cosim.py`, `bench_isa.py` and `stress_isa.py` all import them, so anything at
+their import path runs inside the process that produces the score. One of them,
+`isa_spec.json`, is DATA -- and data that is executed, because `isa_ref.py`
+evaluates the expressions its actions carry, so it is checked here too. That makes "which edits are allowed" a
 property of the harness, not of the prompt, and this module is where it is
 decided. `evaluate.py` re-runs it from git on every candidate, and both edit
 tools run it before writing.
@@ -22,11 +23,21 @@ candidate's process at all (per-shape cosim logs, simulated time, csynth XML).
 from __future__ import annotations
 
 import ast
+import json
+import os
 
 #: Import roots a TinyTPU-isa spec needs. Anything else is refused.
+#:
+#: `ast` and `operator` are here for `isa_ref.py`, which became editable with
+#: the rest of the ISA: it evaluates the spec's action expressions with an AST
+#: whitelist instead of `eval`, precisely because the spec is editable now.
+#: Neither module can execute anything -- `compile`, `exec` and `eval` are
+#: denied names below, and that is what makes `ast` harmless to allow.
 ALLOWED_IMPORT_ROOTS = frozenset(
     {
         "allo",
+        "ast",
+        "operator",
         "numpy",
         "math",
         "typing",
@@ -52,6 +63,8 @@ ALLOWED_EXAMPLES = frozenset(
     {
         "examples.tinytpu.microarch_isa",
         "examples.tinytpu.isa_dsl",
+        "examples.tinytpu.isa_encoding",
+        "examples.tinytpu.isa_ref",
         "examples.tinytpu.ip.isa",
         "examples.tinytpu.ip.tinytpu",
         "examples.tinytpu.ip.assembler",
@@ -243,8 +256,82 @@ def _module_names(tree) -> set[str]:
     return bound
 
 
+#: Keys of a spec action whose string value `isa_ref.py` EVALUATES. Anything
+#: else in `isa_spec.json` is read as data; these four are executed, so they are
+#: held to an expression language instead.
+EXECUTED_SPEC_KEYS = ("base", "offset", "count", "when")
+#: The nodes `isa_ref.expression` admits. Written out here rather than imported
+#: from `isa_ref`, for the same reason `ALLOWED_EXAMPLES` is a literal: the
+#: policy is executed out of git and a candidate must not be able to widen it by
+#: editing the file it would import. `test_harness` phase `s` checks that the
+#: two agree, by putting each construct this rule refuses through
+#: `isa_ref.expression` as well.
+SAFE_EXPR_NODES = (ast.Expression, ast.Name, ast.Load, ast.BinOp, ast.UnaryOp,
+                   ast.Compare, ast.BoolOp, ast.And, ast.Or,
+                   ast.Add, ast.Sub, ast.Mult, ast.FloorDiv, ast.Mod,
+                   ast.BitAnd, ast.BitOr, ast.BitXor, ast.LShift, ast.RShift,
+                   ast.USub, ast.UAdd, ast.Invert, ast.Not,
+                   ast.Eq, ast.NotEq, ast.Lt, ast.LtE, ast.Gt, ast.GtE)
+
+
+def expression_violations(where: str, text: str) -> list[str]:
+    """One executed spec expression, held to names / ints / operators.
+
+    `isa_spec.json` is editable, and `isa_ref.py` evaluates these strings
+    inside the process that produces the verdict. An `eval` of them would reach
+    the type graph and from there the frame holding `gate_runner.py`'s nonce;
+    `isa_ref` walks the AST with a whitelist instead, and this refuses the same
+    constructs at edit time so the agent is told what is wrong rather than
+    having a program refused at run time.
+    """
+    try:
+        tree = ast.parse(text, mode="eval")
+    except SyntaxError as error:
+        return [f"{where}: {text!r} does not parse as an expression "
+                f"({error.msg})"]
+    bad = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant):
+            if not isinstance(node.value, int) or isinstance(node.value, bool):
+                bad.append(f"{where}: {text!r} contains the constant "
+                           f"{node.value!r}; only integers are values here")
+        elif not isinstance(node, SAFE_EXPR_NODES):
+            bad.append(f"{where}: {text!r} uses {type(node).__name__}, which "
+                       f"is not in the expression language the spec's actions "
+                       f"may use (a name, an integer, and arithmetic, bitwise "
+                       f"or comparison operators)")
+    return sorted(set(bad))
+
+
+def spec_data_violations(name: str, source: str) -> list[str]:
+    """`isa_spec.json`: valid JSON, and every executed expression in it safe."""
+    try:
+        spec = json.loads(source)
+    except ValueError as error:
+        return [f"{name}: is not valid JSON ({error}). The spec is read by "
+                f"`gen_isa.py`, which generates `isa_encoding.py` from it; a "
+                f"file that does not parse cannot be checked at all"]
+    if not isinstance(spec, dict):
+        return [f"{name}: the spec must be a JSON object"]
+    problems = []
+    for op in spec.get("opcodes") or []:
+        for i, action in enumerate(op.get("actions") or []):
+            if not isinstance(action, dict):
+                problems.append(f"{name}: {op.get('name')} action {i} is not "
+                                f"an object")
+                continue
+            for key in EXECUTED_SPEC_KEYS:
+                text = action.get(key)
+                if isinstance(text, str):
+                    problems += expression_violations(
+                        f"{name}: {op.get('name')} action {i} {key}", text)
+    return problems
+
+
 def policy_violations(name: str, source: str) -> list[str]:
     """Constructs a hardware spec has no business containing."""
+    if name.endswith(".json"):
+        return spec_data_violations(name, source)
     tree = ast.parse(source, filename=name)
     parent = _parents(tree)
     guarded = _main_guard_nodes(tree)
@@ -331,6 +418,13 @@ def policy_violations(name: str, source: str) -> list[str]:
 #: MAXDIMs and needs the parameter honoured. (The first paid run's accepted
 #: diff replaced the T definition with `T = 4`.)
 PARAMETERS = {"T": "TPU_T", "MAXDIM": "TPU_MAXDIM"}
+#: Files that must define each parameter, exactly once and in the canonical
+#: form. Two of them, because `isa_encoding.py` is GENERATED from the spec and
+#: the spec declares the same parameters with the same environment variables --
+#: `gen_isa.py --check` re-imports both modules under several environments and
+#: requires the defaults to agree, so a literal in either one is caught twice.
+#: Every other file may not assign them at all.
+PARAMETER_OWNERS = frozenset({"microarch_isa.py", "isa_encoding.py"})
 
 
 def _is_env_param(value, env_name) -> bool:
@@ -347,8 +441,8 @@ def _is_env_param(value, env_name) -> bool:
 
 
 def parameter_violations(name: str, source: str) -> list[str]:
-    """T and MAXDIM must stay environment parameters, defined once, in
-    microarch_isa.py, and must not be rebound anywhere in either file."""
+    """T and MAXDIM must stay environment parameters, defined once, in a file
+    that owns them (`PARAMETER_OWNERS`), and rebound nowhere."""
     tree = ast.parse(source, filename=name)
     defs = {p: [] for p in PARAMETERS}
     problems = []
@@ -375,7 +469,7 @@ def parameter_violations(name: str, source: str) -> list[str]:
     for p, env in PARAMETERS.items():
         good = [d for d in defs[p] if d[1] is not None and _is_env_param(d[1], env)
                 and d[0] in tree.body]
-        if name == "microarch_isa.py":
+        if os.path.basename(name) in PARAMETER_OWNERS:
             if len(defs[p]) != 1 or len(good) != 1:
                 problems.append(
                     f"{name}: '{p}' must be defined exactly once, at module level, "
@@ -419,14 +513,25 @@ def doc_lines(source: str) -> list[str]:
     return out
 
 
-def doc_loss(base_source: str, source: str) -> int:
+def doc_loss(base_source: str, source: str, name: str = "") -> int:
     """Net comment/docstring lines removed; negative means documentation was
-    added."""
+    added. A JSON file has none of either and cannot lose any."""
+    if name.endswith(".json"):
+        return 0
     return len(doc_lines(base_source)) - len(doc_lines(source))
 
 
 def doc_violations(name: str, base_source: str, source: str) -> list[str]:
-    """Refuse a net loss of more than DOC_LOSS_MAX comment/docstring lines."""
+    """Refuse a net loss of more than DOC_LOSS_MAX comment/docstring lines.
+
+    JSON has no comments and no docstrings, so `isa_spec.json` has no budget to
+    lose: its prose lives in `_comment` fields, which `doc_lines` could not see
+    without a JSON-shaped rule of its own, and inventing one would refuse a
+    candidate for renaming a key. What the spec is held to instead is
+    `gen_isa.py --conform`, which is a far stronger statement than a line
+    count."""
+    if name.endswith(".json"):
+        return []
     before, after = len(doc_lines(base_source)), len(doc_lines(source))
     if before - after > DOC_LOSS_MAX:
         return [f"{name}: removes {before - after} lines of comments/docstrings "

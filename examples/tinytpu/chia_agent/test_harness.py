@@ -31,6 +31,12 @@ Cases, each with an expected verdict:
                                                tools and the evaluator; a unit
                                                specialised to MAXDIM=16 REJECTED
                                                at gate:param
+  i  the co-design space: a proposed          an out-of-envelope or past-a-
+     configuration, and the ISA editable      ceiling configuration refused
+                                              before anything is built; a spec
+                                              edit without regenerate_isa
+                                              REJECTED at gate:isa; a weakened
+                                              isa_ref REJECTED at gate:pytorch
   control  the run's measured control          a forged or foreign control
                                                record refused; an unrecorded
                                                design still cross-checked
@@ -130,6 +136,13 @@ MUTANTS = {
     "wpr_literal": ("ip/units/dma_load.py",
                     "packed = a_onchip[(dram_row0 + row) * WPR + col_block]",
                     "packed = a_onchip[(dram_row0 + row) * 4 + col_block]"),
+    # i: the reference model's ReLU primitive, weakened. The ISA is editable
+    # now, so this is a candidate rewriting the thing it used to be judged by.
+    # `stress_isa` compares the design against THIS file, so a weakened
+    # reference is exactly what the in-repository checks cannot be trusted for;
+    # the PyTorch oracle is what refuses it, and it refuses it first.
+    "relu_ref": ("isa_ref.py", '    "max0": lambda v: np.maximum(v, 0),',
+                 '    "max0": lambda v: v,'),
     # d: mvout never reaches dma_st, so accu blocks on a full ac2sp.
     "deadlock": ("ip/units/sequencer.py",
                  "                c_acc.put(resolved)\n                c_dst.put(resolved)\n",
@@ -355,6 +368,24 @@ DUNDER_ESCAPES = {
 #: named so that it cannot grow unnoticed.
 PREEXISTING_POLICY_FAILURES = {"isa_dsl.py"}
 
+#: The fan-out probe, run in the `allo` environment: the suite's own
+#: `chained_verification` row, and then the SAME row with `run.layer_sources`
+#: forced back to the chain the harness used to assume. The second half is the
+#: negative control -- a check that cannot fail is not evidence -- and it
+#: reproduces the measured 62-of-128 silent disagreement on demand.
+FANOUT_PROBE = """
+import json
+from examples.tinytpu.workloads import run as runner, scope
+fixed = scope.assumption_rows()["chained_verification"]
+real = runner.layer_sources
+runner.layer_sources = lambda gm, ex: list(range(-1, len(ex.layers) - 1))
+try:
+    broken = scope.assumption_rows()["chained_verification"]
+finally:
+    runner.layer_sources = real
+print(json.dumps({"fixed": fixed, "broken": broken}))
+"""
+
 
 def phase_s():
     """The harness's own guards, checked without Ray or a model."""
@@ -516,6 +547,136 @@ def phase_s():
         want = {"T": int(ev.SCORED["TPU_T"]), "MAXDIM": int(ev.SCORED["TPU_MAXDIM"])}
         check("s.scored configuration pinned", f"env_for sets {ev.SCORED}; "
               f"check_invariants passes at {want}", got, got == want)
+    # -- the co-design space, decided without building anything ------------
+    # The configuration a candidate may propose is checked by arithmetic over
+    # the committed DC runs and the frozen encoding, so every refusal below is
+    # milliseconds and none of it needs Vitis, Ray or a model.
+    check("s.param_configs reproduce the published list at the published row",
+          f"{PARAM_CONFIGS}", ev.param_configs(ev.DEFAULT_CONFIG),
+          ev.param_configs(ev.DEFAULT_CONFIG) == PARAM_CONFIGS)
+    at8 = ev.param_configs({"TPU_T": "8", "TPU_MAXDIM": "64", "TPU_QD": "16"})
+    check("s.param_configs move with the proposal",
+          "at T=8: MAXDIM 24 and 32 (ratio 3 and 4; ratio 2 loses 9 of 24 fuzz "
+          "seeds), and the cross-T case back at T=4/MAXDIM=16", at8,
+          at8 == [{"TPU_MAXDIM": "24"}, {"TPU_MAXDIM": "32"},
+                  {"TPU_T": "4", "TPU_MAXDIM": "16"}])
+    check("s.the model term follows the candidate's T",
+          "T from the proposal, MAXDIM=64, QD=16",
+          ev.model_env({"TPU_T": "8", "TPU_MAXDIM": "32", "TPU_QD": "16"}),
+          ev.model_env({"TPU_T": "8", "TPU_MAXDIM": "32", "TPU_QD": "16"})
+          == {"TPU_T": "8", "TPU_MAXDIM": "64", "TPU_QD": "16"})
+    # The ceilings the evaluator refuses past are the ENCODING's own, computed
+    # from the frozen source. A constant nobody notices going stale is the
+    # defect, so this compares the evaluator's answer with what
+    # `isa_encoding.maxdim_ceiling` says in the environment that can import it.
+    derived = {t: ev.ceilings_at("HEAD", t) for t in (4, 8)}
+    code = ("import json; from examples.tinytpu import isa_encoding as E; "
+            "print(json.dumps({t: {n: E.maxdim_ceiling(n, t) for n in "
+            "E.MAXDIM_CEILINGS} for t in (4, 8)}))")
+    out = subprocess.run([ALLO_PYTHON, "-c", code], cwd=REPO, text=True,
+                         capture_output=True,
+                         env={**os.environ, "PYTHONPATH": str(REPO)})
+    try:
+        live = {int(k): v for k, v in json.loads(out.stdout.strip().splitlines()[-1]).items()}
+    except (ValueError, IndexError):
+        live = {"stderr": out.stderr[-200:]}
+    check("s.the MAXDIM ceilings are the encoding's own",
+          "88/76 at T=4 and 128/120 at T=8, and isa_encoding agrees",
+          f"derived {derived}, isa_encoding {live}",
+          derived == live
+          and derived[4] == {"addressing": 88, "cubic_header": 76}
+          and derived[8] == {"addressing": 128, "cubic_header": 120})
+    # The area proxy REFUSES rather than extrapolating -- and prices what it
+    # was fitted near. The negative control is the second half of this case.
+    proxy_path = REPO / PKG / "chia_agent" / "area_proxy.py"
+    proxy = {"__name__": "area_proxy", "__file__": str(proxy_path)}
+    exec(compile(proxy_path.read_text(), "area_proxy.py", "exec"), proxy)
+    outside = proxy["synthetic_census"](T=4, MAXDIM=88, QD=16, DMA_WORDS=1)
+    inside = proxy["synthetic_census"](T=8, MAXDIM=32, QD=16, DMA_WORDS=1)
+    try:
+        proxy["estimate"](outside)
+        refused = "priced it anyway"
+    except Exception as exc:                      # noqa: BLE001
+        refused = f"{type(exc).__name__}: {exc}"
+    priced = proxy["estimate"](inside)["um2"]
+    check("s.the area proxy refuses to price outside its fitted envelope",
+          "OutsideEnvelope at T=4 MAXDIM=88; a number inside it",
+          f"{refused[:90]}; inside -> {priced:,.0f} um^2",
+          refused.startswith("OutsideEnvelope") and priced > 0)
+    check("s.the envelope is derived from the committed runs, not typed",
+          "T [4,8], MAXDIM [16,64], QD [8,16], DMA_WORDS [1,16]",
+          proxy["envelope"](),
+          proxy["envelope"]() == {"T": (4, 8), "MAXDIM": (16, 64),
+                                  "QD": (8, 16), "DMA_WORDS": (1, 16)})
+    # `isa_spec.json` is editable and its action expressions are EXECUTED by
+    # isa_ref, so the policy holds them to an expression language. Both halves
+    # are checked: the shipped spec passes, and each escape is refused.
+    check("s.policy reads the shipped spec as data",
+          "isa_spec.json passes",
+          sp.policy_violations("isa_spec.json", head("isa_spec.json"))[:2] or "passes",
+          not sp.policy_violations("isa_spec.json", head("isa_spec.json")))
+    check("s.policy refuses a spec that is not JSON", "refused",
+          sp.policy_violations("isa_spec.json", "{not json")[:1],
+          bool(sp.policy_violations("isa_spec.json", "{not json")))
+    for label, expr in {"attribute": "ar_s.__class__",
+                        "subscript": "ar_s[0]",
+                        "call": "len(ar_s)",
+                        "a string constant": "'x' == 'x'",
+                        "a lambda": "(lambda: 0)()"}.items():
+        spec_text = head("isa_spec.json").replace(
+            '"base": "ar_s"', f'"base": "{expr}"', 1)
+        check(f"s.policy refuses a spec expression using: {label}", "refused",
+              sp.policy_violations("isa_spec.json", spec_text)[:1],
+              bool(sp.policy_violations("isa_spec.json", spec_text)))
+    # ...and the reference model refuses exactly the same constructs, which is
+    # what makes the policy a fast message rather than the only defence.
+    code = ("import json,sys; from examples.tinytpu import isa_ref; "
+            "bad=[]\n"
+            "for e in ('ar_s.__class__', 'ar_s[0]', 'len(ar_s)', "
+            "\"'x' == 'x'\", '(lambda: 0)()'):\n"
+            "    try:\n"
+            "        isa_ref.expression(e, {'ar_s': 1}); bad.append(e)\n"
+            "    except ValueError: pass\n"
+            "print(json.dumps({'accepted': bad, "
+            "'arithmetic': isa_ref.expression('(mode & 1) == 0', {'mode': 2})}))")
+    out = subprocess.run([ALLO_PYTHON, "-c", code], cwd=REPO, text=True,
+                         capture_output=True,
+                         env={**os.environ, "PYTHONPATH": str(REPO)})
+    try:
+        agree = json.loads(out.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        agree = {"accepted": ["<no answer>"], "stderr": out.stderr[-200:]}
+    check("s.isa_ref refuses the same expressions the policy does",
+          "none accepted, and real arithmetic still evaluates", agree,
+          not agree.get("accepted") and agree.get("arithmetic") is True)
+    # The fan-out bug, and its negative control: the same probe with the old
+    # chaining put back differs from `model(x)` in 62 of 128 bytes while
+    # agreeing with run.py's own reference on all 128 -- which is the whole of
+    # why the row existed. See workloads/scope.py, assumptions/.
+    out = subprocess.run([ALLO_PYTHON, "-c", FANOUT_PROBE], cwd=REPO, text=True,
+                         capture_output=True,
+                         env={**os.environ, "PYTHONPATH": str(REPO)})
+    try:
+        probe = json.loads(out.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        probe = {"fixed": {}, "broken": {}, "stderr": out.stderr[-300:]}
+    fixed, broken = probe.get("fixed", {}), probe.get("broken", {})
+    check("s.a fan-out model is checked against what PyTorch really returns",
+          "0 of 128 bytes differ from model(x), on a graph that is NOT a chain",
+          f"status={fixed.get('status')} chain={fixed.get('chain')} "
+          f"real={fixed.get('differ_vs_real_forward')}/{fixed.get('bytes')}",
+          fixed.get("status") == "sound" and fixed.get("chain") is False
+          and fixed.get("differ_vs_real_forward") == 0)
+    check("s.negative control: the old chaining is still wrong, silently",
+          "with layer_sources forced back to i-1: 62 of 128 differ from "
+          "model(x), 0 from run.py's own reference",
+          f"real={broken.get('differ_vs_real_forward')}/{broken.get('bytes')} "
+          f"reference={broken.get('differ_vs_run_py_reference')} "
+          f"status={broken.get('status')}",
+          broken.get("differ_vs_real_forward") == 62
+          and broken.get("differ_vs_run_py_reference") == 0
+          and broken.get("status") == "silent-wrong")
+
     # The per-run cap: this run's sessions, a timed-out one found by its title,
     # and none of a concurrent run's.
     import loop
@@ -619,10 +780,15 @@ class Suite:
         A, spec = self.A, self.specs["tpta"]
         self.reset("tpta")
         names = await A.tools()
+        # `regenerate_isa` is the eighth, and it is the only tool that writes a
+        # file the agent did not type: it runs the FROZEN generator on the
+        # candidate's own `isa_spec.json`. The surface is asserted exactly,
+        # because a tool nobody expected is how an editable surface grows.
         want = {f"tpta_{n}" for n in ("read_spec", "read_reference", "replace_text",
                                       "apply_spec_patch", "insert_after",
+                                      "regenerate_isa",
                                       "run_functional_check", "score_cycles")}
-        check("e.tool-surface", "exactly the 7 spec tools", sorted(names),
+        check("e.tool-surface", "exactly the 8 spec tools", sorted(names),
               set(names) == want)
 
         cosim = head("cosim.py")
@@ -856,6 +1022,152 @@ class Suite:
               v.get("ok") and set(param) == want)
         self.reset("tpta")
 
+    # i ------------------------------------------------------------------
+    #: A spec edit that changes what `gen_isa.py` GENERATES and nothing else:
+    #: a parameter's `role`, which is emitted as the trailing comment on that
+    #: parameter's line in `isa_encoding.py`. It is the cheapest edit that
+    #: makes the generated artefact stale, which is the state a candidate is in
+    #: after every spec edit and before `regenerate_isa`.
+    SPEC_ROLE = ("stream depth on every point-to-point channel",
+                 "stream depth on every point-to-point channel (QD)")
+
+    async def phase_i(self):
+        """The co-design space: a configuration a candidate may PROPOSE, and an
+        ISA it may MOVE. Every gate that makes those two safe, and a negative
+        control for each."""
+        print("== i: the co-design space (configuration + ISA)", flush=True)
+        import evaluate as ev
+        A, spec = self.A, self.specs["tpta"]
+
+        # 1. The configuration is refused, or honoured, before anything builds.
+        #    These are milliseconds: `resolve_config` reads a literal out of the
+        #    candidate's own file and `config_refusals` is arithmetic.
+        self.reset("tpta")
+        ref = ev.resolve_ref("HEAD")
+        cfg, proposed = ev.resolve_config(spec)
+        check("i.no proposal is the published row",
+              f"{ev.DEFAULT_CONFIG}, proposed=False", f"{cfg}, {proposed}",
+              cfg == ev.DEFAULT_CONFIG and not proposed
+              and not ev.config_refusals(cfg, ref))
+        cases = {
+            # (declaration, what must be true of the refusals)
+            "T=8 MAXDIM=32 (in the envelope)":
+                ({"T": 8, "MAXDIM": 32}, lambda r: not r),
+            "MAXDIM=88, past the cubic-header ceiling and the envelope":
+                ({"MAXDIM": 88},
+                 lambda r: any("cubic_header ceiling, which is 76" in x for x in r)
+                 and any("fitted envelope [16, 64]" in x for x in r)),
+            "T=8 MAXDIM=128, past the cubic-header ceiling at T=8":
+                ({"T": 8, "MAXDIM": 128},
+                 lambda r: any("cubic_header ceiling, which is 120" in x for x in r)),
+            "QD=8, which deadlocks legal programs":
+                ({"QD": 8},
+                 lambda r: any("limitations item 24" in x for x in r)),
+            "T=2, below the parameter set's floor":
+                ({"T": 2}, lambda r: any("T >= 4" in x for x in r)),
+            "MAXDIM=18, not a multiple of T":
+                ({"MAXDIM": 18},
+                 lambda r: any("not a multiple of T" in x for x in r)),
+            "T=16, outside the fitted envelope":
+                ({"T": 16, "MAXDIM": 64},
+                 lambda r: any("fitted envelope [4, 8]" in x for x in r)),
+        }
+        for label, (decl, want) in cases.items():
+            self.reset("tpta")
+            self.propose(spec, decl)
+            try:
+                cfg, proposed = ev.resolve_config(spec)
+                refusals = ev.config_refusals(cfg, ref)
+                got = refusals or "accepted"
+            except ev.Reject as r:
+                refusals, got = [f"{r.stage}: {r.detail}"], f"{r.stage}: {r.detail[:80]}"
+            check(f"i.config: {label}",
+                  "refused, naming why" if decl != {"T": 8, "MAXDIM": 32}
+                  else "accepted",
+                  got if isinstance(got, str) else [x[:100] for x in got],
+                  want(refusals))
+        # A declaration that is not a literal dict of the proposable keys.
+        for label, text in {
+                "a computed value": f"{ev.CONFIG_DECL} = {{\"T\": 4 * 2}}",
+                "an unknown key": f"{ev.CONFIG_DECL} = {{\"DMA_WORDS\": 16}}",
+                "a non-integer": f"{ev.CONFIG_DECL} = {{\"T\": \"8\"}}"}.items():
+            self.reset("tpta")
+            (spec / "microarch_isa.py").write_text(
+                self.spec("tpta").replace(ANCHOR, ANCHOR + text + "\n", 1))
+            try:
+                ev.resolve_config(spec)
+                got = "accepted"
+            except ev.Reject as r:
+                got = f"{r.stage}: {r.detail[:90]}"
+            check(f"i.config declaration: {label}", "config: refused", got,
+                  got.startswith("config:"))
+        self.reset("tpta")
+
+        # 2. The ISA is editable -- and a spec edit alone leaves the generated
+        #    module stale, which `gen_isa.py --conform` refuses.
+        r = await A.call("replace_text", timeout=60, path="isa_spec.json",
+                         old=self.SPEC_ROLE[0], new=self.SPEC_ROLE[1])
+        v = await A.verdict("run_functional_check")
+        check("i.spec edit accepted, stale artefact REJECTED at gate:isa",
+              "edit accepted (the spec is writable); ok=false at gate:isa",
+              f"{r[:40]!r}; ok={v.get('ok')} stage={v.get('stage')}",
+              r.startswith("Replaced") and not v.get("ok")
+              and v.get("stage") == "gate:isa"
+              and "STALE" in (v.get("detail") or ""),
+              detail=(v.get("detail") or "")[-400:])
+        # ...and `regenerate_isa` -- the frozen generator, on the candidate's
+        # own spec -- makes the same edit pass.
+        r = await A.call("regenerate_isa", timeout=300)
+        v = await A.verdict("run_functional_check")
+        check("i.regenerate_isa then passes",
+              "isa_encoding.py rewritten from the spec; ok=true",
+              f"{r[:60]!r}; ok={v.get('ok')} stage={v.get('stage')}",
+              r.startswith("Regenerated") and v.get("ok"),
+              detail=(v.get("detail") or "")[-400:])
+        self.reset("tpta")
+
+        # 3. The oracle. A weakened reference model is what the in-repository
+        #    checks cannot refuse -- `stress_isa` compares the design against
+        #    THIS file -- and the PyTorch gate refuses it, first and in seconds.
+        f, old, new = MUTANTS["relu_ref"]
+        r = await A.call("replace_text", timeout=60, path=f, old=old, new=new)
+        v = await A.verdict("run_functional_check")
+        gate = v.get("gate") or {}
+        check("i.weakened isa_ref REJECTED at gate:pytorch",
+              "edit accepted; ok=false at gate:pytorch, before bench_isa ran",
+              f"{r[:40]!r}; ok={v.get('ok')} stage={v.get('stage')} "
+              f"bench={gate.get('bench_isa')}",
+              r.startswith("Replaced") and not v.get("ok")
+              and v.get("stage") == "gate:pytorch"
+              and "bench_isa" not in gate,
+              detail=(v.get("detail") or "")[-400:])
+        self.reset("tpta")
+
+        # 4. The unmodified design still passes, and its verdict now carries
+        #    the corpus the oracle actually had.
+        v = await A.verdict("run_functional_check")
+        pt = (v.get("gate") or {}).get("pytorch") or {}
+        check("i.unmodified passes the oracle, and reports its corpus",
+              "ok, >= 2 models and >= 2,000 bytes against torch",
+              f"ok={v.get('ok')} {pt.get('models')} models, "
+              f"{pt.get('bytes')} bytes",
+              v.get("ok") and pt.get("vouched")
+              and int(str(pt.get("models", "0/0")).split("/")[0]) >= 2
+              and (pt.get("bytes") or 0) >= 2000)
+        self.reset("tpta")
+
+    def propose(self, spec: Path, declaration: dict) -> None:
+        """Write a `CHIA_CONFIG` proposal into the candidate's own file.
+
+        Straight to disk, not through the edit tools: a proposal is a legal
+        edit, and what is under test is what the EVALUATOR does with it."""
+        import evaluate as ev
+        text = (spec / "microarch_isa.py").read_text()
+        assert text.count(ANCHOR) == 1
+        decl = ", ".join(f'"{k}": {v}' for k, v in declaration.items())
+        (spec / "microarch_isa.py").write_text(text.replace(
+            ANCHOR, f"{ANCHOR}{ev.CONFIG_DECL} = {{{decl}}}\n", 1))
+
     # d ------------------------------------------------------------------
     async def phase_d(self):
         print("== d: deadlock (one stream put dropped)", flush=True)
@@ -1070,9 +1382,13 @@ class Suite:
         check("loop.spend", "the run's own sessions, found by its tag, cost $0.00",
               f"${mine['usd']:.2f} over {len(mine['sessions'])} session(s)",
               mine["usd"] == 0 and len(mine["sessions"]) > 0)
-        check("loop.opencode-tools", "only the 7 MCP tools advertised to the model",
+        # Eight since `regenerate_isa` landed with the editable ISA. The count
+        # is asserted, not the names: what this guards is that the model is
+        # offered the spec tools and NOTHING else -- no shell, no file writer,
+        # no second server's surface.
+        check("loop.opencode-tools", "only the 8 MCP tools advertised to the model",
               fake.log[0]["tools"] if fake.log else None,
-              bool(fake.log) and len(fake.log[0]["tools"]) == 7
+              bool(fake.log) and len(fake.log[0]["tools"]) == 8
               and all("tpufrontend_" in t for t in fake.log[0]["tools"]))
 
     # control -------------------------------------------------------------
@@ -1226,7 +1542,7 @@ class Suite:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--phases", default="s,control,e,c,g,d,abf,loop,accept")
+    ap.add_argument("--phases", default="s,control,e,c,g,i,d,abf,loop,accept")
     ap.add_argument("--run-dir", type=Path, default=REPO / "chia_runs"
                     / f"harness-test-{time.strftime('%Y%m%d-%H%M%S')}")
     a = ap.parse_args()
@@ -1239,7 +1555,7 @@ def main() -> int:
         for ph in phases:
             if ph == "s":
                 phase_s()
-            elif ph in ("e", "c", "d", "abf", "g"):
+            elif ph in ("e", "c", "d", "abf", "g", "i"):
                 asyncio.run(getattr(suite, f"phase_{ph}")())
             elif ph in ("control", "loop", "accept"):
                 getattr(suite, f"phase_{ph}")()

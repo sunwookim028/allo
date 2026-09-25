@@ -113,17 +113,32 @@ def test_the_two_models_disagree_about_what_a_unit_is(report):
 
 
 def test_the_composition_sees_memories_the_isa_cannot_name():
-    """Three on-chip memories the Action model is silent about, found by the
+    """SEVEN on-chip memories the Action model is silent about, found by the
     derivation rather than by reading the RTL: the sequencer's prefetch
-    window and the two burst landing buffers. They are real state with real
-    ports, and no instruction field names a row of any of them, so an action
-    over them would have no base to resolve. The model's silence is honest;
-    that it was never visible is what the derivation fixes."""
+    window, the two burst landing buffers, and the four arrays of the loop
+    stack. They are real state with real ports, and no instruction field names
+    a row of any of them, so an action over them would have no base to
+    resolve. The model's silence is honest; that it was never visible is what
+    the derivation fixes.
+
+    It was THREE until 2026-09-25, and the four that joined it are the reason
+    this test is worth more than its assertion. `Unit.arrays()` ignored any
+    array declared with an INITIALISER, and the whole loop stack is declared
+    `int32[LOOP_DEPTH] = 0`, so the derivation could not see state the
+    sequencer reads and writes on every LOOP and ENDLOOP. The blind spot had a
+    cost: `gen_isa.py --conform`'s port arm refused a candidate that merely
+    added `= 0` to `spad`, because the array then vanished from this same
+    projection. Removing the guard made the arm strictly stronger, and
+    `gen_isa.UNMODELLED` now carries all eight loop-stack ports with their
+    reason."""
     implied = structure(T.architecture())
     assert {s.name for s in implied.states} - {
-        s.name for s in machine().states} == {"program", "a_onchip",
-                                              "b_onchip"}
+        s.name for s in machine().states} == {
+            "program", "a_onchip", "b_onchip",
+            "loop_body", "loop_iter", "loop_trip", "live_iv"}
     assert implied.state("a_onchip").rows == "MAXDIM * WPR + DMA_WORDS"
+    # An initialised array carries its extent like any other.
+    assert implied.state("loop_trip").rows == "LOOP_DEPTH"
 
 
 def test_the_control_path_cannot_be_modelled_as_an_action():

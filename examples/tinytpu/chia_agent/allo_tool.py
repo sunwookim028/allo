@@ -1,11 +1,19 @@
 """Narrow MCP tool surface for co-designing TinyTPU-isa (examples/tinytpu).
 
-The agent may edit exactly the files `design.EDITABLE` names -- the eight units
-under `ip/units/`, the architecture that wires them, the ISA, the assembler,
-the programs, `microarch_isa.py` (the parameter set) and `isa_dsl.py` (the
-program generator) -- and only in a private spec
-directory, never in the repository. Everything that decides the score is frozen
-and outside its reach; see `evaluate.py` for the list and how it is enforced.
+The agent may edit exactly the files `design.EDITABLE` names -- the instruction
+set (`isa_spec.json`, the `isa_encoding.py` generated from it and the
+`isa_ref.py` built on that), the eight units under `ip/units/`, the
+architecture that wires them, the assembler, the programs, `microarch_isa.py`
+(the parameter set, and the `CHIA_CONFIG` declaration that proposes the
+configuration to be scored at) and `isa_dsl.py` (the program generator) -- and
+only in a private spec directory, never in the repository. Everything that
+decides the score is frozen and outside its reach; see `evaluate.py` for the
+list and how it is enforced.
+
+`isa_encoding.py` is GENERATED. Editing `isa_spec.json` by itself leaves it
+stale and `gen_isa.py --conform` refuses the candidate, so there is a tool --
+`regenerate_isa` -- that runs the FROZEN generator on the spec and writes the
+artefact back. It is the only tool that writes a file the agent did not type.
 """
 
 from __future__ import annotations
@@ -51,7 +59,10 @@ REFERENCE = {
     "shapes.py": "examples/tinytpu/shapes.py",
     "bench_isa.py": "examples/tinytpu/bench_isa.py",
     "stress_isa.py": "examples/tinytpu/stress_isa.py",
-    "isa_ref.py": "examples/tinytpu/isa_ref.py",
+    # `isa_ref.py` is no longer here: it is EDITABLE now, and `read_spec` is
+    # how a writable file is read. `gen_isa.py` took its place, because it is
+    # what an ISA change is held to.
+    "gen_isa.py": "examples/tinytpu/gen_isa.py",
     "evaluate.py": "examples/tinytpu/chia_agent/evaluate.py",
     "param_check.py": "examples/tinytpu/chia_agent/param_check.py",
     # The co-design loop's frozen half. Readable on purpose: the agent should
@@ -102,6 +113,7 @@ class AlloSpecTool(ChiaTool):
         self.mcp.add_tool(self.replace_text, name=f"{self.name}_replace_text")
         self.mcp.add_tool(self.apply_spec_patch, name=f"{self.name}_apply_spec_patch")
         self.mcp.add_tool(self.insert_after, name=f"{self.name}_insert_after")
+        self.mcp.add_tool(self.regenerate_isa, name=f"{self.name}_regenerate_isa")
         self.mcp.add_tool(
             self.run_functional_check, name=f"{self.name}_run_functional_check")
         self.mcp.add_tool(self.score_cycles, name=f"{self.name}_score_cycles")
@@ -179,11 +191,16 @@ class AlloSpecTool(ChiaTool):
 
     # -- MCP tools ---------------------------------------------------------
     def _check(self, name: str, source: str) -> str | None:
-        try:
-            ast.parse(source, filename=name)
-        except SyntaxError as error:
-            return (f"Rejected: the edit leaves {name} unparseable -- {error.msg} "
-                    f"at line {error.lineno}. The file is unchanged.")
+        # `isa_spec.json` is data, not a module: the policy parses it as JSON
+        # and holds the expressions its actions carry -- the strings `isa_ref`
+        # evaluates -- to the same expression language `isa_ref` admits.
+        if not name.endswith(".json"):
+            try:
+                ast.parse(source, filename=name)
+            except SyntaxError as error:
+                return (f"Rejected: the edit leaves {name} unparseable -- "
+                        f"{error.msg} at line {error.lineno}. The file is "
+                        f"unchanged.")
         base = subprocess.run(
             ["git", "show", f"HEAD:examples/tinytpu/{name}"],
             cwd=self.repo, capture_output=True, text=True).stdout
@@ -202,7 +219,10 @@ class AlloSpecTool(ChiaTool):
         With no argument: every writable path with its line count -- the eight
         units under `ip/units/`, the composition `ip/tinytpu.py`, the ISA
         `ip/isa.py`, the assembler, the programs, `microarch_isa.py` (the
-        parameter set) and `isa_dsl.py` (the program generator). With a path:
+        parameter set), `isa_dsl.py` (the program generator) and the
+        instruction set itself -- `isa_spec.json` (the source of truth),
+        `isa_encoding.py` (generated from it: change it with `regenerate_isa`,
+        never by hand) and `isa_ref.py` (the reference model). With a path:
         that file. `allo/compose.py` and `ip/params.py` are frozen machinery
         and are not writable; read them with `read_reference`.
         """
@@ -345,6 +365,56 @@ class AlloSpecTool(ChiaTool):
     # tool runs on the MCP server's event loop, and in the smoke run one hung
     # evaluation blocked every other request -- including tool listing for
     # the next session, which then reported that no tools existed.
+    def regenerate_isa(self) -> str:
+        """Regenerate `isa_encoding.py` from your `isa_spec.json`.
+
+        Run this after every edit to `isa_spec.json`. `isa_encoding.py` is
+        generated from the spec, and `run_functional_check` refuses a candidate
+        whose generated module is not byte-identical to what its own spec
+        produces (`gen_isa.py --conform`), so a spec edit on its own is always
+        a refusal. The generator is FROZEN and is read from git, not from your
+        spec directory: it writes what your spec says, and you cannot change
+        what "says" means.
+
+        Nothing else is touched, and the spec itself is never rewritten.
+        """
+        gen = subprocess.run(["git", "show", f"HEAD:examples/tinytpu/gen_isa.py"],
+                             cwd=self.repo, capture_output=True, text=True)
+        if gen.returncode:
+            return f"Rejected: cannot read the frozen generator ({gen.stderr[:200]})."
+        encoding = self.sources["isa_encoding.py"]
+        with tempfile.TemporaryDirectory(prefix="tinytpu-isa-gen-") as tmp:
+            # The whole spec directory, because `gen_isa.py` lists
+            # `ip/units/` at import time -- a sandbox holding only the spec
+            # raises before it reads a line of it.
+            sandbox = Path(tmp) / "tinytpu"
+            shutil.copytree(self.spec_dir, sandbox)
+            (sandbox / "gen_isa.py").write_text(gen.stdout, encoding="utf-8")
+            # `--write --no-doc` reads the spec and writes one file. It imports
+            # nothing of the design, so it is fast and cannot run the
+            # candidate's code.
+            done = subprocess.run([sys.executable, "gen_isa.py", "--write",
+                                   "--no-doc"], cwd=sandbox, text=True,
+                                  capture_output=True, timeout=300)
+            if done.returncode:
+                return ("Rejected: the generator could not read your spec.\n"
+                        + (done.stdout + done.stderr)[-2000:])
+            produced = (sandbox / "isa_encoding.py").read_text(encoding="utf-8")
+        before = encoding.read_text(encoding="utf-8")
+        if produced == before:
+            return ("isa_encoding.py already matches isa_spec.json; nothing "
+                    "was written.")
+        broken = self._check("isa_encoding.py", produced)
+        if broken:
+            return broken
+        encoding.write_text(produced, encoding="utf-8")
+        added = sum(1 for line in difflib.unified_diff(
+            before.splitlines(), produced.splitlines()) if line.startswith("+"))
+        removed = sum(1 for line in difflib.unified_diff(
+            before.splitlines(), produced.splitlines()) if line.startswith("-"))
+        return (f"Regenerated isa_encoding.py from isa_spec.json "
+                f"(+{added} / -{removed} lines).")
+
     async def run_functional_check(self) -> str:
         """The gate, in ~15 s: bench_isa.py (the published [-4, 4] setup) and
         stress_isa.py (492 runs: full-range/corner/boundary int8, all 64

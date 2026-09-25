@@ -102,6 +102,71 @@ Where it is **not** valid, stated rather than discovered later:
   that is visible to a bit census. A candidate whose *structure* is unchanged
   scores unchanged here however differently it synthesises.
 
+The fitted envelope, and why it REFUSES
+======================================
+
+The loop may now propose ``T`` and ``MAXDIM`` (``chia_agent/evaluate.py``), so
+a configuration nobody has ever synthesised can arrive here. Priced by
+extrapolation it would return a number with no error bar at all -- and the
+"One point below MAXDIM=64" caveat above says exactly where that number would
+be worst, which is also where the loop scores. So `envelope_refusals` REFUSES
+to price a configuration outside the range the committed runs span, and
+`estimate` raises rather than extrapolating. A missing number a search must
+work around is recoverable; a confident wrong one is not.
+
+**A hard boundary and not a widened error bar, and this project has the
+evidence for why that distinction matters.** ``act/cycles.py``'s
+``CRITICAL_WORK_FIT`` was re-derived on 2026-09-25 and came out WORSE (worst
+error 15.79 % -> 18.16 %) with critical work itself unchanged: the whole
+movement was in the measurement, because ``QD=16`` moved the measured cycles
+**+4 / +4 / +4 / -1 / -11** -- a term that grows with work against one that
+shrinks with it, which a single slope cannot hold, and at the smallest shape
+the estimate landed outside the tolerance of the gate it feeds. The lesson is
+that outside its fitted span a model's FUNCTIONAL FORM can be wrong and not
+merely imprecise, so there is no error bar wide enough to make the number
+usable. Hence a refusal with a named cause, and no
+"extrapolate but flag it" path: `require_envelope=False` exists for a person
+asking what the model would say, and it labels its answer `extrapolated` so
+the label travels with the number.
+
+The envelope is DERIVED from ``COMMITTED`` -- the span of each parameter over
+the runs that are actually fitted -- so a twelfth DC run widens it by being
+added to that dict, and nothing here has to be retyped. Today it is
+T in [4, 8], MAXDIM in [16, 64], QD in [8, 16], DMA_WORDS in [1, 16].
+
+The logic-only runs are left OUT of the span: their census has
+``memory_bits = 0``, which is not a design point, and counting it would put 0
+in the envelope's floor and make the floor meaningless.
+
+**The ``QD`` span is the weakest of the four, and it is worth saying why
+rather than reading [8, 16] as calibration.** The values in ``COMMITTED`` are
+*declared here* -- ``asic_synthesis/README.md`` states the ``63ee6ec7`` split
+-- and only ``T8_MAXDIM64``'s export records ``QD`` in its own
+``MANIFEST.json`` at all; the three T=4 exports do not record it, and
+``asic_synthesis``'s own checker treats an absent config key as "cannot pair"
+rather than "matches". So the calibration set cannot *distinguish* ``QD`` on
+three of five runs, which is the same position a candidate proposing an
+unvisited ``MAXDIM`` is in. It does not bite today only because
+``evaluate.QD_REQUIRED`` accepts exactly one depth (limitations item 24), and
+that is a coincidence of two constraints rather than evidence. A clean QD pair
+at the scored point -- priority 3 below -- is what would make the span mean
+something.
+
+What a DC run would buy, in the order it is worth paying for:
+
+1. **T=4 MAXDIM=32** and **T=8 MAXDIM=16**. The interior of the (T, MAXDIM)
+   box has exactly one point in it -- MAXDIM=16 at T=4 -- and the two runs
+   above would make the box fitted at its corners instead of along one edge.
+   They are also the two configurations a co-design loop reaches for first: a
+   bigger array on a small memory, and a small array on a big one.
+2. **T=4 MAXDIM=88 (or 76)**, at a ceiling. It would say whether the cost model
+   holds where the ENCODING stops, which is the only honest way to widen the
+   MAXDIM envelope upward rather than guessing that the line continues.
+3. **A clean QD pair at the scored point** (T=4 MAXDIM=16, QD=8 against 16, two
+   exports of the same commit). It is the axis with no isolated synthesis
+   result at all, and the +6.8 % against +6.6 % agreement above is two
+   estimates agreeing with each other.
+
 Use
 ===
 
@@ -184,13 +249,30 @@ def adapters(*, operand_width: int, store_width: int, ports: int = 2) -> float:
             + STORE_PORT_FIXED + STORE_PORT_PER_BIT * store_width)
 
 
-def estimate(c: dict) -> dict:
+class OutsideEnvelope(Exception):
+    """This configuration is outside what the committed DC runs span.
+
+    Raised rather than returning a number. `estimate` is the only way an area
+    figure enters the objective, so raising here is what makes "the proxy does
+    not extrapolate" a property of the code instead of a note in a docstring.
+    """
+
+
+def estimate(c: dict, require_envelope: bool = True) -> dict:
     """The estimate, and every term of it, from a census.
 
     Returned as a breakdown rather than a scalar on purpose: "+74.4 %, and
     99.1 % of it is two AXI ports" is the finding, and a single number would
     have hidden it.
+
+    Raises `OutsideEnvelope` when the census's parameters fall outside the
+    range the fitted runs span. `require_envelope=False` exists for exactly one
+    caller -- a person asking what the model WOULD say -- and it labels its
+    answer `extrapolated` so the label travels with the number.
     """
+    refusals = envelope_refusals(c.get("parameters") or {})
+    if refusals and require_envelope:
+        raise OutsideEnvelope("; ".join(refusals))
     terms = {
         "adapters": adapters(operand_width=c["operand_port_bits"],
                              store_width=c["store_port_bits"]),
@@ -203,6 +285,9 @@ def estimate(c: dict) -> dict:
             "terms": {k: round(v, 1) for k, v in terms.items()},
             "census": c,
             "estimate": True,
+            "envelope": {k: list(v) for k, v in envelope().items()},
+            "extrapolated": refusals or None,
+            "extrapolated_terms": extrapolated_terms(c) or None,
             "basis": "structural bit census x coefficients fitted to "
                      f"{len(COMMITTED)} committed DC runs; leave-one-out "
                      "0.62 % mean / 1.39 % worst; NOT a measurement"}
@@ -347,6 +432,80 @@ NOT_FITTED = {
 }
 
 
+#: The parameters an envelope is defined over -- the four a census is a
+#: function of. `IMEM_SIZE`, `SPAD_ROWS`, `NVR` and `NAR` are DERIVED from these
+#: (`ip/params.py`), so they are not separate axes; a candidate that overrides
+#: one of them directly moves a census TERM instead, which `estimate` reports.
+ENVELOPE_KEYS = ("T", "MAXDIM", "QD", "DMA_WORDS")
+
+
+def envelope() -> dict:
+    """`{parameter: (low, high)}` over the runs this model is FITTED to.
+
+    Derived from `COMMITTED`, minus the logic-only runs: their census has no
+    unit memory in it at all, so they are a measurement of a stub rather than a
+    configuration anyone would build.
+    """
+    real = [cfg for cfg in COMMITTED.values() if not cfg.get("stubbed")]
+    return {k: (min(cfg[k] for cfg in real), max(cfg[k] for cfg in real))
+            for k in ENVELOPE_KEYS}
+
+
+def envelope_refusals(params: dict) -> list[str]:
+    """Why this configuration cannot be PRICED, or `[]`.
+
+    Called by `chia_agent/evaluate.py` before a candidate is composed, so a
+    configuration this model cannot defend a number for is refused in
+    milliseconds rather than after a csynth. Each refusal names the axis, the
+    span, and the run that would widen it -- a refusal an agent cannot act on
+    is a wall, and this one is meant to be a boundary.
+    """
+    out = []
+    for key, (low, high) in envelope().items():
+        value = params.get(key)
+        if value is None:
+            continue
+        if value < low or value > high:
+            out.append(
+                f"{key}={value} is outside the area proxy's fitted envelope "
+                f"[{low}, {high}]: the coefficients come from "
+                f"{len([c for c in COMMITTED.values() if not c.get('stubbed')])} "
+                f"committed Design Compiler runs and there is no DC run at "
+                f"this {key}, so the area term would be an extrapolation with "
+                f"no error bar. It is refused rather than extrapolated. What "
+                f"would widen it is a DC run at this configuration "
+                f"(examples/tinytpu/asic_synthesis/README.md); the priority "
+                f"order is in this module's docstring")
+    return out
+
+
+def extrapolated_terms(c: dict) -> list[str]:
+    """Census terms outside the range the fitted runs span, named.
+
+    REPORTED, not refused, and the asymmetry is deliberate. A configuration
+    outside the envelope is a point the coefficients were never fitted near,
+    and there is nothing to do but refuse it. A term outside the range is
+    ordinarily a candidate that made something SMALLER -- a shorter instruction
+    memory is below every fitted `buffer_bits` -- and refusing that would refuse
+    the cheapest kind of improvement. So it travels with the estimate instead,
+    where a reader comparing two candidates can see which one is priced off the
+    end of the fit.
+    """
+    real = {k: cfg for k, cfg in COMMITTED.items() if not cfg.get("stubbed")}
+    censuses = [synthetic_census(**cfg) for cfg in real.values()]
+    out = []
+    for term in ("memory_bits", "buffer_bits", "channel_bits",
+                 "processing_elements", "operand_port_bits", "store_port_bits"):
+        if term not in c:
+            continue
+        low, high = min(x[term] for x in censuses), max(x[term] for x in censuses)
+        if c[term] < low:
+            out.append(f"{term}={c[term]} below the fitted range [{low}, {high}]")
+        elif c[term] > high:
+            out.append(f"{term}={c[term]} above the fitted range [{low}, {high}]")
+    return out
+
+
 def committed_area(variant: str) -> float:
     return json.loads((REPORTS / variant / "results.json").read_text())["area"]["total_cell"]
 
@@ -427,7 +586,14 @@ def main(argv=None):
     a = ap.parse_args(argv)
     if a.census or a.estimate:
         c = live_census()
-        print(json.dumps(estimate(c) if a.estimate else c, sort_keys=True))
+        if a.census:
+            print(json.dumps(c, sort_keys=True))
+            return 0
+        try:
+            print(json.dumps(estimate(c), sort_keys=True))
+        except OutsideEnvelope as why:
+            print(f"AREA PROXY REFUSES to price this build: {why}")
+            return 1
         return 0
     return 0 if selfcheck()["ok"] else 1
 

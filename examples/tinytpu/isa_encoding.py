@@ -61,12 +61,28 @@ PARAMETER_RANGE = {
     "QD": (2, None),
     "DMA_WORDS": (1, None),
 }
+#: The same parameters BY VALUE, so that `check_parameters` reads them
+#: from a name it declares rather than through `globals()`. The spec
+#: policy denies `globals` -- it is one of the ways candidate code
+#: reaches a module namespace it was not given -- and this module is
+#: editable now (`chia_agent/design.py`), so the generated form must
+#: pass the policy it is held to.
+PARAMETER_VALUES = {
+    "T": T,
+    "MAXDIM": MAXDIM,
+    "SPAD_ROWS": SPAD_ROWS,
+    "NVR": NVR,
+    "NAR": NAR,
+    "IMEM_SIZE": IMEM_SIZE,
+    "QD": QD,
+    "DMA_WORDS": DMA_WORDS,
+}
 
 def check_parameters():
     """Raise if a build parameter is outside the range the spec admits,
     or breaks one of its cross-parameter constraints."""
     for name, (lo, hi) in PARAMETER_RANGE.items():
-        v = globals()[name]
+        v = PARAMETER_VALUES[name]
         if v < lo or (hi is not None and v > hi):
             raise ValueError(f"{name}={v} outside the spec range {lo}..{hi}")
     if not (T >= 4):

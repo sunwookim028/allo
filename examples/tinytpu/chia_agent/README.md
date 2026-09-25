@@ -299,8 +299,25 @@ To start again, use a **new** `--run-dir`.
 
 | | files | how it is enforced |
 | --- | --- | --- |
-| **editable** | the 14 paths of `design.EDITABLE`: `microarch_isa.py`, `isa_dsl.py`, `ip/{isa,tinytpu,assembler,programs}.py` and the eight units under `ip/units/`. `read_spec()` with no argument lists them with line counts | The agent edits a private copy in `<run>/<worker>/spec/`, never the repository. |
-| **frozen** | main's `cosim.py` (testbench generator, `SHAPES`, numpy golden reference, every Vitis/TCL setting), `bench_isa.py`, `stress_isa.py` (the correctness gate), `isa_ref.py` (the ISA as numpy), `kpn_model.py`; and here `chia_agent/gate_runner.py`, `chia_agent/evaluate.py`, `chia_agent/spec_policy.py` | See below. |
+| **editable** | the 17 paths of `design.EDITABLE`: the ISA (`isa_spec.json`, the generated `isa_encoding.py`, the `isa_ref.py` built on it), `microarch_isa.py`, `isa_dsl.py`, `ip/{isa,tinytpu,assembler,programs}.py` and the eight units under `ip/units/`. `read_spec()` with no argument lists them with line counts | The agent edits a private copy in `<run>/<worker>/spec/`, never the repository. `isa_encoding.py` is generated: the `regenerate_isa` tool runs the frozen generator on the candidate's own spec. |
+| **frozen** | main's `cosim.py` (testbench generator, `SHAPES`, numpy golden reference, every Vitis/TCL setting), `bench_isa.py`, `stress_isa.py` (the correctness gate), `gen_isa.py` (which holds the candidate's spec, its generated module and the design's bit slices to each other), `kpn_model.py`, the workload suite `workloads/` and `chia_agent/area_proxy.py`; and here `chia_agent/gate_runner.py`, `chia_agent/evaluate.py`, `chia_agent/spec_policy.py` | See below. |
+
+The ISA became editable on 2026-09-25, and what replaced the freeze is an
+oracle **outside** this repository: `workloads/run.py --verify` compares the
+candidate's programs against `torch.nn.Linear`'s own forward, byte for byte,
+as the FIRST gate. `allo/actions.py` is not that oracle and was not used as
+one -- it is another model of the same ISA inside the repository, with the
+same failure mode `isa_ref` has. The argument in full, and what the oracle's
+thin corpus is worth, is in `evaluate.py`'s docstring and
+`docs/source/extensions/chia.rst`.
+
+A candidate may also PROPOSE the configuration it is scored at, by declaring
+`CHIA_CONFIG = {"T": 8, "MAXDIM": 32}` at module level in `microarch_isa.py`.
+It is refused -- before anything is built -- outside the area proxy's fitted
+envelope (T in [4,8], MAXDIM in [16,64]), past either computed MAXDIM ceiling
+(88/76 at T=4, 128/120 at T=8), at any `QD` but 16 (limitations item 24), or
+against `ip/params.py`'s invariants. No declaration means T=4 MAXDIM=16, the
+published row.
 
 Mechanical enforcement, not instructions:
 
@@ -414,13 +431,13 @@ This is a policy, not a sandbox. Real isolation would mean a container.
   correctness gate, maintained there and measured by `mutate.py`; keeping a
   second, weaker definition of "correct" here would let the loop drift from
   main exactly the way pinning `cosim.py`/`bench_isa.py` to main prevents.
-  The cost is explicit: `isa_ref.py` is frozen, so **the architectural
-  meaning of each instruction is now part of the contract**. The agent may
-  change how the hardware executes the ISA and which instructions
-  `isa_dsl.py` emits, not what an instruction means, and must keep the names
-  `stress_isa.py` imports. The system prompt says so. An ISA-changing search
-  would need `isa_ref.py` (and `stress_isa.py`'s crafted programs) to become
-  part of the candidate -- a separate design decision.
+  `stress_isa.py` stays frozen and still computes its own numpy gold, so the
+  GEMM bar does not move with the ISA. What DID move (2026-09-25) is
+  `isa_ref.py`: it is the candidate's now, together with `isa_spec.json` and
+  the `isa_encoding.py` generated from it, so the agent may change what an
+  instruction means -- by saying so in the spec, and then passing
+  `gen_isa.py --conform` and the PyTorch oracle. The names `stress_isa.py`
+  imports must still exist.
 - **score**: three terms, all from **RTL cosim** (Vitis HLS 2023.2 csynth +
   xsim), each testbench bit-exact -- `loop.classify` is the frozen rule and its
   docstring is the argument for each term:
