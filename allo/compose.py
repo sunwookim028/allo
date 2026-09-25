@@ -174,7 +174,19 @@ class Unit:
         bound = dict(zip(parameters, self.memories))
         out = {}
         for node in ast.walk(tree):
-            if isinstance(node, ast.AnnAssign) and node.value is None \
+            # An INITIALISED array is still an array. The `node.value is None`
+            # this used to also require made `spad: UInt(VW)[SPAD_ROWS] = 0`
+            # invisible here while the body still read and wrote it, so
+            # `gen_isa.py --conform`'s port arm reported that the composed
+            # region implied no `spad` port -- refusing a one-line, bit-exact
+            # hardware edit (the zero-fill b4be2b10 removed) for a change in
+            # what this function could see rather than in what the design does.
+            # The annotation being a Subscript is what makes it an array; a
+            # scalar `n: int32 = 0` annotates a Name and is still excluded.
+            # `chia_agent/area_proxy.py`'s own census never had the guard,
+            # which is the second reason to believe this one was a defect: the
+            # two walks of the same AST disagreed about the same array.
+            if isinstance(node, ast.AnnAssign) \
                     and isinstance(node.annotation, ast.Subscript):
                 out[node.target.id] = {
                     "rows": ast.unparse(node.annotation.slice),
