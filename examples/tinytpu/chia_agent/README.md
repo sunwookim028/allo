@@ -218,6 +218,20 @@ when a whole iteration ends, which can be tens of minutes -- read the log:
 tail -f ../../../chia_runs/isa-run<N>-<date>/*/worker.log
 ```
 
+and for what is happening INSIDE the current session -- how many turns so
+far, which tools it has called, how long each took, where the wall time has
+gone -- read the trace, which is appended per event and unbuffered:
+
+```bash
+python session_trace.py ../../../chia_runs/isa-run<N>-<date>/<worker>
+```
+
+It works the same on a live run, a finished one and a run that was killed: a
+`model_call.start` or `tool.start` with no matching end is what the process
+was doing when it died. opencode's own event stream is kept beside it in
+`<worker>/opencode/run-*.ndjson` -- including for a call that hit the 2400 s
+timeout, which CHIA's `_capture` would otherwise have unlinked.
+
 ### What it cost
 
 **The `usage` field is not the cost.** A call that runs to the timeout reports
@@ -587,7 +601,8 @@ No git worktree is created per worker. Each worker's spec, logs and
 | `accept.py` | clean-checkout, five-shape acceptance of a claimed winner, against a control it measures in the same run |
 | `control.py` | the control record a claim may rest on, and the cross-check against the published numbers |
 | `allo_tool.py` | the MCP surface: read spec / read frozen reference / replace_text, patch, insert / functional check / score |
-| `llm.py` | CHIA's OpenCodeLLM with a 40-minute MCP request timeout |
+| `llm.py` | CHIA's OpenCodeLLM with a 40-minute MCP request timeout, and the live per-turn trace (it keeps and tails opencode's run stream instead of letting `_capture` unlink it) |
+| `session_trace.py` | the append-only per-event log three writers share, and the reader that prints a session's timeline |
 | `loop.py` | one search: baseline, propose from best, harness re-scores, keep or rewind |
 | `swarm.py` | K searches on different starting angles, global spend cap, report |
 | `spend.py` | USD from opencode's DB: per run, and cumulative on CHIA2026 since the cutover |
@@ -597,6 +612,7 @@ No git worktree is created per worker. Each worker's spec, logs and
 | `smoke.py` | the cheapest end-to-end check |
 | `test_harness.py` | LLM-free end-to-end test of all of the above; run before spending |
 | `fake_model.py` | scripted OpenAI-compatible model that `test_harness.py` points opencode at |
+| `test_session_trace.py` | $0 test of what a session leaves behind, including one KILLED mid-flight and one that hits the timeout |
 
 ## First paid run on CHIA2026, 2026-09-19: one verified win, and two holes
 

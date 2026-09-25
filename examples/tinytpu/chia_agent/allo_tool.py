@@ -35,6 +35,7 @@ from chia.base.tools.ChiaTool import ChiaTool
 
 from design import EDITABLE, UNITS
 from spec_policy import doc_violations, policy_violations
+from session_trace import Trace, traced
 
 #: CHIA binds each tool server to `ray.util.get_node_ip_address()`, which on a
 #: Ray worker is the host's routable address -- an unauthenticated server
@@ -88,7 +89,7 @@ class AlloSpecTool(ChiaTool):
 
     def setup(self, spec_dir: str, work_dir: str, agent_dir: str, repo: str,
               allo_python: str, llvm_build_dir: str,
-              codesign: bool = False) -> None:
+              codesign: bool = False, trace_dir: str | None = None) -> None:
         #: Co-design mode: the evaluator also enumerates the mapspace against
         #: the candidate's hardware and cosims the nest the FROZEN mapper
         #: chose, rather than the program the agent hand-wrote.
@@ -107,19 +108,24 @@ class AlloSpecTool(ChiaTool):
             "LLVM_BUILD_DIR": llvm_build_dir,
         }
         self._lock = threading.Lock()
+        # This server is the ONE component that sees every round trip from the
+        # far side of the MCP boundary, so its timings are the ground truth
+        # for what a tool call cost and are independent of opencode's stream
+        # format. `traced` puts a line out before the work and another after,
+        # which is why a tool call still running when the process dies leaves
+        # a `tool.start` with no `tool.end` -- naming what it was doing.
+        # Passed in rather than read from the environment: a Ray actor
+        # inherits the raylet's environment, not the shell that launched the
+        # loop (the same reason `eval_env` is captured in the driver).
+        self.trace = Trace(Path(trace_dir) / "trace.jsonl") if trace_dir else Trace()
         assert all(path.is_file() for path in self.sources.values()), self.sources
-        self.mcp.add_tool(self.read_spec, name=f"{self.name}_read_spec")
-        self.mcp.add_tool(self.read_reference, name=f"{self.name}_read_reference")
-        self.mcp.add_tool(self.replace_text, name=f"{self.name}_replace_text")
-        self.mcp.add_tool(self.apply_spec_patch, name=f"{self.name}_apply_spec_patch")
-        self.mcp.add_tool(self.insert_after, name=f"{self.name}_insert_after")
-        self.mcp.add_tool(self.regenerate_isa, name=f"{self.name}_regenerate_isa")
-        self.mcp.add_tool(
-            self.run_functional_check, name=f"{self.name}_run_functional_check")
-        self.mcp.add_tool(self.score_cycles, name=f"{self.name}_score_cycles")
-        if self.codesign:
-            self.mcp.add_tool(self.mapspace_report,
-                              name=f"{self.name}_mapspace_report")
+        for method in (self.read_spec, self.read_reference, self.replace_text,
+                       self.apply_spec_patch, self.insert_after,
+                       self.regenerate_isa, self.run_functional_check,
+                       self.score_cycles) + (
+                           (self.mapspace_report,) if self.codesign else ()):
+            name = f"{self.name}_{method.__name__}"
+            self.mcp.add_tool(traced(self.trace, name, method), name=name)
 
     def __getstate__(self):
         # The tool is re-pickled on every prompt; a Lock cannot be.

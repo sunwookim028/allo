@@ -45,6 +45,7 @@ from allo_tool import AlloSpecTool
 from design import EDITABLE
 from llm import IsaOpenCodeLLM
 from spend import run_spend
+from session_trace import ENV_DIR, Trace
 
 AGENT_DIR = Path(__file__).resolve().parent
 DESIGN_DIR = AGENT_DIR.parent
@@ -228,7 +229,8 @@ CODESIGN_MESSAGE = (
 )
 
 
-def make_llm(tool: AlloSpecTool, title: str) -> IsaOpenCodeLLM:
+def make_llm(tool: AlloSpecTool, title: str,
+             trace_dir: str | None = None) -> IsaOpenCodeLLM:
     provider, _, model_id = MODEL.partition("/")
     if TEST_BASE_URL:
         additional = [AdditionalModelProvider(
@@ -236,7 +238,7 @@ def make_llm(tool: AlloSpecTool, title: str) -> IsaOpenCodeLLM:
             api_key="unused")]
     else:
         additional = [vertex_provider(provider, model_id)]
-    return IsaOpenCodeLLM(
+    llm = IsaOpenCodeLLM(
         model=MODEL,
         system_message=CODESIGN_MESSAGE if tool.codesign else SYSTEM_MESSAGE,
         timeout_seconds=2400,
@@ -254,6 +256,12 @@ def make_llm(tool: AlloSpecTool, title: str) -> IsaOpenCodeLLM:
         # no session id.
         extra_cli_args=["--title", title],
     )
+    # Carried on the object, not in the environment: `prompt` runs on a Ray
+    # worker, which inherits the raylet's environment rather than the shell's.
+    # This is what makes a killed call leave a record -- see `llm.py`.
+    llm.trace_dir = trace_dir or os.environ.get(ENV_DIR)
+    llm.trace_label = title
+    return llm
 
 
 def vertex_provider(provider: str, model_id: str) -> AdditionalModelProvider:
@@ -330,22 +338,41 @@ class Budget:
         self.largest_call = max(self.largest_call, usd)
 
 
-def ask(llm, tool, prompt, budget: Budget, what: str, calls: list):
+def ask(llm, tool, prompt, budget: Budget, what: str, calls: list,
+        trace: Trace | None = None):
+    """One model call, with its outcome written down when it happens.
+
+    `calls` is still accumulated for `calls.json`, but that file is written
+    once, at the end of `run()` -- so a run that is killed, or that stops on
+    the budget, used to leave nothing behind. Every call is now also appended
+    to the trace as it finishes, failures included: a call that hit the wall
+    returns `success=False`, no session id and `$0`, and that is exactly the
+    call worth having a line for."""
+    trace = trace or Trace()
     for attempt in range(RATE_LIMIT_RETRIES + 1):
         budget.check(what)
         before = budget.mine()
         started = time.time()
+        trace.event("call.start", what=what, attempt=attempt,
+                    prompt_chars=len(prompt), spent_usd=budget.spent())
         try:
             response = get(
                 llm.prompt.options(resources={"opencode_creds": 1}).chia_remote(
                     llm, prompt, [tool]))
         except RateLimitError:
+            trace.event("call.rate_limited", what=what, attempt=attempt,
+                        seconds=round(time.time() - started, 1))
             if attempt == RATE_LIMIT_RETRIES:
                 raise
             delay = RATE_LIMIT_BACKOFF * (2**attempt) * (0.5 + random.random())
             print(f"  rate limited; retrying in {delay:.0f}s", flush=True)
             time.sleep(delay)
             continue
+        except BaseException as error:
+            trace.event("call.end", what=what, ok=False,
+                        seconds=round(time.time() - started, 1),
+                        error=f"{type(error).__name__}: {error}"[:300])
+            raise
         usage = dict(getattr(response, "usage", None) or {})
         # Money comes from opencode's DB, never from `usage`: a call that timed
         # out returns no session id and reports $0, and was billed.
@@ -354,10 +381,12 @@ def ask(llm, tool, prompt, budget: Budget, what: str, calls: list):
         new = {s: c for s, c in budget.mine().items() if s not in before}
         usd = round(sum(new.values()), 4)
         budget.observe(usd)
-        calls.append({"what": what, "seconds": round(time.time() - started, 1),
-                      "session_id": sid, "sessions": sorted(new), "usd": usd,
-                      "completed": bool(getattr(response, "success", True)),
-                      "num_turns": usage.get("num_turns")})
+        record = {"what": what, "seconds": round(time.time() - started, 1),
+                  "session_id": sid, "sessions": sorted(new), "usd": usd,
+                  "completed": bool(getattr(response, "success", True)),
+                  "num_turns": usage.get("num_turns")}
+        calls.append(record)
+        trace.event("call.end", ok=record["completed"], **record)
         print(f"  [{what}] ${usd:.2f} over {len(new)} session(s), "
               f"{usage.get('num_turns', '?')} turns, {time.time() - started:.0f}s; "
               f"run total ${budget.spent():.2f}", flush=True)
@@ -446,9 +475,30 @@ def classify(base: dict, cand: dict) -> tuple[str, dict]:
     return "trade", detail
 
 
+#: The driver's trace. A module global so `_record` can close an iteration's
+#: span without the object being threaded through all eight of its call sites;
+#: `run()` assigns it, and it is a no-op `Trace()` in every other importer.
+_TRACE = Trace()
+
+
 def _record(log_path: Path, entry: dict) -> None:
+    """Append one outcome to variants.jsonl, and close the iteration's span.
+
+    Every iteration ends with exactly one `_record` of kind `candidate` or
+    `stopped` -- the budget stop, the two no-diff paths, the rejection and the
+    scored verdict all pass through here -- so this is the one place that sees
+    every ending, including the ones that `continue`."""
     with log_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(entry, sort_keys=True) + "\n")
+    if entry.get("kind") in ("candidate", "stopped"):
+        _TRACE.event("iteration.end", iteration=entry.get("iteration"),
+                     ok=bool(entry.get("accepted") is not False),
+                     accepted=entry.get("accepted"),
+                     seconds=entry.get("seconds"),
+                     usd=entry.get("llm_usd"),
+                     reason=entry.get("reason"),
+                     classification=entry.get("classification"),
+                     stage=(entry.get("verdict") or {}).get("stage"))
 
 
 def frozen_is_clean() -> str | None:
@@ -537,10 +587,21 @@ def run(task, iterations, max_debug_attempts, log_dir: Path, spec_dir: Path,
 
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / "variants.jsonl"
+    # Per-turn observability. One append-only file per worker, written as
+    # things happen by three writers -- this driver, the tool server's actor
+    # and the worker that runs `prompt` -- so a session killed at the timeout
+    # still leaves a readable record: `python session_trace.py <log-dir>`.
+    global _TRACE
+    trace = _TRACE = Trace(log_dir / "trace.jsonl")
+    os.environ[ENV_DIR] = str(log_dir)
+    trace.event("run.start", log_dir=str(log_dir), iterations=iterations,
+                codesign=codesign, model=MODEL, cap_usd=budget.cap,
+                title=budget.title, timeout_s=2400)
     calls: list[dict] = []
     seed_spec(spec_dir)
     tool = AlloSpecTool(tool_name, str(spec_dir), str(work_dir), str(AGENT_DIR),
-                        str(REPO_ROOT), ALLO_PYTHON, LLVM_BUILD_DIR, codesign)
+                        str(REPO_ROOT), ALLO_PYTHON, LLVM_BUILD_DIR, codesign,
+                        trace_dir=str(log_dir))
     head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT,
                           capture_output=True, text=True).stdout.strip()
     try:
@@ -548,7 +609,10 @@ def run(task, iterations, max_debug_attempts, log_dir: Path, spec_dir: Path,
         print("=" * 72)
         print("Baseline: gate + cosim of the unmodified design")
         print("=" * 72)
-        baseline = tool.evaluate(work="harness")
+        with trace.span("harness_eval", what="baseline") as extra:
+            baseline = tool.evaluate(work="harness")
+            extra["verdict_ok"] = bool(baseline.get("ok"))
+            extra["stage"] = baseline.get("stage")
         print(f"  {summarize(baseline)}", flush=True)
         design = control.blobs("HEAD")
         cross = (control.crosscheck(baseline["cycles"], design, "cosim")
@@ -566,7 +630,7 @@ def run(task, iterations, max_debug_attempts, log_dir: Path, spec_dir: Path,
 
         best, best_snapshot = baseline, baseline_snapshot
         history: list[str] = []
-        llm = make_llm(tool, budget.title)
+        llm = make_llm(tool, budget.title, str(log_dir))
 
         for iteration in range(1, iterations + 1):
             print("=" * 72)
@@ -578,6 +642,8 @@ def run(task, iterations, max_debug_attempts, log_dir: Path, spec_dir: Path,
                      if history else "  (nothing tried yet)")
             started = time.time()
             n_calls = len(calls)
+            trace.event("iteration.start", iteration=iteration,
+                        best_total=best.get("total_cycles"))
             if codesign:
                 prompt = CODESIGN_PROMPT.format(
                     task=task, tool=tool.name,
@@ -612,7 +678,7 @@ it relies on anything the tests happen not to exercise.
 """
             try:
                 response = ask(llm, tool, prompt, budget, f"iter{iteration}",
-                               calls)
+                               calls, trace)
             except BudgetExhausted as stop:
                 print(f"  BUDGET: {stop}")
                 _record(log_path, {"iteration": iteration, "kind": "stopped",
@@ -636,7 +702,10 @@ it relies on anything the tests happen not to exercise.
                                    "llm_calls": calls[n_calls:]})
                 continue
 
-            verdict = tool.evaluate(work="harness")
+            with trace.span("harness_eval", what=f"iter{iteration}") as extra:
+                verdict = tool.evaluate(work="harness")
+                extra["verdict_ok"] = bool(verdict.get("ok"))
+                extra["stage"] = verdict.get("stage")
             for attempt in range(1, max_debug_attempts + 1):
                 if verdict.get("ok"):
                     break
@@ -650,12 +719,17 @@ it relies on anything the tests happen not to exercise.
                                    "Diagnose it, patch only the writable files "
                                    "read_spec() lists, confirm with run_functional_check, "
                                    "then stop.", budget,
-                                   f"iter{iteration}-debug{attempt}", calls)
+                                   f"iter{iteration}-debug{attempt}", calls,
+                                   trace)
                 except BudgetExhausted as stop:
                     print(f"  BUDGET: {stop}")
                     break
                 print(response.result, flush=True)
-                verdict = tool.evaluate(work="harness")
+                with trace.span("harness_eval",
+                                what=f"iter{iteration}-debug{attempt}") as extra:
+                    verdict = tool.evaluate(work="harness")
+                    extra["verdict_ok"] = bool(verdict.get("ok"))
+                    extra["stage"] = verdict.get("stage")
 
             elapsed = time.time() - started
             diff = tool.diff_against(best_snapshot)
@@ -714,6 +788,10 @@ it relies on anything the tests happen not to exercise.
         best_diff = tool.diff_against(baseline_snapshot)
         (log_dir / "best.diff").write_text(best_diff, encoding="utf-8")
         (log_dir / "calls.json").write_text(json.dumps(calls, indent=1))
+        trace.event("run.end", calls=len(calls),
+                    usd=round(sum(c.get("usd", 0) for c in calls), 4),
+                    baseline_total=baseline.get("total_cycles"),
+                    best_total=best.get("total_cycles"))
         return 0
     finally:
         tool.stop()
