@@ -37,7 +37,8 @@ def test_map_is_a_map():
         assert set(data["config"]) >= {"T", "MAXDIM", "QD", "DMA_WORDS"}
 
 
-def test_chain_sound_accepts_a_chain():
+def test_dataflow_describes_a_chain():
+    """A chain is reported as one, and its sources are the chain."""
     from torch import nn
     from examples.tinytpu.workloads import extract, scope
 
@@ -48,22 +49,30 @@ def test_chain_sound_accepts_a_chain():
             self.fc2 = nn.Linear(16, 16, bias=False)
 
         def forward(self, x):
-            return self.fc2(torch.relu(self.fc1(x)))
+            return self.fc2(self.fc1(x))
 
     model, xs = Chain().eval(), (torch.zeros(4, 16),)
     ex = extract.extract("chain", model, xs)
-    sound, why = scope.chain_sound(extract.trace(model, xs), ex)
-    assert sound, why
+    sources, chain, why = scope.dataflow(extract.trace(model, xs), ex)
+    assert chain, why
+    assert sources == [-1, 0], sources
 
 
-def test_chain_sound_refuses_a_fan_out():
-    """The finding this column exists for.
+def test_dataflow_reads_a_fan_out_instead_of_chaining_it():
+    """The finding this column exists for, in its post-fix form.
 
-    Two bias-free Linears off one input: the extractor refuses nothing, both
-    layers map, and ``run.py`` feeds layer 0's output into layer 1 on BOTH
-    sides of its comparison -- so the comparison agrees with itself while the
-    machine computes something the model does not. The map must call that
-    unsound.
+    Two bias-free Linears off one input: the extractor refuses nothing and
+    both layers map. Before the fix, ``run.py`` fed layer 0's output into
+    layer 1 on BOTH sides of its comparison, so the comparison agreed with
+    itself while the machine computed something the model does not -- 0 of 128
+    bytes differing against its own reference, 62 of 128 against ``model(x)``.
+
+    ``chain`` is now a DESCRIPTION, not a soundness condition, because
+    ``run.layer_sources`` reads the graph. So the assertion that matters is no
+    longer 'the map calls this unsound' but 'the dataflow recorded is the
+    graph's': both layers take the model input, and neither is fed the other.
+    A test that only checked ``not chain`` would still pass if the sources
+    silently went back to being chained.
     """
     from torch import nn
     from examples.tinytpu.workloads import extract, scope
@@ -81,14 +90,16 @@ def test_chain_sound_refuses_a_fan_out():
     ex = extract.extract("fanout", model, xs)
     assert not ex.refusals, "the extractor is expected to accept this graph"
     assert len(ex.layers) == 2
-    sound, why = scope.chain_sound(extract.trace(model, xs), ex)
-    assert not sound, ("a fan-out graph was called a chain; the map's "
-                       "topology_sound column no longer means anything")
-    assert "not a chain" in why
+    sources, chain, why = scope.dataflow(extract.trace(model, xs), ex)
+    assert not chain, why
+    assert sources == [-1, -1], (
+        f"both Linears read the model input; run.py recorded {sources}. "
+        "If this is [-1, 0] the chaining regressed and the end-to-end check "
+        "is comparing two things that are both wrong the same way.")
 
 
-def test_mapped_nodes_handles_a_reused_module():
-    """A module called twice is two layers and two nodes, not one node twice."""
+def test_dataflow_handles_a_reused_module():
+    """A module called twice is two layers with the second fed by the first."""
     from torch import nn
     from examples.tinytpu.workloads import extract, scope
 
@@ -102,6 +113,7 @@ def test_mapped_nodes_handles_a_reused_module():
 
     model, xs = Twice().eval(), (torch.zeros(4, 16),)
     ex = extract.extract("twice", model, xs)
-    nodes = scope.mapped_nodes(extract.trace(model, xs), ex)
-    assert len(nodes) == len(ex.layers) == 2
-    assert nodes[0] is not nodes[1]
+    assert len(ex.layers) == 2, "one module called twice is two layers"
+    sources, chain, why = scope.dataflow(extract.trace(model, xs), ex)
+    assert chain, why
+    assert sources == [-1, 0], sources
