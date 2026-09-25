@@ -36,14 +36,19 @@ CHIA2026 account. The agents themselves are driven by
 Quick start
 -----------
 
-Environment (once): the ``allo`` env with this checkout's ``mlir/build``,
-``chia_env`` (py3.10, ``requirements.txt``), opencode via
-``npm ci --prefix examples/tinytpu/chia_agent``, and
-``chia.env`` copied from ``chia.env.example`` at the repository root.
-``chia.env`` is gitignored and must never be committed. Then:
+Environment: ``chia_env`` (py3.10, ``conda create -n chia_env python=3.10``
+then ``requirements.txt``) is created once per host. Everything else is per
+worktree and is what the two setup scripts do --- ``checkout_setup.sh``
+creates ``chia.env`` from ``chia.env.example`` if there is none (never
+overwriting one, and stopping if one names another project), installs
+opencode, creates ``.chia_scratch/``, runs the Ray check, and reports
+``mlir/build``; ``gcp_setup.sh`` checks the cloud side. Both cost $0 and are
+idempotent. ``chia.env`` is gitignored and must never be committed.
 
 .. code-block:: bash
 
+   examples/tinytpu/reproduce.sh --no-cosim     # this checkout's mlir/build + gates
+   examples/tinytpu/chia_agent/checkout_setup.sh  # chia.env, opencode, scratch, Ray
    examples/tinytpu/chia_agent/gcp_setup.sh  # auth, project, billing, APIs, spend report
    conda activate chia_env; set -a; source chia.env; set +a
    # chia.env MUST be sourced in this shell, before the head: Ray workers
@@ -869,6 +874,16 @@ Limits and known failures
   than the temp directory alone --- the shorter pattern also matches the shell
   you type it in, and ``pkill`` will kill it. ``kill`` alone left the raylet
   running; follow it with ``kill -9``.
+  **Checked since 2026-09-25**, after a third occurrence in which a clean
+  worktree found ``/tmp/ray/ray_current_cluster`` naming a head with no
+  ``gcs_server`` and no ``raylet`` behind it, and ``smoke.py`` sat for ten
+  minutes on ``Failed to connect to GCS``: ``preflight.py`` resolves the
+  address a driver would really dial (``RAY_ADDRESS``, else
+  ``<RAY_TMPDIR or /tmp/ray>/ray_current_cluster``), probes it with a three
+  second timeout, and refuses --- naming the address and giving the fix ---
+  before any worker or model call. It refuses the orphan shape too, by reading
+  the local raylet's working directory. ``python preflight.py --check-ray``
+  runs that check alone, at $0.
 - **The tool servers bind fixed ports from 8000 up**, so two ``chia_agent``
   processes on one host collide. Serialise them.
 - **A checkout under ``/tmp`` cannot run the harness at all**, and it fails in a

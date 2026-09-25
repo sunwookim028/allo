@@ -60,26 +60,43 @@ python3 examples/tinytpu/chia_agent/spend.py report .
 
 ### Set the host up (once)
 
+Two environments, both created once per host and shared by every checkout: the
+`allo` env (py3.12, this repo's own) and `chia_env`, which is what actually
+runs the loop:
+
+```bash
+conda create -n chia_env python=3.10 -y                            # once per host
+conda run -n chia_env pip install -r examples/tinytpu/chia_agent/requirements.txt
+```
+
+Everything else is **per worktree** -- `mlir/build`, `node_modules`,
+`chia.env`, `.chia_scratch` -- and nothing in it is shared between checkouts.
+From a clean checkout, three commands:
+
 ```bash
 conda activate allo
 export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build
-cmake -G Ninja -S mlir -B mlir/build -DMLIR_DIR=$LLVM_BUILD_DIR/lib/cmake/mlir \
-  -DPython3_EXECUTABLE=$(which python) -DPython_EXECUTABLE=$(which python) \
-  -DMLIR_BINDINGS_PYTHON_NB_DOMAIN=allo
-ninja -C mlir/build                          # ~3 min from cold in a new worktree
-npm ci --prefix examples/tinytpu/chia_agent  # opencode, 725 MB, gitignored
-cp examples/tinytpu/chia_agent/chia.env.example chia.env   # repo root; gitignored
-examples/tinytpu/chia_agent/gcp_setup.sh     # auth, project, billing, APIs, $0
+examples/tinytpu/reproduce.sh --no-cosim      # builds THIS checkout's mlir/build
+                                              # (~8 min cold) and runs the gates
+examples/tinytpu/chia_agent/checkout_setup.sh # the checkout side, $0, idempotent
+examples/tinytpu/chia_agent/gcp_setup.sh      # the cloud side, $0, idempotent
 ```
+
+`checkout_setup.sh` is the answer to "a clean checkout hit five blockers before
+a single model call". It creates `chia.env` from `chia.env.example` if there is
+none, installs opencode if `$OPENCODE_BIN/opencode` is missing, creates
+`.chia_scratch/`, runs the Ray liveness check below, and reports `mlir/build`
+and `chia_env` rather than building either behind your back. It never
+overwrites an existing `chia.env`, never prints its contents, and **stops**
+if one names a project other than the template's -- that is exactly the
+configuration that bills the wrong account. Re-run it any time; it is
+idempotent and every step says what it found.
 
 `chia.env` holds the account and project a run charges. It is gitignored;
 **never commit it and never paste its contents anywhere**. `chia.env.example`
 is the committed template and is complete -- for the $0 path it needs no
 edits; for a paid run it needs ADC
 (`gcloud auth application-default login`, once, which `gcp_setup.sh` checks).
-
-Each worktree needs its own `mlir/build` and its own `chia.env`; nothing here
-is shared between checkouts.
 
 ### Start Ray -- the two things that cost the last operator real time
 
@@ -109,6 +126,21 @@ export RAY_ADDRESS=<the address ray start printed>   # the node IP, port 6379
    107 bytes, so `/tmp/ray-chia` works and a path under a scratch directory
    does not.
 
+Both are now checked, at $0, by `preflight.py` -- which `swarm.py`, `loop.py`
+and `smoke.py` all run before any worker and any model call, and which
+`checkout_setup.sh` runs as its step 4:
+
+```bash
+python examples/tinytpu/chia_agent/preflight.py --check-ray   # just this check
+```
+
+It resolves the address a driver would really dial (`RAY_ADDRESS`, else
+`<RAY_TMPDIR or /tmp/ray>/ray_current_cluster`), probes it with a 3 s timeout,
+and additionally refuses a head whose raylet has a **deleted** working
+directory -- the orphan that accepts the connection and then spawns nothing.
+Before it existed, a stale address cost three separate sessions between ten and
+twenty-five minutes each, because the failure is a hang and not an error.
+
 `ray stop` matches Ray processes **by name across the whole host** and would
 kill other worktrees' raylets -- which is how run 2 lost both workers 10.8
 minutes in, at $1.69. Stop only your own cluster, which the private temp dir
@@ -136,6 +168,10 @@ on one host collide. Serialise them.
 opencode pointed at a scripted local model, and clears every cloud credential
 first so it cannot reach Vertex. It is the only thing you should run before
 spending.
+
+It runs in the same shell as the head above -- `chia_env`, with `chia.env`
+sourced and `RAY_ADDRESS` exported. In a new shell, redo those three lines
+first.
 
 ```bash
 cd examples/tinytpu/chia_agent
@@ -483,10 +519,13 @@ cmake -G Ninja -S mlir -B mlir/build -DMLIR_DIR=$LLVM_BUILD_DIR/lib/cmake/mlir \
   -DMLIR_BINDINGS_PYTHON_NB_DOMAIN=allo
 ninja -C mlir/build                        # ~35 s
 PYTHONPATH=$PWD python -c 'import allo; print(allo.__file__)'   # must be this tree
-npm ci --prefix examples/tinytpu/chia_agent   # opencode, 725 MB, gitignored
-cp examples/tinytpu/chia_agent/chia.env.example chia.env  # fill in; gitignored
+examples/tinytpu/chia_agent/checkout_setup.sh # chia.env, opencode, .chia_scratch,
+                                              # Ray, chia_env -- $0, idempotent
 examples/tinytpu/chia_agent/gcp_setup.sh      # checks + billing report
 ```
+
+(`reproduce.sh --no-cosim` does the cmake and ninja above, and the gates with
+them; the explicit form is here for when you want the build alone.)
 
 ### Billing: which project and account a run charges
 
