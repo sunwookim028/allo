@@ -265,10 +265,103 @@ places: ``spec_policy.expression_violations`` at edit time, and
 ``eval`` with emptied builtins still reaches ``().__class__.__bases__[0]`` and
 from there the frame holding ``gate_runner.py``'s nonce.
 
+.. _chia-feedback-ladder:
+
+What the agent may ask, and what each answer is worth
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Reconstructed from opencode's own database across run 3's eight paid sessions,
+and the reason this section exists:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 12 14 12
+
+   * - inside a session
+     - calls
+     - seconds
+     - share
+   * - ``score_cycles`` (gate + csynth + cosim)
+     - 16
+     - 5,634
+     - **37 %**
+   * - ``run_functional_check`` (gate)
+     - 31
+     - 2,288
+     - **15 %**
+   * - model latency (~200 turns, ~35 s/turn)
+     - --
+     - 7,340
+     - **48 %**
+   * - reads, edits, MCP
+     - 55+
+     - **6**
+     - 0.04 %
+
+Evaluation was 59 % of the run as worker-seconds and the MCP layer six seconds,
+so the bottleneck was never the plumbing. It was that **no tool answered in
+under fifty seconds** while the functional check underneath them runs in
+seconds. The tool surface is now a ladder, each rung seeing strictly more than
+the one below and costing roughly ten times as much:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 26 10 32 32
+
+   * - tool
+     - cost
+     - what it runs
+     - what it cannot see
+   * - ``check_bit_exact``
+     - ~16 s
+     - the PyTorch oracle alone
+     - conform, bench_isa, stress_isa, parametricity, RTL -- and **cycles**
+   * - ``run_functional_check``
+     - ~30 s
+     - \+ ``gen_isa --conform``, ``bench_isa``, ``stress_isa``
+     - parametricity, RTL -- and **cycles**
+   * - ``mapspace_report``
+     - ~60 s
+     - \+ the exhaustive mapspace enumeration
+     - a count of nests is a hypothesis about speed, not a measurement
+   * - ``score_cycles``
+     - ~240 s
+     - \+ parametricity, csynth, RTL cosim
+     - nothing; this is the measurement
+
+A functional check says an edit is **legal**, not that it is **faster**. Every
+tool description says so in those words, because an agent optimising against
+the wrong oracle is the predictable failure here and this loop has already been
+measured finding the shortest path to a weaker rule.
+
+**None of this makes acceptance cheaper, and two rules enforce that.**
+``evaluate.py`` refuses a ``--gate-tier`` other than ``full`` unless
+``--gate-only`` is given, so a cheap tier cannot reach a cycle count at all;
+and every caller that decides something -- ``loop.py``'s own verdict,
+``accept.py``, ``control.py``, ``score_cycles`` -- takes the default, which is
+``full``. A candidate is still accepted only on a nonce-vouched cosim against a
+control the run measured itself.
+
+``score_cycles`` is capped at **one measured call per iteration** and memoised
+on the exact spec content: a repeat on an unchanged spec is free and returns
+``cached: true``. Run 3 called it 2-5 times a session although the prompt
+already said the harness re-scores the final spec independently -- 31 % of a
+run spent duplicating work that happens anyway. The cap is the driver's to
+lift (``begin_iteration``, deliberately not an MCP tool).
+
+Every tool result carries the remaining budget: seconds left of the 2400 s
+session, and measured scores left this iteration. Nothing used to tell the
+agent that 2400 s existed, and ``run_functional_check``'s docstring said
+"~15 s" when the call cost 52-76 s -- an agent trying to budget would have
+budgeted four times low. ``allo_tool.TOOL_SECONDS`` is the one measured table
+the docstrings, the prompt and the budget line all read from, and
+``test_harness`` fails if a tool is advertised without an entry in it.
+
 The evaluator
 ~~~~~~~~~~~~~
 
-- **gate** (functional, Allo simulator, ~110 s): ``run.py --verify`` (the
+- **gate** (functional, Allo simulator, ~110 s at the ``full`` tier -- the tier
+  every score and every verdict runs): ``run.py --verify`` (the
   PyTorch oracle, first and cheapest -- 4 s), ``gen_isa.py --conform`` (the
   candidate's own spec against its own generated artefacts and the design's bit
   slices -- 36 s), ``bench_isa.py`` (the published
@@ -283,6 +376,16 @@ The evaluator
   and ``isa_ref``'s ReLU primitive weakened to the identity -- a candidate
   rewriting what used to judge it -- is refused at ``gate:pytorch`` before
   ``bench_isa`` runs at all.
+- **gate**, ``fast`` and ``oracle``: the same frozen checks, fewer of them,
+  reachable only with ``--gate-only``. ``fast`` drops the ``param_check``
+  sweep -- three more builds, and almost the whole cost of a gate call --
+  and ``oracle`` keeps the PyTorch check alone. Both state what they did not
+  look at, in ``gate.not_checked`` and in the tool description. The
+  parametricity property is unweakened: it is still ``gate:param`` that
+  refuses a candidate specialised to the scored configuration, in the tier
+  that decides acceptance. ``test_harness`` asserts both halves -- that the
+  fast tier passes ``wpr_literal`` and says it did not look, and that the full
+  gate rejects it.
 - **score**: a THREE-TERM objective, reported per term and never summed.
   See :ref:`chia-objective` for why each term is there and what it replaced.
 

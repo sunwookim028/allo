@@ -461,9 +461,54 @@ Mechanical enforcement, not instructions:
 
 This is a policy, not a sandbox. Real isolation would mean a container.
 
-## The evaluator (two tiers)
+## The agent's feedback ladder (what it may call, and what each rung sees)
 
-- **gate**: `bench_isa.py` (the published [-4, 4] setup) and main's
+Reconstructed from opencode's own database across run 3's eight paid sessions:
+`score_cycles` was **37 %** of the run (16 calls, 5,634 s), the gate **15 %**
+(31 calls, 2,288 s), model latency **48 %**, and the MCP layer itself **six
+seconds**. The bottleneck was never the plumbing. It was that the cheapest
+question an agent could ask cost 52-76 s and the scoring tool 235 s, while the
+functional check underneath them runs in seconds -- so there was **no tool it
+could call in under fifty seconds**, and fast iteration was impossible rather
+than merely slow.
+
+| rung | cost | what it runs | what it CANNOT see |
+| --- | --- | --- | --- |
+| `check_bit_exact` | ~16 s | the PyTorch oracle alone | conform, bench_isa, stress_isa, parametricity, RTL -- and **cycles** |
+| `run_functional_check` | ~30 s | + `gen_isa --conform`, `bench_isa`, `stress_isa` | parametricity, RTL -- and **cycles** |
+| `mapspace_report` | ~60 s | + the exhaustive mapspace enumeration | a count of nests is a hypothesis about speed, not a measurement |
+| `score_cycles` | ~240 s | + parametricity, csynth, RTL cosim | (nothing; this is the measurement) |
+
+Each rung sees strictly more than the one below. A functional check says an
+edit is **legal**, not that it is **faster**; every tool description says so,
+because a loop optimising against the wrong oracle is the predictable failure
+here and this project has already measured one finding the shortest path to a
+weaker rule.
+
+Two rules keep this from making *acceptance* cheaper:
+
+* `evaluate.py` refuses `--gate-tier` other than `full` unless `--gate-only`
+  is given, so **a cheap tier cannot reach a cycle count at all**. Every caller
+  that decides something -- `loop.py`'s own verdict, `accept.py`, `control.py`,
+  `score_cycles` -- takes the default, which is `full`.
+* `score_cycles` is capped at **one measured call per iteration** and memoised
+  on the exact spec content, so a repeat on an unchanged spec is free and
+  returns `cached: true`. The cap is the driver's to lift (`begin_iteration`,
+  deliberately not an MCP tool); the agent has no tool that lifts it. Run 3
+  called `score_cycles` 2-5 times a session **although the prompt already says
+  the harness re-scores the final spec independently**.
+
+Every tool result also carries the remaining budget -- seconds left of the
+2400 s session, and measured scores left this iteration. Nothing used to tell
+the agent that 2400 s existed, and `run_functional_check`'s docstring said
+"~15 s" when it cost 52-76 s, so an agent trying to budget budgeted four times
+low. `allo_tool.TOOL_SECONDS` is now the one measured table the docstrings, the
+prompt and the per-result budget line all read from.
+
+## The evaluator (three gate tiers, then the score)
+
+- **gate**, `full` -- the tier every score and every verdict runs:
+  `bench_isa.py` (the published [-4, 4] setup) and main's
   `stress_isa.py` must both pass (functional, Allo simulator, ~12 s): 492 runs at `476a70d8`
   of full-range/corner/boundary int8 at all 64 shapes, `C` prefilled with
   random bytes and compared in full, vector and 200 random programs checked
@@ -488,6 +533,16 @@ This is a policy, not a sandbox. Real isolation would mean a container.
   instruction means -- by saying so in the spec, and then passing
   `gen_isa.py --conform` and the PyTorch oracle. The names `stress_isa.py`
   imports must still exist.
+- **gate**, `fast` and `oracle` -- the same frozen checks, fewer of them, and
+  **only** reachable with `--gate-only`. `fast` drops the parametricity sweep
+  (three more builds, and the whole reason a gate call cost a minute rather
+  than twenty seconds); `oracle` keeps the PyTorch check alone. Both name what
+  they did not look at, in the verdict (`gate.not_checked`) and in the tool
+  description. The property did not weaken: `param_check` still refuses a
+  candidate specialised to the scored configuration, at `gate:param`, in the
+  tier that decides acceptance. `test_harness` asserts both halves --
+  that the fast tier passes `wpr_literal` and says it did not look, and that
+  the full gate rejects it.
 - **score**: three terms, all from **RTL cosim** (Vitis HLS 2023.2 csynth +
   xsim), each testbench bit-exact -- `loop.classify` is the frozen rule and its
   docstring is the argument for each term:

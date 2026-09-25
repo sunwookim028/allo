@@ -41,6 +41,7 @@ from chia.models.opencode import AdditionalModelProvider, RateLimitError
 
 import control
 import preflight
+import allo_tool
 from allo_tool import AlloSpecTool
 from design import EDITABLE
 from llm import IsaOpenCodeLLM
@@ -122,9 +123,12 @@ SYSTEM_MESSAGE = (
     "the architectural semantics of an instruction WITHOUT saying so in the "
     "spec, and keep the names stress_isa.py imports. The design is PARAMETRIC: keep T and MAXDIM as "
     "`int(os.environ.get(\"TPU_T\"/\"TPU_MAXDIM\", default))` and derive every "
-    "size from them -- the gate also rebuilds the design at MAXDIM 8 and 12 "
-    "and rejects it if it is not exact there, so a change specialised to the "
-    "scored T=4/MAXDIM=16 is rejected. Keep the documentation: edit or add "
+    "size from them -- the SCORED gate rebuilds the design at two more MAXDIMs "
+    "and a second T and rejects it if it is not exact there, so a change "
+    "specialised to the scored T=4/MAXDIM=16 is rejected. That sweep is NOT in "
+    "run_functional_check, which is why that tool is fast: it will not tell "
+    "you the design stopped being parametric, and score_cycles and the "
+    "harness's verdict both will. Keep the documentation: edit or add "
     "comments and docstrings, never delete them wholesale (more than 15 lines "
     "net is refused). Removing an initialisation or narrowing a datapath "
     "because these particular tests happen not to need it is a defect, not an "
@@ -220,8 +224,10 @@ CODESIGN_MESSAGE = (
     "encodable is checked against isa_ref.py, so widening the encoder by "
     "loosening a check fails immediately. The design is PARAMETRIC: keep T and "
     "MAXDIM as `int(os.environ.get(\"TPU_T\"/\"TPU_MAXDIM\", default))` and "
-    "derive every size from them -- the gate rebuilds the design at MAXDIM 8 "
-    "and 12 and rejects it if it is not exact there. Keep the documentation: "
+    "derive every size from them -- the SCORED gate rebuilds the design at two "
+    "more MAXDIMs and a second T and rejects it if it is not exact there. That "
+    "sweep is not in run_functional_check, which is why that tool is fast. "
+    "Keep the documentation: "
     "edit or add comments and docstrings, never delete them wholesale (more "
     "than 15 lines net is refused). Removing an initialisation or narrowing a "
     "datapath because these particular tests happen not to need it is a defect, "
@@ -524,6 +530,32 @@ def seed_spec(spec_dir: Path) -> None:
             target.write_bytes(blob)
 
 
+#: What every prompt says about time. Run 3 measured 48 % of a session in model
+#: latency and 59 % of the run in evaluation, and NOTHING in the loop had ever
+#: told the agent that a session is 2400 s or what a tool costs -- so it could
+#: not have budgeted even if it had tried. Every tool result now carries the
+#: remaining budget as well; this is the statement of the rule, that one is the
+#: running total.
+BUDGET_NOTE = """YOUR TIME BUDGET. This session is {budget_s} s of wall clock,
+and it ends whether or not you have finished. Tools cost, on this host:
+
+  {tool}_read_spec / _read_reference / the edit tools   free (milliseconds)
+  {tool}_check_bit_exact                                ~{oracle_s} s -- call it freely
+  {tool}_run_functional_check                           ~{fast_s} s
+  {tool}_score_cycles                                   ~{score_s} s, ONCE per iteration
+
+Every tool result tells you what is left. Work in the cheap tiers: find
+mistakes with check_bit_exact, believe a candidate with run_functional_check,
+and score at most once. A functional check says an edit is LEGAL; it says
+nothing about whether it is FASTER, and there is no proxy for cycles anywhere
+below score_cycles. The harness re-scores your final spec independently in any
+case, so a second measured score buys the search nothing.
+
+Read WINDOWS of the big files (read_spec(path=..., start_line=..., max_lines=...))
+once you know where you are working, and do not re-read a file after an edit:
+the edit tools return the diff."""
+
+
 CODESIGN_PROMPT = """TinyTPU-isa CO-DESIGN task:
 
 {task}
@@ -545,10 +577,12 @@ first if you have not: it is the mapper, and it decides what "better" means.
 Then read the spec ({tool}_read_spec). Edit with {tool}_replace_text (exact
 text, must occur once) -- far more reliable than a unified diff.
 
-{tool}_mapspace_report (~30 s, no Vitis) tells you whether your change actually
-widened what the machine can encode, and what the mapper would then choose. Use
-it before {tool}_score_cycles (2-4 min), which is the measurement. The harness
-re-scores your final spec independently either way.
+{tool}_mapspace_report (~60 s, no Vitis) tells you whether your change actually
+widened what the machine can encode, and what the mapper would then choose. A
+wider mapspace is a hypothesis about speed, not a measurement of one. Use it
+before {tool}_score_cycles, which is the measurement.
+
+{budget}
 
 Unlocking nests is a real result even if the cycles do not move -- but say
 which it is. Finish with three or four sentences: which refusal you attacked,
@@ -630,6 +664,13 @@ def run(task, iterations, max_debug_attempts, log_dir: Path, spec_dir: Path,
 
         best, best_snapshot = baseline, baseline_snapshot
         history: list[str] = []
+        # The measured tool costs come from the tool server's own table, so
+        # the prompt and the per-result budget line can never drift apart.
+        budget_note = BUDGET_NOTE.format(
+            tool=tool.name, budget_s=allo_tool.SESSION_BUDGET_S,
+            oracle_s=allo_tool.TOOL_SECONDS["check_bit_exact"],
+            fast_s=allo_tool.TOOL_SECONDS["run_functional_check"],
+            score_s=allo_tool.TOOL_SECONDS["score_cycles"])
         llm = make_llm(tool, budget.title, str(log_dir))
 
         for iteration in range(1, iterations + 1):
@@ -638,6 +679,11 @@ def run(task, iterations, max_debug_attempts, log_dir: Path, spec_dir: Path,
                   f"{best['total_cycles']} cosim cycles {best['cycles']}")
             print("=" * 72, flush=True)
             tool.restore(best_snapshot)
+            # Open the iteration on the tool server: this is what resets the
+            # session clock the tool results report and the one measured
+            # `score_cycles` the iteration may buy. Driver-side on purpose --
+            # an agent that could open an iteration could lift its own cap.
+            tool.begin_iteration(iteration)
             tried = ("\n".join(f"  - {line}" for line in history[-8:])
                      if history else "  (nothing tried yet)")
             started = time.time()
@@ -646,7 +692,7 @@ def run(task, iterations, max_debug_attempts, log_dir: Path, spec_dir: Path,
                         best_total=best.get("total_cycles"))
             if codesign:
                 prompt = CODESIGN_PROMPT.format(
-                    task=task, tool=tool.name,
+                    task=task, tool=tool.name, budget=budget_note,
                     cycles=json.dumps(best["cycles"]),
                     total=best["total_cycles"],
                     area=json.dumps(best["synth"]["area"]),
@@ -669,12 +715,13 @@ Propose ONE candidate that should lower the RTL cosim cycle count. Read the
 spec first ({tool.name}_read_spec; {tool.name}_read_reference for the frozen
 files and the design notes). Edit with {tool.name}_replace_text (exact text,
 must occur once) -- it is far more reliable than a unified diff. Then run
-{tool.name}_run_functional_check until it passes. You may run
-{tool.name}_score_cycles (2-4 minutes) to see the cosim result; the harness
-re-scores your final spec independently either way. Keep the change as small as
-it can be while still being a real architectural change. Finish with two or
-three sentences: what you changed, why it should cost fewer cycles, and whether
-it relies on anything the tests happen not to exercise.
+{tool.name}_check_bit_exact while you are still fixing mistakes, and
+{tool.name}_run_functional_check once you think the candidate is correct. Keep
+the change as small as it can be while still being a real architectural change.
+Finish with two or three sentences: what you changed, why it should cost fewer
+cycles, and whether it relies on anything the tests happen not to exercise.
+
+{budget_note}
 """
             try:
                 response = ask(llm, tool, prompt, budget, f"iter{iteration}",

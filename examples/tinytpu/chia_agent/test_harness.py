@@ -726,6 +726,57 @@ def phase_s():
           and round(sum(mine.values()), 2) == 8.46)
     check("s.cap stops on this run's spend", "stops: $9.46 + $6.00 > $15",
           stopped[:90], "has spent $9.46" in stopped)
+    # -- THE TIERED GATE, AND THE LINE IT MAY NOT CROSS ---------------------
+    #
+    # The cheap tiers exist to make the AGENT's feedback fast. Acceptance must
+    # be exactly as expensive as it was. Four guards, all decidable here:
+    import inspect as _inspect
+    import allo_tool as at
+    # 1. The evaluator itself refuses a cheap tier on anything that scores, so
+    #    no caller -- not a future one either -- can reach a cycle count
+    #    without having run the whole gate.
+    scored_cheap = subprocess.run(
+        [sys.executable, str(AGENT_DIR / "evaluate.py"), "--spec-dir", ".",
+         "--work", ".", "--gate-tier", "fast"],
+        capture_output=True, text=True, cwd=AGENT_DIR)
+    check("s.a cheap gate tier cannot score",
+          "evaluate.py refuses --gate-tier fast without --gate-only",
+          f"rc={scored_cheap.returncode} {scored_cheap.stderr.strip()[-90:]!r}",
+          scored_cheap.returncode != 0
+          and "only allowed with --gate-only" in scored_cheap.stderr)
+    # 2. The tool server's own evaluate() defaults to the full tier, which is
+    #    what `loop.py`'s verdict, `accept.py` and `score_cycles` all take.
+    default_tier = _inspect.signature(at.AlloSpecTool.evaluate).parameters[
+        "gate_tier"].default
+    check("s.the default gate tier is full", "full", default_tier,
+          default_tier == "full")
+    # 3. Only the three fast tools ask for a cheap tier, and every one of them
+    #    is gate-only. Read off the source, so a fourth caller appearing
+    #    anywhere in the agent package fails here rather than in a paid run.
+    cheap_callers = sorted(
+        f"{f.name}:{i}" for f in sorted(AGENT_DIR.glob("*.py"))
+        if f.name != "test_harness.py"
+        for i, line in enumerate(f.read_text().splitlines(), 1)
+        if '"oracle"' in line or '"fast"' in line)
+    allowed = {"allo_tool.py", "evaluate.py"}
+    check("s.only the fast tools ask for a cheap tier",
+          "the cheap tiers are named only in allo_tool.py and evaluate.py",
+          cheap_callers or "none",
+          all(c.split(":")[0] in allowed for c in cheap_callers))
+    # 4. Every advertised tool has a MEASURED cost in TOOL_SECONDS. This is the
+    #    guard against the defect that started this work: `run_functional_check`
+    #    said "~15 s" in its docstring and cost 52-76 s, so an agent trying to
+    #    budget budgeted four times low.
+    advertised = {m for m in dir(at.AlloSpecTool)
+                  if m in at.TOOL_SECONDS or m in (
+                      "read_spec", "read_reference", "replace_text",
+                      "apply_spec_patch", "insert_after", "regenerate_isa",
+                      "check_bit_exact", "run_functional_check", "score_cycles",
+                      "mapspace_report")}
+    missing = sorted(advertised - set(at.TOOL_SECONDS))
+    check("s.every tool has a measured cost", "TOOL_SECONDS covers all 10 tools",
+          missing or f"{len(at.TOOL_SECONDS)} entries", not missing)
+
     # Nothing reads opencode's `usage` (CHIA's cost_usd) as money.
     readers = [f"{f.name}:{i}" for f in sorted(AGENT_DIR.glob("*.py"))
                if f.name not in ("fake_model.py", "test_harness.py")
@@ -765,6 +816,20 @@ class Suite:
     def spec(self, name: str, f="microarch_isa.py") -> str:
         return (self.specs[name] / f).read_text()
 
+    async def full_gate(self, name: str) -> dict:
+        """The gate that can lead to acceptance: the FULL tier, run the way
+        `loop.py` runs its own verdict -- driver-side, its own work dir, not
+        through MCP.
+
+        This exists because the agent's `run_functional_check` is now the
+        `fast` tier and no longer runs the parametricity sweep. The property
+        did not move out of the harness, it moved INTO this call, and the
+        checks below hold it here so that "the fast tier cannot see it" and
+        "the verdict still refuses it" are two assertions rather than one
+        hopeful comment."""
+        return await asyncio.to_thread(self.tools[name].evaluate, True, None,
+                                       "harness")
+
     def close(self):
         import ray
         for t in self.tools.values():
@@ -780,15 +845,17 @@ class Suite:
         A, spec = self.A, self.specs["tpta"]
         self.reset("tpta")
         names = await A.tools()
-        # `regenerate_isa` is the eighth, and it is the only tool that writes a
-        # file the agent did not type: it runs the FROZEN generator on the
-        # candidate's own `isa_spec.json`. The surface is asserted exactly,
-        # because a tool nobody expected is how an editable surface grows.
+        # `regenerate_isa` is the only tool that writes a file the agent did
+        # not type: it runs the FROZEN generator on the candidate's own
+        # `isa_spec.json`. `check_bit_exact` is the cheap rung of the feedback
+        # ladder -- the PyTorch oracle on its own, ~16 s. The surface is
+        # asserted exactly, because a tool nobody expected is how an editable
+        # surface grows.
         want = {f"tpta_{n}" for n in ("read_spec", "read_reference", "replace_text",
                                       "apply_spec_patch", "insert_after",
-                                      "regenerate_isa",
+                                      "regenerate_isa", "check_bit_exact",
                                       "run_functional_check", "score_cycles")}
-        check("e.tool-surface", "exactly the 8 spec tools", sorted(names),
+        check("e.tool-surface", "exactly the 9 spec tools", sorted(names),
               set(names) == want)
 
         cosim = head("cosim.py")
@@ -998,28 +1065,42 @@ class Suite:
                          new="the shipped instantiation of the `ip` unit library today")
         check("g.edit: docstring reworded", "Replaced (edits are fine)", r[:60],
               r.startswith("Replaced"))
-        # Past the static policy: a unit specialised to MAXDIM=16.
+        # Past the static policy: a unit specialised to MAXDIM=16. This is the
+        # one property the fast tier deliberately does not check, so it is
+        # checked TWICE: that the fast tier passes it and says in the verdict
+        # that it did not look, and that the full gate -- the tier every score
+        # and the harness's own verdict use -- still refuses it.
         self.reset("tpta")
         f, old, new = MUTANTS["wpr_literal"]
         r = await A.call("replace_text", timeout=60, path=f, old=old, new=new)
         v = await A.verdict("run_functional_check")
-        check("g.wpr_literal", "edit accepted; bench+stress pass at 16; REJECTED at "
-              "gate:param", f"{r[:40]!r}; ok={v.get('ok')} stage={v.get('stage')} "
-              f"{(v.get('detail') or '')[:80]!r}",
-              r.startswith("Replaced") and not v.get("ok")
-              and v.get("stage") == "gate:param")
+        g = v.get("gate") or {}
+        check("g.wpr_literal fast tier passes and admits it did not look",
+              "ok at tier=fast (it IS exact at 16), param 'not run at this tier'",
+              f"{r[:40]!r}; ok={v.get('ok')} tier={g.get('tier')} "
+              f"param={g.get('param')!r}",
+              r.startswith("Replaced") and v.get("ok") and g.get("tier") == "fast"
+              and g.get("param") == "not run at this tier"
+              and "parametricity" in (g.get("not_checked") or ""))
+        v = await self.full_gate("tpta")
+        check("g.wpr_literal", "REJECTED at gate:param by the FULL gate, which is "
+              "what every score and the harness verdict run",
+              f"ok={v.get('ok')} tier={v.get('gate_tier')} "
+              f"stage={v.get('stage')} {(v.get('detail') or '')[:80]!r}",
+              not v.get("ok") and v.get("stage") == "gate:param"
+              and v.get("gate_tier") == "full")
         # The unmodified design passes it, at every configuration the gate
         # names -- taken from PARAM_CONFIGS, not restated here, because this
         # check asserted "8 and 12" for a while after a third configuration
         # (varying T) was added and was no longer checking the whole gate.
         self.reset("tpta")
-        v = await A.verdict("run_functional_check")
+        v = await self.full_gate("tpta")
         param = (v.get("gate") or {}).get("param", {})
         want = {",".join(f"{k}={v2}" for k, v2 in cfg.items())
                 for cfg in PARAM_CONFIGS}
         check("g.unmodified passes gate:param",
               f"ok, PARAM OK at all {len(want)}: {sorted(want)}", param,
-              v.get("ok") and set(param) == want)
+              v.get("ok") and isinstance(param, dict) and set(param) == want)
         self.reset("tpta")
 
     # i ------------------------------------------------------------------
@@ -1242,6 +1323,53 @@ class Suite:
               f"A={ca} B={cb} A-logs={logs_a}", distinct)
         (self.run_dir / "abf.json").write_text(json.dumps({"a": va, "b": vb}, indent=1))
 
+        # -- what makes the agent's scoring cheap without making acceptance
+        # -- cheap. Both halves, on a tool that has just paid for a real cosim.
+        t = time.time()
+        again = await self.A.verdict("score_cycles")
+        took_again = time.time() - t
+        check("f.score_cycles repeat on an unchanged spec is free",
+              "cached=true, identical cycles, under 5 s",
+              f"cached={again.get('cached')} {again.get('cycles')} in "
+              f"{took_again:.1f}s",
+              again.get("cached") is True and again.get("cycles") == ca
+              and took_again < 5)
+        # A CHANGED spec in the same iteration is refused rather than paid for,
+        # and the refusal says what to do instead.
+        r = await self.A.call("replace_text", timeout=60, path="microarch_isa.py",
+                              old=ANCHOR, new=ANCHOR + "# a comment, for the cap test\n")
+        t = time.time()
+        capped = await self.A.verdict("score_cycles")
+        took_cap = time.time() - t
+        check("f.score_cycles is capped at one measured call per iteration",
+              "stage=budget, refused in under 5 s, naming the cheap tools",
+              f"{r[:20]!r}; stage={capped.get('stage')} in {took_cap:.1f}s",
+              r.startswith("Replaced") and not capped.get("ok")
+              and capped.get("stage") == "budget" and took_cap < 5
+              and "run_functional_check" in (capped.get("detail") or ""))
+        # The cap is the DRIVER's to lift, and lifting it is what opening the
+        # next iteration means. An agent has no tool that does this.
+        surface = await self.A.tools()
+        lifters = [n for n in surface if "iteration" in n or "budget" in n]
+        check("f.begin_iteration is not an MCP tool",
+              "the driver opens an iteration; the agent cannot",
+              lifters or "none", not lifters)
+        self.tools["tpta"].begin_iteration(1)
+        b = self.tools["tpta"].budget()
+        check("f.the next iteration restores the allowance",
+              "score_cycles_left == 1, and a session budget is reported",
+              f"left={b['score_cycles_left']} of {b['session_seconds']}s",
+              b["score_cycles_left"] == 1 and b["session_seconds"] == 2400)
+        # Every tool result carries the remaining budget: a text tool as a
+        # trailing line, a verdict as a field, because the verdict is parsed.
+        listing = await self.A.call("read_spec", timeout=60)
+        check("f.every tool result reports the budget",
+              "read_spec ends in a [budget] line; a verdict carries budget",
+              listing.strip().splitlines()[-1][:60],
+              "[budget]" in listing and isinstance(again.get("budget"), dict)
+              and "seconds_left" in (again.get("budget") or {}))
+        self.reset("tpta")
+
     # loop --------------------------------------------------------------------
     def phase_loop(self):
         """The real swarm -> loop -> opencode -> MCP path, with a scripted model."""
@@ -1382,13 +1510,13 @@ class Suite:
         check("loop.spend", "the run's own sessions, found by its tag, cost $0.00",
               f"${mine['usd']:.2f} over {len(mine['sessions'])} session(s)",
               mine["usd"] == 0 and len(mine["sessions"]) > 0)
-        # Eight since `regenerate_isa` landed with the editable ISA. The count
-        # is asserted, not the names: what this guards is that the model is
-        # offered the spec tools and NOTHING else -- no shell, no file writer,
-        # no second server's surface.
-        check("loop.opencode-tools", "only the 8 MCP tools advertised to the model",
+        # Nine since `check_bit_exact` landed beside `regenerate_isa`. The
+        # count is asserted, not the names: what this guards is that the model
+        # is offered the spec tools and NOTHING else -- no shell, no file
+        # writer, no second server's surface.
+        check("loop.opencode-tools", "only the 9 MCP tools advertised to the model",
               fake.log[0]["tools"] if fake.log else None,
-              bool(fake.log) and len(fake.log[0]["tools"]) == 8
+              bool(fake.log) and len(fake.log[0]["tools"]) == 9
               and all("tpufrontend_" in t for t in fake.log[0]["tools"]))
 
     # control -------------------------------------------------------------

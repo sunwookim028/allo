@@ -1091,9 +1091,44 @@ def isa_gate(tree, env, work, verify_now):
             "seconds": round(sec, 1)}
 
 
-def gate(tree, env, work, verify_now, cfg=None):
-    result = {"pytorch": pytorch_gate(tree, env, work, verify_now),
-              "isa": isa_gate(tree, env, work, verify_now)}
+#: The gate's three tiers. They differ ONLY in how much of the same frozen
+#: gate they run, never in how any of it judges; a check that runs in a cheap
+#: tier is the identical nonce-vouched call the expensive one makes.
+#:
+#: Why they exist. Run 3 measured `run_functional_check` at 52-76 s and
+#: `score_cycles` at 235 s, against ~6 s of loop overhead: the agent had NO
+#: tool it could call in under 50 s, so it could not iterate. The cost is
+#: almost all the param sweep, which rebuilds the whole design at two more
+#: MAXDIMs and a second T. That property is worth exactly as much as before --
+#: it is what refuses a change specialised to the scored point -- so it is not
+#: weakened, it is MOVED to where it decides something: `full`, which is the
+#: only tier a scoring run may use and therefore the only tier that can lead to
+#: acceptance (`main` refuses any other with `--gate-only` absent).
+#:
+#:   oracle  the PyTorch bit-exactness check alone. The one check with
+#:           something outside this repository on one side.
+#:   fast    + gen_isa --conform, bench_isa, stress_isa. Every functional
+#:           property at the scored configuration; NOT parametricity.
+#:   full    + the param sweep. The tier every score and every verdict uses.
+GATE_TIERS = ("oracle", "fast", "full")
+
+
+def gate(tree, env, work, verify_now, cfg=None, tier="full"):
+    if tier not in GATE_TIERS:
+        raise Reject("setup", f"unknown gate tier {tier!r}; one of {GATE_TIERS}")
+    result = {"tier": tier,
+              "pytorch": pytorch_gate(tree, env, work, verify_now)}
+    if tier == "oracle":
+        result.update(
+            vouched=True, param="not run at this tier",
+            not_checked="gen_isa --conform, bench_isa, stress_isa and the "
+                        "param sweep. This tier says the workload suite is "
+                        "bit-exact against torch; it does not say the "
+                        "candidate is a correct general GEMM, and it says "
+                        "nothing whatever about cycles",
+            seconds=result["pytorch"]["seconds"])
+        return result
+    result["isa"] = isa_gate(tree, env, work, verify_now)
     ok, rc, out, sec = vouched("bench_isa", tree, env, work, tree, GATE_TIMEOUT)
     verify_now("bench_isa")
     if not ok or not re.search(r"^  ALL EXACT$", out, re.M) or "FAILURES" in out:
@@ -1108,9 +1143,12 @@ def gate(tree, env, work, verify_now, cfg=None):
     if not ok2 or not m or m.group(1) != m.group(2):
         raise Reject("gate:stress", out2[-4000:])
     # 3. Parametricity: the same candidate, rebuilt at other MAXDIMs, must
-    # build, honour the parameter, and be exact (param_check.py).
+    # build, honour the parameter, and be exact (param_check.py). THREE more
+    # builds, and the whole reason a gate call costs a minute rather than
+    # twenty seconds -- so the `fast` tier stops here and every scoring run,
+    # which is to say everything that can lead to acceptance, does not.
     param, sec3 = {}, 0.0
-    for pcfg in param_configs(cfg or DEFAULT_CONFIG):
+    for pcfg in (param_configs(cfg or DEFAULT_CONFIG) if tier == "full" else ()):
         ok3, rc3, out3, s3 = vouched("param_check", tree, dict(env, **pcfg), work,
                                      tree, GATE_TIMEOUT)
         sec3 += s3
@@ -1122,9 +1160,17 @@ def gate(tree, env, work, verify_now, cfg=None):
         param[tag] = lines_with(out3, "PARAM OK")[0]
     result.update(
         bench_isa="ALL EXACT", stress=lines_with(out2, "STRESS OK")[0],
-        stress_runs=int(m.group(1)), param=param, vouched=True,
+        stress_runs=int(m.group(1)),
+        param=param if tier == "full" else "not run at this tier",
+        vouched=True,
         seconds=round(sec + sec2 + sec3 + result["pytorch"]["seconds"]
                       + result["isa"]["seconds"], 1))
+    if tier != "full":
+        result["not_checked"] = (
+            "parametricity: the design is NOT rebuilt at the other MAXDIMs or "
+            "at the second T, so a change specialised to the scored "
+            "configuration still passes here. It is refused by the full gate, "
+            "which every scored run and the harness's own verdict use")
     return result
 
 
@@ -1334,15 +1380,29 @@ def main():
     ap.add_argument("--models", default=",".join(SCORED_MODELS),
                     help="the model term's workloads; empty measures none")
     ap.add_argument("--gate-only", action="store_true")
+    ap.add_argument("--gate-tier", default="full", choices=GATE_TIERS,
+                    help="how much of the frozen gate to run. Only `full` may "
+                         "be combined with a scoring run, so nothing a cheaper "
+                         "tier passes can ever reach acceptance")
     ap.add_argument("--codesign", action="store_true",
                     help="run the co-design stages: the exhaustive mapspace "
                          "enumeration with its refusal histogram, and cosim of "
                          "the program the frozen mapper chose for this hardware")
     a = ap.parse_args()
+    # THE RULE THAT KEEPS ACCEPTANCE WHERE IT WAS. A cheap tier is a tool for
+    # the agent to iterate against; it is not a cheaper way to be accepted.
+    # Refused here, at the one place the tier is read, rather than trusted to
+    # every caller: a scoring run always runs the whole gate, so the verdict
+    # `accept.py` and `loop.py` act on is bit-for-bit the verdict they acted on
+    # before this flag existed.
+    if a.gate_tier != "full" and not a.gate_only:
+        ap.error("--gate-tier other than 'full' is only allowed with "
+                 "--gate-only: a scored candidate always runs the whole gate")
     shapes = [s for s in a.shapes.split(",") if s]
     started = time.time()
     result = {"ok": False, "frozen_ref": FROZEN_REF, "shapes": shapes,
-              "codesign": a.codesign,
+              "codesign": a.codesign, "gate_tier": a.gate_tier,
+              "gate_only": a.gate_only,
               "measurement": "cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim "
                              "(RTL), m_axi_latency default 0, one bit-exact TB "
                              "per shape"}
@@ -1395,8 +1455,12 @@ def main():
         env = env_for(tree, cfg)
         result["invariants"] = check_invariants(tree, env, work, cfg)
         verify_now("the import check")
-        result["gate"] = gate(tree, env, work, verify_now, cfg)
-        if a.codesign:
+        result["gate"] = gate(tree, env, work, verify_now, cfg, a.gate_tier)
+        # The mapspace enumeration is a second, independent signal, not part
+        # of the gate; the `oracle` tier skips it because that tier exists to
+        # answer in seconds and the enumeration is the expensive half of a
+        # co-design gate call.
+        if a.codesign and a.gate_tier != "oracle":
             result["mapspace"] = mapspace_gate(tree, env, work, shapes, verify_now)
         if not a.gate_only:
             runner = codesign_score if a.codesign else score
