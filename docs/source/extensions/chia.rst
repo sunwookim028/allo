@@ -760,6 +760,12 @@ than after:
      - once, after the pre-flight gate and before the first worker
    * - ``<run>/<worker>/worker.log``
      - continuously, unbuffered --- the only live signal inside an iteration
+   * - ``<run>/<worker>/trace.jsonl``
+     - appended per EVENT, unbuffered --- every turn, every tool call, every
+       model call, as they happen (below)
+   * - ``<run>/<worker>/opencode/run-*.ndjson``
+     - opencode's own event stream, written by opencode as the session runs
+       and kept even when the call is killed
    * - ``<run>/<worker>/variants.jsonl``
      - appended once per finished iteration, which can be tens of minutes apart
    * - ``<run>/<worker>/best.diff``, ``calls.json``
@@ -793,6 +799,85 @@ evaluator compares the checkout's tracked files after every gate and returns
 ``tamper`` if they moved. Measured 2026-09-24: editing three ``chia_agent``
 files during a ``test_harness.py`` run turned two ``gate:param`` cases into
 ``tamper`` failures; both passed on a clean tree.
+
+What a session writes while it runs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Before 2026-09-25 a session was a black box between its two ends. ``worker.log``
+said an iteration had started and, tens of minutes later, ``variants.jsonl``
+said what the candidate scored; in between nothing recorded how many turns the
+agent took, which tools it called, or where the time went. Run 3 measured what
+that costs: **167 minutes wall, of which all cosim evaluation was 661 s --
+7 %** --- and four model calls that each ran the full 2400 s timeout. The
+calls that consumed the wall clock were exactly the ones that reported
+nothing, because **a timed-out call returns no session id and ``$0`` on
+``usage``**, which is why run 3 reads ``$0.00`` there while opencode's database
+charges ``$20.72``.
+
+The record existed and was being deleted. opencode's ``run --format json``
+emits newline-delimited events live --- one per message part, per model step,
+per tool call --- and CHIA's ``OpenCodeLLM._capture`` streams them into a
+``NamedTemporaryFile`` and then ``os.unlink``\ s it in a ``finally``. So the
+transcript survives only when the call returns; on ``subprocess.TimeoutExpired``
+it is destroyed on the way out.
+
+``chia_agent/session_trace.py`` is the log, and three writers append to it:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 30 48
+
+   * - writer
+     - events
+     - why there
+   * - ``llm.py``
+     - ``model_call.start`` / ``.end`` / ``.timeout``, ``session``, ``stream``
+     - ``_capture`` is overridden to write opencode's run stream to a durable
+       path and tail it in a thread while the call runs. It is the only place
+       that sees a turn that made no tool call --- the 2400 s "thinking"
+       case --- and the only place that can stop the transcript being unlinked.
+   * - ``allo_tool.py``
+     - ``tool.start`` / ``tool.end``
+     - the tool server is the one component that sees a round trip from the
+       far side of the MCP boundary, so its timings do not depend on
+       opencode's stream shape, which is not ours and has changed between
+       releases.
+   * - ``loop.py``
+     - ``run.*``, ``iteration.*``, ``call.*``, ``harness_eval.*``
+     - divides the wall clock into model calls, the agent's tool calls and
+       the harness's own re-scoring. ``calls.json`` is written once, at the
+       end; these lines are written as each call finishes, failures included.
+
+Every event is **one ``os.write`` on an ``O_APPEND`` descriptor** --- one
+syscall, nothing buffered in the process --- so a ``SIGKILL`` loses nothing
+already logged, and the driver, the tool server's Ray actor and the worker
+that runs ``prompt`` can share one file. A buffered log is no better than no
+log when the process is killed.
+
+Read one back with::
+
+   python examples/tinytpu/chia_agent/session_trace.py <run>/<worker>
+
+which prints the timeline --- each turn, each tool call with its duration,
+where the wall went --- and, at the end, **what was still open when the trace
+stopped**. A ``model_call.start`` or a ``tool.start`` with no matching end is
+the signal: it names what the process was doing when it died.
+
+``test_session_trace.py`` (~2 minutes, $0, no Vertex call, no Ray, no tool
+server) covers the cases a passing test would skip: a session **killed
+mid-flight** with ``SIGKILL`` to its process group, and one that hits
+``timeout_seconds``. Both leave a complete, readable trace and the raw
+opencode stream on disk. It drives ``fake_model.py`` through the real
+opencode binary, so the event shapes it parses are opencode's own, not a
+fixture's.
+
+What is still invisible: the *content* of a turn --- the trace records that a
+turn happened, how long it took and what it called, not what the model said or
+thought. The text is in the raw stream beside it, which is kept but not
+summarised. Per-turn **cost** is recorded only when opencode's
+``step-finish`` carries one; the authoritative money still comes from
+opencode's database (``spend.py``), because a killed session never writes its
+final usage anywhere.
 
 The $0 harness test
 ~~~~~~~~~~~~~~~~~~~
