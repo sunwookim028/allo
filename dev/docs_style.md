@@ -127,15 +127,43 @@ if there is a lot. Never above the Reference section.
 
 ## Pages that need this
 
-| page | what is wrong | priority |
-| --- | --- | --- |
-| `extensions/chia.rst` | opens with a principle; findings above reference; very long | high |
-| `designs/tinytpu_isa.rst` | reference and history interleaved; ~2000 lines | high |
-| `designs/gemmini_comparison.rst` | argumentative throughout; no quick start | high |
-| `extensions/act.rst`, `act_specs.rst` | no quick start; two pages that overlap | medium |
-| `designs/benchmarks.rst` | a results page, which is correct — but it is where other pages' history should go | keep |
+**Applied 2026-09-24** in `95bfd77a`, merged as `5d7223e9` ("the fork's pages
+open with the thing"). All four pages now carry the template's sections in the
+template's order, and each one over ~400 lines was split into a reference page
+and a results page. No number was changed; every correction and retraction
+moved with its page's history rather than being summarised.
+
+| page | what was wrong | what was done | state |
+| --- | --- | --- | --- |
+| `extensions/chia.rst` | opens with a principle; findings above reference; very long | opens with what the loop is and what it produces; Quick start second; 1232 → 454 lines, findings to `chia_results.rst`, the co-design argument to `chia_codesign.rst`. Cap and spend arithmetic kept on the page, under Reference → Billing | done |
+| `designs/tinytpu_isa.rst` | reference and history interleaved; ~2000 lines | 2266 → 952; the instruction/encoding reference to `tinytpu_isa_spec.rst`, measurements and retractions to `tinytpu_isa_results.rst`, older history already on `tinytpu_history.rst` | done |
+| `designs/gemmini_comparison.rst` | argumentative throughout; no quick start | 2462 → 962; Quick start is `reproduce.sh` plus the parity configs; every measurement and withdrawn claim to `gemmini_results.rst`, including the 36.4 % restatement and the withdrawn "52 % of the bound" attribution | done |
+| `extensions/act.rst`, `act_specs.rst` | no quick start; two pages that overlap | both open by saying what they are for and pointing at the other: `act.rst` is the mapper, `act_specs.rst` is the corpus and the judge, `act_results.rst` is the measurements. 949 → 557 and 748 → 543 | done |
+| `designs/benchmarks.rst` | a results page, which is correct — but it is where other pages' history should go | not restyled, as intended; grew an index of where each other page's results now live | keep |
+
+Left open, with the reason:
+
+- **`extensions/chia.rst` has regrown to 929 lines** (454 at the restyle) from
+  a day of real feature work on 2026-09-24/25 — the runbook, the two derived
+  guards, the candidate-proposed configuration. It is still in template order
+  with Quick start in the first screenful, so this is new content rather than
+  undone restyling, but it is over the ~400-line threshold again and its
+  Reference section is now the largest part of it. The next split is
+  `chia_runbook.rst`, and it is not done. `act.rst` (557 → 690, the TOSA front
+  end) and `tinytpu_isa.rst` (952 → 999) regrew the same way, less far.
+- The threshold itself wants restating. A page splits when its *Reference*
+  section stops being skimmable, not at a line count — `gemmini_comparison.rst`
+  is 962 lines and skims fine because its reference is tables.
 
 ## Pages that do not exist yet and should
+
+Two of these four now exist: **the SystemC emitter** is `backends/systemc.rst`
+(`4a089373`, 2026-09-24) and **the PD / ASIC flow** is partly
+`backends/asic_manifest.rst` (`0f6bdcd3`), which covers the manifest but not
+preflight or the settings snapshot. **The workload suite** is
+`designs/workload_suite.rst` (`46e73b39`). **The CHIA loop as a tool** remains
+the open one: `extensions/chia.rst` now has a Quick start and a runbook, but
+the page is still organised around what the loop found.
 
 - **The PD / ASIC flow** — preflight, the documented command sequence, the
   settings snapshot, what is committed and what stays on scratch.
