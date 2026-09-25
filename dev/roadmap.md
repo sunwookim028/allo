@@ -246,6 +246,25 @@ Recorded because each cost real work today.
   allo` still worked from inside a checkout and failed everywhere else, so it
   surfaced only when an agent ran a docs build from its own worktree. Removing
   a worktree is not free if anything outside git references it.
+- **A test whose subprocess does not pin `PYTHONPATH` is not testing your
+  checkout.** Sharper than the editable-install entry above, and worse: there
+  `import allo` *failed* and you noticed. Here it *succeeds against the wrong
+  tree*. `tests/dataflow/test_bf16_dataflow.py` ran its emitter probes through
+  `subprocess.run([sys.executable, script])` with no `env=`, so they resolved
+  `allo` through the editable install -- `/home/sk3463/allo`, a checkout at
+  `31a8e9ce` predating every fix of 2026-09-25. Those arms had been going red
+  and green for reasons unrelated to the code under test, and the red was read
+  as "bf16 still aborts" when bf16 had emitted for hours. Fixed by pinning the
+  root via the `pyproject.toml` marker. **If a test shells out, pass `env` with
+  the checkout root on `PYTHONPATH`.**
+- **A pipeline hides the exit code of everything but its last command.**
+  `pytest ... | tail -3` returns *tail's* status, which is always 0, so a
+  chained `&& git push` runs on a failing test suite. I did exactly that on
+  2026-09-25 and pushed before knowing the result; it happened to be clean, and
+  the 18 failures I had seen were a stale-bindings artefact. Redirect to a file
+  and check `$?`, or use `PIPESTATUS`. Read the output *and* the code -- the
+  house rule "read the output, not the exit code" guards against a different
+  failure and does not cover this one.
 - **Test a check's failure path, not only its pass path.** A check that has
   only ever said ok proves nothing. The ASIC preflight's library-checksum
   branch was confirmed by copying a real `stdcells.db`, appending one null
