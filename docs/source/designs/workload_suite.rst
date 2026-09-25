@@ -220,14 +220,20 @@ Three checks, and a layer that fails any of them is reported, never rounded.
    compares against ``spec.gold``, the einsum in int64, over the output region,
    with everything outside the write window required to be untouched. This is
    the corpus's own bar and every layer of every model clears it.
-#. **The chain against PyTorch.** The suite then runs the *model*: each layer's
-   program in turn through ``isa_ref``, with the real weights in DRAM and the
-   previous layer's int8 output as the next layer's activation, against
-   PyTorch's own evaluation of the same modules with the machine's epilogue
-   (ReLU where fused, then the clip to int8) applied in torch. Every model
-   matches on every byte. This is what makes the suite a workload rather than
-   a shape table: the machine computes the model, not a GEMM of the model's
-   size.
+#. **The model against PyTorch.** The suite then runs the *model*: each layer's
+   program in turn through ``isa_ref``, with the real weights in DRAM and each
+   layer fed the activation **the fx graph says it consumes**
+   (``run.layer_sources``), against PyTorch's own evaluation of the same
+   dataflow with the machine's epilogue (ReLU where fused, then the clip to
+   int8) applied in torch. Every model matches on every byte. This is what
+   makes the suite a workload rather than a shape table: the machine computes
+   the model, not a GEMM of the model's size.
+
+   Both sides used to chain layer *i* into *i+1* regardless of the graph, and
+   :ref:`that was wrong for any graph that is not a chain
+   <workload-suite-fanout>`. A graph neither side can represent now raises
+   ``run.Unrepresentable``, which ``gate.py`` turns into a failure rather than
+   an approximation.
 #. **The RTL.** Three of the four models' layers go through ``cosim.py``'s
    machinery, below, each compared against ``isa_ref`` over all 4096 bytes of
    ``C`` rather than over the result region alone.
@@ -301,8 +307,8 @@ Three provenance facts that belong with the claims rather than under them:
   model of the ISA written here --- against ``spec.gold`` --- a numpy einsum
   written here; agreeing proves the mapper matches our own semantics and puts
   PyTorch on neither side. Only the chained check has ``torch`` on one side,
-  and what is on it is ``nn.Linear``'s forward rather than ``model(x)``. Over
-  the whole suite that is **8 912 bytes**, of which ``mlp_wide`` is 8 192, and
+  and what is on it is ``nn.Linear``'s forward on the graph's own dataflow.
+  Over the whole suite that is **8 912 bytes**, of which ``mlp_wide`` is 8 192, and
   ``mlp_bias`` contributes none at all: ``gate.py`` skips the end-to-end check
   for a probe, so the probe has no PyTorch comparison. The RTL row is a
   *record* that xsim once printed those cycles, declared in ``claims.json``
@@ -342,8 +348,8 @@ rather than asserted. **shapes**: each of M, K and N swept independently
 across its ceiling, every mapped cell verified against ``spec.gold``, so a
 shape that maps to a *wrong* program is a status and not a silence.
 **entries**: per suite entry, which of its checks compares against PyTorch and
-which compares two things this repository wrote --- and whether the graph is
-the chain that comparison assumes. **assumptions**: what the verification
+which compares two things this repository wrote --- and which dataflow the
+comparison read off the graph. **assumptions**: what the verification
 itself takes for granted, probed.
 
 There is no hand-maintained expected-value list: the committed map is the
@@ -351,21 +357,29 @@ program's own output, so a cell can only move by the measurement moving.
 ``--check`` refuses to compare a configuration it has never recorded, on the
 same principle ``claims.json`` follows.
 
-Two things the first run found, both recorded and neither patched:
+.. _workload-suite-fanout:
+
+Two things the first run found; the first is still open, the second is fixed:
 
 * **A ``K`` or ``N`` that is not a multiple of ``T`` refuses with no reason
   given** --- above.
-* **The end-to-end PyTorch check assumes the graph is a chain.**
-  ``run.py`` feeds layer *i*'s output to layer *i+1* on *both* sides of the
-  comparison, so a fan-out graph is compared against a PyTorch evaluation that
-  is not the model either, and they agree. Measured on two bias-free Linears
-  off one input: nothing refused, both layers mapped, the suite's own check
-  reports 0 of 128 bytes differing, and the machine's output differs from
-  ``model(x)`` in 62 of 128. All five committed models are chains ---
-  ``scope.py`` recomputes that and reports ``topology_sound`` per entry rather
-  than assuming it --- so no number on this page is affected. The *claim* is:
-  the suite's PyTorch evidence holds for chain-topology graphs, and nothing in
-  the suite enforces that scope.
+* **The end-to-end PyTorch check assumed the graph is a chain. FIXED
+  2026-09-25.** ``run.py`` fed layer *i*'s output to layer *i+1* on *both*
+  sides of the comparison, so a fan-out graph was compared against a PyTorch
+  evaluation that was not the model either, and they agreed. Measured on two
+  bias-free Linears off one input: nothing refused, both layers mapped, the
+  suite's own check reported 0 of 128 bytes differing, and the machine's output
+  differed from ``model(x)`` in **62 of 128**. Both sides now take each layer's
+  activation from ``run.layer_sources``, which reads the fx graph; the same
+  probe reports 0 and 0, and ``scope.py``'s ``assumptions`` row -- which is the
+  regression test, and keeps its probe -- reads ``sound``.
+
+  Every committed model is a chain, so no number on this page moved. What
+  moved is that the check is now evidence for graphs that are not chains, and
+  that is what made it safe to *gate* on: ``run.py --verify`` is the CHIA
+  loop's first gate, and with the ISA editable it is the only comparison with
+  something outside this repository on one side
+  (:ref:`chia-isa-editable`).
 
 The numbers
 ===========

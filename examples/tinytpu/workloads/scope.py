@@ -294,61 +294,32 @@ def shape_rows():
 
 
 # -------------------------------------------------------------- evidence ---
-def mapped_nodes(gm, extraction):
-    """The graph node behind each extracted layer, in the extractor's order.
+def dataflow(gm, extraction):
+    """How ``run.py`` resolves each mapped layer's activation, and whether the
+    graph is one chain.
 
-    Matched greedily by module target down the graph, not by looking the
-    target up: a module called twice is two nodes and two layers, and a
-    lookup would return the first one both times.
+    -> ``(sources, chain, why)``. ``sources`` is ``run.layer_sources``'s own
+    answer -- ``-1`` for the model input, ``j`` for mapped layer ``j`` -- so
+    this row records the dataflow the END-TO-END CHECK ACTUALLY USED rather
+    than a second opinion about it. ``chain`` says whether that dataflow
+    happens to be the straight chain ``i -> i+1``; it is now a DESCRIPTION,
+    not a soundness condition. It used to be one: both sides of the comparison
+    chained the layers regardless of the graph, so a fan-out was compared
+    against a PyTorch evaluation that was not the model either and the two
+    agreed. ``run.layer_sources`` reads the graph now, and a graph it cannot
+    represent raises instead of being chained.
     """
-    pending = [l.module for l in extraction.layers]
-    out, at = [], 0
-    for node in gm.graph.nodes:
-        if at >= len(pending):
-            break
-        if node.op == "call_module" and node.target == pending[at]:
-            out.append(node)
-            at += 1
-    return out + [None] * (len(pending) - len(out))
-
-
-def chain_sound(gm, extraction):
-    """Is the suite's end-to-end check MEANINGFUL for this graph?
-
-    ``run.py`` chains layer i's int8 output into layer i+1 on both sides of
-    the comparison -- the machine's and PyTorch's -- so a graph whose Linears
-    are not a single chain is compared against a PyTorch evaluation that is
-    also not the model. The two then agree, and the agreement says nothing.
-    This recomputes the topology rather than trusting it.
-    """
-    previous = None
-    for node, layer in zip(mapped_nodes(gm, extraction), extraction.layers):
-        if node is None:
-            return False, f"no graph node for module {layer.module}"
-        source = node.args[0] if node.args else None
-        if previous is None:
-            if getattr(source, "op", None) != "placeholder":
-                return False, (f"the first mapped layer consumes "
-                               f"{getattr(source, 'name', source)!r}, not the "
-                               f"model input")
-        else:
-            reached = {previous}
-            for user in list(previous.users):
-                if extract_is_relu(gm, user):
-                    reached.add(user)
-            if source not in reached:
-                return False, (f"layer {layer.name} consumes "
-                               f"{getattr(source, 'name', source)!r}, which is "
-                               f"not the previous mapped layer's result: the "
-                               f"graph is not a chain and run.py chains it "
-                               f"anyway, on BOTH sides of the comparison")
-        previous = node
-    return True, "the mapped Linears form one chain from the model input"
-
-
-def extract_is_relu(gm, node):
-    from examples.tinytpu.workloads import extract
-    return extract.is_relu(gm, node)
+    from examples.tinytpu.workloads import run as runner
+    try:
+        sources = runner.layer_sources(gm, extraction)
+    except runner.Unrepresentable as why:
+        return None, False, str(why)
+    chain = sources == [i - 1 for i in range(len(sources))]
+    named = [("input" if j < 0 else extraction.layers[j].name) for j in sources]
+    return sources, chain, ("the mapped Linears form one chain from the model "
+                            "input" if chain else
+                            f"not a chain: each layer's activation is {named}, "
+                            f"and run.py feeds it exactly that")
 
 
 def entry_rows():
@@ -356,8 +327,9 @@ def entry_rows():
 
     The distinction the owner asked for, computed rather than declared:
     ``vs_spec`` holds two things this repository wrote against each other;
-    ``vs_pytorch`` is the only check with PyTorch on one side, and it is only
-    sound when ``chain_sound`` is true.
+    ``vs_pytorch`` is the only check with PyTorch on one side, and since
+    ``run.layer_sources`` reads the graph it is evidence for a graph of any
+    shape -- ``dataflow`` records which shape it was.
     """
     from examples.tinytpu.act import correctness
     from examples.tinytpu.workloads import extract, gate, models, run as runner
@@ -394,24 +366,20 @@ def entry_rows():
                 "evidence_for": "the mapper agrees with our own semantics; "
                                 "PyTorch is not on either side"}
         if row["vs_spec"]["ok"] and tier != "probe":
-            sound, why = chain_sound(gm, ex)
+            _, chain, why = dataflow(gm, ex)
             model, xs = models.build(name)
             want = runner.quantized_reference(model, ex, xs[0])
             got = runner.run_on_machine(model, ex, programs, xs[0])
             bad = sum(int((a != b).sum()) for a, b in zip(got, want))
             row["vs_pytorch"] = {
                 "ok": bad == 0, "bytes": sum(int(a.size) for a in want),
-                "differ": bad, "topology_sound": sound, "topology": why,
+                "differ": bad, "chain": chain, "dataflow": why,
                 "reference": "torch's own nn.Linear forward on the model's "
                              "real weights, with the machine's epilogue "
                              "applied in torch",
-                "evidence_for": ("the machine computes what this model's "
-                                 "PyTorch modules compute"
-                                 if sound else
-                                 "NOTHING: run.py chains the layers on both "
-                                 "sides, so a non-chain graph is compared "
-                                 "against a PyTorch evaluation that is also "
-                                 "not the model")}
+                "evidence_for": "the machine computes what this model's "
+                                "PyTorch modules compute, on the dataflow the "
+                                "fx graph declares"}
         elif tier == "probe":
             row["vs_pytorch"] = {
                 "ok": None,
@@ -435,13 +403,23 @@ def entry_rows():
 def assumption_rows():
     """What the suite's own verification ASSUMES, probed rather than trusted.
 
-    ``run.py`` compares two chains: each layer's program fed the previous
-    layer's int8 output, and PyTorch's ``nn.Linear`` fed the same. Neither
-    side reads the fx graph's dataflow. For a chain of Linears that is the
-    model; for any other shape of graph it is not, and **both sides are wrong
-    the same way, so they agree**. This runs a graph the extractor accepts
-    whole and refuses nothing in, and records what each comparison says. The
-    row is a measurement, not an assertion: it moves if the harness changes.
+    **FIXED, and this row is the regression test.** ``run.py`` used to compare
+    two chains -- each layer's program fed the previous layer's int8 output,
+    and PyTorch's ``nn.Linear`` fed the same -- with neither side reading the
+    fx graph's dataflow. For a chain of Linears that is the model; for a
+    fan-out it is not, and both sides were wrong the same way, so they agreed:
+    this probe measured 0 of 128 bytes differing against ``run.py``'s own
+    reference while the machine differed from ``model(x)`` in **62 of 128**.
+    Both sides now take the dataflow from ``run.layer_sources``, so the two
+    numbers are the same number, and a graph that cannot be represented raises
+    rather than being chained anyway.
+
+    The probe stays because the row is a MEASUREMENT, not an assertion: it is
+    what would move if the harness regressed. The gate that depends on it is
+    ``run.py --verify``, which ``chia_agent/evaluate.py`` runs on every
+    candidate -- and it is load-bearing now that the ISA is editable, because
+    it is the only comparison with something outside this repository on one
+    side.
     """
     import numpy as np
     import torch
@@ -469,7 +447,7 @@ def assumption_rows():
 
     ex = extract.extract("fanout_probe", model, xs)
     gm = extract.trace(model, xs)
-    sound, why = chain_sound(gm, ex)
+    sources, chain, why = dataflow(gm, ex)
     programs = []
     for sp in extract.specs(ex):
         result = mapping(sp)
@@ -489,7 +467,7 @@ def assumption_rows():
         "probe": "two bias-free nn.Linears off one input, returned as a pair",
         "extractor_refusals": len(ex.refusals),
         "layers_mapped": len(programs),
-        "topology_sound": sound, "topology": why,
+        "chain": chain, "dataflow": why, "sources": sources,
         "bytes": total,
         "differ_vs_run_py_reference": agreed,
         "differ_vs_real_forward": real,
@@ -497,12 +475,14 @@ def assumption_rows():
         "why": (f"the extractor refuses nothing, both layers map, and "
                 f"run.py's own reference agrees on {total - agreed} of "
                 f"{total} bytes -- while the machine's output differs from "
-                f"what model(x) actually returns in {real} of {total}. "
-                f"run.py chains the layers on BOTH sides of the comparison, "
-                f"so a fan-out graph is checked against a PyTorch evaluation "
-                f"that is not the model either."
+                f"what model(x) actually returns in {real} of {total}. A "
+                f"fan-out graph is being chained on one side of the comparison "
+                f"or the other: this is the bug the row exists for, and it was "
+                f"fixed once already."
                 if real != agreed else
-                "run.py's reference and the real forward() agree")}}
+                f"run.py's reference and the real forward() agree, on a graph "
+                f"that is NOT a chain ({why}): both sides take each layer's "
+                f"activation from the fx graph, so the agreement is evidence")}}
 
 
 # ------------------------------------------------------------------ main ---
@@ -560,7 +540,7 @@ def summarise(cell):
         p = cell.get("vs_pytorch") or {}
         return (f"tier={cell['tier']} layers={cell['layers']} "
                 f"vs_spec={(cell.get('vs_spec') or {}).get('ok')} "
-                f"vs_pytorch={p.get('ok')} sound={p.get('topology_sound')} "
+                f"vs_pytorch={p.get('ok')} chain={p.get('chain')} "
                 f"rtl={(cell.get('rtl') or {}).get('declared_for_this_config')}")
     return json.dumps(cell, sort_keys=True)[:90]
 
@@ -584,7 +564,7 @@ def show(data):
         print(f"    {name:12s} tier={row['tier']:10s} "
               f"vs_spec(ours-vs-ours)={(row.get('vs_spec') or {}).get('ok')}  "
               f"vs_pytorch={p.get('ok')} over {p.get('bytes')} bytes  "
-              f"topology_sound={p.get('topology_sound')}  "
+              f"chain={p.get('chain')}  "
               f"rtl_declared={(row.get('rtl') or {}).get('declared_for_this_config')}")
     print("\n  ASSUMPTIONS the suite's verification makes, probed")
     for name, row in data.get("assumptions", {}).items():
@@ -593,15 +573,19 @@ def show(data):
     silent = [k for k, v in data["shapes"].items() if v["status"] == "silent-wrong"]
     blind = [k for k, v in data["shapes"].items()
              if v["status"] == "refused-without-a-cause"]
+    # A graph run.py could not represent at all: `dataflow` returns no sources
+    # and the end-to-end check did not run. NOT "chain is False" -- a fan-out
+    # is checked correctly now, and counting one as unsound would report the
+    # fix as the defect.
     unsound = [n for n, v in data["entries"].items()
-               if (v.get("vs_pytorch") or {}).get("topology_sound") is False]
+               if (v.get("vs_pytorch") or {}).get("ok") is None]
     print(f"\n  {len(data['shapes'])} shape cells, "
           f"{sum(1 for v in data['shapes'].values() if v['status'] == 'mapped')} "
           f"mapped and bit-exact, {len(silent)} SILENT-WRONG {silent}, "
           f"{len(blind)} refused with no cause named {blind}")
     broken = [n for n, v in data.get("assumptions", {}).items()
               if v["status"] == "silent-wrong"]
-    print(f"  {len(unsound)} entr(ies) whose vs-PyTorch check is unsound "
+    print(f"  {len(unsound)} entr(ies) whose vs-PyTorch check did not run "
           f"{unsound}; {len(broken)} harness assumption(s) that fail silently "
           f"{broken}")
 

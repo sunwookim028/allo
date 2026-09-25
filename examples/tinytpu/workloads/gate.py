@@ -21,9 +21,11 @@ What it does, in one pass and at zero cost (no Vitis, no licence, no RTL):
    ``act.correctness.check`` -- ``isa_ref`` against the spec's ``gold`` over
    four operand distributions, with the write window enforced.
 4. Runs the **model**, not the layers: each layer's program in turn through
-   ``isa_ref`` with the previous layer's int8 output as the next activation,
-   against PyTorch's own evaluation with the machine's epilogue. Bit-exact on
-   every byte or it fails.
+   ``isa_ref``, each fed the activation the **fx graph** says it consumes
+   (``run.layer_sources``), against PyTorch's own evaluation of the same
+   dataflow with the machine's epilogue. Bit-exact on every byte or it fails.
+   A graph whose layers cannot be fed that way is a failure, not an
+   approximation.
 5. Enforces the **tier**. ``confirmed`` requires a declared RTL measurement
    whose configuration is the one this process is running -- T, MAXDIM, QD and
    DMA_WORDS, all four. A measurement from another configuration is refused as
@@ -236,9 +238,18 @@ def run_model(name, entry, module, docs_root, specs_dir, live, report):
     if tier != "probe":
         check_specs_on_disk(extraction, specs_dir)
         model, example_inputs = models.build(name)
-        want = runner.quantized_reference(model, extraction, example_inputs[0])
-        got = runner.run_on_machine(model, extraction, programs,
-                                    example_inputs[0])
+        try:
+            want = runner.quantized_reference(model, extraction,
+                                              example_inputs[0])
+            got = runner.run_on_machine(model, extraction, programs,
+                                        example_inputs[0])
+        except runner.Unrepresentable as why:
+            raise Fail(f"{name}: the suite cannot feed this graph one layer "
+                       f"from another -- {why}. A graph the end-to-end check "
+                       f"cannot represent is a failure here; it used to be "
+                       f"chained anyway, and the comparison then said nothing "
+                       f"(workloads/scope.py, assumptions/"
+                       f"chained_verification).") from why
         bad = sum(int((a != b).sum()) for a, b in zip(got, want))
         total = sum(a.size for a in want)
         if bad:
