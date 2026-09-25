@@ -268,7 +268,7 @@ from there the frame holding ``gate_runner.py``'s nonce.
 .. _chia-feedback-ladder:
 
 What the agent may ask, and what each answer is worth
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Reconstructed from opencode's own database across run 3's eight paid sessions,
 and the reason this section exists:
@@ -317,13 +317,13 @@ the one below and costing roughly ten times as much:
      - the PyTorch oracle alone
      - the ISA checks, bench_isa, stress_isa, parametricity, RTL -- and **cycles**
    * - ``run_functional_check``
-     - ~36 s
+     - ~41 s
      - \+ ``bench_isa``, ``stress_isa`` and a 0.08 s staleness check:
        everything the Allo **simulator** can answer
      - the two checks that REBUILD the design -- ``gen_isa --conform`` and
        parametricity -- and RTL, and **cycles**
    * - ``mapspace_report``
-     - ~66 s
+     - ~42 s
      - \+ the exhaustive mapspace enumeration
      - a count of nests is a hypothesis about speed, not a measurement
    * - ``score_cycles``

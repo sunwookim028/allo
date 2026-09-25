@@ -1107,7 +1107,7 @@ def isa_gate(tree, env, work, verify_now):
 #:
 #:   oracle  ~13 s. The PyTorch bit-exactness check alone: the one check with
 #:           something outside this repository on one side.
-#:   fast    ~36 s. + bench_isa, stress_isa -- everything the Allo SIMULATOR
+#:   fast    ~41 s. + bench_isa, stress_isa -- everything the Allo SIMULATOR
 #:           can answer -- and the cheap staleness arm (`stale_gate`, 0.08 s).
 #:           NOT `gen_isa --conform` and NOT parametricity: those two are the
 #:           gate's whole cost (33 s and 39 s measured, against 27 s for

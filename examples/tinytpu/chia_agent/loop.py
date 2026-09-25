@@ -577,7 +577,7 @@ first if you have not: it is the mapper, and it decides what "better" means.
 Then read the spec ({tool}_read_spec). Edit with {tool}_replace_text (exact
 text, must occur once) -- far more reliable than a unified diff.
 
-{tool}_mapspace_report (~60 s, no Vitis) tells you whether your change actually
+{tool}_mapspace_report (~42 s, no Vitis) tells you whether your change actually
 widened what the machine can encode, and what the mapper would then choose. A
 wider mapspace is a hypothesis about speed, not a measurement of one. Use it
 before {tool}_score_cycles, which is the measurement.

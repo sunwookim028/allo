@@ -24,7 +24,7 @@ runs in seconds. So there was no tool it could call in under fifty seconds, and
 fast iteration was impossible rather than merely slow.
 
   check_bit_exact        ~13 s   the PyTorch oracle alone
-  run_functional_check   ~36 s   + bench_isa and stress_isa: everything the
+  run_functional_check   ~41 s   + bench_isa and stress_isa: everything the
                                  Allo simulator can answer
   score_cycles          ~240 s   + gen_isa --conform, parametricity, csynth
                                  and RTL cosim
@@ -130,8 +130,8 @@ TOOL_SECONDS = {
     "insert_after": 0.2,
     "regenerate_isa": 3,
     "check_bit_exact": 13,
-    "run_functional_check": 36,
-    "mapspace_report": 66,
+    "run_functional_check": 41,
+    "mapspace_report": 42,
     "score_cycles": 240,
 }
 
@@ -718,7 +718,7 @@ class AlloSpecTool(ChiaTool):
         return json.dumps(verdict, indent=1)
 
     async def run_functional_check(self) -> str:
-        """WHAT THE SIMULATOR CAN ANSWER, ~36 s (measured; this docstring used
+        """WHAT THE SIMULATOR CAN ANSWER, ~41 s (measured; this docstring used
         to say "~15 s" for a call that cost 52-76 s).
 
         The PyTorch oracle; a 0.08 s check that `isa_encoding.py` is what your
@@ -814,7 +814,7 @@ class AlloSpecTool(ChiaTool):
         return json.dumps(verdict, indent=1)
 
     async def mapspace_report(self) -> str:
-        """The co-design signal, ~66 s and no Vitis: the fast gate plus the
+        """The co-design signal, ~42 s and no Vitis: the fast gate plus the
         exhaustive mapspace enumeration against your hardware.
 
         Reports, per scored shape, how many of the enumerated loop nests this

@@ -475,8 +475,8 @@ than merely slow.
 | rung | cost | what it runs | what it CANNOT see |
 | --- | --- | --- | --- |
 | `check_bit_exact` | ~13 s | the PyTorch oracle alone | the ISA checks, bench_isa, stress_isa, conform, parametricity, RTL -- and **cycles** |
-| `run_functional_check` | ~36 s | + `bench_isa`, `stress_isa`, and a 0.08 s staleness check: everything the Allo **simulator** can answer | the two checks that REBUILD the design -- `gen_isa --conform` and parametricity -- and RTL, and **cycles** |
-| `mapspace_report` | ~66 s | + the exhaustive mapspace enumeration | a count of nests is a hypothesis about speed, not a measurement |
+| `run_functional_check` | ~41 s | + `bench_isa`, `stress_isa`, and a 0.08 s staleness check: everything the Allo **simulator** can answer | the two checks that REBUILD the design -- `gen_isa --conform` and parametricity -- and RTL, and **cycles** |
+| `mapspace_report` | ~42 s | + the exhaustive mapspace enumeration | a count of nests is a hypothesis about speed, not a measurement |
 | `score_cycles` | ~240 s | + `gen_isa --conform`, parametricity, csynth, RTL cosim | (nothing; this is the measurement) |
 
 Measured on this host, per gate call: PyTorch oracle **2.8 s**, `bench_isa`
