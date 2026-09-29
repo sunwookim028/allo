@@ -1,0 +1,2 @@
+  wrote examples/tinytpu/isa_encoding.py
+  wrote docs/source/designs/tinytpu_isa_spec.rst

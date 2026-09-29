@@ -32,7 +32,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                 "..", "..")))
 from examples.tinytpu import microarch_isa as U  # noqa: E402
 from examples.tinytpu.isa_encoding import (  # noqa: E402
-    OPCODE_NAME, machine, operands)
+    ACTIONS, OPCODE_NAME, machine, operands)
 
 #: Which dispatch queue each unit is fed by. The queues are the design's, the
 #: units the spec's; which opcode reaches which queue, and with what work
@@ -41,6 +41,13 @@ QUEUE = {"dma_ld": "c_dld", "spm": "c_spm", "vru": "c_vru", "accu": "c_acc",
          "dma_st": "c_dst"}
 
 T = U.T
+
+#: The opcodes whose `accu` actions emit a retired row on `ac2sp` -- `mvout`
+#: and `mvoutrelu` -- derived from the actions, so a new retiring instruction
+#: cannot leave `dma_st` waiting on a row this model never sends.
+RETIRES = frozenset(op for op, acts in ACTIONS.items()
+                    if any(a.unit == "accu" and a.kind == "emit"
+                           and a.port == "ac2sp" for a in acts))
 
 
 def build(prog):
@@ -176,7 +183,7 @@ def build(prog):
         def body(word, r):
             if word[0] == U.OP_MM:
                 yield ("get", f"cw{T - 1}")
-            if word[0] == U.OP_MVOUT:
+            if word[0] in RETIRES:
                 yield ("put", "ac2sp", 0)
         yield from flat("c_acc", n_row, body)
 

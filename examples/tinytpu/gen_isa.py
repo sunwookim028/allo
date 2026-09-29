@@ -1947,10 +1947,16 @@ def check_actions(spec, U, E):
                   if any(a["unit"] == u["name"] for a in o["actions"])}
         if u["name"] == "sequencer":
             continue                  # it decodes every opcode to dispatch it
-        if len(acting) == 1:
-            # One opcode reaches this unit's queue, so its body needs no
-            # opcode test and declares no OP_ name. That exemption is itself
-            # derived: it holds exactly while the actions name one opcode.
+        behaviours = {json.dumps([a for a in o["actions"]
+                                  if a["unit"] == u["name"]], sort_keys=True)
+                      for o in spec["opcodes"]
+                      if o["software_constant"] in acting}
+        if len(behaviours) == 1:
+            # Every opcode that reaches this unit's queue does the same thing
+            # there (one opcode, or `mvout` and `mvoutrelu` at `dma_st`), so
+            # its body needs no opcode test and declares no OP_ name. That
+            # exemption is itself derived: it holds exactly while the actions
+            # at this unit are identical.
             acting = set()
         if declared != acting:
             fails.append(

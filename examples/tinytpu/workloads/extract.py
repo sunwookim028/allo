@@ -81,6 +81,17 @@ def shape_of(node):
     return None if meta is None else tuple(meta.shape)
 
 
+def target_name(node):
+    """`torch.sigmoid`, not `<built-in method sigmoid ... at 0x...>`: a
+    refusal names the op the way the model's source does, and the same way on
+    every run."""
+    target = node.target
+    if callable(target):
+        module = getattr(target, "__module__", None) or "torch"
+        return f"{module}.{getattr(target, '__name__', target)}"
+    return str(target)
+
+
 def is_relu(gm, node):
     if node.op == "call_module":
         return isinstance(gm.get_submodule(node.target), nn.ReLU)
@@ -119,7 +130,7 @@ def extract(name, model, example_inputs):
                     "is not its only consumer, has no fused epilogue to ride on"))
             else:
                 refusals.append(Refusal(
-                    node.name, f"{node.op} {node.target} is not an int8 GEMM "
+                    node.name, f"{node.op} {target_name(node)} is not an int8 GEMM "
                                f"or a fused ReLU; this build computes "
                                f"int8 x int8 -> int32 with a ReLU epilogue"))
             continue
