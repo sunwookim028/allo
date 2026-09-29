@@ -95,6 +95,37 @@ and ``gh-pages`` holds the published site. ``chia-codesign`` is retired. Explora
 ``fix/vhls-mlir-percent-alloc-csim`` is gone: upstream PR #554 merged and is now
 the tip of ``upstream/main``.
 
+Checkouts on this host
+----------------------
+
+**One checkout, ``~/allo``, on ``main``.** It holds the repository (every
+worktree's ``.git`` points into it) and its own ``mlir/build``, rebuilt with
+``ninja -C mlir/build`` after a pull that touches ``mlir/``. Other long-lived
+paths: ``~/llvm-allo-6b09f739`` (``LLVM_BUILD_DIR``) and ``~/chia-ortools``
+(``scripts/act-test-recipe.sh``). ``chia.env`` lives only in ``~/allo``
+(gitignored, mode 600). Keep a backup of it outside the repository, never
+under a name ``.gitignore`` does not match.
+
+Feature work goes in a worktree, ideally in the session's scratch directory,
+and the worktree is removed when its branch merges. Before removing one:
+
+- ``git -C <wt> status`` is clean, and ``git rev-list HEAD --not --remotes``
+  is empty. Push the branch if it is not.
+- Anything the work produced in **gitignored** paths (``chia_runs/``,
+  ``.scratch/``, a hand-made measurement directory) is harvested into
+  ``dev/records/`` first. ``git worktree remove`` deletes ignored files
+  without asking.
+- Nothing is running from it: a CHIA run leaves a Ray head node behind
+  (``ray status``; ``ray stop`` from the ``chia_env`` env), which holds tens of
+  processes and gigabytes of RAM after its jobs finish.
+
+The 2026-09-29 cleanup retired ``allo-coord``, ``allo-minitpu``,
+``allo-smoke``, ``wt/`` and ``work/``, eleven merged branches, and a Ray node
+four days idle. Before that it harvested the only copies of CHIA run 4's
+evidence (``dev/records/tinytpu/chia-evidence/isa-run4-20260925/``) and of the
+fast-feedback measurements (on ``chia-fast-feedback``). ``~/allo``'s old
+detached commit is tag ``archive/dev-tree-31a8e9ce``; ``main`` supersedes it.
+
 Read-only lineages on the ``kai`` remote, for reference rather than merging:
 ``kai/main`` (has ``dataflow.py``, plus ``frontend/ harness/ primitives/``),
 ``kai/allov2`` (``compiler/ lang/ operators/ schedule``, no ``dataflow.py``, no ACT),
