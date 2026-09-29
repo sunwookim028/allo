@@ -91,6 +91,8 @@ log
 
 _tmp
 *.txt
+# The tutorial's captured outputs, which its page includes.
+!docs/source/designs/tinytpu_tutorial/*.txt
 sg_execution_times.rst
 
 # XLS[cc] generated test files

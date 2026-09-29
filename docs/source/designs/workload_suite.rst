@@ -859,6 +859,12 @@ Limits
 Running it
 ==========
 
+**One model, every stage printed, run on the design:** ``make mlp``. The
+walk-through, and two changes to the machine put through it, are
+:doc:`tinytpu_tutorial`.
+
+The suite's report, every model:
+
 .. code-block:: bash
 
     cd examples/tinytpu

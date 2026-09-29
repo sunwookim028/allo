@@ -1,0 +1,88 @@
+
+[1] PyTorch: mlp_small, input (8, 32)
+-------------------------------------
+# workloads/models.py
+class MlpSmall(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.fc1 = nn.Linear(32, 32, bias=False)
+        self.fc2 = nn.Linear(32, 16, bias=False)
+
+    def forward(self, x):
+        return self.fc2(torch.relu(self.fc1(x)))
+
+[2] Trace: AlloTracer + torch.fx ShapeProp
+------------------------------------------
+graph():
+    %x : [num_users=1] = placeholder[target=x]
+    %fc1 : [num_users=1] = call_module[target=fc1](args = (%x,), kwargs = {})
+    %relu : [num_users=1] = call_function[target=torch.relu](args = (%fc1,), kwargs = {})
+    %fc2 : [num_users=1] = call_module[target=fc2](args = (%relu,), kwargs = {})
+    return fc2
+
+[3] Workload specs: 2 layers
+----------------------------
+  mlp_small_l0   mk,kn->mn  m=8 k=32 n=32  epilogue=relu+saturate
+  mlp_small_l1   mk,kn->mn  m=8 k=32 n=16  epilogue=saturate
+
+[4] Compile with ACT: search the mapspace onto the TinyTPU
+----------------------------------------------------------
+
+  mlp_small_l0: 2036 loop nests, 3 legal, 2033 refused
+      refused  1722  acc-split
+      refused   242  acc-position
+      refused    61  ar-distance
+      refused     8  AGU_TERMS
+    rank  mapping        instrs est. cycles
+       1  N8>K8              13        1085
+       2  M2>N8>K8           15        1588
+       3  N8>M2>K8           15        1790
+    picked N8>K8; the program against the spec's einsum (isa_ref, 4 operand distributions): BIT-EXACT
+
+  mlp_small_l1: 1175 loop nests, 3 legal, 1172 refused
+      refused   990  acc-split
+      refused   141  acc-position
+      refused    37  ar-distance
+      refused     4  AGU_TERMS
+    rank  mapping        instrs est. cycles
+       1  N4>K8              13         682
+       2  M2>N4>K8           15         884
+       3  N4>M2>K8           15         984
+    picked N4>K8; the program against the spec's einsum (isa_ref, 4 operand distributions): BIT-EXACT
+
+[5] The program ACT emitted for mlp_small_l0 (13 instructions)
+--------------------------------------------------------------
+    0  loop x8
+    1    dma_ld rows=8 mode=2 dram_row0=0 col_block=0 dst_row0=0   agu: col_block+=iv0*1, dst_row0+=iv0*64
+    2  endloop
+    3  loop x8
+    4    dma_ld rows=32 mode=1 dram_row0=0 col_block=0 dst_row0=0   agu: col_block+=iv0*1, dst_row0+=iv0*64
+    5  endloop
+    6  loop x8
+    7    mm rows=8 vr_a=0 ar0=0 acc=0 spad_w=0   agu: spad_w+=iv0*64
+    8    loop x7
+    9      mm rows=8 vr_a=64 ar0=0 acc=1 spad_w=4   agu: vr_a+=iv1*64, spad_w+=iv0*64, spad_w+=iv1*4
+   10    endloop
+   11    mvoutrelu rows=8 ar0=0 dram_row0=0 col_block=0   agu: col_block+=iv0*1
+   12  endloop
+
+[6] Build the design: df.build(tinytpu_isa, target='simulator')
+---------------------------------------------------------------
+  built: T=4 (4x4 array), MAXDIM=64, DMA_WORDS=1
+
+[7] Run the model on the design, one program per layer
+------------------------------------------------------
+  mlp_small_l0   8x32x32   design vs isa_ref over all 4096 bytes of C: 0 differ
+  mlp_small_l1   8x32x16   design vs isa_ref over all 4096 bytes of C: 0 differ
+
+[✓] Against PyTorch
+-------------------
+  0 of 384 output bytes differ
+  torch  [127, -128, 127, -128, -128, -128, -128, -128, 127, -128, -128, 127, 127, -128, -128, -128]
+  tpu    [127, -128, 127, -128, -128, -128, -128, -128, 127, -128, -128, 127, 127, -128, -128, -128]
+
+Summary (cycles are the cost model's estimate; `make mlp-cosim` measures)
+  layer          mapping        instrs est. cycles
+  mlp_small_l0   N8>K8              13        1085
+  mlp_small_l1   N4>K8              13         682
+  model                                       1767

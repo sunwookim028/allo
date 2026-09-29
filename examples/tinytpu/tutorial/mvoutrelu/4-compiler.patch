@@ -1,0 +1,65 @@
+diff --git a/examples/tinytpu/act_machine.py b/examples/tinytpu/act_machine.py
+index 8861df60..3ec8bc1e 100644
+--- a/examples/tinytpu/act_machine.py
++++ b/examples/tinytpu/act_machine.py
+@@ -13,7 +13,8 @@ from allo.act.schedule import Region  # noqa: E402
+ from allo.act.schedule import Step  # noqa: E402
+ from examples.tinytpu.microarch_isa import (  # noqa: E402
+     AGU_TERMS, DMA_SRC_B, DMA_TO_VR, LOOP_DEPTH, NAR, NVR, OP_DMA_LD,
+-    OP_ENDLOOP, OP_LOOP, OP_MM, OP_MVOUT, OP_VADD, OP_VLD, OP_VRELU,
++    OP_ENDLOOP, OP_LOOP, OP_MM, OP_MVOUT, OP_MVOUTRELU, OP_VADD, OP_VLD,
++    OP_VRELU,
+     SPAD_ROWS, T, expand,
+ )
+ 
+@@ -85,10 +86,14 @@ MVOUT = Opcode(
+     reads=(lambda nr, f0, **_: Region(AR, f0, nr),),
+     writes=(lambda nr, f1, f2, **_: Region(dram("C", f2), f1, nr),))
+ 
++MVOUTRELU = Opcode(
++    code=OP_MVOUTRELU, name="mvoutrelu",
++    loads=MVOUT.loads, reads=MVOUT.reads, writes=MVOUT.writes)
++
+ MACHINE = Machine(
+     name="tinytpu-isa",
+     spaces=(Space(SPAD, SPAD_ROWS), Space(VR, NVR), Space(AR, NAR)),
+-    opcodes=(DMA_LD, VLD, MM, VADD, VRELU, MVOUT))
++    opcodes=(DMA_LD, VLD, MM, VADD, VRELU, MVOUT, MVOUTRELU))
+ 
+ 
+ def is_control(prog):
+diff --git a/examples/tinytpu/act_target.py b/examples/tinytpu/act_target.py
+index 4c882c5e..8029f87d 100644
+--- a/examples/tinytpu/act_target.py
++++ b/examples/tinytpu/act_target.py
+@@ -32,6 +32,13 @@ EPILOGUE = {
+     "relu": lambda k, dst, src, rows: k.vrelu(dst, src, rows),
+ }
+ 
++# An epilogue op the retiring instruction can apply on its way out. When the
++# LAST op of the epilogue is one of these, it is folded into the `mvout` and
++# costs no accumulator pass of its own.
++FUSED_RETIRE = {
++    "relu": lambda k: k.mvoutrelu,
++}
++
+ # Which kind of gap each refusal is. `express` means the instruction word has no
+ # field or no room for what the nest asks; the design is fine and the encoding
+ # is not. `refuse` means the machine would accept the program and produce a
+@@ -260,10 +267,13 @@ class TinyTpu(Target):
+             result = into[workload.contractions[0]]
+             for term in workload.contractions[1:]:
+                 k.vadd(result, result, into[term], rows=rows)
+-            for op in workload.epilogue:
++            epilogue, retire = list(workload.epilogue), k.mvout
++            if epilogue and epilogue[-1] in FUSED_RETIRE:
++                retire = FUSED_RETIRE[epilogue.pop()](k)
++            for op in epilogue:
+                 EPILOGUE[op](k, result, result, rows)
+-            k.mvout(result, dram_row=walked(0, row_terms),
+-                    col_block=walked(0, column_terms), rows=rows)
++            retire(result, dram_row=walked(0, row_terms),
++                   col_block=walked(0, column_terms), rows=rows)
+ 
+         def walk(loops, open_loops):
+             if not loops:
