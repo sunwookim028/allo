@@ -1,0 +1,33 @@
+--- a/microarch_isa.py
++++ b/microarch_isa.py
+@@ -54,7 +54,7 @@
+ # Operand-burst width in packed words per loop iteration. 1 is the shipped
+ # design; `TPU_DMA_WIDEN=1` selects the widest beat the 64-byte bus holds, and
+ # `TPU_DMA_WORDS` names one directly.
+-_WIDEN = TpuParams.widest_burst(T, MAXDIM) if os.environ.get("TPU_DMA_WIDEN") == "1" else 1
++_WIDEN = TpuParams.widest_burst(T, MAXDIM)
+ DMA_WORDS = int(os.environ.get("TPU_DMA_WORDS", _WIDEN))
+ 
+ 
+--- a/isa_spec.json
++++ b/isa_spec.json
+@@ -1402,7 +1402,7 @@
+       "name": "DMA_WORDS",
+       "env": "TPU_DMA_WORDS",
+       "default": null,
+-      "default_expression": "min(WPR, max(1, BUS_BYTES // (VW // 8))) if os.environ.get(\"TPU_DMA_WIDEN\") == \"1\" else 1",
++      "default_expression": "min(WPR, max(1, BUS_BYTES // (VW // 8)))",
+       "min": 1,
+       "max": null,
+       "role": "packed words the operand burst moves per loop iteration",
+--- a/isa_encoding.py
++++ b/isa_encoding.py
+@@ -48,7 +48,7 @@
+ NVR = int(os.environ.get("TPU_NVR", max(TEST_WINDOW, OPERAND_ROWS)))   # operand vector registers
+ NAR = int(os.environ.get("TPU_NAR", max(128, TEST_WINDOW, 2 * MAXDIM + 8)))   # accumulator vector registers
+ IMEM_SIZE = int(os.environ.get("TPU_IMEM", NHDR + IWORDS * 24))   # instruction memory depth in 64-bit words
+-DMA_WORDS = int(os.environ.get("TPU_DMA_WORDS", min(WPR, max(1, BUS_BYTES // (VW // 8))) if os.environ.get("TPU_DMA_WIDEN") == "1" else 1))   # packed words the operand burst moves per loop iteration
++DMA_WORDS = int(os.environ.get("TPU_DMA_WORDS", min(WPR, max(1, BUS_BYTES // (VW // 8)))))   # packed words the operand burst moves per loop iteration
+ 
+ #: (name, minimum, maximum or None) per build parameter, from the spec.
+ PARAMETER_RANGE = {

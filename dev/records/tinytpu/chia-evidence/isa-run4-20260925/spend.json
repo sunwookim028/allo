@@ -1,0 +1,17 @@
+{
+ "run_dir": "/home/sk3463/allo-smoke/chia_runs/isa-run4-20260925",
+ "run_tag": "chia-run isa-run4-20260925@1790322426341",
+ "run_tag_source": "run.json",
+ "t0_ms": 1790322426341,
+ "source": "opencode's own database (spend.run_spend), NEVER the `usage` field",
+ "run_usd": 2.7635,
+ "run_sessions": 1,
+ "per_session_usd": {
+  "ses_f286e0fa8ffes3pPxxfiorOmaD": 2.7635
+ },
+ "model_messages": 56,
+ "per_run_cap_usd": 10.0,
+ "cumulative_chia2026_usd_after": 127.0428,
+ "cumulative_sessions_after": 39,
+ "total_cap_usd": 500.0
+}

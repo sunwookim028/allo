@@ -1,0 +1,13 @@
+[
+ {
+  "what": "iter1",
+  "seconds": 2145.2,
+  "session_id": "ses_f286e0fa8ffes3pPxxfiorOmaD",
+  "sessions": [
+   "ses_f286e0fa8ffes3pPxxfiorOmaD"
+  ],
+  "usd": 2.7635,
+  "completed": true,
+  "num_turns": 56
+ }
+]

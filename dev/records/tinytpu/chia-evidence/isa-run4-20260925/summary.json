@@ -1,0 +1,43 @@
+{
+ "workers": {
+  "front-end": [
+   {
+    "iteration": 1,
+    "accepted": true,
+    "ok": true,
+    "stage": null,
+    "cycles": {
+     "16x16x16": 627,
+     "4x4x4": 175
+    },
+    "total": 2397,
+    "primary": "total_model_cycles",
+    "llm_usd": 2.7635
+   }
+  ]
+ },
+ "baseline": {
+  "16x16x16": 674,
+  "4x4x4": 175
+ },
+ "best": {
+  "worker": "front-end",
+  "iteration": 1,
+  "total": 2397,
+  "primary": "total_model_cycles",
+  "cycles": {
+   "16x16x16": 627,
+   "4x4x4": 175
+  }
+ },
+ "spend": {
+  "usd": 2.7635,
+  "messages": 56,
+  "sessions": {
+   "ses_f286e0fa8ffes3pPxxfiorOmaD": 2.7635
+  }
+ },
+ "account_window_usd": 2.7635,
+ "wall_seconds": 3440.5,
+ "hard_cap_hit": false
+}
