@@ -15,6 +15,17 @@ Allo is a Python-embedded, MLIR-based language and compiler designed to facilita
 * **Multiple Backend Support**: Allo currently targets AMD and Intel FPGAs as well as AMD Ryzen NPUs (AI Engine), with planned support for GPUs and ASICs in future releases.
 
 
+## This Fork: PyTorch onto an Accelerator You Can Change
+
+This fork adds a hardware/compiler co-design loop on top of Allo. It has a TPU-style accelerator written as Allo dataflow units ([TinyTPU](https://sunwookim028.github.io/allo/designs/tinytpu_isa.html)), and the ACT compiler, which maps unchanged PyTorch models onto that accelerator. After every change to the machine, the model is checked against PyTorch again. One command runs a PyTorch MLP through the whole flow on the simulated design:
+
+```bash
+cd examples/tinytpu && make mlp
+```
+
+[The tutorial](https://sunwookim028.github.io/allo/designs/tinytpu_tutorial.html) then changes the machine twice, first a larger array and then a new fused instruction, and recompiles the same model for each version. Documentation for the fork: https://sunwookim028.github.io/allo/.
+
+
 ## Getting Started
 
 Please check out the [Allo documentation](https://cornell-zhang.github.io/allo) for installation instructions and tutorials.
