@@ -1,0 +1,22 @@
+{
+ "run_dir": "/home/sk3463/work/measure/before-loop/loop",
+ "run_tag": "chia-run loop@1790339665229",
+ "run_tag_source": "run.json",
+ "t0_ms": 1790339665229,
+ "source": "opencode's own database (spend.run_spend), NEVER the `usage` field",
+ "run_usd": 0.0,
+ "run_sessions": 5,
+ "per_session_usd": {
+  "ses_f274a4080ffexKS4HGvvpxg051": 0.0,
+  "ses_f274b660fffedJoSPBsC5m4RKR": 0.0,
+  "ses_f274ca829ffeVKu992BlxD3qb9": 0.0,
+  "ses_f27593884ffeef1BqhhYbSHhx1": 0.0,
+  "ses_f2765e37cffe3BihIaFsbnarSf": 0.0
+ },
+ "model_messages": 15,
+ "per_run_cap_usd": 5.0,
+ "cumulative_chia2026_usd_after": 127.0428,
+ "cumulative_sessions_after": 39,
+ "total_cap_usd": 500.0,
+ "note": "no session carries this tag -- no model call was made, the run predates the titling, or its sessions are gone. summary.json recorded $0.0. `spend.py report <repo>` attributes by time window instead."
+}

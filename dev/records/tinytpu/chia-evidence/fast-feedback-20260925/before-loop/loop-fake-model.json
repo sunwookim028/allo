@@ -1,0 +1,260 @@
+[
+ {
+  "script": [
+   [
+    "read_spec",
+    {}
+   ],
+   [
+    "replace_text",
+    {
+     "path": "microarch_isa.py",
+     "old": "import os\n",
+     "new": "import os\n"
+    }
+   ],
+   [
+    "run_functional_check",
+    {}
+   ],
+   [
+    "score_cycles",
+    {}
+   ],
+   [
+    "say",
+    "No-op: re-saved the design unchanged."
+   ]
+  ],
+  "tools": [
+   "tpufrontend_tpufrontend_apply_spec_patch",
+   "tpufrontend_tpufrontend_insert_after",
+   "tpufrontend_tpufrontend_read_reference",
+   "tpufrontend_tpufrontend_read_spec",
+   "tpufrontend_tpufrontend_regenerate_isa",
+   "tpufrontend_tpufrontend_replace_text",
+   "tpufrontend_tpufrontend_run_functional_check",
+   "tpufrontend_tpufrontend_score_cycles"
+  ],
+  "calls": [
+   {
+    "tool": "tpufrontend_tpufrontend_read_spec",
+    "args": {},
+    "sent": 1790340375.2980804,
+    "result": "Writable files (read one with read_spec(path=...)):\n  microarch_isa.py                    103 lines\n  isa_dsl.py                          782 lines\n  isa_spec.json                      1912 lines\n  isa_encoding.py                     720 lines\n  isa_ref.py                          241 lines\n  ip/isa.py                           129 lines\n  ip/tinytpu.py                       100 lines\n  ip/assembler.py                     328 lines\n  ip/programs.py                      133 lines\n  ip/units/sequencer.py               151 lines   (a unit)\n  ip/units/dma_load.py                102 lines   (a unit)\n  ip/units/scratchpad.py               64 lines   (a unit)\n  ip/units/vector_regs.py              52 lines   (a unit)\n  ip/units/weight_loader.py            60 lines   (a unit)\n  ip/units/pe.py                       65 lines   (a unit)\n  ip/units/accumulator.py             138 lines   (a unit)\n  ip/units/dma_store.py                46 lines   (a unit)",
+    "returned_after_s": 0.3
+   },
+   {
+    "tool": "tpufrontend_tpufrontend_replace_text",
+    "args": {
+     "path": "microarch_isa.py",
+     "old": "import os\n",
+     "new": "import os\n"
+    },
+    "sent": 1790340375.6266923,
+    "result": "Replaced 1 occurrence in microarch_isa.py.",
+    "returned_after_s": 0.2
+   },
+   {
+    "tool": "tpufrontend_tpufrontend_run_functional_check",
+    "args": {},
+    "sent": 1790340375.793173,
+    "result": "{\n \"ceilings\": {\n  \"addressing\": 88,\n  \"cubic_header\": 76\n },\n \"codesign\": false,\n \"config\": {\n  \"TPU_MAXDIM\": \"16\",\n  \"TPU_QD\": \"16\",\n  \"TPU_T\": \"4\"\n },\n \"config_proposed\": false,\n \"frozen_ref\": \"247d422eda85a8a1bc5989b70f68720308013a42\",\n \"gate\": {\n  \"bench_isa\": \"ALL EXACT\",\n  \"isa\": {\n   \"conform\": \"ISA OK: the spec, its 1 generated artefacts and all 9 consumers agree\",\n   \"seconds\": 38.0,\n   \"vouched\": true\n  },\n  \"param\": {\n   \"TPU_MAXDIM=12\": \"PARAM OK: 186/186 runs exact at T=4 MAXDIM=12 (27 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)\",\n   \"TPU_MAXDIM=8\": \"PARAM OK: 68/68 runs exact at T=4 MAXDIM=8 (8 GEMM shapes x relu x full/corner/boundary, 20 random programs; 4 seeds skipped as ungeneratable at this MAXDIM)\",\n   \"TPU_T=8,TPU_MAXDIM=32\": \"PARAM OK: 408/408 runs exact at T=8 MAXDIM=32 (64 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)\"\n  },\n  \"pytorch\": {\n   \"bytes\": 2688,\n   \"corpus\": [\n    \"mlp_tiny          2      8     1024       0   BIT-EXACT against torch\",\n    \"mlp_deep          4      8     1664       0   BIT-EXACT against torch\"\n   ],\n   \"models\": \"2/4\",\n   \"reference\": \"torch.nn.Linear's own forward on the model's real weights, with the machine's epilogue applied in torch; nothing a candidate writes is on either side\",\n   \"seconds\": 4.1,\n   \"vouched\": true\n  },\n  \"seconds\": 108.7,\n  \"stress\": \"STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)\",\n  \"stress_runs\": 492,\n  \"vouched\": true\n },\n \"invariants\": {\n  \"DMA_WORDS\": 1,\n  \"IMEM_SIZE\": 56,\n  \"MAXDIM\": 16,\n  \"QD\": 16,\n  \"T\": 4\n },\n \"measurement\": \"cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape\",\n \"ok\": true,\n \"sandbox\": true,\n \"seconds\": 119.1,\n \"shapes\": [\n  \"4x4x4\",\n  \"16x16x16\"\n ],\n \"shapes_skipped\": {}\n}",
+    "returned_after_s": 119.3
+   },
+   {
+    "tool": "tpufrontend_tpufrontend_score_cycles",
+    "args": {},
+    "sent": 1790340495.0949886,
+    "result": "{\n \"area\": {\n  \"basis\": \"structural bit census x coefficients fitted to 7 committed DC runs; leave-one-out 0.62 % mean / 1.39 % worst; NOT a measurement\",\n  \"census\": {\n   \"buffer_bits\": 8256,\n   \"channel_bits\": 35328,\n   \"memory_bits\": 20480,\n   \"operand_port_bits\": 32,\n   \"parameters\": {\n    \"AW\": 128,\n    \"DMA_WORDS\": 1,\n    \"IMEM_SIZE\": 56,\n    \"MAXDIM\": 16,\n    \"NAR\": 128,\n    \"NVR\": 64,\n    \"QD\": 16,\n    \"SPAD_ROWS\": 64,\n    \"T\": 4,\n    \"VW\": 32\n   },\n   \"per_channel\": {\n    \"a_fwd\": 1536,\n    \"ac2sp\": 512,\n    \"acol\": 2048,\n    \"c_acc\": 1024,\n    \"c_dld\": 1024,\n    \"c_dst\": 1024,\n    \"c_spm\": 1024,\n    \"c_vru\": 1024,\n    \"cw\": 8192,\n    \"dma2sp\": 512,\n    \"dma2vr\": 512,\n    \"p_fwd\": 6144,\n    \"sp2vr\": 512,\n    \"wcol\": 2048,\n    \"wq\": 2048,\n    \"wrow\": 6144\n   },\n   \"per_unit\": {\n    \"accu\": 16384,\n    \"dma_ld\": 4160,\n    \"dma_st\": 0,\n    \"pe\": 0,\n    \"sequencer\": 4096,\n    \"spm\": 2048,\n    \"vru\": 2048,\n    \"wld\": 0\n   },\n   \"processing_elements\": 16,\n   \"store_port_bits\": 32\n  },\n  \"envelope\": {\n   \"DMA_WORDS\": [\n    1,\n    16\n   ],\n   \"MAXDIM\": [\n    16,\n    64\n   ],\n   \"QD\": [\n    8,\n    16\n   ],\n   \"T\": [\n    4,\n    8\n   ]\n  },\n  \"estimate\": true,\n  \"extrapolated\": null,\n  \"extrapolated_terms\": null,\n  \"terms\": {\n   \"adapters\": 832528.4,\n   \"array\": 39696.0,\n   \"buffers\": 52764.1,\n   \"channels\": 162932.7,\n   \"unit_memory\": 115062.8\n  },\n  \"um2\": 1202984.0\n },\n \"ceilings\": {\n  \"addressing\": 88,\n  \"cubic_header\": 76\n },\n \"codesign\": false,\n \"config\": {\n  \"TPU_MAXDIM\": \"16\",\n  \"TPU_QD\": \"16\",\n  \"TPU_T\": \"4\"\n },\n \"config_proposed\": false,\n \"cosim_seconds\": 184.4,\n \"cycles\": {\n  \"16x16x16\": 674,\n  \"4x4x4\": 175\n },\n \"frozen_ref\": \"247d422eda85a8a1bc5989b70f68720308013a42\",\n \"gate\": {\n  \"bench_isa\": \"ALL EXACT\",\n  \"isa\": {\n   \"conform\": \"ISA OK: the spec, its 1 generated artefacts and all 9 consumers agree\",\n   \"seconds\": 36.8,\n   \"vouched\": true\n  },\n  \"param\": {\n   \"TPU_MAXDIM=12\": \"PARAM OK: 186/186 runs exact at T=4 MAXDIM=12 (27 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)\",\n   \"TPU_MAXDIM=8\": \"PARAM OK: 68/68 runs exact at T=4 MAXDIM=8 (8 GEMM shapes x relu x full/corner/boundary, 20 random programs; 4 seeds skipped as ungeneratable at this MAXDIM)\",\n   \"TPU_T=8,TPU_MAXDIM=32\": \"PARAM OK: 408/408 runs exact at T=8 MAXDIM=32 (64 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)\"\n  },\n  \"pytorch\": {\n   \"bytes\": 2688,\n   \"corpus\": [\n    \"mlp_tiny          2      8     1024       0   BIT-EXACT against torch\",\n    \"mlp_deep          4      8     1664       0   BIT-EXACT against torch\"\n   ],\n   \"models\": \"2/4\",\n   \"reference\": \"torch.nn.Linear's own forward on the model's real weights, with the machine's epilogue applied in torch; nothing a candidate writes is on either side\",\n   \"seconds\": 3.6,\n   \"vouched\": true\n  },\n  \"seconds\": 108.7,\n  \"stress\": \"STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)\",\n  \"stress_runs\": 492,\n  \"vouched\": true\n },\n \"invariants\": {\n  \"DMA_WORDS\": 1,\n  \"IMEM_SIZE\": 56,\n  \"MAXDIM\": 16,\n  \"QD\": 16,\n  \"T\": 4\n },\n \"measurement\": \"cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape\",\n \"model_cycles\": {\n  \"mlp_deep\": 2117,\n  \"mlp_tiny\": 1150\n },\n \"model_env\": {\n  \"TPU_MAXDIM\": \"64\",\n  \"TPU_QD\": \"16\",\n  \"TPU_T\": \"4\"\n },\n \"model_seconds\": 399.4,\n \"model_skipped\": {},\n \"objective\": {\n  \"area\": {\n   \"basis\": \"structural bit census x coefficients fitted to 7 committed DC runs; leave-one-out 0.62 % mean / 1.39 % worst; NOT a measurement\",\n   \"census\": {\n    \"buffer_bits\": 8256,\n    \"channel_bits\": 35328,\n    \"memory_bits\": 20480,\n    \"operand_port_bits\": 32,\n    \"parameters\": {\n     \"AW\": 128,\n     \"DMA_WORDS\": 1,\n     \"IMEM_SIZE\": 56,\n     \"MAXDIM\": 16,\n     \"NAR\": 128,\n     \"NVR\": 64,\n     \"QD\": 16,\n     \"SPAD_ROWS\": 64,\n     \"T\": 4,\n     \"VW\": 32\n    },\n    \"per_channel\": {\n     \"a_fwd\": 1536,\n     \"ac2sp\": 512,\n     \"acol\": 2048,\n     \"c_acc\": 1024,\n     \"c_dld\": 1024,\n     \"c_dst\": 1024,\n     \"c_spm\": 1024,\n     \"c_vru\": 1024,\n     \"cw\": 8192,\n     \"dma2sp\": 512,\n     \"dma2vr\": 512,\n     \"p_fwd\": 6144,\n     \"sp2vr\": 512,\n     \"wcol\": 2048,\n     \"wq\": 2048,\n     \"wrow\": 6144\n    },\n    \"per_unit\": {\n     \"accu\": 16384,\n     \"dma_ld\": 4160,\n     \"dma_st\": 0,\n     \"pe\": 0,\n     \"sequencer\": 4096,\n     \"spm\": 2048,\n     \"vru\": 2048,\n     \"wld\": 0\n    },\n    \"processing_elements\": 16,\n    \"store_port_bits\": 32\n   },\n   \"envelope\": {\n    \"DMA_WORDS\": [\n     1,\n     16\n    ],\n    \"MAXDIM\": [\n     16,\n     64\n    ],\n    \"QD\": [\n     8,\n     16\n    ],\n    \"T\": [\n     4,\n     8\n    ]\n   },\n   \"estimate\": true,\n   \"extrapolated\": null,\n   \"extrapolated_terms\": null,\n   \"terms\": {\n    \"adapters\": 832528.4,\n    \"array\": 39696.0,\n    \"buffers\": 52764.1,\n    \"channels\": 162932.7,\n    \"unit_memory\": 115062.8\n   },\n   \"um2\": 1202984.0\n  },\n  \"gemm\": {\n   \"16x16x16\": 674,\n   \"4x4x4\": 175\n  },\n  \"model\": {\n   \"mlp_deep\": 2117,\n   \"mlp_tiny\": 1150\n  },\n  \"model_env\": {\n   \"TPU_MAXDIM\": \"64\",\n   \"TPU_QD\": \"16\",\n   \"TPU_T\": \"4\"\n  },\n  \"model_skipped\": null,\n  \"note\": \"three terms, reported per shape and per model; never summed into one score. `area` is an ESTIMATE (chia_agent/area_proxy.py), `resources` is csynth's FPGA table, and the two disagree by design\",\n  \"resources\": {\n   \"bram_18k\": 40,\n   \"dsp\": 14,\n   \"estimated_ns\": 2.431,\n   \"ff\": 18825,\n   \"lut\": 27428,\n   \"uram\": 0\n  }\n },\n \"ok\": true,\n \"sandbox\": true,\n \"seconds\": 705.1,\n \"shapes\": [\n  \"4x4x4\",\n  \"16x16x16\"\n ],\n \"shapes_skipped\": {},\n \"synth\": {\n  \"area\": {\n   \"bram_18k\": 40,\n   \"dsp\": 14,\n   \"ff\": 18825,\n   \"lut\": 27428,\n   \"uram\": 0\n  },\n  \"estimated_ns\": 2.431,\n  \"target_ns\": 3.33\n },\n \"total_cycles\": 849,\n \"total_model_cycles\": 3267\n}",
+    "returned_after_s": 705.4
+   }
+  ],
+  "started": 1790340375.2980564
+ },
+ {
+  "script": [
+   [
+    "replace_text",
+    {
+     "path": "ip/units/scratchpad.py",
+     "old": "    spad: UInt(VW)[SPAD_ROWS]\n",
+     "new": "    spad: UInt(VW)[SPAD_ROWS] = 0\n"
+    }
+   ],
+   [
+    "run_functional_check",
+    {}
+   ],
+   [
+    "say",
+    "Re-added the spad zero-fill."
+   ]
+  ],
+  "tools": [
+   "tpufrontend_tpufrontend_apply_spec_patch",
+   "tpufrontend_tpufrontend_insert_after",
+   "tpufrontend_tpufrontend_read_reference",
+   "tpufrontend_tpufrontend_read_spec",
+   "tpufrontend_tpufrontend_regenerate_isa",
+   "tpufrontend_tpufrontend_replace_text",
+   "tpufrontend_tpufrontend_run_functional_check",
+   "tpufrontend_tpufrontend_score_cycles"
+  ],
+  "calls": [
+   {
+    "tool": "tpufrontend_tpufrontend_replace_text",
+    "args": {
+     "path": "ip/units/scratchpad.py",
+     "old": "    spad: UInt(VW)[SPAD_ROWS]\n",
+     "new": "    spad: UInt(VW)[SPAD_ROWS] = 0\n"
+    },
+    "sent": 1790341205.7760382,
+    "result": "Replaced 1 occurrence in ip/units/scratchpad.py.",
+    "returned_after_s": 0.4
+   },
+   {
+    "tool": "tpufrontend_tpufrontend_run_functional_check",
+    "args": {},
+    "sent": 1790341206.1753252,
+    "result": "{\n \"ceilings\": {\n  \"addressing\": 88,\n  \"cubic_header\": 76\n },\n \"codesign\": false,\n \"config\": {\n  \"TPU_MAXDIM\": \"16\",\n  \"TPU_QD\": \"16\",\n  \"TPU_T\": \"4\"\n },\n \"config_proposed\": false,\n \"frozen_ref\": \"247d422eda85a8a1bc5989b70f68720308013a42\",\n \"gate\": {\n  \"bench_isa\": \"ALL EXACT\",\n  \"isa\": {\n   \"conform\": \"ISA OK: the spec, its 1 generated artefacts and all 9 consumers agree\",\n   \"seconds\": 37.8,\n   \"vouched\": true\n  },\n  \"param\": {\n   \"TPU_MAXDIM=12\": \"PARAM OK: 186/186 runs exact at T=4 MAXDIM=12 (27 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)\",\n   \"TPU_MAXDIM=8\": \"PARAM OK: 68/68 runs exact at T=4 MAXDIM=8 (8 GEMM shapes x relu x full/corner/boundary, 20 random programs; 4 seeds skipped as ungeneratable at this MAXDIM)\",\n   \"TPU_T=8,TPU_MAXDIM=32\": \"PARAM OK: 408/408 runs exact at T=8 MAXDIM=32 (64 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)\"\n  },\n  \"pytorch\": {\n   \"bytes\": 2688,\n   \"corpus\": [\n    \"mlp_tiny          2      8     1024       0   BIT-EXACT against torch\",\n    \"mlp_deep          4      8     1664       0   BIT-EXACT against torch\"\n   ],\n   \"models\": \"2/4\",\n   \"reference\": \"torch.nn.Linear's own forward on the model's real weights, with the machine's epilogue applied in torch; nothing a candidate writes is on either side\",\n   \"seconds\": 4.3,\n   \"vouched\": true\n  },\n  \"seconds\": 116.9,\n  \"stress\": \"STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)\",\n  \"stress_runs\": 492,\n  \"vouched\": true\n },\n \"invariants\": {\n  \"DMA_WORDS\": 1,\n  \"IMEM_SIZE\": 56,\n  \"MAXDIM\": 16,\n  \"QD\": 16,\n  \"T\": 4\n },\n \"measurement\": \"cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape\",\n \"ok\": true,\n \"sandbox\": true,\n \"seconds\": 127.7,\n \"shapes\": [\n  \"4x4x4\",\n  \"16x16x16\"\n ],\n \"shapes_skipped\": {}\n}",
+    "returned_after_s": 128.0
+   }
+  ],
+  "started": 1790341205.7760189
+ },
+ {
+  "script": [
+   [
+    "replace_text",
+    {
+     "path": "ip/units/pe.py",
+     "old": "psum: int32 = psum_north + activation16 * weight16",
+     "new": "psum: int16 = psum_north + activation16 * weight16"
+    }
+   ],
+   [
+    "say",
+    "Narrowed the PE partial sum to int16."
+   ]
+  ],
+  "tools": [
+   "tpufrontend_tpufrontend_apply_spec_patch",
+   "tpufrontend_tpufrontend_insert_after",
+   "tpufrontend_tpufrontend_read_reference",
+   "tpufrontend_tpufrontend_read_spec",
+   "tpufrontend_tpufrontend_regenerate_isa",
+   "tpufrontend_tpufrontend_replace_text",
+   "tpufrontend_tpufrontend_run_functional_check",
+   "tpufrontend_tpufrontend_score_cycles"
+  ],
+  "calls": [
+   {
+    "tool": "tpufrontend_tpufrontend_replace_text",
+    "args": {
+     "path": "ip/units/pe.py",
+     "old": "psum: int32 = psum_north + activation16 * weight16",
+     "new": "psum: int16 = psum_north + activation16 * weight16"
+    },
+    "sent": 1790342028.7043085,
+    "result": "Replaced 1 occurrence in ip/units/pe.py.",
+    "returned_after_s": 0.3
+   }
+  ],
+  "started": 1790342028.704285
+ },
+ {
+  "script": [
+   [
+    "say",
+    "I cannot fix this."
+   ]
+  ],
+  "tools": [
+   "tpufrontend_tpufrontend_apply_spec_patch",
+   "tpufrontend_tpufrontend_insert_after",
+   "tpufrontend_tpufrontend_read_reference",
+   "tpufrontend_tpufrontend_read_spec",
+   "tpufrontend_tpufrontend_regenerate_isa",
+   "tpufrontend_tpufrontend_replace_text",
+   "tpufrontend_tpufrontend_run_functional_check",
+   "tpufrontend_tpufrontend_score_cycles"
+  ],
+  "calls": [],
+  "started": 1790342110.6705225
+ },
+ {
+  "script": [
+   [
+    "apply_spec_patch",
+    {
+     "patch": "--- a/cosim.py\n+++ b/cosim.py\n@@ -70,7 +70,7 @@\n \n VITIS = \"/opt/xilinx/Vitis_HLS/2023.2/settings64.sh\"\n LDFLAGS = \"-B/usr/bin\"\n-from examples.tinytpu.shapes import SHAPES as _ALL  # noqa: E402\n+from examples.tinytpu.shapes import S_ as _ALL  # noqa: E402\n # Only shapes the built array can express: every dimension must be a multiple\n # of T, since one vmatpush-equivalent is a whole packed word of T lanes.\n SHAPES = [s for s in _ALL if all(d % T == 0 for d in s)]\n"
+    }
+   ],
+   [
+    "replace_text",
+    {
+     "path": "../cosim.py",
+     "old": "SHAPES",
+     "new": "S_"
+    }
+   ],
+   [
+    "replace_text",
+    {
+     "path": "microarch_isa.py",
+     "old": "import os\n",
+     "new": "import os\nimport cosim\n"
+    }
+   ],
+   [
+    "say",
+    "Tried to edit the frozen files."
+   ]
+  ],
+  "tools": [
+   "tpufrontend_tpufrontend_apply_spec_patch",
+   "tpufrontend_tpufrontend_insert_after",
+   "tpufrontend_tpufrontend_read_reference",
+   "tpufrontend_tpufrontend_read_spec",
+   "tpufrontend_tpufrontend_regenerate_isa",
+   "tpufrontend_tpufrontend_replace_text",
+   "tpufrontend_tpufrontend_run_functional_check",
+   "tpufrontend_tpufrontend_score_cycles"
+  ],
+  "calls": [
+   {
+    "tool": "tpufrontend_tpufrontend_apply_spec_patch",
+    "args": {
+     "patch": "--- a/cosim.py\n+++ b/cosim.py\n@@ -70,7 +70,7 @@\n \n VITIS = \"/opt/xilinx/Vitis_HLS/2023.2/settings64.sh\"\n LDFLAGS = \"-B/usr/bin\"\n-from examples.tinytpu.shapes import SHAPES as _ALL  # noqa: E402\n+from examples.tinytpu.shapes import S_ as _ALL  # noqa: E402\n # Only shapes the built array can express: every dimension must be a multiple\n # of T, since one vmatpush-equivalent is a whole packed word of T lanes.\n SHAPES = [s for s in _ALL if all(d % T == 0 for d in s)]\n"
+    },
+    "sent": 1790342186.0723407,
+    "result": "Rejected: patches may touch only ['microarch_isa.py', 'isa_dsl.py', 'isa_spec.json', 'isa_encoding.py', 'isa_ref.py', 'ip/isa.py', 'ip/tinytpu.py', 'ip/assembler.py', 'ip/programs.py', 'ip/units/sequencer.py', 'ip/units/dma_load.py', 'ip/units/scratchpad.py', 'ip/units/vector_regs.py', 'ip/units/weight_loader.py', 'ip/units/pe.py', 'ip/units/accumulator.py', 'ip/units/dma_store.py']. Everything else is frozen.",
+    "returned_after_s": 0.3
+   },
+   {
+    "tool": "tpufrontend_tpufrontend_replace_text",
+    "args": {
+     "path": "../cosim.py",
+     "old": "SHAPES",
+     "new": "S_"
+    },
+    "sent": 1790342186.3491757,
+    "result": "Rejected: path must be one of ['microarch_isa.py', 'isa_dsl.py', 'isa_spec.json', 'isa_encoding.py', 'isa_ref.py', 'ip/isa.py', 'ip/tinytpu.py', 'ip/assembler.py', 'ip/programs.py', 'ip/units/sequencer.py', 'ip/units/dma_load.py', 'ip/units/scratchpad.py', 'ip/units/vector_regs.py', 'ip/units/weight_loader.py', 'ip/units/pe.py', 'ip/units/accumulator.py', 'ip/units/dma_store.py'].",
+    "returned_after_s": 0.2
+   },
+   {
+    "tool": "tpufrontend_tpufrontend_replace_text",
+    "args": {
+     "path": "microarch_isa.py",
+     "old": "import os\n",
+     "new": "import os\nimport cosim\n"
+    },
+    "sent": 1790342186.554232,
+    "result": "Rejected: the edit is outside what a spec may contain -- microarch_isa.py: imports 'cosim', which is not allowed. Describe hardware; do not read, write, or execute. The file is unchanged.",
+    "returned_after_s": 0.1
+   }
+  ],
+  "started": 1790342186.0723205
+ }
+]

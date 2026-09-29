@@ -1,0 +1,68 @@
+{
+ "workers": {
+  "front-end": [
+   {
+    "iteration": 1,
+    "accepted": false,
+    "ok": null,
+    "stage": null,
+    "cycles": null,
+    "total": null,
+    "primary": "total_cycles",
+    "llm_usd": 0
+   },
+   {
+    "iteration": 2,
+    "accepted": false,
+    "ok": true,
+    "stage": null,
+    "cycles": {
+     "16x16x16": 674,
+     "4x4x4": 202
+    },
+    "total": 7757,
+    "primary": "total_model_cycles",
+    "llm_usd": 0
+   },
+   {
+    "iteration": 3,
+    "accepted": false,
+    "ok": false,
+    "stage": "gate:stress",
+    "cycles": null,
+    "total": null,
+    "primary": "total_cycles",
+    "llm_usd": 0
+   },
+   {
+    "iteration": 4,
+    "accepted": false,
+    "ok": null,
+    "stage": null,
+    "cycles": null,
+    "total": null,
+    "primary": "total_cycles",
+    "llm_usd": 0
+   }
+  ]
+ },
+ "baseline": {
+  "16x16x16": 674,
+  "4x4x4": 175
+ },
+ "best": null,
+ "spend": {
+  "usd": 0.0,
+  "messages": 15,
+  "sessions": {
+   "ses_f270d67ccffeC6FeEFngE7Mio4": 0.0,
+   "ses_f270e9bf6ffebxP1RGCZu6POGs": 0.0,
+   "ses_f270fe80effeklLpubqddQKJ3j": 0.0,
+   "ses_f271b2ec2ffeBQItAzGeVQJxrt": 0.0,
+   "ses_f27269a7affeIVzvBVXyTU80Ob": 0.0
+  }
+ },
+ "account_window_usd": 0.0,
+ "wall_seconds": 2367.2,
+ "hard_cap_hit": false
+}

@@ -1,0 +1,87 @@
+{
+ "phases": [
+  "loop"
+ ],
+ "seconds": 2555,
+ "head": "247d422eda85a8a1bc5989b70f68720308013a42",
+ "results": [
+  {
+   "case": "loop.fake-model",
+   "expected": "5 scripted sessions consumed, no errors",
+   "actual": "5 sessions, errors=[]",
+   "pass": true
+  },
+  {
+   "case": "loop.baseline",
+   "expected": "cycles == {'4x4x4': 175, '16x16x16': 674}",
+   "actual": {
+    "16x16x16": 674,
+    "4x4x4": 175
+   },
+   "pass": true
+  },
+  {
+   "case": "a.noop via opencode score_cycles (mid-turn MCP)",
+   "expected": "{'4x4x4': 175, '16x16x16': 674}, returned after > 60 s",
+   "actual": "{'16x16x16': 674, '4x4x4': 175} after 705.4s",
+   "pass": true
+  },
+  {
+   "case": "loop.iter1 no-op",
+   "expected": "not accepted: no diff, not re-scored",
+   "actual": "accepted=False reason=no diff",
+   "pass": true
+  },
+  {
+   "case": "b.spad_zero via loop",
+   "expected": "bit-exact, delta > 0, REJECTED (not better)",
+   "actual": "ok=True {'16x16x16': 674, '4x4x4': 202} delta=4490 (total_model_cycles) accepted=False",
+   "pass": true
+  },
+  {
+   "case": "c.narrow16 via loop",
+   "expected": "REJECTED at gate:stress (after 1 debug session)",
+   "actual": "stage=gate:stress accepted=False",
+   "pass": true
+  },
+  {
+   "case": "e.attacks via opencode",
+   "expected": "every call Rejected; no diff",
+   "actual": "[\"Rejected: patches may touch only ['micro\", \"Rejected: path must be one of ['microarc\", 'Rejected: the edit is outside what a spe']; reason=no diff",
+   "pass": true
+  },
+  {
+   "case": "loop.artifacts",
+   "expected": "best.diff empty, summary.json with no best",
+   "actual": "best.diff='' best=None",
+   "pass": true
+  },
+  {
+   "case": "loop.spend",
+   "expected": "the run's own sessions, found by its tag, cost $0.00",
+   "actual": "$0.00 over 5 session(s)",
+   "pass": true
+  },
+  {
+   "case": "loop.opencode-tools",
+   "expected": "only the 8 MCP tools advertised to the model",
+   "actual": [
+    "tpufrontend_tpufrontend_apply_spec_patch",
+    "tpufrontend_tpufrontend_insert_after",
+    "tpufrontend_tpufrontend_read_reference",
+    "tpufrontend_tpufrontend_read_spec",
+    "tpufrontend_tpufrontend_regenerate_isa",
+    "tpufrontend_tpufrontend_replace_text",
+    "tpufrontend_tpufrontend_run_functional_check",
+    "tpufrontend_tpufrontend_score_cycles"
+   ],
+   "pass": true
+  },
+  {
+   "case": "hygiene.no-orphans-at-exit",
+   "expected": "no process under the scratch dir",
+   "actual": "none",
+   "pass": true
+  }
+ ]
+}

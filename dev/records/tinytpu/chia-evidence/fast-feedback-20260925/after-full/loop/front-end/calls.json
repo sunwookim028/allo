@@ -1,0 +1,47 @@
+[
+ {
+  "what": "iter1",
+  "seconds": 749.7,
+  "session_id": "ses_f27269a7affeIVzvBVXyTU80Ob",
+  "sessions": [],
+  "usd": 0,
+  "completed": true,
+  "num_turns": 5
+ },
+ {
+  "what": "iter2",
+  "seconds": 51.4,
+  "session_id": "ses_f271b2ec2ffeBQItAzGeVQJxrt",
+  "sessions": [],
+  "usd": 0,
+  "completed": true,
+  "num_turns": 3
+ },
+ {
+  "what": "iter3",
+  "seconds": 5.1,
+  "session_id": "ses_f270fe80effeklLpubqddQKJ3j",
+  "sessions": [],
+  "usd": 0,
+  "completed": true,
+  "num_turns": 2
+ },
+ {
+  "what": "iter3-debug1",
+  "seconds": 3.3,
+  "session_id": "ses_f270e9bf6ffebxP1RGCZu6POGs",
+  "sessions": [],
+  "usd": 0,
+  "completed": true,
+  "num_turns": 1
+ },
+ {
+  "what": "iter4",
+  "seconds": 4.4,
+  "session_id": "ses_f270d67ccffeC6FeEFngE7Mio4",
+  "sessions": [],
+  "usd": 0,
+  "completed": true,
+  "num_turns": 4
+ }
+]

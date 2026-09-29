@@ -1,0 +1,590 @@
+{
+ "a": {
+  "area": {
+   "basis": "structural bit census x coefficients fitted to 7 committed DC runs; leave-one-out 0.62 % mean / 1.39 % worst; NOT a measurement",
+   "census": {
+    "buffer_bits": 8256,
+    "channel_bits": 35328,
+    "memory_bits": 20480,
+    "operand_port_bits": 32,
+    "parameters": {
+     "AW": 128,
+     "DMA_WORDS": 1,
+     "IMEM_SIZE": 56,
+     "MAXDIM": 16,
+     "NAR": 128,
+     "NVR": 64,
+     "QD": 16,
+     "SPAD_ROWS": 64,
+     "T": 4,
+     "VW": 32
+    },
+    "per_channel": {
+     "a_fwd": 1536,
+     "ac2sp": 512,
+     "acol": 2048,
+     "c_acc": 1024,
+     "c_dld": 1024,
+     "c_dst": 1024,
+     "c_spm": 1024,
+     "c_vru": 1024,
+     "cw": 8192,
+     "dma2sp": 512,
+     "dma2vr": 512,
+     "p_fwd": 6144,
+     "sp2vr": 512,
+     "wcol": 2048,
+     "wq": 2048,
+     "wrow": 6144
+    },
+    "per_unit": {
+     "accu": 16384,
+     "dma_ld": 4160,
+     "dma_st": 0,
+     "pe": 0,
+     "sequencer": 4096,
+     "spm": 2048,
+     "vru": 2048,
+     "wld": 0
+    },
+    "processing_elements": 16,
+    "store_port_bits": 32
+   },
+   "envelope": {
+    "DMA_WORDS": [
+     1,
+     16
+    ],
+    "MAXDIM": [
+     16,
+     64
+    ],
+    "QD": [
+     8,
+     16
+    ],
+    "T": [
+     4,
+     8
+    ]
+   },
+   "estimate": true,
+   "extrapolated": null,
+   "extrapolated_terms": null,
+   "terms": {
+    "adapters": 832528.4,
+    "array": 39696.0,
+    "buffers": 52764.1,
+    "channels": 162932.7,
+    "unit_memory": 115062.8
+   },
+   "um2": 1202984.0
+  },
+  "ceilings": {
+   "addressing": 88,
+   "cubic_header": 76
+  },
+  "codesign": false,
+  "config": {
+   "TPU_MAXDIM": "16",
+   "TPU_QD": "16",
+   "TPU_T": "4"
+  },
+  "config_proposed": false,
+  "cosim_seconds": 169.6,
+  "cycles": {
+   "16x16x16": 674,
+   "4x4x4": 175
+  },
+  "frozen_ref": "3e8db6fe2ed7f2181e2055272edd512e102d6e18",
+  "gate": {
+   "bench_isa": "ALL EXACT",
+   "isa": {
+    "conform": "ISA OK: the spec, its 1 generated artefacts and all 9 consumers agree",
+    "seconds": 38.4,
+    "vouched": true
+   },
+   "param": {
+    "TPU_MAXDIM=12": "PARAM OK: 186/186 runs exact at T=4 MAXDIM=12 (27 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)",
+    "TPU_MAXDIM=8": "PARAM OK: 68/68 runs exact at T=4 MAXDIM=8 (8 GEMM shapes x relu x full/corner/boundary, 20 random programs; 4 seeds skipped as ungeneratable at this MAXDIM)",
+    "TPU_T=8,TPU_MAXDIM=32": "PARAM OK: 408/408 runs exact at T=8 MAXDIM=32 (64 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)"
+   },
+   "pytorch": {
+    "bytes": 2688,
+    "corpus": [
+     "mlp_tiny          2      8     1024       0   BIT-EXACT against torch",
+     "mlp_deep          4      8     1664       0   BIT-EXACT against torch"
+    ],
+    "models": "2/4",
+    "reference": "torch.nn.Linear's own forward on the model's real weights, with the machine's epilogue applied in torch; nothing a candidate writes is on either side",
+    "seconds": 2.8,
+    "vouched": true
+   },
+   "seconds": 104.7,
+   "stress": "STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)",
+   "stress_runs": 492,
+   "tier": "full",
+   "vouched": true
+  },
+  "gate_only": false,
+  "gate_tier": "full",
+  "invariants": {
+   "DMA_WORDS": 1,
+   "IMEM_SIZE": 56,
+   "MAXDIM": 16,
+   "QD": 16,
+   "T": 4
+  },
+  "measurement": "cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape",
+  "model_cycles": {
+   "mlp_deep": 2117,
+   "mlp_tiny": 1150
+  },
+  "model_env": {
+   "TPU_MAXDIM": "64",
+   "TPU_QD": "16",
+   "TPU_T": "4"
+  },
+  "model_seconds": 387.6,
+  "model_skipped": {},
+  "objective": {
+   "area": {
+    "basis": "structural bit census x coefficients fitted to 7 committed DC runs; leave-one-out 0.62 % mean / 1.39 % worst; NOT a measurement",
+    "census": {
+     "buffer_bits": 8256,
+     "channel_bits": 35328,
+     "memory_bits": 20480,
+     "operand_port_bits": 32,
+     "parameters": {
+      "AW": 128,
+      "DMA_WORDS": 1,
+      "IMEM_SIZE": 56,
+      "MAXDIM": 16,
+      "NAR": 128,
+      "NVR": 64,
+      "QD": 16,
+      "SPAD_ROWS": 64,
+      "T": 4,
+      "VW": 32
+     },
+     "per_channel": {
+      "a_fwd": 1536,
+      "ac2sp": 512,
+      "acol": 2048,
+      "c_acc": 1024,
+      "c_dld": 1024,
+      "c_dst": 1024,
+      "c_spm": 1024,
+      "c_vru": 1024,
+      "cw": 8192,
+      "dma2sp": 512,
+      "dma2vr": 512,
+      "p_fwd": 6144,
+      "sp2vr": 512,
+      "wcol": 2048,
+      "wq": 2048,
+      "wrow": 6144
+     },
+     "per_unit": {
+      "accu": 16384,
+      "dma_ld": 4160,
+      "dma_st": 0,
+      "pe": 0,
+      "sequencer": 4096,
+      "spm": 2048,
+      "vru": 2048,
+      "wld": 0
+     },
+     "processing_elements": 16,
+     "store_port_bits": 32
+    },
+    "envelope": {
+     "DMA_WORDS": [
+      1,
+      16
+     ],
+     "MAXDIM": [
+      16,
+      64
+     ],
+     "QD": [
+      8,
+      16
+     ],
+     "T": [
+      4,
+      8
+     ]
+    },
+    "estimate": true,
+    "extrapolated": null,
+    "extrapolated_terms": null,
+    "terms": {
+     "adapters": 832528.4,
+     "array": 39696.0,
+     "buffers": 52764.1,
+     "channels": 162932.7,
+     "unit_memory": 115062.8
+    },
+    "um2": 1202984.0
+   },
+   "gemm": {
+    "16x16x16": 674,
+    "4x4x4": 175
+   },
+   "model": {
+    "mlp_deep": 2117,
+    "mlp_tiny": 1150
+   },
+   "model_env": {
+    "TPU_MAXDIM": "64",
+    "TPU_QD": "16",
+    "TPU_T": "4"
+   },
+   "model_skipped": null,
+   "note": "three terms, reported per shape and per model; never summed into one score. `area` is an ESTIMATE (chia_agent/area_proxy.py), `resources` is csynth's FPGA table, and the two disagree by design",
+   "resources": {
+    "bram_18k": 40,
+    "dsp": 14,
+    "estimated_ns": 2.431,
+    "ff": 18825,
+    "lut": 27428,
+    "uram": 0
+   }
+  },
+  "ok": true,
+  "sandbox": true,
+  "seconds": 673.4,
+  "shapes": [
+   "4x4x4",
+   "16x16x16"
+  ],
+  "shapes_skipped": {},
+  "synth": {
+   "area": {
+    "bram_18k": 40,
+    "dsp": 14,
+    "ff": 18825,
+    "lut": 27428,
+    "uram": 0
+   },
+   "estimated_ns": 2.431,
+   "target_ns": 3.33
+  },
+  "total_cycles": 849,
+  "total_model_cycles": 3267,
+  "budget": {
+   "iteration": 0,
+   "session_seconds": 2400,
+   "seconds_used": 673.5,
+   "seconds_left": 1726.5,
+   "score_cycles_left": 0,
+   "tool_seconds": {
+    "read_spec": 0.01,
+    "read_reference": 0.05,
+    "replace_text": 0.2,
+    "apply_spec_patch": 0.3,
+    "insert_after": 0.2,
+    "regenerate_isa": 3,
+    "check_bit_exact": 13,
+    "run_functional_check": 41,
+    "mapspace_report": 42,
+    "score_cycles": 240
+   }
+  }
+ },
+ "b": {
+  "area": {
+   "basis": "structural bit census x coefficients fitted to 7 committed DC runs; leave-one-out 0.62 % mean / 1.39 % worst; NOT a measurement",
+   "census": {
+    "buffer_bits": 8256,
+    "channel_bits": 35328,
+    "memory_bits": 20480,
+    "operand_port_bits": 32,
+    "parameters": {
+     "AW": 128,
+     "DMA_WORDS": 1,
+     "IMEM_SIZE": 56,
+     "MAXDIM": 16,
+     "NAR": 128,
+     "NVR": 64,
+     "QD": 16,
+     "SPAD_ROWS": 64,
+     "T": 4,
+     "VW": 32
+    },
+    "per_channel": {
+     "a_fwd": 1536,
+     "ac2sp": 512,
+     "acol": 2048,
+     "c_acc": 1024,
+     "c_dld": 1024,
+     "c_dst": 1024,
+     "c_spm": 1024,
+     "c_vru": 1024,
+     "cw": 8192,
+     "dma2sp": 512,
+     "dma2vr": 512,
+     "p_fwd": 6144,
+     "sp2vr": 512,
+     "wcol": 2048,
+     "wq": 2048,
+     "wrow": 6144
+    },
+    "per_unit": {
+     "accu": 16384,
+     "dma_ld": 4160,
+     "dma_st": 0,
+     "pe": 0,
+     "sequencer": 4096,
+     "spm": 2048,
+     "vru": 2048,
+     "wld": 0
+    },
+    "processing_elements": 16,
+    "store_port_bits": 32
+   },
+   "envelope": {
+    "DMA_WORDS": [
+     1,
+     16
+    ],
+    "MAXDIM": [
+     16,
+     64
+    ],
+    "QD": [
+     8,
+     16
+    ],
+    "T": [
+     4,
+     8
+    ]
+   },
+   "estimate": true,
+   "extrapolated": null,
+   "extrapolated_terms": null,
+   "terms": {
+    "adapters": 832528.4,
+    "array": 39696.0,
+    "buffers": 52764.1,
+    "channels": 162932.7,
+    "unit_memory": 115062.8
+   },
+   "um2": 1202984.0
+  },
+  "ceilings": {
+   "addressing": 88,
+   "cubic_header": 76
+  },
+  "codesign": false,
+  "config": {
+   "TPU_MAXDIM": "16",
+   "TPU_QD": "16",
+   "TPU_T": "4"
+  },
+  "config_proposed": false,
+  "cosim_seconds": 171.0,
+  "cycles": {
+   "16x16x16": 674,
+   "4x4x4": 202
+  },
+  "frozen_ref": "3e8db6fe2ed7f2181e2055272edd512e102d6e18",
+  "gate": {
+   "bench_isa": "ALL EXACT",
+   "isa": {
+    "conform": "ISA OK: the spec, its 1 generated artefacts and all 9 consumers agree",
+    "seconds": 35.8,
+    "vouched": true
+   },
+   "param": {
+    "TPU_MAXDIM=12": "PARAM OK: 186/186 runs exact at T=4 MAXDIM=12 (27 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)",
+    "TPU_MAXDIM=8": "PARAM OK: 68/68 runs exact at T=4 MAXDIM=8 (8 GEMM shapes x relu x full/corner/boundary, 20 random programs; 4 seeds skipped as ungeneratable at this MAXDIM)",
+    "TPU_T=8,TPU_MAXDIM=32": "PARAM OK: 408/408 runs exact at T=8 MAXDIM=32 (64 GEMM shapes x relu x full/corner/boundary, 24 random programs; 0 seeds skipped as ungeneratable at this MAXDIM)"
+   },
+   "pytorch": {
+    "bytes": 2688,
+    "corpus": [
+     "mlp_tiny          2      8     1024       0   BIT-EXACT against torch",
+     "mlp_deep          4      8     1664       0   BIT-EXACT against torch"
+    ],
+    "models": "2/4",
+    "reference": "torch.nn.Linear's own forward on the model's real weights, with the machine's epilogue applied in torch; nothing a candidate writes is on either side",
+    "seconds": 3.7,
+    "vouched": true
+   },
+   "seconds": 111.8,
+   "stress": "STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)",
+   "stress_runs": 492,
+   "tier": "full",
+   "vouched": true
+  },
+  "gate_only": false,
+  "gate_tier": "full",
+  "invariants": {
+   "DMA_WORDS": 1,
+   "IMEM_SIZE": 56,
+   "MAXDIM": 16,
+   "QD": 16,
+   "T": 4
+  },
+  "measurement": "cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape",
+  "model_cycles": {
+   "mlp_deep": 5133,
+   "mlp_tiny": 2624
+  },
+  "model_env": {
+   "TPU_MAXDIM": "64",
+   "TPU_QD": "16",
+   "TPU_T": "4"
+  },
+  "model_seconds": 389.7,
+  "model_skipped": {},
+  "objective": {
+   "area": {
+    "basis": "structural bit census x coefficients fitted to 7 committed DC runs; leave-one-out 0.62 % mean / 1.39 % worst; NOT a measurement",
+    "census": {
+     "buffer_bits": 8256,
+     "channel_bits": 35328,
+     "memory_bits": 20480,
+     "operand_port_bits": 32,
+     "parameters": {
+      "AW": 128,
+      "DMA_WORDS": 1,
+      "IMEM_SIZE": 56,
+      "MAXDIM": 16,
+      "NAR": 128,
+      "NVR": 64,
+      "QD": 16,
+      "SPAD_ROWS": 64,
+      "T": 4,
+      "VW": 32
+     },
+     "per_channel": {
+      "a_fwd": 1536,
+      "ac2sp": 512,
+      "acol": 2048,
+      "c_acc": 1024,
+      "c_dld": 1024,
+      "c_dst": 1024,
+      "c_spm": 1024,
+      "c_vru": 1024,
+      "cw": 8192,
+      "dma2sp": 512,
+      "dma2vr": 512,
+      "p_fwd": 6144,
+      "sp2vr": 512,
+      "wcol": 2048,
+      "wq": 2048,
+      "wrow": 6144
+     },
+     "per_unit": {
+      "accu": 16384,
+      "dma_ld": 4160,
+      "dma_st": 0,
+      "pe": 0,
+      "sequencer": 4096,
+      "spm": 2048,
+      "vru": 2048,
+      "wld": 0
+     },
+     "processing_elements": 16,
+     "store_port_bits": 32
+    },
+    "envelope": {
+     "DMA_WORDS": [
+      1,
+      16
+     ],
+     "MAXDIM": [
+      16,
+      64
+     ],
+     "QD": [
+      8,
+      16
+     ],
+     "T": [
+      4,
+      8
+     ]
+    },
+    "estimate": true,
+    "extrapolated": null,
+    "extrapolated_terms": null,
+    "terms": {
+     "adapters": 832528.4,
+     "array": 39696.0,
+     "buffers": 52764.1,
+     "channels": 162932.7,
+     "unit_memory": 115062.8
+    },
+    "um2": 1202984.0
+   },
+   "gemm": {
+    "16x16x16": 674,
+    "4x4x4": 202
+   },
+   "model": {
+    "mlp_deep": 5133,
+    "mlp_tiny": 2624
+   },
+   "model_env": {
+    "TPU_MAXDIM": "64",
+    "TPU_QD": "16",
+    "TPU_T": "4"
+   },
+   "model_skipped": null,
+   "note": "three terms, reported per shape and per model; never summed into one score. `area` is an ESTIMATE (chia_agent/area_proxy.py), `resources` is csynth's FPGA table, and the two disagree by design",
+   "resources": {
+    "bram_18k": 40,
+    "dsp": 14,
+    "estimated_ns": 2.431,
+    "ff": 18835,
+    "lut": 27540,
+    "uram": 0
+   }
+  },
+  "ok": true,
+  "sandbox": true,
+  "seconds": 684.5,
+  "shapes": [
+   "4x4x4",
+   "16x16x16"
+  ],
+  "shapes_skipped": {},
+  "synth": {
+   "area": {
+    "bram_18k": 40,
+    "dsp": 14,
+    "ff": 18835,
+    "lut": 27540,
+    "uram": 0
+   },
+   "estimated_ns": 2.431,
+   "target_ns": 3.33
+  },
+  "total_cycles": 876,
+  "total_model_cycles": 7757,
+  "budget": {
+   "iteration": 0,
+   "session_seconds": 2400,
+   "seconds_used": 684.5,
+   "seconds_left": 1715.5,
+   "score_cycles_left": 0,
+   "tool_seconds": {
+    "read_spec": 0.01,
+    "read_reference": 0.05,
+    "replace_text": 0.2,
+    "apply_spec_patch": 0.3,
+    "insert_after": 0.2,
+    "regenerate_isa": 3,
+    "check_bit_exact": 13,
+    "run_functional_check": 41,
+    "mapspace_report": 42,
+    "score_cycles": 240
+   }
+  }
+ }
+}

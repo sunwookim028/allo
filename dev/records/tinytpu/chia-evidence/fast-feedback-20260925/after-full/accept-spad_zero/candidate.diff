@@ -1,0 +1,11 @@
+--- a/ip/units/scratchpad.py
++++ b/ip/units/scratchpad.py
+@@ -19,7 +19,7 @@
+     isa=("OP_MM", "OP_DMA_LD", "OP_VLD"),
+ )
+ def spm():
+-    spad: UInt(VW)[SPAD_ROWS]
++    spad: UInt(VW)[SPAD_ROWS] = 0
+     count_word: UInt(64) = c_spm.get()
+     n_row: int32 = count_word[0:16]
+     array_counts_word: UInt(64) = c_spm.get()
