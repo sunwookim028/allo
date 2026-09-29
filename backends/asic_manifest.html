@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>The ASIC manifest &#8212; Allo Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic_mod.css?v=9b2032db" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=db78e746"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/petite-vue.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="AMD MLIR-AIE (AI Engine)" href="aie/index.html" />
+    <link rel="prev" title="Non-Blocking Stream Operations" href="nonblocking_streams.html" /> 
+  </head><body data-dark_mode_code_blocks="true">
+
+<div id="top_nav">
+    
+
+    <nav>
+        
+            
+        
+
+        <p id="toggle_sidebar">
+            <a href="#" title="Toggle sidebar">|||</a>
+        </p>
+        <h1><a href="../index.html" title="Go to homepage">Allo Documentation</a></h1>
+            <a id="source_link" href="https://github.com/sunwookim028/allo">
+    
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512">
+            <path fill="white" d="M 244.8,8 C 106.1,8 0,113.3 0,252 c 0,110.9 69.8,205.8 169.5,239.2 12.8,2.3 17.3,-5.6 17.3,-12.1 0,-6.2 -0.3,-40.4 -0.3,-61.4 0,0 -70,15 -84.7,-29.8 0,0 -11.4,-29.1 -27.8,-36.6 0,0 -22.9,-15.7 1.6,-15.4 0,0 24.9,2 38.6,25.8 21.9,38.6 58.6,27.5 72.9,20.9 2.3,-16 8.8,-27.1 16,-33.7 -55.9,-6.2 -112.3,-14.3 -112.3,-110.5 0,-27.5 7.6,-41.3 23.6,-58.9 -2.6,-6.5 -11.1,-33.3 2.6,-67.9 20.9,-6.5 69,27 69,27 20,-5.6 41.5,-8.5 62.8,-8.5 21.3,0 42.8,2.9 62.8,8.5 0,0 48.1,-33.6 69,-27 13.7,34.7 5.2,61.4 2.6,67.9 16,17.7 25.8,31.5 25.8,58.9 0,96.5 -58.9,104.2 -114.8,110.5 9.2,7.9 17,22.9 17,46.4 0,33.7 -0.3,75.4 -0.3,83.6 0,6.5 4.6,14.4 17.3,12.1 C 428.2,457.8 496,362.9 496,252 496,113.3 383.5,8 244.8,8 Z"/>
+        </svg>
+    
+</a>
+        
+
+        <a id="mode_toggle" href="#" @click.prevent="handleClick" :title="mode">
+    <template v-if="mode == 'light'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_light"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M67.48,18.073c1.913,-1.912 1.913,-5.018 0,-6.931c-1.912,-1.912 -5.018,-1.912 -6.931,0l-6.798,6.799c-1.912,1.912 -1.912,5.018 0,6.931c1.913,1.912 5.018,1.912 6.931,-0l6.798,-6.799Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.728,61.108c1.912,-1.913 1.912,-5.018 -0,-6.931c-1.913,-1.913 -5.019,-1.913 -6.931,-0l-6.799,6.798c-1.912,1.913 -1.912,5.019 0,6.931c1.913,1.913 5.019,1.913 6.931,0l6.799,-6.798Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.682,54.177c-1.913,-1.913 -5.018,-1.913 -6.931,-0c-1.912,1.913 -1.912,5.018 0,6.931l6.798,6.798c1.913,1.913 5.019,1.913 6.931,0c1.913,-1.912 1.913,-5.018 0,-6.931l-6.798,-6.798Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M4.901,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,-0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M18.929,11.142c-1.912,-1.912 -5.018,-1.912 -6.931,0c-1.912,1.913 -1.912,5.019 0,6.931l6.799,6.799c1.912,1.912 5.018,1.912 6.931,-0c1.912,-1.913 1.912,-5.019 -0,-6.931l-6.799,-6.799Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.108,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c-0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c-0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'dark'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_dark"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.901,2.196 -4.901,4.901c0,2.705 2.197,4.901 4.901,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.662,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.989,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.732,61.103c1.91,-1.91 1.91,-5.011 0,-6.921l-0.009,-0.01c-1.91,-1.91 -5.012,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.909,1.91 5.011,1.91 6.92,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.672,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.52,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l-0,-0.01c-0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.901,2.196 -4.901,4.901c0,2.704 2.197,4.9 4.901,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.73,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 -0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.098,34.623c-2.699,0 -4.891,2.192 -4.891,4.892l-0,0.019c-0,2.699 2.192,4.891 4.891,4.891c2.7,0 4.892,-2.192 4.892,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.892,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'darkest'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_darkest"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><path d="M39.315,23.791c8.684,-0 15.734,7.05 15.734,15.733c0,8.684 -7.05,15.734 -15.734,15.734c-8.683,0 -15.733,-7.05 -15.733,-15.734c-0,-8.683 7.05,-15.733 15.733,-15.733Zm0,4.737c6.069,0 10.997,4.927 10.997,10.996c-0,6.069 -4.928,10.996 -10.997,10.996c-6.068,0 -10.996,-4.927 -10.996,-10.996c0,-6.069 4.928,-10.996 10.996,-10.996Z" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.216,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.9,2.196 -4.9,4.901c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.666,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.99,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.737,61.103c1.909,-1.91 1.909,-5.011 -0,-6.921l-0.01,-0.01c-1.91,-1.91 -5.011,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.91,1.91 5.011,1.91 6.921,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.676,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.524,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l0,-0.01c0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.216,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901c-0,2.704 2.196,4.9 4.9,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.734,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.103,34.623c-2.7,0 -4.892,2.192 -4.892,4.892l-0,0.019c-0,2.699 2.192,4.891 4.892,4.891c2.699,0 4.891,-2.192 4.891,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.891,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+</a>
+
+<script>
+(function() {
+    const LOCAL_STORAGE_KEY = 'piccoloThemeMode'
+
+    var initialMode = localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (initialMode) {
+        // Make sure the value in local storage is valid
+        if (['light', 'dark', 'darkest'].indexOf(initialMode) == -1) {
+            initialMode = 'light'
+            localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+        }
+    } else {
+        // Check if the client prefers dark mode
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialMode = 'dark'
+        } else {
+            initialMode = 'light'
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+    }
+
+    document.documentElement.dataset.mode = initialMode
+
+    PetiteVue.createApp({
+        'mode': initialMode,
+        handleClick() {
+            let currentMode = this.mode
+
+            if (currentMode == 'light') {
+                this.mode = 'dark'
+            } else if (currentMode == 'dark') {
+                this.mode = 'darkest'
+            } else if (currentMode == 'darkest') {
+                this.mode = 'light'
+            }
+
+            document.documentElement.dataset.mode = this.mode
+            localStorage.setItem(LOCAL_STORAGE_KEY, this.mode)
+
+            console.log(this.mode)
+        }
+    }).mount('#mode_toggle')
+})()
+</script>
+            <p class="mobile_search_link">
+                <a href="../search.html" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65 64" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                        <path d="M14.873 40.009c-2.315-3.943-3.642-8.532-3.642-13.429C11.231 11.91 23.141 0 37.811 0s26.58 11.91 26.58 26.58-11.91 26.58-26.58 26.58a26.44 26.44 0 0 1-14.277-4.161L9.739 62.794a3.12 3.12 0 0 1-4.413 0L.913 58.382c-1.217-1.218-1.217-3.196 0-4.413l13.96-13.96zM37.811 8.054c10.225 0 18.526 8.301 18.526 18.526s-8.301 18.526-18.526 18.526-18.526-8.301-18.526-18.526S27.586 8.054 37.811 8.054z" fill="#fff" />
+                    </svg>
+                </a>
+            </p>
+        
+
+        <div class="searchbox_wrapper">
+            
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+    </nav>
+</div>
+
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper"><p class="caption" role="heading"><span class="caption-text">Paper</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../paper.html">A Co-Design Compilation Flow as a Harness for Language Models to Improve It</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup/index.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_01_get_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/tutorial_02_vhls.html">Vivado/Vitis HLS Backend</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Deep Dive</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dive/frontend_syntax.html">Frontend Syntax Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/dataflow.html">Dataflow Programming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_01_data_types.html">Data Types and Type Casting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_02_template.html">Template Kernels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_03_composition.html">Kernel Composition</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/ip.html">IP Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dive/pytorch.html">PyTorch Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_05_verifier.html">Equivalence Checking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/dive_04_features.html">Other Features</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Backends</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="llvm.html">LLVM (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="vitis.html">AMD Vitis HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="catapult.html">Siemens Catapult HLS (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="systemc.html">SystemC emitter (Catapult, ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tapa.html">RapidStream TAPA (FPGA)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="xls.html">Google XLS (ASIC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="simulator.html">Multi-Threaded Simulator (CPU)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">The ASIC manifest</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_tutorial.html">Tutorial: A PyTorch MLP on TinyTPU, Then Change It</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_library.html">The Unit Library: Composing a Region from Units</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/ip_gaps.html">The IP Library’s Gaps, and the Adder Tree</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_comparison.html">TinyTPU-isa vs Gemmini: A Matched Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/gemmini_results.html">TinyTPU-isa vs Gemmini: Results and History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/benchmarks.html">The Benchmark Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/workload_suite.html">The Workload Suite: PyTorch MLPs on TinyTPU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_history.html">TinyTPU-isa: Design History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/minitpu.html">MiniTPU: Reference Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designs/design_space.html">Systolic-Array Design Space: Sourced Survey</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Extensions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/catapult_systemc.html">Catapult SystemC Flow and the Wire</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia.html">CHIA Agentic Co-Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia_results.html">CHIA Agentic Co-Design: Results</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/chia_codesign.html">The Original Co-Design Effort (<code class="docutils literal notranslate"><span class="pre">chia-codesign</span></code>)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/agentic_experiments.html">Agentic Experiments: What We Ran and What It Shows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act.html">ACT and the TinyTPU-isa Mapper</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act_specs.html">ACT Workload Specs and the Judge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/act_results.html">ACT: Results, Findings and Corrections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extensions/codesign.html">The Co-design Loop: Mapping and Hardware Together</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_01_ir_builder.html">IR Builder Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gallery/developer_02_mlir.html">MLIR Translation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/extending_allo.html">Extending Allo’s Abstractions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/stream_ports.html">Stream Ports: a Unit with an Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/actions.html">Actions: an Instruction as Composed Unit Effects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/limitations.html">Allo Limitations Register</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/dataflow_semantics.html">Dataflow Simulation Semantics: Allo vs HLS CSIM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer/pitfalls.html">Dataflow Region Pitfalls</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">Schedule Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html#data-types">Data Types</a></li>
+</ul>
+
+        </div>
+      </div>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="the-asic-manifest">
+<h1>The ASIC manifest<a class="headerlink" href="#the-asic-manifest" title="Link to this heading"><span>¶</span></a></h1>
+<p><code class="docutils literal notranslate"><span class="pre">allo/backend/asic</span></code> (see its <code class="docutils literal notranslate"><span class="pre">PROVENANCE.md</span></code>) has two entry points, and
+they sit on opposite sides of one question.</p>
+<p>The <strong>flat flow</strong> consumes a directory of Verilog and an <code class="docutils literal notranslate"><span class="pre">sv2v_manifest.f</span></code>
+file list, entered at the design collector. It knows nothing about Allo, and
+every ASIC number the fork has published came through it — which is why those
+runs were fed by <em>committed RTL exports</em> rather than by the compiler.</p>
+<p><strong>AAAH</strong>, the <code class="docutils literal notranslate"><span class="pre">allo-*</span></code> nodes, consumes Allo-level architecture, and <strong>not
+through files</strong>. Its compilation node loads an Allo design and <em>calls</em>
+<code class="docutils literal notranslate"><span class="pre">build(project,</span> <span class="pre">target,</span> <span class="pre">mode,</span> <span class="pre">configs)</span></code> with
+<code class="docutils literal notranslate"><span class="pre">configs[&quot;asic_manifest&quot;]</span> <span class="pre">=</span> <span class="pre">{...}</span></code>: Allo is asked to emit, as part of
+compilation, the architecture it just compiled. Downstream planners then place
+macros on a grid from PID row/column deltas, weight the wires between them by
+<strong>pre-HLS stream bit width</strong>, and decide which RTL modules are one macro by
+<em>semantic identity</em> rather than by name. None of that survives in emitted
+Verilog, so nothing later in the flow can recover it or check it.</p>
+<p>Until 2026-09-24 this fork did not emit that manifest, which is why the TinyTPU
+runs were routed around the compilation node. <code class="xref py py-mod docutils literal notranslate"><span class="pre">allo.backend.asic_manifest</span></code>
+is the emitter.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>Emitting the manifest is not the same as closing the loop. Allo now emits
+what its own ASIC backend consumes, verified against the consumer and
+against TinyTPU’s known post-HLS structure; <strong>an end-to-end PD run from the
+specification has not been performed</strong>, and cannot be on a host without a
+Synopsys DC licence. What still has to be proved is at the bottom of this
+page.</p>
+</div>
+<section id="what-is-emitted-and-when">
+<h2>What is emitted, and when<a class="headerlink" href="#what-is-emitted-and-when" title="Link to this heading"><span>¶</span></a></h2>
+<p>Two files, matching what <code class="docutils literal notranslate"><span class="pre">nodes/allo-asic-compilation/validate_build.py</span></code>
+checks for, each with a <code class="docutils literal notranslate"><span class="pre">.tcl</span></code> sibling because the flow’s nodes stage both:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">asic-manifest.json</span></code> — <code class="docutils literal notranslate"><span class="pre">stage:</span> <span class="pre">&quot;pre_hls&quot;</span></code></dt><dd><p>The architecture. Written inside <code class="docutils literal notranslate"><span class="pre">allo.dataflow.build()</span></code>, from the
+schedule that is about to be handed to the backend, <strong>before any HLS tool
+runs</strong> — so it exists whether or not a licence does.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">asic-manifest-final.json</span></code> — <code class="docutils literal notranslate"><span class="pre">stage:</span> <span class="pre">&quot;post_hls_enriched&quot;</span></code></dt><dd><p>The same records joined to the RTL the backend produced. Written from
+<code class="xref py py-class docutils literal notranslate"><span class="pre">HLSModule</span></code> once <code class="docutils literal notranslate"><span class="pre">csyn</span></code> has succeeded, because
+only then do the module names exist to join to.</p>
+</dd>
+</dl>
+<p><code class="docutils literal notranslate"><span class="pre">asic-debug/</span></code> holds flat TSV views of the same records, for reading by eye.</p>
+<p>Nothing happens unless <code class="docutils literal notranslate"><span class="pre">configs[&quot;asic_manifest&quot;][&quot;enabled&quot;]</span></code> is set, so the
+ordinary Vitis and Catapult paths are unchanged.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">allo.dataflow</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">df</span>
+
+<span class="n">df</span><span class="o">.</span><span class="n">build</span><span class="p">(</span>
+    <span class="n">design</span><span class="p">,</span>
+    <span class="n">target</span><span class="o">=</span><span class="s2">"vitis_hls"</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">"csyn"</span><span class="p">,</span>
+    <span class="n">project</span><span class="o">=</span><span class="s2">"top.prj"</span><span class="p">,</span>
+    <span class="n">configs</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">"frequency"</span><span class="p">:</span> <span class="mf">300.0</span><span class="p">,</span>
+        <span class="s2">"device"</span><span class="p">:</span> <span class="s2">"u280"</span><span class="p">,</span>
+        <span class="s2">"asic_manifest"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"enabled"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="s2">"path"</span><span class="p">:</span> <span class="s2">"asic-manifest.json"</span><span class="p">,</span>
+            <span class="s2">"debug_artifacts"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="s2">"debug_dir"</span><span class="p">:</span> <span class="s2">"asic-debug"</span><span class="p">,</span>
+        <span class="p">},</span>
+    <span class="p">},</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>That <code class="docutils literal notranslate"><span class="pre">configs</span></code> dict is not an invention of this page: it is verbatim what
+<code class="docutils literal notranslate"><span class="pre">nodes/allo-asic-compilation/backend.py</span></code> builds and passes in.</p>
+</section>
+<section id="the-schema-as-the-consumers-define-it">
+<h2>The schema, as the consumers define it<a class="headerlink" href="#the-schema-as-the-consumers-define-it" title="Link to this heading"><span>¶</span></a></h2>
+<p>The schema is not documented anywhere in the flow; it is whatever its readers
+read. The fields below are the ones actually consumed, with the consumer that
+demands each.</p>
+<section id="envelope">
+<h3>Envelope<a class="headerlink" href="#envelope" title="Link to this heading"><span>¶</span></a></h3>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">stage</span></code></dt><dd><p><code class="docutils literal notranslate"><span class="pre">&quot;pre_hls&quot;</span></code> / <code class="docutils literal notranslate"><span class="pre">&quot;post_hls_enriched&quot;</span></code>. <code class="docutils literal notranslate"><span class="pre">validate_build</span></code> rejects
+anything else.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">top</span></code></dt><dd><p>The RTL top module name. <code class="docutils literal notranslate"><span class="pre">plan_assembly</span></code> requires it to be both the
+node’s <code class="docutils literal notranslate"><span class="pre">top_module</span></code> parameter and a module present in <code class="docutils literal notranslate"><span class="pre">design.v</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">backend</span></code></dt><dd><p><code class="docutils literal notranslate"><span class="pre">vitis</span></code> / <code class="docutils literal notranslate"><span class="pre">catapult</span></code> / <code class="docutils literal notranslate"><span class="pre">systemc</span></code>; <code class="docutils literal notranslate"><span class="pre">plan_macros</span></code> and
+<code class="docutils literal notranslate"><span class="pre">plan_assembly</span></code> refuse a mismatch with their own parameter.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">summary</span></code></dt><dd><p><code class="docutils literal notranslate"><span class="pre">unmatched_or_ambiguous</span></code> and <code class="docutils literal notranslate"><span class="pre">unjoined_post_hls_records</span></code> <strong>must both
+be 0</strong>, checked twice (<code class="docutils literal notranslate"><span class="pre">validate_build</span></code>, <code class="docutils literal notranslate"><span class="pre">plan_macros</span></code>).</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">top_arguments[]</span></code></dt><dd><p>Order is load-bearing: it must equal the frozen workload’s
+<code class="docutils literal notranslate"><span class="pre">call_signature</span></code>. Each entry carries <code class="docutils literal notranslate"><span class="pre">ordinal</span></code>, <code class="docutils literal notranslate"><span class="pre">name</span></code>, <code class="docutils literal notranslate"><span class="pre">shape</span></code>,
+<code class="docutils literal notranslate"><span class="pre">type</span></code>, <code class="docutils literal notranslate"><span class="pre">direction</span></code>.</p>
+</dd>
+</dl>
+</section>
+<section id="pe-instances">
+<h3><code class="docutils literal notranslate"><span class="pre">pe_instances[]</span></code><a class="headerlink" href="#pe-instances" title="Link to this heading"><span>¶</span></a></h3>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">semantic_id</span></code></dt><dd><p><code class="docutils literal notranslate"><span class="pre">&lt;top&gt;/&lt;kernel&gt;/pid=&lt;i&gt;[,&lt;j&gt;]</span></code>. The format is fixed by
+<code class="docutils literal notranslate"><span class="pre">plan_physical_intent</span></code>: it takes the first two <code class="docutils literal notranslate"><span class="pre">/</span></code>-segments as the
+kernel key and regex-matches <code class="docutils literal notranslate"><span class="pre">pid=([0-9,-]+)</span></code>. Must be unique –
+several consumers key a dict on it with a bare <code class="docutils literal notranslate"><span class="pre">[]</span></code> lookup.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">kernel</span></code></dt><dd><p>The bare kernel name (<em>not</em> <code class="docutils literal notranslate"><span class="pre">top/kernel</span></code>).</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">pid</span></code></dt><dd><p>List of ints. <code class="docutils literal notranslate"><span class="pre">plan_macros</span></code> turns a +-1 delta on the last axis into
+<code class="docutils literal notranslate"><span class="pre">E</span></code>/<code class="docutils literal notranslate"><span class="pre">W</span></code> and on the second-to-last into <code class="docutils literal notranslate"><span class="pre">S</span></code>/<code class="docutils literal notranslate"><span class="pre">N</span></code>; the row index
+increases <strong>southward</strong>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">ports[]</span></code></dt><dd><p>The stream interface, in a dense 0-based <code class="docutils literal notranslate"><span class="pre">ordinal</span></code> order, each with
+<code class="docutils literal notranslate"><span class="pre">channel_id</span></code>, <code class="docutils literal notranslate"><span class="pre">stream</span></code>, <code class="docutils literal notranslate"><span class="pre">direction</span></code> (<code class="docutils literal notranslate"><span class="pre">in</span></code>/<code class="docutils literal notranslate"><span class="pre">out</span></code>) and <code class="docutils literal notranslate"><span class="pre">type</span></code>.
+The flow zips this positionally against the RTL’s handshake bundles, so an
+<code class="docutils literal notranslate"><span class="pre">m_axi</span></code> memory argument is <strong>not</strong> one of them.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">post_hls_records[]</span></code></dt><dd><p>Post-HLS only: <code class="docutils literal notranslate"><span class="pre">rtl_root_module</span></code>, <code class="docutils literal notranslate"><span class="pre">rtl_modules[].name</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rtl_equivalence_hash</span></code>.</p>
+</dd>
+</dl>
+</section>
+<section id="channels">
+<h3><code class="docutils literal notranslate"><span class="pre">channels[]</span></code><a class="headerlink" href="#channels" title="Link to this heading"><span>¶</span></a></h3>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">channel_id</span></code> and <code class="docutils literal notranslate"><span class="pre">stream</span></code></dt><dd><p>Provenance; <code class="docutils literal notranslate"><span class="pre">ports[].channel_id</span></code> joins to it, and a <code class="docutils literal notranslate"><span class="pre">null</span></code> there means
+a SystemC-internal channel.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">type</span></code></dt><dd><p>The MLIR stream type. <code class="docutils literal notranslate"><span class="pre">plan_physical_intent</span></code> takes the <strong>first</strong>
+<code class="docutils literal notranslate"><span class="pre">i&lt;N&gt;</span></code>/<code class="docutils literal notranslate"><span class="pre">u&lt;N&gt;</span></code> in it as the placement edge weight, so
+<code class="docutils literal notranslate"><span class="pre">!allo.stream&lt;i32,</span> <span class="pre">16&gt;</span></code> weighs 32 and the depth is ignored.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">endpoints[]</span></code></dt><dd><p><code class="docutils literal notranslate"><span class="pre">pe</span></code> (a <code class="docutils literal notranslate"><span class="pre">semantic_id</span></code>), <code class="docutils literal notranslate"><span class="pre">role</span></code> (<code class="docutils literal notranslate"><span class="pre">producer</span></code>/<code class="docutils literal notranslate"><span class="pre">consumer</span></code> – read by
+physical intent), <code class="docutils literal notranslate"><span class="pre">direction</span></code> (<code class="docutils literal notranslate"><span class="pre">in</span></code>/<code class="docutils literal notranslate"><span class="pre">out</span></code> – read by macro planning),
+and <code class="docutils literal notranslate"><span class="pre">accesses[].port_ordinal</span></code>. Both vocabularies are emitted, because the
+two nodes read different ones.</p>
+</dd>
+</dl>
+</section>
+<section id="macro-groups-post-hls">
+<h3><code class="docutils literal notranslate"><span class="pre">macro_groups[]</span></code> (post-HLS)<a class="headerlink" href="#macro-groups-post-hls" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">macro_class_id</span></code>, <code class="docutils literal notranslate"><span class="pre">representative</span></code> (must be in <code class="docutils literal notranslate"><span class="pre">pe_instances</span></code>),
+<code class="docutils literal notranslate"><span class="pre">member_count</span></code>, <code class="docutils literal notranslate"><span class="pre">members[]</span></code> (<code class="docutils literal notranslate"><span class="pre">semantic_id</span></code>, <code class="docutils literal notranslate"><span class="pre">rtl_module</span></code>,
+<code class="docutils literal notranslate"><span class="pre">orientation</span></code>), and <code class="docutils literal notranslate"><span class="pre">proof.status</span></code> — which must be exactly <code class="docutils literal notranslate"><span class="pre">&quot;proven&quot;</span></code> or
+the class is silently dropped.</p>
+</section>
+</section>
+<section id="what-the-emitter-derives-it-from">
+<h2>What the emitter derives it from<a class="headerlink" href="#what-the-emitter-derives-it-from" title="Link to this heading"><span>¶</span></a></h2>
+<p>Everything comes out of the <strong>realized dataflow IR</strong>, never from a table
+someone typed. A hand-written manifest would be a second editing surface for
+the architecture, which is precisely what having one Allo specification exists
+to remove.</p>
+<p>After <code class="docutils literal notranslate"><span class="pre">allo.dataflow.customize</span></code>, the module is one <code class="docutils literal notranslate"><span class="pre">func.func</span></code> per kernel
+instance plus a top function whose body constructs every stream and then calls
+each instance with the streams it is wired to. <strong>That body is the netlist.</strong></p>
+<ul class="simple">
+<li><p><strong>PE instances</strong> — every <code class="docutils literal notranslate"><span class="pre">func.func</span></code> carrying <code class="docutils literal notranslate"><span class="pre">df.kernel</span></code>. Its name is
+<code class="docutils literal notranslate"><span class="pre">&lt;kernel&gt;_&lt;i&gt;_&lt;j&gt;</span></code>; the region’s own <code class="docutils literal notranslate"><span class="pre">mappings</span></code> dict gives the split
+exactly (a kernel whose name ends in <code class="docutils literal notranslate"><span class="pre">_&lt;digits&gt;</span></code> is otherwise
+indistinguishable from one grid axis).</p></li>
+<li><p><strong>Ports</strong> — the <code class="docutils literal notranslate"><span class="pre">stypes</span></code> attribute, stamped per argument by
+<code class="docutils literal notranslate"><span class="pre">move_stream_to_interface</span></code>: <code class="docutils literal notranslate"><span class="pre">i</span></code> read, <code class="docutils literal notranslate"><span class="pre">o</span></code> written, <code class="docutils literal notranslate"><span class="pre">_</span></code> not a link.</p></li>
+<li><p><strong>Channels and their endpoints</strong> — the SSA value each <code class="docutils literal notranslate"><span class="pre">allo.stream_construct</span></code>
+defines, matched against the operands of each <code class="docutils literal notranslate"><span class="pre">func.call</span></code>.</p></li>
+<li><p><strong>Top arguments</strong> — <code class="docutils literal notranslate"><span class="pre">allo.dataflow._build_manifest_top_arguments</span></code> pairs the
+<em>realized</em> argument order with <code class="docutils literal notranslate"><span class="pre">analyze_arg_load_store</span></code>’s directions.
+A region’s arguments are not necessarily emitted in declaration order
+(<a class="reference internal" href="../developer/pitfalls.html"><span class="doc">Dataflow Region Pitfalls</span></a>), and direction is a fact about the body.</p></li>
+<li><p><strong>Memories</strong> — <code class="docutils literal notranslate"><span class="pre">postprocess_hls_code</span></code> pragmas argument <em>i</em> onto
+<code class="docutils literal notranslate"><span class="pre">bundle=gmem{i}</span></code>, so the manifest names the <code class="docutils literal notranslate"><span class="pre">&lt;top&gt;_gmem&lt;i&gt;_m_axi</span></code> adapter
+Vitis will generate for it.</p></li>
+</ul>
+<p>The emitter refuses what the consumers assume and never state: a duplicate
+<code class="docutils literal notranslate"><span class="pre">semantic_id</span></code>, a non-dense port ordinal, an endpoint naming an unknown PE or
+an ordinal that PE does not have, and a channel with two writers or two
+readers. Each of those is otherwise a <code class="docutils literal notranslate"><span class="pre">KeyError</span></code>, a <code class="docutils literal notranslate"><span class="pre">StopIteration</span></code> or a
+silently misplaced macro several nodes downstream.</p>
+<p>Post-HLS, the join walks Vitis’s naming: a kernel becomes <code class="docutils literal notranslate"><span class="pre">&lt;top&gt;_&lt;instance&gt;</span></code>
+(sometimes with a numeric disambiguator — <code class="docutils literal notranslate"><span class="pre">dma_ld_0</span></code> becomes
+<code class="docutils literal notranslate"><span class="pre">tinytpu_isa_dma_ld_0_1</span></code>), with <code class="docutils literal notranslate"><span class="pre">&lt;root&gt;_...</span></code> children for each pipelined
+loop it split out. Which modules belong to no kernel is decided by <em>this
+design’s</em> kernel names rather than by a list of vendor module-name patterns:
+an unclaimed module named after one of the design’s kernels is the error, and
+everything else is plumbing.</p>
+</section>
+<section id="validated-against-tinytpu">
+<h2>Validated against TinyTPU<a class="headerlink" href="#validated-against-tinytpu" title="Link to this heading"><span>¶</span></a></h2>
+<p>At the shipped configuration (<code class="docutils literal notranslate"><span class="pre">TPU_T=4</span></code>, <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=64</span></code>) the emitter
+produces, entirely from the design:</p>
+<ul class="simple">
+<li><p>8 kernels and <strong>38 PE instances</strong> — <code class="docutils literal notranslate"><span class="pre">pe</span></code> and <code class="docutils literal notranslate"><span class="pre">wld</span></code> at 4×4, the other six
+singletons — matching <code class="docutils literal notranslate"><span class="pre">TPU.architecture</span></code>’s <code class="docutils literal notranslate"><span class="pre">instances=</span></code>;</p></li>
+<li><p><strong>85 channels</strong>, one per element of the 16 declared <code class="docutils literal notranslate"><span class="pre">Channel</span></code>s including
+the array ones, of which 12 (<code class="docutils literal notranslate"><span class="pre">3</span> <span class="pre">*</span> <span class="pre">T</span></code>) are the terminal elements of the
+three chains and carry no endpoints — the last column forwards nothing east
+and the bottom row sends <code class="docutils literal notranslate"><span class="pre">cw</span></code> rather than a partial sum south;</p></li>
+<li><p>4 memories on <code class="docutils literal notranslate"><span class="pre">gmem0</span></code>–<code class="docutils literal notranslate"><span class="pre">gmem3</span></code>.</p></li>
+</ul>
+<p>The post-HLS join, run against the committed 145-file RTL export, reproduces
+the module names in the shipped <code class="docutils literal notranslate"><span class="pre">T4_MAXDIM64_shipped</span></code> hierarchy report
+exactly: <code class="docutils literal notranslate"><span class="pre">accu_0</span></code>, <code class="docutils literal notranslate"><span class="pre">spm_0</span></code>, <code class="docutils literal notranslate"><span class="pre">vru_0</span></code>, <code class="docutils literal notranslate"><span class="pre">dma_ld_0_1</span></code>, <code class="docutils literal notranslate"><span class="pre">sequencer_0_1</span></code>
+and <code class="docutils literal notranslate"><span class="pre">gmem0..3_m_axi</span></code>, with 0 unmatched PEs and 0 unjoined records.</p>
+<p>The sharpest check is that the flow’s <em>own</em> planner reads the array back out.
+<code class="docutils literal notranslate"><span class="pre">plan_macros.graph_pin_sides</span></code> is given PIDs and channel endpoints and nothing
+about systolic arrays; on <code class="docutils literal notranslate"><span class="pre">pe(1,1)</span></code> it returns <code class="docutils literal notranslate"><span class="pre">a_fwd</span></code> in from the <strong>W</strong>,
+out to the <strong>E</strong>, and <code class="docutils literal notranslate"><span class="pre">p_fwd</span></code> in from the <strong>N</strong>, out to the <strong>S</strong>. 90 of the
+146 stream pins resolve as <code class="docutils literal notranslate"><span class="pre">same_kernel_neighbor</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_asic_manifest.py</span></code> runs all of this, computing its
+expectations from <code class="docutils literal notranslate"><span class="pre">TPU.architecture</span></code> rather than hard-coding them, and loads
+<code class="docutils literal notranslate"><span class="pre">plan_macros</span></code> and <code class="docutils literal notranslate"><span class="pre">plan_physical_intent</span></code> from
+<code class="docutils literal notranslate"><span class="pre">allo/backend/asic/nodes/</span></code> so that “the consumer accepts it” is executed
+rather than asserted.</p>
+</section>
+<section id="what-is-not-emitted">
+<h2>What is <em>not</em> emitted<a class="headerlink" href="#what-is-not-emitted" title="Link to this heading"><span>¶</span></a></h2>
+<p><strong>Per-argument Catapult RTL protocol capture.</strong> <code class="docutils literal notranslate"><span class="pre">allo-testbench-generation</span></code>
+wants <code class="docutils literal notranslate"><span class="pre">catapult_argument</span></code>, <code class="docutils literal notranslate"><span class="pre">data_ports</span></code>/<code class="docutils literal notranslate"><span class="pre">triosy_ports</span></code>, <code class="docutils literal notranslate"><span class="pre">packing</span></code> and
+<code class="docutils literal notranslate"><span class="pre">interface.roles</span></code> on the <code class="docutils literal notranslate"><span class="pre">catapult</span></code>/<code class="docutils literal notranslate"><span class="pre">systemc</span></code> path. Those are a parse of
+Catapult’s generated RTL, not an architectural fact, and they belong to a
+separate post-HLS extractor. The Vitis path — the one every TinyTPU ASIC number
+came from — is complete; the post-HLS join is hooked only to Vitis <code class="docutils literal notranslate"><span class="pre">csyn</span></code>
+for the same reason, because emitting a wrong join would be worse than
+emitting none.</p>
+<p><strong>Arithmetic.</strong> A composed region declares what a unit is wired to and never
+what it computes, so the manifest carries no compute ports. That is the Action
+layer’s to add (<a class="reference internal" href="../developer/actions.html"><span class="doc">Actions: an Instruction as Composed Unit Effects</span></a>).</p>
+<p><strong>Macro reuse, on the Vitis path.</strong> Each of TinyTPU’s 38 PEs hashes to its own
+macro class, so <code class="docutils literal notranslate"><span class="pre">member_count</span></code> is 1 everywhere. This is not a defect in the
+hashing: Vitis specializes every instance, and two interior PEs that are the
+same hardware are emitted with <em>different port orders</em>, which
+<code class="docutils literal notranslate"><span class="pre">plan_macros.validate_and_map_ports</span></code> correctly refuses to call equivalent.
+Macro planning at the default <code class="docutils literal notranslate"><span class="pre">min_macro_reuse=2</span></code> would therefore find no
+class to harden. Getting reuse back is a question about how the design is
+emitted, not about the manifest.</p>
+</section>
+<section id="what-a-licensed-host-would-still-have-to-prove">
+<h2>What a licensed host would still have to prove<a class="headerlink" href="#what-a-licensed-host-would-still-have-to-prove" title="Link to this heading"><span>¶</span></a></h2>
+<p>Success here is that the consumer accepts the manifest. It is <strong>not</strong> a PD run.
+On a host with Vitis HLS <em>and</em> a Synopsys DC licence, the path from
+specification to PPA would have to show, in order:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">run_design.py</span></code> → <code class="docutils literal notranslate"><span class="pre">validate_build.py</span></code> passing on a real <code class="docutils literal notranslate"><span class="pre">csyn</span></code>: the
+four manifest files present, both stages correct, both summary counters 0,
+and the frozen workload’s interface matching <code class="docutils literal notranslate"><span class="pre">top_arguments</span></code>. Everything
+but the <code class="docutils literal notranslate"><span class="pre">csyn</span></code> is exercised offline today.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sv2v-rtl-allo</span></code> and <code class="docutils literal notranslate"><span class="pre">allo-asic-macro-plan</span></code> running on that manifest.
+This is where the reuse ceiling above bites first, and where the failure
+would be <code class="docutils literal notranslate"><span class="pre">no</span> <span class="pre">proven</span> <span class="pre">macro</span> <span class="pre">classes</span> <span class="pre">meet</span> <span class="pre">reuse</span> <span class="pre">threshold</span></code> rather than
+anything about the manifest’s shape.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">allo-asic-assembly-plan</span></code> → <code class="docutils literal notranslate"><span class="pre">allo-asic-physical-intent</span></code> →
+<code class="docutils literal notranslate"><span class="pre">allo-asic-rtl-assembly</span></code>, which additionally require every
+<code class="docutils literal notranslate"><span class="pre">stable_instance_name</span></code> to survive into the synthesized netlist, and the
+<code class="docutils literal notranslate"><span class="pre">macro-link.rpt</span></code> count to match <code class="docutils literal notranslate"><span class="pre">elaborated_macro_instance_count</span></code>.</p></li>
+<li><p>A DC run that does <strong>not</strong> dissolve the boundaries. At the flattening effort
+the published runs use, synthesis flattens the hierarchy again unless told
+otherwise — and changing that makes new numbers non-comparable with the four
+already published. The manifest buys planning and attribution; it does not
+by itself buy a hierarchy-preserving netlist.</p></li>
+</ol>
+<p>What could still be wrong at that point, honestly: the Catapult/SystemC
+per-argument capture is absent, so those two backends cannot reach the
+testbench node; the post-HLS join is validated against one design’s naming and
+a second design could exercise a Vitis renaming this walk does not cover (the
+counters would say so rather than the join guessing); and <code class="docutils literal notranslate"><span class="pre">top_interface</span></code> on
+the non-Vitis paths is a documented default rather than an observation.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+    
+        <div id="show_right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&lt;</span><span>Page contents</span></a></p>
+        </div>
+
+        <div id="right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:</span></a></p>
+            <div class="page_toc">
+                <ul>
+<li><a class="reference internal" href="#">The ASIC manifest</a><ul>
+<li><a class="reference internal" href="#what-is-emitted-and-when">What is emitted, and when</a></li>
+<li><a class="reference internal" href="#the-schema-as-the-consumers-define-it">The schema, as the consumers define it</a><ul>
+<li><a class="reference internal" href="#envelope">Envelope</a></li>
+<li><a class="reference internal" href="#pe-instances"><code class="docutils literal notranslate"><span class="pre">pe_instances[]</span></code></a></li>
+<li><a class="reference internal" href="#channels"><code class="docutils literal notranslate"><span class="pre">channels[]</span></code></a></li>
+<li><a class="reference internal" href="#macro-groups-post-hls"><code class="docutils literal notranslate"><span class="pre">macro_groups[]</span></code> (post-HLS)</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#what-the-emitter-derives-it-from">What the emitter derives it from</a></li>
+<li><a class="reference internal" href="#validated-against-tinytpu">Validated against TinyTPU</a></li>
+<li><a class="reference internal" href="#what-is-not-emitted">What is <em>not</em> emitted</a></li>
+<li><a class="reference internal" href="#what-a-licensed-host-would-still-have-to-prove">What a licensed host would still have to prove</a></li>
+</ul>
+</li>
+</ul>
+
+            </div>
+        </div>
+    
+
+      <div class="clearer"></div>
+    </div>
+    <div class="button_nav_wrapper">
+        <div class="button_nav">
+            <div class="left">
+                
+                <a href="nonblocking_streams.html">
+                    <span class="icon">&lt;</span><span>Non-Blocking Stream Operations</span></a>
+                
+            </div>
+
+            <div class="right">
+                
+                    <a href="aie/index.html"><span>AMD MLIR-AIE (AI Engine)</span><span class="icon">&gt;</span></a>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Allo Authors.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+
+<p id="theme_credit">Styled using the <a href="https://github.com/piccolo-orm/piccolo_theme">Piccolo Theme</a></p>
+  </body>
+</html>

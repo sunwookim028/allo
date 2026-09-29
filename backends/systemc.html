@@ -170,10 +170,12 @@
 <li class="toctree-l1"><a class="reference internal" href="xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="simulator.html">Multi-Threaded Simulator (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="asic_manifest.html">The ASIC manifest</a></li>
 <li class="toctree-l1"><a class="reference internal" href="aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_tutorial.html">Tutorial: A PyTorch MLP on TinyTPU, Then Change It</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
@@ -244,7 +246,7 @@ correctly.</p>
 <span class="nb">source</span><span class="w"> </span><span class="k">$(</span>conda<span class="w"> </span>info<span class="w"> </span>--base<span class="k">)</span>/etc/profile.d/conda.sh<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>conda<span class="w"> </span>activate<span class="w"> </span>allo
 <span class="nb">export</span><span class="w"> </span><span class="nv">LLVM_BUILD_DIR</span><span class="o">=</span>/home/sk3463/llvm-allo-6b09f739/build<span class="w"> </span><span class="nv">OMP_NUM_THREADS</span><span class="o">=</span><span class="m">8</span>
 
-<span class="nb">cd</span><span class="w"> </span>examples/systemc
+<span class="nb">cd</span><span class="w"> </span>tests/systemc
 python<span class="w"> </span>pc_channel.py<span class="w"> </span>systemc<span class="w">      </span><span class="c1"># print the generated SystemC</span>
 python<span class="w"> </span>pc_channel.py<span class="w"> </span>mlir<span class="w">         </span><span class="c1"># the MLIR it was emitted from</span>
 </pre></div>
@@ -440,24 +442,22 @@ you report needs this</strong>: a region contains its testbench kernels and thei
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">allo/backend/catapult.py</span></code></p></td>
 <td><p>the TCL generator both Catapult flows share</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">examples/systemc/</span></code></p></td>
-<td><p>the designs, in Allo, and nothing else</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">examples/eva/</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">examples/eva/</span></code></p></td>
 <td><p>the EVA design and its emitted project</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tests/systemc/</span></code></p></td>
-<td><p>what acts on those designs: RTL cosim testbenches, the Catapult <code class="docutils literal notranslate"><span class="pre">csyn</span></code>
-driver, and <code class="docutils literal notranslate"><span class="pre">rtlsim/</span></code> — this fork’s SystemC-vs-RTL cross-check harness
-(<a class="reference internal" href="../developer/limitations.html#limitation-22"><span class="std std-ref">22. The SystemC fork’s Wire is semantically incomplete – and wrong in RTL, not just in simulation</span></a>)</p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tests/systemc/</span></code></p></td>
+<td><p>the emitter demonstrations, in Allo, with <code class="docutils literal notranslate"><span class="pre">test_emit.py</span></code> collecting the
+claim each one makes about the emitted text; plus what acts on them: RTL
+cosim testbenches, the Catapult <code class="docutils literal notranslate"><span class="pre">csyn</span></code> driver, and <code class="docutils literal notranslate"><span class="pre">rtlsim/</span></code> — this
+fork’s SystemC-vs-RTL cross-check harness (<a class="reference internal" href="../developer/limitations.html#limitation-22"><span class="std std-ref">22. The SystemC fork’s Wire is semantically incomplete – and wrong in RTL, not just in simulation</span></a>)</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dev/records/systemc/</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dev/records/systemc/</span></code></p></td>
 <td><p>what was measured: <code class="docutils literal notranslate"><span class="pre">VERDICTS.md</span></code>, <code class="docutils literal notranslate"><span class="pre">reports/</span></code>, and the archived emitter output</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_systemc_backend.py</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_systemc_backend.py</span></code></p></td>
 <td><p>the suite; emit cases run anywhere, csim/cosim cases skip without <code class="docutils literal notranslate"><span class="pre">MGC_HOME</span></code></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dev/systemc/</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dev/systemc/</span></code></p></td>
 <td><p>the emitter author’s working notes, kept whole and not rewritten</p></td>
 </tr>
 </tbody>

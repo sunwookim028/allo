@@ -170,10 +170,12 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/asic_manifest.html">The ASIC manifest</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_tutorial.html">Tutorial: A PyTorch MLP on TinyTPU, Then Change It</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
@@ -236,7 +238,7 @@ that they stay checkable.</p>
 <section id="why-the-core-was-rebuilt-rather-than-ported">
 <h2>Why the core was rebuilt rather than ported<a class="headerlink" href="#why-the-core-was-rebuilt-rather-than-ported" title="Link to this heading"><span>¶</span></a></h2>
 <p><strong>Rebuild the core against this fork’s abstractions, using ACT’s algorithms as
-the reference; cite ACT, copy nothing.</strong> That is what <code class="docutils literal notranslate"><span class="pre">act/</span></code> is. The decision
+the reference; cite ACT, copy nothing.</strong> That is what <code class="docutils literal notranslate"><span class="pre">allo/act/</span></code> is. The decision
 was forced rather than preferred, and the reasoning is worth keeping because it
 is the argument any future port has to answer:</p>
 <ol class="arabic simple">
@@ -264,13 +266,13 @@ None of that shape survives a second architecture.</p></li>
 to instruction, a memoized tree DP that is globally optimal because multi-use
 values are forced cut points), its residence and layout solvers, its Belady
 spiller, and its MLIR emission. Those are the parts of ACT that are genuinely
-hard and genuinely good, and <code class="docutils literal notranslate"><span class="pre">act/</span></code> has none of them. <code class="docutils literal notranslate"><span class="pre">act/</span></code> is a mapper, a
+hard and genuinely good, and <code class="docutils literal notranslate"><span class="pre">allo/act/</span></code> has none of them. <code class="docutils literal notranslate"><span class="pre">allo/act/</span></code> is a mapper, a
 cost model and a lowering, and it stops where ACT’s interesting work begins.
 When the bindings for the chia lineage can be built, the matcher is the piece to
 revisit first – not the mapper.</p>
-<p>What is kept from ACT, deliberately: the interface. <code class="docutils literal notranslate"><span class="pre">act.nest.Loop</span></code> carries
+<p>What is kept from ACT, deliberately: the interface. <code class="docutils literal notranslate"><span class="pre">allo.act.nest.Loop</span></code> carries
 ACT’s four field names in ACT’s order, so a real <code class="docutils literal notranslate"><span class="pre">mapping.Mapping.loops</span></code> can
-be handed to <code class="docutils literal notranslate"><span class="pre">act.search</span></code> unchanged, and <code class="docutils literal notranslate"><span class="pre">Priced.cost</span></code> is ACT’s
+be handed to <code class="docutils literal notranslate"><span class="pre">allo.act.search</span></code> unchanged, and <code class="docutils literal notranslate"><span class="pre">Priced.cost</span></code> is ACT’s
 <code class="docutils literal notranslate"><span class="pre">(makespan,</span> <span class="pre">emits)</span></code> lexicographic pair.</p>
 </section>
 <section id="act-s-mapper-as-the-code-has-it">
@@ -430,7 +432,7 @@ the <strong>pointwise minimum</strong> over every assignment satisfying (a) non-
 (b) <code class="docutils literal notranslate"><span class="pre">start_dst</span> <span class="pre">&gt;=</span> <span class="pre">finish_src</span></code> for each derived dependence, and (c)
 <code class="docutils literal notranslate"><span class="pre">start_later</span> <span class="pre">&gt;=</span> <span class="pre">start_earlier</span> <span class="pre">+</span> <span class="pre">issue_earlier</span></code> for consecutive epochs on one
 unit. That is the proposition <code class="docutils literal notranslate"><span class="pre">tests/act/test_schedule.py</span></code> holds
-<code class="docutils literal notranslate"><span class="pre">act.schedule.run</span></code> to, against two solvers that do not share its algorithm: a
+<code class="docutils literal notranslate"><span class="pre">allo.act.schedule.run</span></code> to, against two solvers that do not share its algorithm: a
 least-fixpoint iteration over the constraint system, and brute force over every
 start vector for the smallest cases.</p>
 <p>Also worth recording for a future port: <code class="docutils literal notranslate"><span class="pre">epoch.py</span></code> is 480 lines with <strong>zero</strong>
@@ -465,7 +467,8 @@ number for any claim about the hardware.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">TPU_PRJ</span><span class="o">=</span>/tmp/act-cosim.prj<span class="w"> </span>python<span class="w"> </span>act_cosim.py<span class="w"> </span>gemm<span class="w"> </span>4x4x4<span class="w"> </span>--top<span class="w"> </span><span class="m">1</span><span class="w"> </span>--baseline
 </pre></div>
 </div>
-<p>Measured 2026-09-22 on this host, one synthesis per project, default testbench:</p>
+<p>Re-measured 2026-09-25 on this host at <code class="docutils literal notranslate"><span class="pre">TPU_T=4</span> <span class="pre">TPU_MAXDIM=16</span></code>, one
+synthesis per project, default testbench, every row <code class="docutils literal notranslate"><span class="pre">exact</span></code>:</p>
 <table class="docutils align-default">
 <colgroup>
 <col style="width: 34.9%" />
@@ -487,78 +490,91 @@ number for any claim about the hardware.</p>
 <td><p>10</p></td>
 <td><p>4</p></td>
 <td><p>50</p></td>
-<td><p><strong>172</strong></p></td>
+<td><p><strong>175</strong></p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm</span></code> 4x4x4, the search’s choice</p></td>
 <td><p>8</p></td>
 <td><p>4</p></td>
 <td><p>40</p></td>
-<td><p><strong>169</strong></p></td>
+<td><p><strong>172</strong></p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm</span></code> 8x8x8</p></td>
 <td><p>13</p></td>
 <td><p>10</p></td>
 <td><p>115</p></td>
-<td><p><strong>262</strong></p></td>
+<td><p><strong>265</strong></p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm</span></code> 12x12x12</p></td>
 <td><p>13</p></td>
 <td><p>18</p></td>
 <td><p>227</p></td>
-<td><p><strong>418</strong></p></td>
+<td><p><strong>421</strong></p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm</span></code> 16x16x8</p></td>
 <td><p>13</p></td>
 <td><p>16</p></td>
 <td><p>261</p></td>
-<td><p><strong>484</strong></p></td>
+<td><p><strong>482</strong></p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemm</span></code> 16x16x16</p></td>
 <td><p>13</p></td>
 <td><p>28</p></td>
 <td><p>453</p></td>
-<td><p><strong>686</strong></p></td>
+<td><p><strong>674</strong></p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> 16x16x16</p></td>
 <td><p>14</p></td>
 <td><p>32</p></td>
 <td><p>517</p></td>
-<td><p><strong>750</strong></p></td>
+<td><p><strong>738</strong></p></td>
 </tr>
 </tbody>
 </table>
-<p>The <code class="docutils literal notranslate"><span class="pre">gemm</span></code> rows reproduce <strong>172 / 262 / 418 / 484 / 686</strong> exactly, all five,
-so the harness is the one those figures came from. (That was the published row
-when this was measured. It moved to <strong>171 / 261 / 417 / 483 / 685</strong> on
-2026-09-22 when the memory sizing became derived, and to
-<strong>175 / 265 / 421 / 482 / 674</strong> on 2026-09-24 when <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> became the
-default channel depth; the reproduction above is of the design as it then
-stood, and is not a disagreement.) The
+<p>The <code class="docutils literal notranslate"><span class="pre">gemm</span></code> rows reproduce <strong>175 / 265 / 421 / 482 / 674</strong> exactly, all five,
+so the harness is the one those figures came from. (The table was first taken on
+2026-09-22 against the then-published <strong>172 / 262 / 418 / 484 / 686</strong>, and it
+reproduced that row exactly too. It moved to <strong>171 / 261 / 417 / 483 / 685</strong>
+when the memory sizing became derived and to the present row on 2026-09-24 when
+<code class="docutils literal notranslate"><span class="pre">QD=16</span></code> became the default channel depth; the whole table was re-measured on
+2026-09-25 rather than edited, which is why the <code class="docutils literal notranslate"><span class="pre">model</span></code> column is unchanged and
+every <code class="docutils literal notranslate"><span class="pre">cosim</span></code> number moved.) The
 <code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> row settles what they are: <strong>plain</strong> <code class="docutils literal notranslate"><span class="pre">gemm</span></code>, because
 <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code>’s <code class="docutils literal notranslate"><span class="pre">testbench(M,</span> <span class="pre">K,</span> <span class="pre">N)</span></code> leaves <code class="docutils literal notranslate"><span class="pre">relu</span></code> at its default.
-<code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> at 16x16x16 is 750, and 750 - 686 = <strong>64</strong>, exactly the four
-<code class="docutils literal notranslate"><span class="pre">vrelu</span></code> instructions’ 64 <code class="docutils literal notranslate"><span class="pre">accu</span></code> rows. The delta is accounted for to the
-cycle, which is the best evidence available that the units’ work counts are the
-right model of this machine.</p>
+<code class="docutils literal notranslate"><span class="pre">gemm.relu</span></code> at 16x16x16 is 738, and 738 - 674 = <strong>64</strong>, exactly the four
+<code class="docutils literal notranslate"><span class="pre">vrelu</span></code> instructions’ 64 <code class="docutils literal notranslate"><span class="pre">accu</span></code> rows — the same 64 that 750 - 686 gave
+before <code class="docutils literal notranslate"><span class="pre">QD=16</span></code>. The delta is accounted for to the cycle and the accounting
+survived a change that moved every other number on this page, which is the best
+evidence available that the units’ work counts are the right model of this
+machine.</p>
 </section>
 <section id="the-error-bar-a-pick-has-to-carry">
 <h2>The error bar a pick has to carry<a class="headerlink" href="#the-error-bar-a-pick-has-to-carry" title="Link to this heading"><span>¶</span></a></h2>
-<p>Over those six points the model fits <code class="docutils literal notranslate"><span class="pre">cosim</span> <span class="pre">=</span> <span class="pre">128</span> <span class="pre">+</span> <span class="pre">1.24</span> <span class="pre">x</span> <span class="pre">makespan</span></code> with a
-worst residual of <strong>34 cycles</strong> – computed from the table by
-<code class="docutils literal notranslate"><span class="pre">act_machine.fit</span></code>, not typed in, and re-checked by a test that fails if the
-model drifts from the stored points. So the model’s <em>absolute</em> level is
-predictable across shapes to a few percent once the intercept is allowed.</p>
+<p>Over those six points the model fits <code class="docutils literal notranslate"><span class="pre">cosim</span> <span class="pre">=</span> <span class="pre">135</span> <span class="pre">+</span> <span class="pre">1.20</span> <span class="pre">x</span> <span class="pre">makespan</span></code> with a
+worst residual of <strong>34 cycles</strong> (34.21, at <code class="docutils literal notranslate"><span class="pre">gemm</span></code> 16x16x8) – computed from the
+table by <code class="docutils literal notranslate"><span class="pre">act_machine.fit</span></code>, not typed in, and re-checked by a test that fails
+if the model drifts from the stored points. The re-measurement barely moved it:
+it was <code class="docutils literal notranslate"><span class="pre">128</span> <span class="pre">+</span> <span class="pre">1.24</span> <span class="pre">x</span> <span class="pre">makespan</span></code>, worst 33.74, also at 16x16x8. A
+two-parameter fit over makespan absorbs most of what <code class="docutils literal notranslate"><span class="pre">QD=16</span></code> did, which is the
+opposite of what happened to <code class="docutils literal notranslate"><span class="pre">act.cycles.estimate</span></code>’s one-variable fit over
+critical work; makespan already carries the sequencer term, so it is closer to
+monotone in the thing <code class="docutils literal notranslate"><span class="pre">QD</span></code> changed. So the model’s <em>absolute</em> level is
+predictable across shapes to a few percent at the large shapes once the
+intercept is allowed — and to 20 % at the smallest, which is the number a
+small-shape claim has to carry.</p>
 <p>That is the wrong statistic for ranking, and saying so matters. Ranking compares
 two mappings of <strong>one</strong> shape, where the intercept is common and only the
 difference matters, and there is exactly <strong>one</strong> such pair measured: at 4x4x4 the
-model put the two programs <strong>1.25x</strong> apart and the machine put them <strong>1.02x</strong>
+model put the two programs <strong>1.25x</strong> apart and the machine put them <strong>1.017x</strong>
 apart, same order. The model therefore overstated the gap by roughly an order of
-magnitude while getting the direction right.</p>
+magnitude while getting the direction right. Both cycle counts moved by +3 under
+<code class="docutils literal notranslate"><span class="pre">QD=16</span></code> (172 / 169 became 175 / 172), so the machine’s margin is essentially
+unchanged and this conclusion is not an artefact of the row it was first taken
+on.</p>
 <p><code class="docutils literal notranslate"><span class="pre">act_compile.py</span></code> prints this wherever it reports a pick, rather than leaving
 it on this page:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>chosen: N4&gt;K4  cost (517, 32)
-margin over the runner-up 1.24x. That margin sizes nothing: cosim ~ 128 +
-1.24 x makespan over 6 measured points, worst residual 34 cycles, but the
+margin over the runner-up 1.24x. That margin sizes nothing: cosim ~ 135 +
+1.20 x makespan over 6 measured points, worst residual 34 cycles, but the
 model's ORDER is validated on 1 same-shape pair -- gemm 4x4x4: model 1.25x
 -&gt; cosim 1.02x, same order -- so it overstated the gap by an order of
 magnitude while getting the order right. Treat the pick as a ranking
@@ -579,11 +595,14 @@ word for word. At 4x4x4 it is not: every tile count is 1 there, so the mapspace
 offers a single nest with no emitted loops, and the program it lowers drops a
 trip-1 hardware loop the hand-written generator keeps – 8 static instructions
 against 10, the same 4 dynamic issues, and a model cost of 40 against 50.</p>
-<p>Cosim, in the table above: <strong>169 cycles against 172</strong>, both exact. The
-hand-written program reproduces the published 172 for that shape to the cycle,
+<p>Cosim, in the table above: <strong>172 cycles against 175</strong>, both exact. The
+hand-written program reproduces the published 175 for that shape to the cycle,
 and the search’s program is 3 cycles faster. The model predicted a 10-cycle
 saving and the machine gave 3, which is the expected direction of error for a
-model that charges a fixed <code class="docutils literal notranslate"><span class="pre">II</span></code> per fetch and no overlap.</p>
+model that charges a fixed <code class="docutils literal notranslate"><span class="pre">II</span></code> per fetch and no overlap. It was 169 against
+172 before <code class="docutils literal notranslate"><span class="pre">QD=16</span></code>: <strong>the mapping-side saving is still exactly 3 cycles</strong>, so
+what <code class="docutils literal notranslate"><span class="pre">QD</span></code> changed is the machine’s fixed cost and not what dropping a trip-1
+loop is worth.</p>
 <p>That is the whole shape of what a mapper buys on this machine today: it
 reproduces a carefully hand-tuned choice where that choice is right, and it
 removes overhead the generator could not see, because the generator has no cost
@@ -701,10 +720,31 @@ It should stay there and stay out of the cycle gate.</p>
 <section id="what-the-cheap-gate-is-worth">
 <span id="act-specs-gate-measured"></span><h2>What the cheap gate is worth<a class="headerlink" href="#what-the-cheap-gate-is-worth" title="Link to this heading"><span>¶</span></a></h2>
 <p>Measured with <code class="docutils literal notranslate"><span class="pre">act/calibrate.py</span></code>, which runs one <code class="docutils literal notranslate"><span class="pre">csynth_design</span></code> and then
-one <code class="docutils literal notranslate"><span class="pre">cosim_design</span></code> per program on that same RTL. Everything in this section
-was measured in this session (<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/logs/cosim_act_corpus_sweep.log</span></code> and
-<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/logs/cosim_act_relu_hang.log</span></code>); <code class="docutils literal notranslate"><span class="pre">PUBLISHED_CYCLES</span></code> in <code class="docutils literal notranslate"><span class="pre">cycles.py</span></code> is the
-only attributed number on the page.</p>
+one <code class="docutils literal notranslate"><span class="pre">cosim_design</span></code> per program on that same RTL
+(<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/logs/cosim_act_corpus_sweep.log</span></code> and
+<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/logs/cosim_act_relu_hang.log</span></code>).</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>This whole section is a measurement of the design at ``e24e433b``, at the
+then-default ``TPU_QD=8``, and it was NOT re-measured in the 2026-09-25
+refit.</strong> Its <code class="docutils literal notranslate"><span class="pre">cosim</span></code> column is that design’s (the <code class="docutils literal notranslate"><span class="pre">gemm</span></code> rows are
+172 / 262 / 418 / 484 / 686) and its <code class="docutils literal notranslate"><span class="pre">estimate</span></code> column is the
+<code class="docutils literal notranslate"><span class="pre">173.2</span> <span class="pre">+</span> <span class="pre">1.621</span></code> fit of that time. The shipped fit is now
+<code class="docutils literal notranslate"><span class="pre">179.0</span> <span class="pre">+</span> <span class="pre">1.573</span></code> against 175 / 265 / 421 / 482 / 674.</p>
+<p>The estimate column was deliberately <strong>left alone</strong> rather than recomputed.
+Recomputing it under the new fit while leaving the old <code class="docutils literal notranslate"><span class="pre">cosim</span></code> column in
+place would make every number in the <code class="docutils literal notranslate"><span class="pre">error</span></code> column a comparison between
+two different designs, which is worse than being out of date: the in-sample
+9.2 %, the out-of-sample 13.9 % and the 6.0 % mean below are all statistics
+of that pairing and only of it.</p>
+<p><strong>What it would take to re-derive them:</strong> <code class="docutils literal notranslate"><span class="pre">act/calibrate.py</span> <span class="pre">specs</span></code> and
+<code class="docutils literal notranslate"><span class="pre">act/calibrate.py</span> <span class="pre">variants</span></code> re-run on the current design at
+<code class="docutils literal notranslate"><span class="pre">TPU_T=4</span> <span class="pre">TPU_MAXDIM=16</span></code> — one <code class="docutils literal notranslate"><span class="pre">csynth</span></code> plus a cosim per program over
+the twelve specs, of which one (<code class="docutils literal notranslate"><span class="pre">relu_16x16</span></code>) is expected not to complete
+(<a class="reference internal" href="../developer/limitations.html#limitation-24"><span class="std std-ref">item 24</span></a>). Until that runs, read the error column as
+a property of the model in the <code class="docutils literal notranslate"><span class="pre">QD=8</span></code> regime. It is tracked in
+<code class="docutils literal notranslate"><span class="pre">chia_agent/control.NEEDS_REFIT</span></code>.</p>
+</div>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">TPU_PRJ</span><span class="o">=</span>/somewhere/with/room<span class="w"> </span>python<span class="w"> </span>act/calibrate.py<span class="w"> </span>specs
 <span class="nv">TPU_PRJ</span><span class="o">=</span>/somewhere/with/room<span class="w"> </span>python<span class="w"> </span>act/calibrate.py<span class="w"> </span>variants
 </pre></div>

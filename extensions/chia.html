@@ -170,10 +170,12 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/asic_manifest.html">The ASIC manifest</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_tutorial.html">Tutorial: A PyTorch MLP on TinyTPU, Then Change It</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
@@ -240,24 +242,44 @@ CHIA2026 account. The agents themselves are driven by
 <a class="reference external" href="https://github.com/ucb-bar/chia">CHIA</a> (<code class="docutils literal notranslate"><span class="pre">ucb-bar/chia</span></code> at <code class="docutils literal notranslate"><span class="pre">16c35e9</span></code>).</p>
 <section id="quick-start">
 <h2>Quick start<a class="headerlink" href="#quick-start" title="Link to this heading"><span>¶</span></a></h2>
-<p>Environment (once): the <code class="docutils literal notranslate"><span class="pre">allo</span></code> env with this checkout’s <code class="docutils literal notranslate"><span class="pre">mlir/build</span></code>,
-<code class="docutils literal notranslate"><span class="pre">chia_env</span></code> (py3.10, <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code>), opencode via
-<code class="docutils literal notranslate"><span class="pre">npm</span> <span class="pre">ci</span> <span class="pre">--prefix</span> <span class="pre">examples/tinytpu/chia_agent</span></code>, and
-<code class="docutils literal notranslate"><span class="pre">chia.env</span></code> copied from <code class="docutils literal notranslate"><span class="pre">chia.env.example</span></code> at the repository root.
-<code class="docutils literal notranslate"><span class="pre">chia.env</span></code> is gitignored and must never be committed. Then:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>examples/tinytpu/chia_agent/gcp_setup.sh<span class="w">  </span><span class="c1"># auth, project, billing, APIs, spend report</span>
+<p>Environment: <code class="docutils literal notranslate"><span class="pre">chia_env</span></code> (py3.10, <code class="docutils literal notranslate"><span class="pre">conda</span> <span class="pre">create</span> <span class="pre">-n</span> <span class="pre">chia_env</span> <span class="pre">python=3.10</span></code>
+then <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code>) is created once per host. Everything else is per
+worktree and is what the two setup scripts do — <code class="docutils literal notranslate"><span class="pre">checkout_setup.sh</span></code>
+creates <code class="docutils literal notranslate"><span class="pre">chia.env</span></code> from <code class="docutils literal notranslate"><span class="pre">chia.env.example</span></code> if there is none (never
+overwriting one, and stopping if one names another project), installs
+opencode, creates <code class="docutils literal notranslate"><span class="pre">.chia_scratch/</span></code>, runs the Ray check, and reports
+<code class="docutils literal notranslate"><span class="pre">mlir/build</span></code>; <code class="docutils literal notranslate"><span class="pre">gcp_setup.sh</span></code> checks the cloud side. Both cost $0 and are
+idempotent. <code class="docutils literal notranslate"><span class="pre">chia.env</span></code> is gitignored and must never be committed.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>examples/tinytpu/reproduce.sh<span class="w"> </span>--no-cosim<span class="w">     </span><span class="c1"># this checkout's mlir/build + gates</span>
+examples/tinytpu/chia_agent/checkout_setup.sh<span class="w">  </span><span class="c1"># chia.env, opencode, scratch, Ray</span>
+examples/tinytpu/chia_agent/gcp_setup.sh<span class="w">  </span><span class="c1"># auth, project, billing, APIs, spend report</span>
 conda<span class="w"> </span>activate<span class="w"> </span>chia_env<span class="p">;</span><span class="w"> </span><span class="nb">set</span><span class="w"> </span>-a<span class="p">;</span><span class="w"> </span><span class="nb">source</span><span class="w"> </span>chia.env<span class="p">;</span><span class="w"> </span><span class="nb">set</span><span class="w"> </span>+a
-ray<span class="w"> </span>start<span class="w"> </span>--head<span class="w"> </span>--resources<span class="o">=</span><span class="s1">'{"opencode_creds": 2}'</span><span class="w"> </span>--include-dashboard<span class="o">=</span><span class="nb">false</span>
+<span class="c1"># chia.env MUST be sourced in this shell, before the head: Ray workers</span>
+<span class="c1"># inherit the raylet's environment (loop.py passes no env_vars), and</span>
+<span class="c1"># opencode is on PATH only because chia.env puts OPENCODE_BIN there.</span>
+<span class="c1"># A private --temp-dir, short enough for a Unix socket (107 bytes), plus</span>
+<span class="c1"># RAY_ADDRESS: never address="auto" on the shared default, never `ray stop`.</span>
+ray<span class="w"> </span>start<span class="w"> </span>--head<span class="w"> </span>--temp-dir<span class="o">=</span>/tmp/ray-chia<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--resources<span class="o">=</span><span class="s1">'{"opencode_creds": 2}'</span><span class="w"> </span>--include-dashboard<span class="o">=</span><span class="nb">false</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">RAY_ADDRESS</span><span class="o">=</span>&lt;what<span class="w"> </span>ray<span class="w"> </span>start<span class="w"> </span>printed&gt;
 <span class="nb">cd</span><span class="w"> </span>examples/tinytpu/chia_agent
-python<span class="w"> </span>test_harness.py<span class="w"> </span>--phases<span class="w"> </span>e,c<span class="w">    </span><span class="c1"># ~1 min, $0; full suite ~30 min, $0</span>
+python<span class="w"> </span>test_harness.py<span class="w"> </span>--phases<span class="w"> </span>e,c<span class="w">    </span><span class="c1"># ~2 min, $0; full suite ~30 min, $0</span>
 python<span class="w"> </span>preflight.py<span class="w"> </span>--budget-usd<span class="w"> </span><span class="m">30</span><span class="w">    </span><span class="c1"># the gate alone, $0</span>
-python<span class="w"> </span>swarm.py<span class="w"> </span>--workers<span class="w"> </span><span class="m">2</span><span class="w"> </span>--iterations<span class="w"> </span><span class="m">3</span><span class="w"> </span>--budget-usd<span class="w"> </span><span class="m">30</span>
+python<span class="w"> </span>swarm.py<span class="w"> </span>--workers<span class="w"> </span><span class="m">2</span><span class="w"> </span>--iterations<span class="w"> </span><span class="m">3</span><span class="w"> </span>--budget-usd<span class="w"> </span><span class="m">30</span><span class="w"> </span>--run-dir<span class="w"> </span>&lt;run&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tee<span class="w"> </span>&lt;run&gt;/swarm.log<span class="w">         </span><span class="c1"># swarm's own stdout is not persisted</span>
+python<span class="w"> </span>swarm.py<span class="w"> </span>--status<span class="w"> </span>&lt;run&gt;<span class="w">         </span><span class="c1"># any time, from any shell, $0</span>
 python<span class="w"> </span>accept.py<span class="w"> </span>--out<span class="w"> </span>&lt;run&gt;/control<span class="w">                 </span><span class="c1"># the run's control, once</span>
 python<span class="w"> </span>accept.py<span class="w"> </span>--diff<span class="w"> </span>&lt;run&gt;/&lt;worker&gt;/best.diff<span class="w"> </span>--out<span class="w"> </span>&lt;run&gt;/accept-&lt;worker&gt;<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--control<span class="w"> </span>&lt;run&gt;/control/accept.json<span class="w">              </span><span class="c1"># or omit it and measure again</span>
-ray<span class="w"> </span>stop<span class="w">                               </span><span class="c1"># and remove the Ray session directory</span>
+python3<span class="w"> </span>spend.py<span class="w"> </span>run<span class="w"> </span>&lt;run&gt;<span class="w">             </span><span class="c1"># what it cost, from opencode's DB</span>
+pgrep<span class="w"> </span>-f<span class="w"> </span>/tmp/ray-chia/session_<span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="w"> </span>-r<span class="w"> </span><span class="nb">kill</span><span class="w">   </span><span class="c1"># this cluster only;</span>
+<span class="w">                                       </span><span class="c1"># `ray stop` is host-wide</span>
 </pre></div>
 </div>
+<p>The full procedure, written for someone who has never run this — what a run
+is and costs, the $0 path, pre-registration, watching a run, reading the
+spend, and abandoning an interrupted one — is the “Quick start, assuming
+nothing” section of <code class="docutils literal notranslate"><span class="pre">examples/tinytpu/chia_agent/README.md</span></code>.</p>
 <p><code class="docutils literal notranslate"><span class="pre">test_harness.py</span></code> and <code class="docutils literal notranslate"><span class="pre">preflight.py</span></code> cost nothing and need no model call,
 so run them first: <code class="docutils literal notranslate"><span class="pre">--phases</span> <span class="pre">e,c</span></code> takes about a minute and the full suite
 about thirty. Each candidate’s evaluation is 2-3 minutes of cosim, and
@@ -359,40 +381,123 @@ raw run output (worker logs, cosim logs, csynth XMLs) are on the tag
 </thead>
 <tbody>
 <tr class="row-even"><td><p><strong>editable</strong></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code>, <code class="docutils literal notranslate"><span class="pre">isa_dsl.py</span></code></p></td>
-<td><p>The agent edits a private copy in <code class="docutils literal notranslate"><span class="pre">&lt;run&gt;/&lt;worker&gt;/spec/</span></code>, never the
-repository.</p></td>
+<td><p>the seventeen paths <code class="docutils literal notranslate"><span class="pre">chia_agent/design.py</span></code> names: the instruction set
+(<code class="docutils literal notranslate"><span class="pre">isa_spec.json</span></code>, the <code class="docutils literal notranslate"><span class="pre">isa_encoding.py</span></code> generated from it and the
+<code class="docutils literal notranslate"><span class="pre">isa_ref.py</span></code> built on that), <code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code> (the parameter set,
+and the <code class="docutils literal notranslate"><span class="pre">CHIA_CONFIG</span></code> declaration below), <code class="docutils literal notranslate"><span class="pre">isa_dsl.py</span></code> (the program
+generator), <code class="docutils literal notranslate"><span class="pre">ip/isa.py</span></code>, <code class="docutils literal notranslate"><span class="pre">ip/tinytpu.py</span></code>, <code class="docutils literal notranslate"><span class="pre">ip/assembler.py</span></code>,
+<code class="docutils literal notranslate"><span class="pre">ip/programs.py</span></code>, and the eight units under <code class="docutils literal notranslate"><span class="pre">ip/units/</span></code></p></td>
+<td><p>The agent edits a private copy in <code class="docutils literal notranslate"><span class="pre">&lt;run&gt;/&lt;worker&gt;/spec/</span></code>, which
+mirrors the package, never the repository. The hardware left
+<code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code> for <code class="docutils literal notranslate"><span class="pre">ip/units/</span></code> when the design became a unit
+library, so an editable set that stopped at the two old file names
+would no longer contain the machine – both wins of run 1 landed in
+what is now <code class="docutils literal notranslate"><span class="pre">ip/units/dma_load.py</span></code> and <code class="docutils literal notranslate"><span class="pre">ip/units/sequencer.py</span></code>.
+<code class="docutils literal notranslate"><span class="pre">isa_encoding.py</span></code> is generated: the <code class="docutils literal notranslate"><span class="pre">regenerate_isa</span></code> tool runs the
+frozen generator on the candidate’s own spec, because an agent cannot
+keep a 700-line generated file byte-identical by hand.</p></td>
 </tr>
 <tr class="row-odd"><td><p><strong>frozen</strong></p></td>
 <td><p>main’s <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code> (testbench, <code class="docutils literal notranslate"><span class="pre">SHAPES</span></code>, golden reference, every
 Vitis/TCL setting), <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code>, <code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code>,
-<code class="docutils literal notranslate"><span class="pre">isa_ref.py</span></code>, <code class="docutils literal notranslate"><span class="pre">kpn_model.py</span></code>; and <code class="docutils literal notranslate"><span class="pre">chia_agent/</span></code>’s
-<code class="docutils literal notranslate"><span class="pre">evaluate.py</span></code>, <code class="docutils literal notranslate"><span class="pre">gate_runner.py</span></code>, <code class="docutils literal notranslate"><span class="pre">param_check.py</span></code>,
-<code class="docutils literal notranslate"><span class="pre">spec_policy.py</span></code></p></td>
-<td><p>Read from git, never from disk; main’s five files must also be
-byte-identical to <code class="docutils literal notranslate"><span class="pre">MAIN_BASE</span></code> (<code class="docutils literal notranslate"><span class="pre">476a70d8</span></code>) in <code class="docutils literal notranslate"><span class="pre">evaluate.py</span></code>.</p></td>
+<code class="docutils literal notranslate"><span class="pre">kpn_model.py</span></code>, <code class="docutils literal notranslate"><span class="pre">shapes.py</span></code>, <code class="docutils literal notranslate"><span class="pre">gen_isa.py</span></code>; the workload suite
+(<code class="docutils literal notranslate"><span class="pre">workloads/</span></code>) and <code class="docutils literal notranslate"><span class="pre">chia_agent/area_proxy.py</span></code> – what prices the
+design and what it is priced <em>on</em>; the design’s own machinery
+(<code class="docutils literal notranslate"><span class="pre">ip/params.py</span></code>, the package <code class="docutils literal notranslate"><span class="pre">__init__</span></code>s, and the reduce IP they
+import); and <code class="docutils literal notranslate"><span class="pre">chia_agent/</span></code>’s <code class="docutils literal notranslate"><span class="pre">evaluate.py</span></code>, <code class="docutils literal notranslate"><span class="pre">gate_runner.py</span></code>,
+<code class="docutils literal notranslate"><span class="pre">param_check.py</span></code>, <code class="docutils literal notranslate"><span class="pre">spec_policy.py</span></code>, <code class="docutils literal notranslate"><span class="pre">mapspace.py</span></code>,
+<code class="docutils literal notranslate"><span class="pre">codesign_gate.py</span></code>, <code class="docutils literal notranslate"><span class="pre">codesign_cosim.py</span></code></p></td>
+<td><p>Read from git, never from disk; main’s design evaluator must also be
+byte-identical to the base <code class="docutils literal notranslate"><span class="pre">evaluate.main_base()</span></code> <strong>derives</strong> – the
+merge-base of the frozen ref with main. It was a hand-written
+<code class="docutils literal notranslate"><span class="pre">MAIN_BASE</span></code> constant, and it went stale four times in five days,
+each time refusing every candidate at stage <code class="docutils literal notranslate"><span class="pre">setup</span></code> with a message
+that blamed the design rather than the pin.</p></td>
 </tr>
 </tbody>
 </table>
-<p>Because <code class="docutils literal notranslate"><span class="pre">isa_ref.py</span></code> is frozen and <code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code> checks programs against
-it, <strong>what each instruction means is part of the contract</strong>: the agent may
-change how the hardware executes the ISA and which instructions the generator
-emits, not an instruction’s semantics.</p>
+</section>
+<section id="why-the-isa-can-move-and-what-the-oracle-is">
+<span id="chia-isa-editable"></span><h3>Why the ISA can move, and what the oracle is<a class="headerlink" href="#why-the-isa-can-move-and-what-the-oracle-is" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">isa_spec.json</span></code>, <code class="docutils literal notranslate"><span class="pre">isa_encoding.py</span></code> and <code class="docutils literal notranslate"><span class="pre">isa_ref.py</span></code> were frozen until
+2026-09-25, and the reason was sound: <code class="docutils literal notranslate"><span class="pre">isa_ref.py</span></code> is what <code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code>
+checks random programs against, so a candidate that could rewrite its own
+reference model could weaken the rule and score strictly better. The cost was
+that the loop could not change the instruction set at all, which is half of a
+co-design space.</p>
+<p><strong>The referee cannot be the editable surface, so the referee moved outside the
+repository.</strong> <code class="docutils literal notranslate"><span class="pre">workloads/run.py</span> <span class="pre">--verify</span></code> is the one check with something
+this project did not write on one side: <code class="docutils literal notranslate"><span class="pre">torch.nn.Linear</span></code>’s own forward on
+the model’s real weights, with the machine’s epilogue applied in torch. It is
+now the FIRST gate, it costs 4 s at MAXDIM=16, and a byte that differs is
+<code class="docutils literal notranslate"><span class="pre">gate:pytorch</span></code>. <code class="docutils literal notranslate"><span class="pre">allo/actions.py</span></code> is not the answer to this and was not
+used for it: it is another model of the same ISA <em>inside</em> the repository, with
+the same failure mode <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code> has.</p>
+<p>Two other things carry the weight the freeze used to:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">gen_isa.py</span> <span class="pre">--conform</span></code> (frozen) is a gate on the candidate’s <strong>own</strong> spec:
+<code class="docutils literal notranslate"><span class="pre">isa_encoding.py</span></code> byte-identical to what that spec generates, every
+software constant and bit slice of the design at the spec’s positions, the
+assembler and generator through the same encoder, the reference model
+structurally forbidden from importing an opcode number or a field position
+from the design, and the bit ranges the <em>emitted HLS</em> reads. 36 s.</p></li>
+<li><p><strong>The GEMM goldens were never</strong> <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code>. <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code>,
+<code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code> and <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code>’s testbench each compute their own numpy
+gold, and all three are frozen. <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code> is the reference for <em>random
+programs</em> only.</p></li>
+</ul>
+<p><strong>What the oracle is worth, stated rather than implied.</strong> 8,912 bytes across
+four MLPs at MAXDIM=64, 92 % of it <code class="docutils literal notranslate"><span class="pre">mlp_wide</span></code>; <code class="docutils literal notranslate"><span class="pre">mlp_bias</span></code> contributes none,
+because it is the probe that must not map. At the scored MAXDIM=16 only two
+models fit, and <code class="docutils literal notranslate"><span class="pre">--verify</span></code> draws each eight times (the mapping depends only
+on the shapes, so extra draws are nearly free) for 2,688 bytes over six layers.
+That is an oracle, not a corpus: it adds a reference nobody here can edit, and
+it adds no shape the GEMM sweep does not already cover. Widening it means more
+models that fit a small build, and that is the next thing to do to this gate.</p>
+<p>Because the spec is editable and <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code> <em>evaluates</em> the expressions its
+actions carry, those expressions are held to an expression language – a name,
+an integer, arithmetic, bitwise and comparison operators – in two independent
+places: <code class="docutils literal notranslate"><span class="pre">spec_policy.expression_violations</span></code> at edit time, and
+<code class="docutils literal notranslate"><span class="pre">isa_ref.expression</span></code>, an AST walk that replaced <code class="docutils literal notranslate"><span class="pre">eval</span></code>, at run time. An
+<code class="docutils literal notranslate"><span class="pre">eval</span></code> with emptied builtins still reaches <code class="docutils literal notranslate"><span class="pre">().__class__.__bases__[0]</span></code> and
+from there the frame holding <code class="docutils literal notranslate"><span class="pre">gate_runner.py</span></code>’s nonce.</p>
 </section>
 <section id="the-evaluator">
 <h3>The evaluator<a class="headerlink" href="#the-evaluator" title="Link to this heading"><span>¶</span></a></h3>
-<ul class="simple">
-<li><p><strong>gate</strong> (functional, Allo simulator, ~30 s): <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code> (the published
+<ul>
+<li><p><strong>gate</strong> (functional, Allo simulator, ~110 s): <code class="docutils literal notranslate"><span class="pre">run.py</span> <span class="pre">--verify</span></code> (the
+PyTorch oracle, first and cheapest – 4 s), <code class="docutils literal notranslate"><span class="pre">gen_isa.py</span> <span class="pre">--conform</span></code> (the
+candidate’s own spec against its own generated artefacts and the design’s bit
+slices – 36 s), <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code> (the published
 [-4, 4] setup), main’s <code class="docutils literal notranslate"><span class="pre">stress_isa.py</span></code> (492 runs: full-range, corner and
 boundary int8 at all 64 shapes, <code class="docutils literal notranslate"><span class="pre">C</span></code> prefilled and compared in full, vector
 and random programs against <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code>, many calls on one build), and
-<code class="docutils literal notranslate"><span class="pre">param_check.py</span></code> at <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=8</span></code>, <code class="docutils literal notranslate"><span class="pre">12</span></code> and <code class="docutils literal notranslate"><span class="pre">TPU_T=8</span>
-<span class="pre">TPU_MAXDIM=32</span></code> (below). Negative control:
-an int16 partial sum passes <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code> and every cosim testbench, and
-<code class="docutils literal notranslate"><span class="pre">stress_isa</span></code> rejects it (251/492 exact).</p></li>
-<li><p><strong>score</strong>: the sum of RTL cosim cycles (Vitis HLS 2023.2 csynth + xsim) at
-4x4x4 and 16x16x16, each testbench bit-exact, the 3.33 ns clock met. About
-2-3 min per candidate. Area is recorded, not scored.</p></li>
+<code class="docutils literal notranslate"><span class="pre">param_check.py</span></code> at three configurations <code class="docutils literal notranslate"><span class="pre">evaluate.param_configs</span></code>
+derives from the candidate’s own (below). Negative controls, all in
+<code class="docutils literal notranslate"><span class="pre">test_harness.py</span></code>: an int16 partial sum passes <code class="docutils literal notranslate"><span class="pre">bench_isa.py</span></code> and every
+cosim testbench and <code class="docutils literal notranslate"><span class="pre">stress_isa</span></code> rejects it (251/492 exact); a spec edit
+without <code class="docutils literal notranslate"><span class="pre">regenerate_isa</span></code> is refused at <code class="docutils literal notranslate"><span class="pre">gate:isa</span></code> for a stale artefact;
+and <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code>’s ReLU primitive weakened to the identity – a candidate
+rewriting what used to judge it – is refused at <code class="docutils literal notranslate"><span class="pre">gate:pytorch</span></code> before
+<code class="docutils literal notranslate"><span class="pre">bench_isa</span></code> runs at all.</p></li>
+<li><p><strong>score</strong>: a THREE-TERM objective, reported per term and never summed.
+See <a class="reference internal" href="#chia-objective"><span class="std std-ref">The objective, and the two axes it replaced</span></a> for why each term is there and what it replaced.</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">model</span></code> – RTL cosim cycles for <code class="docutils literal notranslate"><span class="pre">mlp_tiny</span></code> and <code class="docutils literal notranslate"><span class="pre">mlp_deep</span></code>, the two
+workload-suite models whose every layer fits one build, over one csynth
+shared by all six layers. <strong>The primary</strong>, and measured at
+<code class="docutils literal notranslate"><span class="pre">evaluate.SCORED_MODEL_ENV</span></code> — <code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code>, <strong>not</strong> the GEMM term’s
+16, for the measured reason below.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">gemm</span></code> – RTL cosim cycles at 4x4x4 and 16x16x16, unchanged. <strong>The
+control</strong>, kept so that a change which helps models and hurts GEMM shapes
+has to be stated rather than hidden.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">area</span></code> – a standard-cell area ESTIMATE from the candidate’s own
+structural bit census (<code class="docutils literal notranslate"><span class="pre">chia_agent/area_proxy.py</span></code>), in milliseconds.
+csynth’s FPGA resource table is still reported beside it and no longer
+decides anything.</p></li>
+</ol>
+<p>Each testbench bit-exact, the 3.33 ns clock met.</p>
+</li>
 <li><p><strong>acceptance</strong>: <code class="docutils literal notranslate"><span class="pre">accept.py</span></code> is the only way a win is claimed. On a clean
 <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">worktree</span></code> with its own <code class="docutils literal notranslate"><span class="pre">mlir/</span></code> build it runs <code class="docutils literal notranslate"><span class="pre">bench_isa</span></code>,
 <code class="docutils literal notranslate"><span class="pre">stress_isa</span></code>, <code class="docutils literal notranslate"><span class="pre">param_check</span></code>, cosim at all five shapes, and the
@@ -405,6 +510,230 @@ off the same build (guard 10); the row published when run 1 was scored,
 that measurement was cross-checked against. Measuring the control per run is
 exactly why the published row having moved twice since – most recently to
 175 / 265 / 421 / 482 / 674 – does not invalidate the run.</p></li>
+</ul>
+</section>
+<section id="the-objective-and-the-two-axes-it-replaced">
+<span id="chia-objective"></span><h3>The objective, and the two axes it replaced<a class="headerlink" href="#the-objective-and-the-two-axes-it-replaced" title="Link to this heading"><span>¶</span></a></h3>
+<p>Until 2026-09-24 the loop scored on <strong>GEMM shapes</strong> against <strong>csynth’s FPGA
+resource table</strong>, and this project had measured both to be misleading.</p>
+<p><strong>The workload class changes the answer by four to eight times.</strong> The same
+optimisation – widening the operand burst – is worth <strong>4.3-7.0 %</strong> of runtime
+on GEMM shapes and <strong>25-34 %</strong> on multi-layer models
+(<a class="reference internal" href="../designs/workload_suite.html"><span class="doc">The Workload Suite: PyTorch MLPs on TinyTPU</span></a>). A model does not make the problem bigger, it
+makes it <em>longer</em>, so a fixed per-call cost is repaid at every layer instead of
+amortised by one large problem. A loop ranking changes on GEMM shapes ranks
+them on the workload class <strong>least</strong> sensitive to the cost they remove. So the
+model term is the primary and the GEMM shapes are kept as the control: a
+control that is dropped cannot catch a change that buys models with shapes.</p>
+<p><strong>…but only at MAXDIM=64, and that had to be measured.</strong> Every one of those
+figures was taken at <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=64</span></code>, and the loop scores at 16, where a DRAM
+row is 4 packed words instead of 16 and every operand burst is four times
+shorter. Asked directly — both models, every layer, one csynth per burst
+width, at <code class="docutils literal notranslate"><span class="pre">T=4</span> <span class="pre">MAXDIM=16</span> <span class="pre">QD=16</span></code> — the widening is worth <strong>zero cycles</strong>:
+861 -&gt; 861 and 1,530 -&gt; 1,530, layer by layer, to the cycle
+(<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/model-term-maxdim-20260924.rst</span></code>).</p>
+<p>Worse than insensitive: at MAXDIM=16 the relationship <strong>inverts</strong>. The GEMM
+shapes there <em>do</em> see the widening — CHIA run 1 measured
+<code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">/</span> <span class="pre">0</span> <span class="pre">/</span> <span class="pre">-42</span> <span class="pre">/</span> <span class="pre">-59</span> <span class="pre">/</span> <span class="pre">-59</span></code> on exactly that configuration — and the models do
+not. A model term at MAXDIM=16 would be the <em>less</em> burst-sensitive of the two
+terms, which is the opposite of the reason for having one. So the model term is
+measured at MAXDIM=64 and the GEMM control stays at 16 because that is the
+published row: <strong>two configurations, two csynths per candidate</strong>, and that is
+what the term costs.</p>
+<p>Measured, that price is <strong>348 s</strong> for the model term (one <code class="docutils literal notranslate"><span class="pre">csynth</span></code> and six
+layer cosims, returning the published 1 150 and 2 117) on top of a ~230 s
+evaluation — <strong>2.5x per candidate</strong>. Against run 3’s whole-run numbers it is
+about <strong>1.28x wall</strong>, because the model calls dominate and they have not
+changed, and <strong>no change to the spend cap</strong>: the term adds no model calls, so
+the $60 cap still buys the six candidates run 3 got for $20.74. What to watch
+instead is <strong>Vitis load, 2.5x per candidate</strong>, which across a four-worker swarm
+is licence and CPU contention rather than money.</p>
+<p><strong>The FPGA table understates silicon in the components a search most wants to
+change.</strong> The burst widening is +43 % flip-flops and +92 % block RAM on FPGA
+and <strong>+74.4 % cell area</strong> in 45 nm, of which <strong>99.1 % is two AXI master ports</strong>
+that grow 13x when widened. The arithmetic array is <strong>under 4 %</strong> of our
+standard-cell logic while the memory-interface adapters are <strong>40.9 %</strong>
+(<a class="reference internal" href="../paper.html"><span class="doc">A Co-Design Compilation Flow as a Harness for Language Models to Improve It</span></a>). A Design Compiler run is ~70 minutes on another host with a
+licence, so the fix cannot be “run DC in the loop”; it is
+<code class="docutils literal notranslate"><span class="pre">chia_agent/area_proxy.py</span></code>, which <strong>counts the bits the design declares</strong> –
+every array a unit declares, every channel the architecture wires, at the
+candidate’s own parameter set – and prices them, plus the AXI adapters, at
+coefficients fitted to the committed DC runs.</p>
+<p>It reports itself as an estimate everywhere, and it states its error:</p>
+<ul class="simple">
+<li><p><strong>0.33 % mean / 0.91 % worst</strong> in-sample over the seven committed TinyTPU DC
+runs, <strong>0.62 % / 1.39 %</strong> leave-one-out;</p></li>
+<li><p>its channel census reproduces, <strong>to the bit</strong>, a hand count taken off the
+emitted RTL’s instance list (16,640 bits of queue at <code class="docutils literal notranslate"><span class="pre">QD=8</span></code>, 33,280 at 16);</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">examples/tinytpu/chia_agent/area_proxy.py</span> <span class="pre">--selfcheck</span></code> re-derives
+every one of those numbers from the committed reports and fails if any moved.</p></li>
+</ul>
+<p>What it is <strong>not</strong>: it is a model of this design and this flow (flip-flop
+memories, <code class="docutils literal notranslate"><span class="pre">sram_mode='none'</span></code>); the four Gemmini runs are not fitted and not
+predicted by it; it prices <em>structure</em>, not synthesis, so a construct Vitis
+renders as a multi-write-port RAM is invisible to it; and the configuration the
+loop scores at, T=4 MAXDIM=16, has exactly <strong>one</strong> committed DC run and is the
+worst-predicted of the seven. That wants a twelfth DC run, not a better fit.</p>
+</section>
+<section id="the-configuration-is-a-candidate-s-to-propose-inside-a-stated-envelope">
+<span id="chia-configuration"></span><h3>The configuration is a candidate’s to propose, inside a stated envelope<a class="headerlink" href="#the-configuration-is-a-candidate-s-to-propose-inside-a-stated-envelope" title="Link to this heading"><span>¶</span></a></h3>
+<p>Until 2026-09-25 <code class="docutils literal notranslate"><span class="pre">evaluate.SCORED</span></code> pinned T=4 MAXDIM=16 and
+<code class="docutils literal notranslate"><span class="pre">check_invariants</span></code> refused any candidate whose build disagreed, so the loop
+searched the implementation of eight units at one architecture. A candidate now
+declares, at module level in its own <code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">CHIA_CONFIG</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"T"</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span> <span class="s2">"MAXDIM"</span><span class="p">:</span> <span class="mi">32</span><span class="p">}</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">evaluate.resolve_config</span></code> reads it with <code class="docutils literal notranslate"><span class="pre">ast.literal_eval</span></code> – no import, no
+candidate code – before the tree is composed, and every stage then runs pinned
+to it; <code class="docutils literal notranslate"><span class="pre">check_invariants</span></code> still requires the build to <em>report</em> what was
+declared, so the declaration is a claim with a check on it. A candidate that
+declares nothing is scored at T=4 MAXDIM=16 QD=16, the published row, so no
+existing candidate, control or published number moves.</p>
+<p>Four things refuse a proposal, all of them before anything is built, and all of
+them naming what would lift the refusal:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 24.0%" />
+<col style="width: 76.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>refusal</p></th>
+<th class="head"><p>why</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>outside the fitted envelope</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">area_proxy.envelope_refusals</span></code>. The coefficients are fitted to five
+committed DC runs (the two logic-only ones are stubs, not design
+points), which span T in [4, 8], MAXDIM in [16, 64], QD in [8, 16],
+DMA_WORDS in [1, 16]. Outside that span the area term would be an
+extrapolation with no error bar, so <code class="docutils literal notranslate"><span class="pre">estimate</span></code> <strong>raises</strong>
+(<code class="docutils literal notranslate"><span class="pre">OutsideEnvelope</span></code>) instead of returning a number. A missing figure a
+search must work around is recoverable; a confident wrong one is not.
+The envelope is derived from <code class="docutils literal notranslate"><span class="pre">COMMITTED</span></code>, so a twelfth DC run widens
+it by being added to that dict.</p></td>
+</tr>
+<tr class="row-odd"><td><p>past a MAXDIM ceiling</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(MAXDIM</span> <span class="pre">//</span> <span class="pre">T)</span> <span class="pre">*</span> <span class="pre">MAXDIM</span> <span class="pre">&lt;=</span> <span class="pre">2048</span></code> for the operand layout’s addressing
+and <code class="docutils literal notranslate"><span class="pre">MAXDIM**3</span> <span class="pre">//</span> <span class="pre">T**2</span> <span class="pre">+</span> <span class="pre">MAXDIM**2</span> <span class="pre">//</span> <span class="pre">T</span> <span class="pre">&lt;=</span> <span class="pre">32767</span></code> for a cubic GEMM’s
+header count: <strong>88 and 76 at T=4, 128 and 120 at T=8</strong>. Computed from
+the frozen <code class="docutils literal notranslate"><span class="pre">isa_encoding.MAXDIM_CEILINGS</span></code> and never typed into the
+evaluator – this project has already written one of them down wrong in
+three documents (“MAXDIM &lt;= 90” against an answer of 88). The refusal
+names the ceiling and its value.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">QD</span></code> other than 16</p></td>
+<td><p>depth 8 deadlocks legal programs – three of the ten tiled programs
+never complete in cosim (<a class="reference internal" href="../developer/limitations.html"><span class="doc">Allo Limitations Register</span></a> item 24) – so it
+is refused rather than left to hang for the 1,800 s cosim timeout.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">&lt;</span> <span class="pre">4</span></code> or <code class="docutils literal notranslate"><span class="pre">MAXDIM</span> <span class="pre">%</span> <span class="pre">T</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ip/params.py</span></code>’s invariants.</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Inside the envelope is still thin, and the loop should be told so.</strong> The
+(T, MAXDIM) box has one interior point – MAXDIM=16 at T=4, the
+worst-predicted of the seven runs. The DC runs that would earn the box, in
+order: <strong>T=4 MAXDIM=32</strong> and <strong>T=8 MAXDIM=16</strong> (the corners a co-design loop
+reaches for first), then <strong>T=4 at a ceiling (88 or 76)</strong>, then <strong>a clean QD
+pair at the scored point</strong> – two exports of one commit, which is the only way
+to replace the +6.8 %-against-+6.6 % agreement of two estimates with a
+measurement. The priority list lives in <code class="docutils literal notranslate"><span class="pre">area_proxy.py</span></code>’s docstring, beside
+the model it would correct.</p>
+<p><strong>Cost, measured rather than estimated</strong>
+(<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/codesign-space-20260925.rst</span></code>). One whole candidate is
+<strong>623.9 s</strong> at the published row and <strong>1050.5 s</strong> at <code class="docutils literal notranslate"><span class="pre">T=8</span> <span class="pre">MAXDIM=32</span></code> –
+<strong>1.68x</strong> – on the unmodified design, same host, both <code class="docutils literal notranslate"><span class="pre">ok:</span> <span class="pre">true</span></code>. The two
+new gates are 37.8 s of the first figure (6.1 %), and <code class="docutils literal notranslate"><span class="pre">gen_isa.py</span> <span class="pre">--conform</span></code>
+is 34.9 s of that because it builds the design down the HLS path to read the
+bit ranges the emitted C++ takes. A candidate was ~578 s before this work. A
+spend ceiling for a search that may propose T=8 should use the T=8 figure, not
+an average.</p>
+<p>That T=8 run is also the first co-design point this loop could produce:
+16x16x16 falls from <strong>674 to 426 cycles</strong> (-36.8 %) and <code class="docutils literal notranslate"><span class="pre">mlp_tiny</span></code> from
+<strong>1,150 to 783</strong> (-31.9 %) for an area estimate up from <strong>1.20 to 2.23 mm^2</strong>
+(+85.6 %), clock met at 2.431 ns. A trade the objective can now state.</p>
+<p><strong>Two things a T=8 candidate cannot measure, and both are frozen machinery
+rather than the candidate.</strong> <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code> asserts every scored dimension is a
+multiple of T, and <code class="docutils literal notranslate"><span class="pre">4x4x4</span></code> and <code class="docutils literal notranslate"><span class="pre">12x12x12</span></code> are not multiples of 8, so the
+GEMM term at T=8 is <code class="docutils literal notranslate"><span class="pre">16x16x16</span></code> alone (<code class="docutils literal notranslate"><span class="pre">shapes_skipped</span></code> says so). The frozen
+mapper refuses <code class="docutils literal notranslate"><span class="pre">mlp_deep</span></code>’s 16x16x12 layer for the same reason, so the model
+term is <code class="docutils literal notranslate"><span class="pre">mlp_tiny</span></code> alone (<code class="docutils literal notranslate"><span class="pre">model_skipped</span></code>) and the oracle’s corpus becomes
+<code class="docutils literal notranslate"><span class="pre">mlp_tiny</span></code> + <code class="docutils literal notranslate"><span class="pre">mlp_small</span></code>. Either could have been made a refusal; both were
+made SCOPE, because refusing a candidate for the shape list’s choice of numbers
+would leave every T but 4 unreachable and the loop searching one architecture
+again. The consequence is real and is reported per run: <strong>a T=8 candidate is
+measured on a narrower workload than a T=4 one.</strong> Widening it means shapes and
+models legal at more than one T, which is a person’s edit to <code class="docutils literal notranslate"><span class="pre">shapes.py</span></code> and
+<code class="docutils literal notranslate"><span class="pre">workloads/models.py</span></code>.</p>
+</section>
+<section id="whether-the-new-objective-is-better-the-re-score">
+<h3>Whether the new objective is better: the re-score<a class="headerlink" href="#whether-the-new-objective-is-better-the-re-score" title="Link to this heading"><span>¶</span></a></h3>
+<p>Asserting it would be worthless, so <code class="docutils literal notranslate"><span class="pre">chia_agent/rescore.py</span></code> hands both
+objectives the four changes this project has already measured and prints how
+each ranks them:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">examples</span><span class="o">/</span><span class="n">tinytpu</span><span class="o">/</span><span class="n">chia_agent</span><span class="o">/</span><span class="n">rescore</span><span class="o">.</span><span class="n">py</span>
+</pre></div>
+</div>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 38.0%" />
+<col style="width: 42.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>change</p></th>
+<th class="head"><p>old objective</p></th>
+<th class="head"><p>new objective</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>burst widening</p></td>
+<td><p><strong>could not see it</strong> – never measured at either search shape</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">trade</span></code>: -25 to -34 % on models, <strong>+73.3 % area (est.)</strong>, 99.6 % of
+it in the adapters</p></td>
+</tr>
+<tr class="row-odd"><td><p>channel depth <code class="docutils literal notranslate"><span class="pre">QD</span></code> 8 -&gt; 16</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">trade</span></code>, <strong>kept</strong> on a -7 total over the two scored shapes</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">regression</span></code>: the five-shape total is <strong>zero</strong> (+4+4+4-1-11), and
++6.8 % area</p></td>
+</tr>
+<tr class="row-even"><td><p>operand mirror removal</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">regression</span></code> (+16)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">regression</span></code>; no area measurement of it exists on either axis</p></td>
+</tr>
+<tr class="row-odd"><td><p>CHIA run 1’s burst win</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">trade</span></code>, <strong>kept</strong> on -59</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">trade</span></code>, kept – and now <strong>priced</strong>: +24.3 % area (est.), 99.6 % of it
+in the AXI master ports</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Nothing is reversed</strong>, which is the first thing to check. What changes is
+the classification of the two that matter, and one of them <em>indicts the old
+objective directly</em>: the channel-depth change sums to <strong>zero</strong> over the five
+shapes, so no cycle objective over the five can prefer it, and over the two the
+loop actually scored it sums to -7, so the old objective would have kept it for
+the wrong reason. What it really buys is three legal programs going from never
+completing to completing, and <strong>neither objective has a term for that</strong>. That
+gap is open.</p>
+<p>Two honest limits on this evidence:</p>
+<ul class="simple">
+<li><p><strong>Model cycles exist for exactly one of the four changes.</strong> On the other
+three the new objective is running on its GEMM control, and is the old
+objective with a better resource axis. The resource axis is supported
+strongly; the model axis on a single point.</p></li>
+<li><p>And that single point is the one the MAXDIM measurement above qualifies: the
+model term earns its place at MAXDIM=64 and demonstrably does not at 16. The
+objective is better <em>because the term is measured where the effect is</em>, and
+the honest form of that sentence names the configuration.</p></li>
+<li><p>The proxy’s attribution of run 1’s win – +24.3 % area, 99.6 % in the AXI
+master ports – is the same attribution Design Compiler made for the
+MAXDIM=64 widening (99.1 % in two adapters), reached in milliseconds instead
+of 56 minutes. It is a <em>prediction</em>, and the way to settle it is a DC run on
+that export.</p></li>
 </ul>
 </section>
 </section>
@@ -445,10 +774,25 @@ with <code class="docutils literal notranslate"><span class="pre">git</span> <sp
 </section>
 <section id="guards">
 <h3>Guards<a class="headerlink" href="#guards" title="Link to this heading"><span>¶</span></a></h3>
+<p>Two of these are <strong>derived rather than listed</strong>, because the same defect has
+now broken the loop twice: a value copied into several files with nothing
+comparing the copies to its source. The frozen set is the import closure of
+the evaluation’s entry points, computed from the ref (<code class="docutils literal notranslate"><span class="pre">evaluate.import_closure</span></code>),
+and <code class="docutils literal notranslate"><span class="pre">compose</span></code> refuses a tree that is not closed under its own imports. The
+published five-shape row is parsed out of <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code>’s <code class="docutils literal notranslate"><span class="pre">EXPECTED</span></code>
+(<code class="docutils literal notranslate"><span class="pre">control.reproduced</span></code>), and the copies that cannot be derived are gated by
+<code class="docutils literal notranslate"><span class="pre">control.check_pins</span></code>. Both run in <code class="docutils literal notranslate"><span class="pre">test_harness.py</span></code>’s guard phases, in
+under a minute, rather than after a candidate’s evaluation.</p>
+<p>What each cost before it was derived: a hand-written <code class="docutils literal notranslate"><span class="pre">WORKLOAD_SUITE</span></code> that
+omitted its own runner’s imports failed <strong>every</strong> candidate at stage <code class="docutils literal notranslate"><span class="pre">model</span></code>,
+so the loop could complete no run; and four literal copies of the pre-<code class="docutils literal notranslate"><span class="pre">TPU_QD=16</span></code>
+row in <code class="docutils literal notranslate"><span class="pre">swarm.py</span></code> meant every worker a run launched was handed a baseline the
+design had not produced for days.</p>
 <p>Mechanical enforcement, not instructions:</p>
 <ol class="arabic">
 <li><p><strong>Tool surface.</strong> opencode’s own file and shell tools are denied; the MCP
-edit tools accept only the two bare file names.</p></li>
+edit tools accept only the paths <code class="docutils literal notranslate"><span class="pre">design.EDITABLE</span></code> names, and
+<code class="docutils literal notranslate"><span class="pre">read_spec()</span></code> with no argument lists them.</p></li>
 <li><p><strong>Frozen files from git</strong>, a fresh evaluation tree per candidate, anything
 else in the spec directory ignored; <code class="docutils literal notranslate"><span class="pre">loop.py</span></code> refuses to start on a dirty
 frozen path.</p></li>
@@ -474,10 +818,12 @@ a fresh nonce on stdin before the candidate is imported, the verdict is the
 check’s <em>return value</em>, and <code class="docutils literal notranslate"><span class="pre">numpy</span></code>/<code class="docutils literal notranslate"><span class="pre">allo</span></code> are frozen against
 monkeypatching for the duration; only then is <code class="docutils literal notranslate"><span class="pre">CHIA-GATE</span> <span class="pre">&lt;check&gt;</span> <span class="pre">OK</span>
 <span class="pre">&lt;nonce&gt;</span></code> printed, and the evaluator requires that line.</p></li>
-<li><p><strong>Parametricity.</strong> The scored configuration is T=4, MAXDIM=16, so a design
-specialised to it would pass everything. <code class="docutils literal notranslate"><span class="pre">param_check.py</span></code> rebuilds the
-candidate at <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=8</span></code>, <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=12</span></code> and
-<code class="docutils literal notranslate"><span class="pre">TPU_T=8</span> <span class="pre">TPU_MAXDIM=32</span></code>, requires the build to report that configuration,
+<li><p><strong>Parametricity.</strong> A design specialised to the one configuration it is
+scored at would pass everything else. <code class="docutils literal notranslate"><span class="pre">param_check.py</span></code> rebuilds the
+candidate at three other configurations – at the published row,
+<code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=8</span></code>, <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=12</span></code> and <code class="docutils literal notranslate"><span class="pre">TPU_T=8</span> <span class="pre">TPU_MAXDIM=32</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">evaluate.param_configs</span></code> moves that list onto whatever configuration the
+candidate proposed – requires the build to report that configuration,
 and requires every GEMM shape of it (full-range, corner and boundary
 operands, <code class="docutils literal notranslate"><span class="pre">C</span></code> compared in full) and random programs to be exact
 (<code class="docutils literal notranslate"><span class="pre">gate:param</span></code>). The policy requires <code class="docutils literal notranslate"><span class="pre">T</span></code> and <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code> to stay
@@ -496,9 +842,10 @@ revision of this page concluded otherwise; the withdrawal is recorded in
 <li><p><strong>Documentation.</strong> A candidate may not remove, net, more than 15 lines of
 comments and docstrings against the frozen file; rewording is free.</p></li>
 <li><p><strong>Memory model and premises.</strong> Every <code class="docutils literal notranslate"><span class="pre">TPU_*</span></code> variable but the project path
-is scrubbed before cosim (<code class="docutils literal notranslate"><span class="pre">m_axi_latency</span></code> 0, as Gemmini’s harness), T == 4,
-MAXDIM == 16, the 3.33 ns target, and each shape’s own cosim log and
-simulated time must agree with the reported cycles.</p></li>
+is scrubbed before cosim (<code class="docutils literal notranslate"><span class="pre">m_axi_latency</span></code> 0, as Gemmini’s harness); the
+build must report the configuration it is scored at (<code class="docutils literal notranslate"><span class="pre">check_invariants</span></code>,
+T, MAXDIM and QD); the 3.33 ns target must be met; and each shape’s own
+cosim log and simulated time must agree with the reported cycles.</p></li>
 <li><p><strong>Loopback.</strong> The MCP tool servers bind 127.0.0.1 by default; a multi-host
 swarm must opt in with <code class="docutils literal notranslate"><span class="pre">TINYTPU_TOOL_HOST=node</span></code> and bring its own
 authentication.</p></li>
@@ -513,7 +860,7 @@ number: not a byte of it exists on disk when the cycles are taken, its
 processes are sandboxed to their work directory (guard 4) and so cannot
 write a control record either, and the control’s cosim verdict is
 nonce-vouched (guard 5) like every other. <code class="docutils literal notranslate"><span class="pre">accept.json</span></code> records it as
-<code class="docutils literal notranslate"><span class="pre">control</span></code> – cycles, the two editable files’ blob ids, the ref, the
+<code class="docutils literal notranslate"><span class="pre">control</span></code> – cycles, every editable file’s blob id, the ref, the
 estimated clock, the wall time, when it was measured – so an accepted
 result can be re-derived against the same control.
 <code class="docutils literal notranslate"><span class="pre">--control</span> <span class="pre">&lt;control-run&gt;/accept.json</span></code> reuses one control for the rest of
@@ -579,12 +926,170 @@ and bills the project in the request URL. <code class="docutils literal notransl
 worker or model call in <code class="docutils literal notranslate"><span class="pre">swarm.py</span></code>, <code class="docutils literal notranslate"><span class="pre">loop.py</span></code> and <code class="docutils literal notranslate"><span class="pre">smoke.py</span></code>, and refuses
 unless the project bills <code class="docutils literal notranslate"><span class="pre">CHIA_BILLING_ACCOUNT</span></code>, Vertex AI is enabled,
 <code class="docutils literal notranslate"><span class="pre">--budget-usd</span></code> is given, and CHIA’s cumulative spend so far plus this run’s cap
-fits <strong>``CHIA_TOTAL_CAP_USD`` ($100 in chia.env)</strong>; it prints the account,
+fits <strong>``CHIA_TOTAL_CAP_USD`` ($500 in chia.env, and the committed default in ``preflight.py``)</strong>; it prints the account,
 project, spend so far, remaining and the run’s cap. Cumulative spend is
 opencode’s own database, attributed to CHIA2026 by the cutover time recorded
 in <code class="docutils literal notranslate"><span class="pre">billing.json</span></code> (opencode stores no GCP project with a session). These are
 opencode’s figures from its price table, not the invoice; the remaining credit
 is only in the Cloud Console.</p>
+</section>
+<section id="a-run-in-flight-and-one-that-was-interrupted">
+<h3>A run in flight, and one that was interrupted<a class="headerlink" href="#a-run-in-flight-and-one-that-was-interrupted" title="Link to this heading"><span>¶</span></a></h3>
+<p>A run is legible from its own directory, with no memory of how it was
+started:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">swarm</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">status</span> <span class="o">&lt;</span><span class="n">run</span><span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>which prints which iteration each worker is on, every candidate with its
+verdict, whether the run is still alive, the spend so far from opencode’s
+database, and the question each worker was asked. It starts nothing and
+spends nothing, and it works equally on a live run, a finished one and a
+committed evidence directory.</p>
+<p>What a run writes, and when, is worth knowing before an interruption rather
+than after:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>file</p></th>
+<th class="head"><p>written</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;run&gt;/run.json</span></code></p></td>
+<td><p>once, after the pre-flight gate and before the first worker</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;run&gt;/&lt;worker&gt;/worker.log</span></code></p></td>
+<td><p>continuously, unbuffered — the only live signal inside an iteration</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;run&gt;/&lt;worker&gt;/trace.jsonl</span></code></p></td>
+<td><p>appended per EVENT, unbuffered — every turn, every tool call, every
+model call, as they happen (below)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;run&gt;/&lt;worker&gt;/opencode/run-*.ndjson</span></code></p></td>
+<td><p>opencode’s own event stream, written by opencode as the session runs
+and kept even when the call is killed</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;run&gt;/&lt;worker&gt;/variants.jsonl</span></code></p></td>
+<td><p>appended once per finished iteration, which can be tens of minutes apart</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;run&gt;/&lt;worker&gt;/best.diff</span></code>, <code class="docutils literal notranslate"><span class="pre">calls.json</span></code></p></td>
+<td><p>only on a worker’s normal exit</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;run&gt;/summary.json</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;run&gt;/spend.json</span></code></p></td>
+<td><p>only after every worker has exited</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">swarm.log</span></code></p></td>
+<td><p>never, by itself — pipe <code class="docutils literal notranslate"><span class="pre">swarm.py</span></code> through <code class="docutils literal notranslate"><span class="pre">tee</span></code>, or the
+<code class="docutils literal notranslate"><span class="pre">HARD</span> <span class="pre">CAP:</span></code> line is lost</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>There is no resume.</strong> No flag, no checkpoint: <code class="docutils literal notranslate"><span class="pre">loop.py</span></code> never reads
+<code class="docutils literal notranslate"><span class="pre">variants.jsonl</span></code> back. <code class="docutils literal notranslate"><span class="pre">swarm.py</span></code> refuses a <code class="docutils literal notranslate"><span class="pre">--run-dir</span></code> that already
+holds a <code class="docutils literal notranslate"><span class="pre">run.json</span></code>, because re-using one is worse than starting over: it
+overwrites the tag that attributes the old run’s spend, truncates
+<code class="docutils literal notranslate"><span class="pre">worker.log</span></code>, appends a second run’s iterations to <code class="docutils literal notranslate"><span class="pre">variants.jsonl</span></code>, and
+leaves the previous run’s edited spec in place — so the “baseline” the new
+run measures is that design rather than <code class="docutils literal notranslate"><span class="pre">HEAD</span></code>’s. Start again with a new
+<code class="docutils literal notranslate"><span class="pre">--run-dir</span></code>.</p>
+<p>Abandoning one cleanly means recording its cost <strong>before</strong> anything else,
+then killing what a <code class="docutils literal notranslate"><span class="pre">SIGTERM</span></code> to the workers does not reach — opencode is
+a grandchild outside the loops’ process groups and keeps spending after its
+driver dies. The sequence is in
+<code class="docutils literal notranslate"><span class="pre">examples/tinytpu/chia_agent/README.md</span></code> (“If a run was interrupted”). The
+money is already counted either way: the cumulative cap sums every session on
+the account since the cutover, finished run or not, so an abandoned run still
+reduces what the next one may spend.</p>
+<p><strong>Do not edit the checkout while a run or the harness is running.</strong> The
+evaluator compares the checkout’s tracked files after every gate and returns
+<code class="docutils literal notranslate"><span class="pre">tamper</span></code> if they moved. Measured 2026-09-24: editing three <code class="docutils literal notranslate"><span class="pre">chia_agent</span></code>
+files during a <code class="docutils literal notranslate"><span class="pre">test_harness.py</span></code> run turned two <code class="docutils literal notranslate"><span class="pre">gate:param</span></code> cases into
+<code class="docutils literal notranslate"><span class="pre">tamper</span></code> failures; both passed on a clean tree.</p>
+</section>
+<section id="what-a-session-writes-while-it-runs">
+<h3>What a session writes while it runs<a class="headerlink" href="#what-a-session-writes-while-it-runs" title="Link to this heading"><span>¶</span></a></h3>
+<p>Before 2026-09-25 a session was a black box between its two ends. <code class="docutils literal notranslate"><span class="pre">worker.log</span></code>
+said an iteration had started and, tens of minutes later, <code class="docutils literal notranslate"><span class="pre">variants.jsonl</span></code>
+said what the candidate scored; in between nothing recorded how many turns the
+agent took, which tools it called, or where the time went. Run 3 measured what
+that costs: <strong>167 minutes wall, of which all cosim evaluation was 661 s –
+7 %</strong> — and four model calls that each ran the full 2400 s timeout. The
+calls that consumed the wall clock were exactly the ones that reported
+nothing, because <strong>a timed-out call returns no session id and ``$0`` on
+``usage``</strong>, which is why run 3 reads <code class="docutils literal notranslate"><span class="pre">$0.00</span></code> there while opencode’s database
+charges <code class="docutils literal notranslate"><span class="pre">$20.72</span></code>.</p>
+<p>The record existed and was being deleted. opencode’s <code class="docutils literal notranslate"><span class="pre">run</span> <span class="pre">--format</span> <span class="pre">json</span></code>
+emits newline-delimited events live — one per message part, per model step,
+per tool call — and CHIA’s <code class="docutils literal notranslate"><span class="pre">OpenCodeLLM._capture</span></code> streams them into a
+<code class="docutils literal notranslate"><span class="pre">NamedTemporaryFile</span></code> and then <code class="docutils literal notranslate"><span class="pre">os.unlink</span></code>s it in a <code class="docutils literal notranslate"><span class="pre">finally</span></code>. So the
+transcript survives only when the call returns; on <code class="docutils literal notranslate"><span class="pre">subprocess.TimeoutExpired</span></code>
+it is destroyed on the way out.</p>
+<p><code class="docutils literal notranslate"><span class="pre">chia_agent/session_trace.py</span></code> is the log, and three writers append to it:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 22.0%" />
+<col style="width: 30.0%" />
+<col style="width: 48.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>writer</p></th>
+<th class="head"><p>events</p></th>
+<th class="head"><p>why there</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">llm.py</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">model_call.start</span></code> / <code class="docutils literal notranslate"><span class="pre">.end</span></code> / <code class="docutils literal notranslate"><span class="pre">.timeout</span></code>, <code class="docutils literal notranslate"><span class="pre">session</span></code>, <code class="docutils literal notranslate"><span class="pre">stream</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">_capture</span></code> is overridden to write opencode’s run stream to a durable
+path and tail it in a thread while the call runs. It is the only place
+that sees a turn that made no tool call — the 2400 s “thinking”
+case — and the only place that can stop the transcript being unlinked.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">allo_tool.py</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">tool.start</span></code> / <code class="docutils literal notranslate"><span class="pre">tool.end</span></code></p></td>
+<td><p>the tool server is the one component that sees a round trip from the
+far side of the MCP boundary, so its timings do not depend on
+opencode’s stream shape, which is not ours and has changed between
+releases.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">loop.py</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">run.*</span></code>, <code class="docutils literal notranslate"><span class="pre">iteration.*</span></code>, <code class="docutils literal notranslate"><span class="pre">call.*</span></code>, <code class="docutils literal notranslate"><span class="pre">harness_eval.*</span></code></p></td>
+<td><p>divides the wall clock into model calls, the agent’s tool calls and
+the harness’s own re-scoring. <code class="docutils literal notranslate"><span class="pre">calls.json</span></code> is written once, at the
+end; these lines are written as each call finishes, failures included.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Every event is <strong>one ``os.write`` on an ``O_APPEND`` descriptor</strong> — one
+syscall, nothing buffered in the process — so a <code class="docutils literal notranslate"><span class="pre">SIGKILL</span></code> loses nothing
+already logged, and the driver, the tool server’s Ray actor and the worker
+that runs <code class="docutils literal notranslate"><span class="pre">prompt</span></code> can share one file. A buffered log is no better than no
+log when the process is killed.</p>
+<p>Read one back with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">examples</span><span class="o">/</span><span class="n">tinytpu</span><span class="o">/</span><span class="n">chia_agent</span><span class="o">/</span><span class="n">session_trace</span><span class="o">.</span><span class="n">py</span> <span class="o">&lt;</span><span class="n">run</span><span class="o">&gt;/&lt;</span><span class="n">worker</span><span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>which prints the timeline — each turn, each tool call with its duration,
+where the wall went — and, at the end, <strong>what was still open when the trace
+stopped</strong>. A <code class="docutils literal notranslate"><span class="pre">model_call.start</span></code> or a <code class="docutils literal notranslate"><span class="pre">tool.start</span></code> with no matching end is
+the signal: it names what the process was doing when it died.</p>
+<p><code class="docutils literal notranslate"><span class="pre">test_session_trace.py</span></code> (~2 minutes, $0, no Vertex call, no Ray, no tool
+server) covers the cases a passing test would skip: a session <strong>killed
+mid-flight</strong> with <code class="docutils literal notranslate"><span class="pre">SIGKILL</span></code> to its process group, and one that hits
+<code class="docutils literal notranslate"><span class="pre">timeout_seconds</span></code>. Both leave a complete, readable trace and the raw
+opencode stream on disk. It drives <code class="docutils literal notranslate"><span class="pre">fake_model.py</span></code> through the real
+opencode binary, so the event shapes it parses are opencode’s own, not a
+fixture’s.</p>
+<p>What is still invisible: the <em>content</em> of a turn — the trace records that a
+turn happened, how long it took and what it called, not what the model said or
+thought. The text is in the raw stream beside it, which is kept but not
+summarised. Per-turn <strong>cost</strong> is recorded only when opencode’s
+<code class="docutils literal notranslate"><span class="pre">step-finish</span></code> carries one; the authoritative money still comes from
+opencode’s database (<code class="docutils literal notranslate"><span class="pre">spend.py</span></code>), because a killed session never writes its
+final usage anywhere.</p>
 </section>
 <section id="the-0-harness-test">
 <h3>The $0 harness test<a class="headerlink" href="#the-0-harness-test" title="Link to this heading"><span>¶</span></a></h3>
@@ -595,7 +1100,11 @@ cross-check; <strong>e</strong> frozen-file and import-time attacks, forged verd
 sandbox, and that a candidate can neither write nor fake a control record;
 <strong>c</strong> an int16 partial sum rejected by stress; <strong>g</strong> the
 parametricity and documentation guards; <strong>d</strong> a deadlock killed at 240 s;
-<strong>abf</strong> no-op and a slower design scored concurrently; <strong>loop</strong> the real
+<strong>i</strong> the co-design space – every configuration refusal (envelope, both
+ceilings, <code class="docutils literal notranslate"><span class="pre">QD=8</span></code>, the parameter invariants), a spec edit refused at
+<code class="docutils literal notranslate"><span class="pre">gate:isa</span></code> until <code class="docutils literal notranslate"><span class="pre">regenerate_isa</span></code> runs, and a weakened <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code> refused
+at <code class="docutils literal notranslate"><span class="pre">gate:pytorch</span></code>; <strong>abf</strong> no-op and a slower design scored concurrently;
+<strong>loop</strong> the real
 <code class="docutils literal notranslate"><span class="pre">swarm</span> <span class="pre">-&gt;</span> <span class="pre">loop</span> <span class="pre">-&gt;</span> <span class="pre">opencode</span> <span class="pre">-&gt;</span> <span class="pre">MCP</span></code> path; <strong>accept</strong> <code class="docutils literal notranslate"><span class="pre">accept.py</span></code> on a
 correct-but-slower diff, against a control measured in that same run. 57/57
 at landing (<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/chia-evidence/harness-test-20260919-190240/</span></code>).</p>
@@ -607,15 +1116,90 @@ at landing (<code class="docutils literal notranslate"><span class="pre">dev/rec
 <li><p><strong>Every search so far is n=1 per arm.</strong> No rate of discovery is
 demonstrated; see <a class="reference internal" href="chia_results.html"><span class="doc">CHIA Agentic Co-Design: Results</span></a>.</p></li>
 <li><p><strong>Run 2 was stopped after 2 of 5 iterations</strong> by a per-run cap that summed
-the whole account rather than its own sessions.</p></li>
-<li><p><strong>The $0 guard suite, 57 cases at landing, does not currently pass</strong> (one
-stale assertion, one crash in the loop phase).</p></li>
+the whole account rather than its own sessions. Fixed: every session a run
+opens is titled with the run’s tag (<code class="docutils literal notranslate"><span class="pre">--title</span></code>), and <code class="docutils literal notranslate"><span class="pre">spend.run_spend</span></code>
+sums those and the ids the loop saw returned. Nothing else on the account
+is counted against a run’s cap.</p></li>
+<li><p><strong>The $0 guard suite passes: 101 cases, 74.5 minutes</strong> (2026-09-25, all nine
+phases, <code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/chia-evidence/harness-test-20260925-033220/results.json</span></code>;
+it was 98 cases in 46.9 minutes on 2026-09-24).
+It was 57 at landing and did not pass; the repair that restored it also
+added phase <code class="docutils literal notranslate"><span class="pre">s</span></code>, which checks the static guards – the derived main base,
+the pinned scored configuration, the spend attribution and the policy’s
+scope – in twenty seconds and without Ray or a model.</p></li>
 <li><p><strong>A ``tamper`` verdict on a run that should have been clean</strong> is usually a
 person or another agent editing the checkout while a measurement was in
-flight, not the candidate (guard 4).</p></li>
+flight, not the candidate (guard 4). Confirmed the hard way on 2026-09-24:
+an agent edited <code class="docutils literal notranslate"><span class="pre">chia_agent/README.md</span></code> – inside <code class="docutils literal notranslate"><span class="pre">CHECKOUT_WATCH</span></code> –
+while a gate was running, and the guard refused the candidate at <code class="docutils literal notranslate"><span class="pre">tamper</span></code>
+without attributing anything to it. An unplanned violation is a better test
+of that guard than a constructed one.</p></li>
 <li><p><strong>Timed-out opencode sessions are billed but reported as $0</strong> by the
 per-worker figures, which is why every cap reads opencode’s database
-(<code class="docutils literal notranslate"><span class="pre">spend.py</span></code>) instead.</p></li>
+(<code class="docutils literal notranslate"><span class="pre">spend.py</span></code>) instead. Measured at run scale on 2026-09-24: all four of run
+3’s large iteration calls ran the full 2400 s timeout and returned no
+<code class="docutils literal notranslate"><span class="pre">usage</span></code>, so <strong>the whole run reads $0.00 on ``usage`` and $20.72 on the
+database</strong>. The known form was one call billed $4.33 and reported as $0.00.</p></li>
+<li><p><strong>A pinned constant nobody notices going stale is the defect, not its
+value.</strong> <code class="docutils literal notranslate"><span class="pre">MAIN_BASE</span></code> went stale four times in five days and then stopped
+resolving at all when the design moved to <code class="docutils literal notranslate"><span class="pre">examples/tinytpu/</span></code>; each time it
+refused <strong>every</strong> candidate at stage <code class="docutils literal notranslate"><span class="pre">setup</span></code> with a message that blamed the
+design. It is derived now (<code class="docutils literal notranslate"><span class="pre">evaluate.main_base</span></code>). <code class="docutils literal notranslate"><span class="pre">control.PUBLISHED</span></code> had
+gone stale the same way – still 172 / 262 / 418 / 484 / 686 after the design
+shipped 175 / 265 / 421 / 482 / 674 – and now reads <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code>’s
+<code class="docutils literal notranslate"><span class="pre">EXPECTED</span></code>, the one row a gate checks on every run.</p></li>
+<li><p><strong>A Ray head started without ``chia.env`` sourced fails silently.</strong>
+<code class="docutils literal notranslate"><span class="pre">loop.py</span></code> connects with <code class="docutils literal notranslate"><span class="pre">runtime_env={&quot;working_dir&quot;:</span> <span class="pre">...}</span></code> and no
+<code class="docutils literal notranslate"><span class="pre">env_vars</span></code>, so Ray workers inherit the <em>raylet’s</em> environment — and
+<code class="docutils literal notranslate"><span class="pre">opencode</span></code> is on <code class="docutils literal notranslate"><span class="pre">PATH</span></code> only because <code class="docutils literal notranslate"><span class="pre">chia.env</span></code> exports
+<code class="docutils literal notranslate"><span class="pre">OPENCODE_BIN</span></code>. Start the head from a shell that has sourced it, not just
+the shell that runs <code class="docutils literal notranslate"><span class="pre">swarm.py</span></code>: otherwise workers cannot find the binary,
+every model call returns empty, and nothing reports an error.</p></li>
+<li><p><strong>``ray.init(address=”auto”)`` can hang forever on a dead head.</strong> An orphaned
+Ray head whose raylet’s working directory has been removed accepts the
+connection and then cannot spawn a single worker: every one dies in
+<code class="docutils literal notranslate"><span class="pre">setup_worker.py</span></code> at <code class="docutils literal notranslate"><span class="pre">os.getcwd()</span></code>, and the driver blocks in <code class="docutils literal notranslate"><span class="pre">ray.get</span></code>
+with no error. Observed 2026-09-24 against a head left by a deleted
+worktree. <code class="docutils literal notranslate"><span class="pre">ray</span> <span class="pre">stop</span></code> is not the fix (it is host-wide, see below); start a
+head with a private <code class="docutils literal notranslate"><span class="pre">--temp-dir</span></code> and set <code class="docutils literal notranslate"><span class="pre">RAY_ADDRESS</span></code>, which overrides
+even an explicit <code class="docutils literal notranslate"><span class="pre">address=&quot;auto&quot;</span></code> and leaves
+<code class="docutils literal notranslate"><span class="pre">/tmp/ray/ray_current_cluster</span></code> alone for other tracks. Two things about
+that temp directory, measured here on 2026-09-24: the path must be <strong>short</strong>,
+because Ray puts a Unix socket under it and <code class="docutils literal notranslate"><span class="pre">AF_UNIX</span></code> caps the path at 107
+bytes (<code class="docutils literal notranslate"><span class="pre">/tmp/ray-chia</span></code> is fine, a path under a session scratch directory is
+not); and to stop only that cluster, match <code class="docutils literal notranslate"><span class="pre">&lt;temp-dir&gt;/session_</span></code> rather
+than the temp directory alone — the shorter pattern also matches the shell
+you type it in, and <code class="docutils literal notranslate"><span class="pre">pkill</span></code> will kill it. <code class="docutils literal notranslate"><span class="pre">kill</span></code> alone left the raylet
+running; follow it with <code class="docutils literal notranslate"><span class="pre">kill</span> <span class="pre">-9</span></code>.
+<strong>Checked since 2026-09-25</strong>, after a third occurrence in which a clean
+worktree found <code class="docutils literal notranslate"><span class="pre">/tmp/ray/ray_current_cluster</span></code> naming a head with no
+<code class="docutils literal notranslate"><span class="pre">gcs_server</span></code> and no <code class="docutils literal notranslate"><span class="pre">raylet</span></code> behind it, and <code class="docutils literal notranslate"><span class="pre">smoke.py</span></code> sat for ten
+minutes on <code class="docutils literal notranslate"><span class="pre">Failed</span> <span class="pre">to</span> <span class="pre">connect</span> <span class="pre">to</span> <span class="pre">GCS</span></code>: <code class="docutils literal notranslate"><span class="pre">preflight.py</span></code> resolves the
+address a driver would really dial (<code class="docutils literal notranslate"><span class="pre">RAY_ADDRESS</span></code>, else
+<code class="docutils literal notranslate"><span class="pre">&lt;RAY_TMPDIR</span> <span class="pre">or</span> <span class="pre">/tmp/ray&gt;/ray_current_cluster</span></code>), probes it with a three
+second timeout, and refuses — naming the address and giving the fix —
+before any worker or model call. It refuses the orphan shape too, by reading
+the local raylet’s working directory. <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">preflight.py</span> <span class="pre">--check-ray</span></code>
+runs that check alone, at $0.</p></li>
+<li><p><strong>The tool servers bind fixed ports from 8000 up</strong>, so two <code class="docutils literal notranslate"><span class="pre">chia_agent</span></code>
+processes on one host collide. Serialise them.</p></li>
+<li><p><strong>A checkout under ``/tmp`` cannot run the harness at all</strong>, and it fails in a
+way that blames the candidate. <code class="docutils literal notranslate"><span class="pre">evaluate.sandboxed</span></code> gives every gate
+<code class="docutils literal notranslate"><span class="pre">--tmpfs</span> <span class="pre">/tmp</span></code> and then re-binds only the work directory and the composed
+tree, so a worktree living anywhere else under <code class="docutils literal notranslate"><span class="pre">/tmp</span></code> — an agent
+scratchpad, for instance — is <strong>masked inside the sandbox</strong>. <code class="docutils literal notranslate"><span class="pre">allo</span></code> is not
+composed into the tree (<code class="docutils literal notranslate"><span class="pre">CHECKOUT_WATCH</span></code> guards it instead), so it is looked
+up on <code class="docutils literal notranslate"><span class="pre">PYTHONPATH</span></code>, which points at the invisible checkout; the import then
+falls through to the <code class="docutils literal notranslate"><span class="pre">allo</span></code> env’s editable install, which resolves to
+whatever tree last ran <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">-e</span></code> — on this host
+<code class="docutils literal notranslate"><span class="pre">/home/sk3463/allo</span></code>, whose HEAD had no <code class="docutils literal notranslate"><span class="pre">allo/compose.py</span></code>. Every candidate
+dies at stage <code class="docutils literal notranslate"><span class="pre">import</span></code> with <code class="docutils literal notranslate"><span class="pre">ModuleNotFoundError:</span> <span class="pre">No</span> <span class="pre">module</span> <span class="pre">named</span>
+<span class="pre">'allo.compose'</span></code>, which reads exactly like a broken design. Measured
+2026-09-25 over two full harness runs. <strong>Put the worktree under ``/home``.</strong>
+Copying a prebuilt <code class="docutils literal notranslate"><span class="pre">mlir/build</span></code> there is not enough either: the bindings
+carry an RPATH into the old build directory, so inside the sandbox they raise
+<code class="docutils literal notranslate"><span class="pre">ImportError:</span> <span class="pre">libAlloMLIRAggregateCAPI.so.22.0git</span></code>. Build <code class="docutils literal notranslate"><span class="pre">mlir/</span></code> in the
+worktree that will run the harness.</p></li>
 </ul>
 <section id="running-two-tracks-on-one-host-ray-stop-is-global">
 <h3>Running two tracks on one host: <code class="docutils literal notranslate"><span class="pre">ray</span> <span class="pre">stop</span></code> is global<a class="headerlink" href="#running-two-tracks-on-one-host-ray-stop-is-global" title="Link to this heading"><span>¶</span></a></h3>
@@ -673,13 +1257,19 @@ claim register and its own setup instructions.</p></li>
 <li><a class="reference internal" href="#how-it-works">How it works</a><ul>
 <li><a class="reference internal" href="#the-design-under-search">The design under search</a></li>
 <li><a class="reference internal" href="#editable-vs-frozen">Editable vs. frozen</a></li>
+<li><a class="reference internal" href="#why-the-isa-can-move-and-what-the-oracle-is">Why the ISA can move, and what the oracle is</a></li>
 <li><a class="reference internal" href="#the-evaluator">The evaluator</a></li>
+<li><a class="reference internal" href="#the-objective-and-the-two-axes-it-replaced">The objective, and the two axes it replaced</a></li>
+<li><a class="reference internal" href="#the-configuration-is-a-candidate-s-to-propose-inside-a-stated-envelope">The configuration is a candidate’s to propose, inside a stated envelope</a></li>
+<li><a class="reference internal" href="#whether-the-new-objective-is-better-the-re-score">Whether the new objective is better: the re-score</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#reference">Reference</a><ul>
 <li><a class="reference internal" href="#where-the-code-lives">Where the code lives</a></li>
 <li><a class="reference internal" href="#guards">Guards</a></li>
 <li><a class="reference internal" href="#billing">Billing</a></li>
+<li><a class="reference internal" href="#a-run-in-flight-and-one-that-was-interrupted">A run in flight, and one that was interrupted</a></li>
+<li><a class="reference internal" href="#what-a-session-writes-while-it-runs">What a session writes while it runs</a></li>
 <li><a class="reference internal" href="#the-0-harness-test">The $0 harness test</a></li>
 </ul>
 </li>

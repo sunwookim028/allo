@@ -170,10 +170,12 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/asic_manifest.html">The ASIC manifest</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_tutorial.html">Tutorial: A PyTorch MLP on TinyTPU, Then Change It</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
@@ -513,16 +515,23 @@ design is one flat loop over the work count the header promises it
 (<a class="reference internal" href="../designs/tinytpu_isa.html"><span class="doc">TinyTPU-isa: A Programmable GEMM Accelerator</span></a>, the row-flattening note), and the units run
 concurrently, so the steady state is the busiest unit’s count and everything
 else is fixed cost:</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>cycles = 173.2 + 1.621 * max(dma_ld, spm, vru, accu, dma_st)
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>cycles = 179.0 + 1.573 * max(dma_ld, spm, vru, accu, dma_st)
 </pre></div>
 </div>
 <p>Both counts come straight off the header <code class="docutils literal notranslate"><span class="pre">assemble</span></code> writes, so the gate
 needs no new model of the machine – it reads the number the assembler already
 had to compute. The two constants are least squares over the five published
-cosim points, which are Vitis measurements this fork attributes to
-<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/logs/cosim_isa_landed_sweep.log</span></code> at <code class="docutils literal notranslate"><span class="pre">e24e433b</span></code>. The gate passes a
-submission whose estimate is within 10% of the reference submission’s, and
-<code class="docutils literal notranslate"><span class="pre">--cosim</span></code> measures only what passes.</p>
+cosim points, which <code class="docutils literal notranslate"><span class="pre">cycles.py</span></code> now <strong>derives</strong> from <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code>’s
+<code class="docutils literal notranslate"><span class="pre">EXPECTED</span></code> rather than holding as a literal: it held one, and the literal went
+stale by a whole row. <code class="docutils literal notranslate"><span class="pre">refit()</span></code> recovers the constants from those points and
+this module’s <code class="docutils literal notranslate"><span class="pre">__main__</span></code> fails if the stored pair disagrees. Refitted
+2026-09-25 from <code class="docutils literal notranslate"><span class="pre">(173.2,</span> <span class="pre">1.621)</span></code>, and <strong>the refit made the fit worse</strong> –
+worst residual 15.8 to 18.2 cycles over the five points, because <code class="docutils literal notranslate"><span class="pre">TPU_QD=16</span></code>
+moved the three small shapes up and the two large ones down and one slope cannot
+hold both. At the smallest shape the residual is now larger than the 10 % gate
+below, so <code class="docutils literal notranslate"><span class="pre">--cosim</span></code> is the answer there rather than the estimate. The gate
+passes a submission whose estimate is within 10% of the reference submission’s,
+and <code class="docutils literal notranslate"><span class="pre">--cosim</span></code> measures only what passes.</p>
 <p>The real measurement is <code class="docutils literal notranslate"><span class="pre">act/measure.py</span></code>: one <code class="docutils literal notranslate"><span class="pre">csynth_design</span></code>, then one
 <code class="docutils literal notranslate"><span class="pre">cosim_design</span></code> per submission on that same RTL, with a testbench that
 prefills <code class="docutils literal notranslate"><span class="pre">C</span></code> and compares every byte against <code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code>, so a cosim

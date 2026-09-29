@@ -170,10 +170,12 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/asic_manifest.html">The ASIC manifest</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_tutorial.html">Tutorial: A PyTorch MLP on TinyTPU, Then Change It</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">TinyTPU-isa: The ISA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
@@ -1398,7 +1400,7 @@ resolves to: field[target] += iv[level] * stride, for each term with target != 0
 </table>
 <p>Cross-parameter constraints, asserted by <code class="docutils literal notranslate"><span class="pre">isa_encoding.check_parameters()</span></code>:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">&gt;=</span> <span class="pre">4</span></code> – a packed operand word must hold the two 16-bit counts vru sends down wcol</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">&gt;=</span> <span class="pre">4</span></code> – a packed operand word must hold the two 16-bit counts spm sends down wcol</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">MAXDIM</span> <span class="pre">%</span> <span class="pre">T</span> <span class="pre">==</span> <span class="pre">0</span></code> – a DRAM row must be a whole number of packed words</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">OPERAND_ROWS</span> <span class="pre">&lt;=</span> <span class="pre">2048</span></code> – an address field carries 11 usable bits, and the layout numbers its rows 0 .. OPERAND_ROWS-1, so the highest address must be &lt;= 2047</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">AR_RAW_DIST</span> <span class="pre">&lt;=</span> <span class="pre">T</span></code> – a T-row GEMM must satisfy the accumulator distance contract</p></li>

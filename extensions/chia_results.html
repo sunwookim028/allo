@@ -170,10 +170,12 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/asic_manifest.html">The ASIC manifest</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_tutorial.html">Tutorial: A PyTorch MLP on TinyTPU, Then Change It</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
@@ -239,8 +241,9 @@ The loop itself – how to run it, the guards, the evaluator – is on
 <ul class="simple">
 <li><p><strong>It works end to end on real tools.</strong> Every accepted number is RTL cosim
 cycles plus csynth area and clock, bit-exact against a frozen reference
-model. About <strong>$85</strong> spent on the CHIA2026 account so far; the harness is
-also exercised with no model at all.</p></li>
+model. <strong>$124.26</strong> spent on the CHIA2026 account so far, of a $500 ceiling
+(<code class="docutils literal notranslate"><span class="pre">spend.py</span> <span class="pre">report</span></code>, which recomputes it rather than quoting this page);
+the harness is also exercised with no model at all.</p></li>
 <li><p><strong>It finds real design changes, not yet novel ones.</strong> Best so far: a DMA
 burst widening worth 55-61 % of the steady-state gap to Gemmini (not
 landed; its banked form synthesises with no cycle loss).</p></li>
@@ -406,6 +409,259 @@ the per-call usage.</p></li>
 </ul>
 <p>A capped smoke run on the earlier design is recorded in
 <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
+</section>
+<section id="third-paid-run-2026-09-24">
+<h2>Third paid run, 2026-09-24<a class="headerlink" href="#third-paid-run-2026-09-24" title="Link to this heading"><span>¶</span></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/chia-evidence/isa-run3-20260924/</span></code>: 2 workers x 3
+iterations, $60 cap, <code class="docutils literal notranslate"><span class="pre">gemini-3.1-pro-preview</span></code> on <code class="docutils literal notranslate"><span class="pre">chia2026-tinytpu</span></code>,
+166.8 minutes, <strong>$20.72</strong> read from opencode’s database. The question, what was
+expected of it and what would have counted as a negative were committed
+<strong>before</strong> the run, in
+<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/chia-evidence/prereg-run3-20260924.md</span></code>; the result is
+appended to that same file.</p>
+<p>This is the first run after the harness repair that made the loop run against
+the design as it now is: a <strong>package</strong>. The hardware had moved out of
+<code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code> into eight modules under <code class="docutils literal notranslate"><span class="pre">ip/units/</span></code> while the harness
+still named two editable files, so the agent could only edit a 102-line
+instantiation with no hardware in it. <code class="docutils literal notranslate"><span class="pre">chia_agent/design.py</span></code> now names
+fourteen editable paths.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 12.0%" />
+<col style="width: 6.0%" />
+<col style="width: 34.0%" />
+<col style="width: 20.0%" />
+<col style="width: 14.0%" />
+<col style="width: 14.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>worker</p></th>
+<th class="head"><p>iter</p></th>
+<th class="head"><p>files touched</p></th>
+<th class="head"><p>4x4x4 / 16x16x16</p></th>
+<th class="head"><p>verdict</p></th>
+<th class="head"><p>$</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>front-end</p></td>
+<td><p>1</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ip/units/dma_load.py</span></code></p></td>
+<td><p>175 / 674</p></td>
+<td><p>not-better</p></td>
+<td><p>3.33</p></td>
+</tr>
+<tr class="row-odd"><td><p>front-end</p></td>
+<td><p>2</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ip/assembler.py</span></code>, <code class="docutils literal notranslate"><span class="pre">ip/units/dma_load.py</span></code>, <code class="docutils literal notranslate"><span class="pre">ip/units/sequencer.py</span></code></p></td>
+<td><p>176 / 674</p></td>
+<td><p>not-better</p></td>
+<td><p>3.84</p></td>
+</tr>
+<tr class="row-even"><td><p>front-end</p></td>
+<td><p>3</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ip/units/dma_load.py</span></code></p></td>
+<td><p>175 / 674</p></td>
+<td><p>not-better</p></td>
+<td><p>4.26</p></td>
+</tr>
+<tr class="row-odd"><td><p>tail</p></td>
+<td><p>1</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ip/tinytpu.py</span></code></p></td>
+<td><p>175 / 674</p></td>
+<td><p>not-better</p></td>
+<td><p>2.79</p></td>
+</tr>
+<tr class="row-even"><td><p>tail</p></td>
+<td><p>2</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ip/assembler.py</span></code>, <code class="docutils literal notranslate"><span class="pre">ip/tinytpu.py</span></code>, <code class="docutils literal notranslate"><span class="pre">ip/units/dma_load.py</span></code>,
+<code class="docutils literal notranslate"><span class="pre">ip/units/sequencer.py</span></code></p></td>
+<td><p>180 / 683</p></td>
+<td><p>not-better</p></td>
+<td><p>3.49</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>tail</strong></p></td>
+<td><p><strong>3</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code>, <code class="docutils literal notranslate"><span class="pre">ip/tinytpu.py</span></code></p></td>
+<td><p><strong>175 / 627</strong></p></td>
+<td><p><strong>win</strong></p></td>
+<td><p>2.84</p></td>
+</tr>
+</tbody>
+</table>
+<p>Baseline, measured by each worker itself: 175 / 674.</p>
+<p><strong>Every candidate reached a graded verdict.</strong> None died at <code class="docutils literal notranslate"><span class="pre">setup</span></code>,
+<code class="docutils literal notranslate"><span class="pre">policy</span></code>, <code class="docutils literal notranslate"><span class="pre">import</span></code>, <code class="docutils literal notranslate"><span class="pre">invariant</span></code> or <code class="docutils literal notranslate"><span class="pre">tamper</span></code>. That was the run’s primary
+pre-registered outcome, and it is what “the loop runs end to end” means – the
+$0 harness suite passing does not establish it.</p>
+<p><strong>The reach repair is visible in what the workers edited.</strong> Every candidate but
+the winner touched only files under <code class="docutils literal notranslate"><span class="pre">ip/</span></code>; the winner touched
+<code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code> for a single line of parameter default. <strong>Four of the six
+could not have been expressed at all</strong> under the editable set the harness had
+before the repair. That is behavioural evidence for the decomposition, not an
+inference from a file listing.</p>
+<section id="the-win-independently-accepted">
+<h3>The win, independently accepted<a class="headerlink" href="#the-win-independently-accepted" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">accept.py</span></code> on a clean <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">worktree</span></code> with its own <code class="docutils literal notranslate"><span class="pre">mlir/</span></code> build, against
+a control it measured itself in that run before the candidate’s diff existed
+(<code class="docutils literal notranslate"><span class="pre">accept-tail-iter3/</span></code>):</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 14.0%" />
+<col style="width: 14.0%" />
+<col style="width: 14.0%" />
+<col style="width: 14.0%" />
+<col style="width: 14.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"></th>
+<th class="head"><p>4x4x4</p></th>
+<th class="head"><p>8x8x8</p></th>
+<th class="head"><p>12x12x12</p></th>
+<th class="head"><p>16x16x8</p></th>
+<th class="head"><p>16x16x16</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>control (this run)</p></td>
+<td><p>175</p></td>
+<td><p>265</p></td>
+<td><p>421</p></td>
+<td><p>482</p></td>
+<td><p>674</p></td>
+</tr>
+<tr class="row-odd"><td><p>candidate</p></td>
+<td><p>175</p></td>
+<td><p>265</p></td>
+<td><p><strong>386</strong></p></td>
+<td><p><strong>435</strong></p></td>
+<td><p><strong>627</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>delta</p></td>
+<td><p>0</p></td>
+<td><p>0</p></td>
+<td><p>-35</p></td>
+<td><p>-47</p></td>
+<td><p>-47</p></td>
+</tr>
+</tbody>
+</table>
+<p>Total <strong>-129 cycles</strong> over the five shapes; -7.0% at 16x16x16 and -9.8% at
+16x16x8. <code class="docutils literal notranslate"><span class="pre">bench_isa</span></code> ALL EXACT, <code class="docutils literal notranslate"><span class="pre">stress_isa</span></code> 492/492, <code class="docutils literal notranslate"><span class="pre">param_check</span></code>
+exact at <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=8</span></code>, <code class="docutils literal notranslate"><span class="pre">TPU_MAXDIM=12</span></code> and <code class="docutils literal notranslate"><span class="pre">TPU_T=8</span> <span class="pre">TPU_MAXDIM=32</span></code>,
+all five cosim testbenches bit-exact, the <code class="docutils literal notranslate"><span class="pre">TPU_TB=stress</span></code> RTL testbench clean
+over six calls a shape, estimated clock 2.431 ns against the 3.33 ns target,
+spec policy clean, and the cross-check agreeing exactly with <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code>’s
+published row.</p>
+<p>The diff is 22 lines across two files: <code class="docutils literal notranslate"><span class="pre">_WIDEN</span> <span class="pre">=</span>
+<span class="pre">TpuParams.widest_burst(T,</span> <span class="pre">MAXDIM)</span></code> in <code class="docutils literal notranslate"><span class="pre">microarch_isa.py</span></code>, which deletes the
+<code class="docutils literal notranslate"><span class="pre">TPU_DMA_WIDEN</span></code> gate and turns the widened operand burst on by default; and
+the <code class="docutils literal notranslate"><span class="pre">ac2sp</span></code> channel (accumulator to <code class="docutils literal notranslate"><span class="pre">dma_st</span></code>) deepened from <code class="docutils literal notranslate"><span class="pre">QD</span></code> to 32 in
+<code class="docutils literal notranslate"><span class="pre">ip/tinytpu.py</span></code>.</p>
+<p><strong>The first half is a rediscovery, and the pre-registration named it before the
+run.</strong> <code class="docutils literal notranslate"><span class="pre">TPU_DMA_WIDEN</span></code> was already in the tree and off by default. The agent
+could not switch it on through the environment – every <code class="docutils literal notranslate"><span class="pre">TPU_*</span></code> variable is
+scrubbed before cosim – so it changed the default. Writing the prediction down
+first is what makes calling it a rediscovery a check rather than an argument.
+The channel depth was not predicted.</p>
+</section>
+<section id="which-half-won-measured-afterwards-at-0">
+<h3>Which half won, measured afterwards at $0<a class="headerlink" href="#which-half-won-measured-afterwards-at-0" title="Link to this heading"><span>¶</span></a></h3>
+<p>The win is two changes, so <code class="docutils literal notranslate"><span class="pre">accept.py</span></code> was run again on the burst-widening
+half alone, reusing the control the first acceptance had measured
+(<code class="docutils literal notranslate"><span class="pre">accept-burst-only/</span></code>). No model call, so it costs nothing.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 32.1%" />
+<col style="width: 10.4%" />
+<col style="width: 10.4%" />
+<col style="width: 12.3%" />
+<col style="width: 11.3%" />
+<col style="width: 12.3%" />
+<col style="width: 11.3%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"></th>
+<th class="head"><p>4x4x4</p></th>
+<th class="head"><p>8x8x8</p></th>
+<th class="head"><p>12x12x12</p></th>
+<th class="head"><p>16x16x8</p></th>
+<th class="head"><p>16x16x16</p></th>
+<th class="head"><p>total</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>control</p></td>
+<td><p>175</p></td>
+<td><p>265</p></td>
+<td><p>421</p></td>
+<td><p>482</p></td>
+<td><p>674</p></td>
+<td><p>–</p></td>
+</tr>
+<tr class="row-odd"><td><p>both changes</p></td>
+<td><p>175</p></td>
+<td><p>265</p></td>
+<td><p>386</p></td>
+<td><p>435</p></td>
+<td><p>627</p></td>
+<td><p><strong>-129</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>burst widening alone</p></td>
+<td><p>175</p></td>
+<td><p>265</p></td>
+<td><p>386</p></td>
+<td><p>435</p></td>
+<td><p>627</p></td>
+<td><p><strong>-129</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Identical, shape for shape.</strong> The <code class="docutils literal notranslate"><span class="pre">ac2sp</span></code> deepening is worth <strong>exactly zero
+cycles</strong> over the five shapes, and the whole win is the half the
+pre-registration named before the run.</p>
+<p>That agrees, from an independent measurement on a different harness, with what
+the objective work found separately: <code class="docutils literal notranslate"><span class="pre">channel_depth</span></code> sums to zero over the
+five published shapes. That work also established what the depth change <em>does</em>
+buy – three legal programs going from hanging to bit-exact – and that <strong>no
+term in either objective scores it</strong>. So the agent proposed a change whose value
+the objective cannot see, and kept it because the objective did not penalise it
+either. This objective would have accepted that change for no reason and would
+equally have discarded it for no reason; neither outcome is a judgement about
+the change.</p>
+</section>
+<section id="a-recorded-negative-rediscovered-from-three-lines-away">
+<h3>A recorded negative, rediscovered from three lines away<a class="headerlink" href="#a-recorded-negative-rediscovered-from-three-lines-away" title="Link to this heading"><span>¶</span></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">front-end</span></code>’s first iteration merged <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code>’s two operand-burst loops
+into one bounded by <code class="docutils literal notranslate"><span class="pre">max(a_rows,</span> <span class="pre">b_rows)</span></code>. <code class="docutils literal notranslate"><span class="pre">ip/units/dma_load.py:45</span></code> – in
+the file the agent was reading and editing, three lines above the loop it
+rewrote – records that this change “was measured to move nothing”, and names
+the reason: the bursts are already hidden behind the sequencer’s prefetch. It
+scored 175 / 674, unchanged, exactly as the note says.</p>
+<p>The information was in-band, adjacent and specific, so this is not an artefact
+of anything withheld. One hypothesis, worth a designed test rather than a claim
+at n=1: a unit-scoped edit is badly placed to weigh a whole-pipeline fact, so
+the decomposition that gave the loop its reach back may also have made
+locally-plausible global nulls easier to propose.</p>
+</section>
+<section id="what-this-run-does-not-show">
+<h3>What this run does not show<a class="headerlink" href="#what-this-run-does-not-show" title="Link to this heading"><span>¶</span></a></h3>
+<p>n=1 per arm, like every run before it. No rate of discovery, in either
+direction; one win is one win, not a capability.</p>
+<p>And the objective it optimised – summed cosim cycles at 4x4x4 and 16x16x16 –
+is now known to be <strong>partial</strong>. Work on another track, completed while this run
+was in flight, measured the burst widening as worth <strong>zero</strong> cycles on the
+model suite at the scored configuration (861 to 861, 1,530 to 1,530) against
+-287 and -583 at <code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code>: at <code class="docutils literal notranslate"><span class="pre">MAXDIM=16</span></code> a DRAM row is four packed
+words rather than sixteen and the prologue hides the burst for the models. The
+relationship inverts at the scored point – the GEMM shapes see the widening
+and the models do not. So a <strong>null</strong> against this objective is weaker evidence
+of “no headroom” than it looks, and this <strong>win</strong> is a win on GEMM shapes at one
+configuration rather than a win on the workloads. The pre-registration was left
+as written and the deviation recorded in its results section, where a reader
+can check it.</p>
+</section>
 </section>
 <section id="what-is-and-is-not-demonstrated">
 <h2>What Is and Is Not Demonstrated<a class="headerlink" href="#what-is-and-is-not-demonstrated" title="Link to this heading"><span>¶</span></a></h2>
@@ -700,6 +956,13 @@ their own page: <a class="reference internal" href="chia_codesign.html"><span cl
 <li><a class="reference internal" href="#contributions">Contributions</a></li>
 <li><a class="reference internal" href="#what-the-loop-has-measured-against-the-principle">What the loop has, measured against the principle</a></li>
 <li><a class="reference internal" href="#first-paid-run-2026-09-19">First paid run, 2026-09-19</a></li>
+<li><a class="reference internal" href="#third-paid-run-2026-09-24">Third paid run, 2026-09-24</a><ul>
+<li><a class="reference internal" href="#the-win-independently-accepted">The win, independently accepted</a></li>
+<li><a class="reference internal" href="#which-half-won-measured-afterwards-at-0">Which half won, measured afterwards at $0</a></li>
+<li><a class="reference internal" href="#a-recorded-negative-rediscovered-from-three-lines-away">A recorded negative, rediscovered from three lines away</a></li>
+<li><a class="reference internal" href="#what-this-run-does-not-show">What this run does not show</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#what-is-and-is-not-demonstrated">What Is and Is Not Demonstrated</a></li>
 <li><a class="reference internal" href="#the-planned-experiments">The Planned Experiments</a><ul>
 <li><a class="reference internal" href="#the-one-thing-every-experiment-below-is-designed-to-fix">The one thing every experiment below is designed to fix</a></li>

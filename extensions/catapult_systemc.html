@@ -170,10 +170,12 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/asic_manifest.html">The ASIC manifest</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_tutorial.html">Tutorial: A PyTorch MLP on TinyTPU, Then Change It</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
@@ -540,14 +542,14 @@ hang or a truncated run; the failing one is a complete run with wrong data.</p>
 rewrote its outermost loop to <code class="docutils literal notranslate"><span class="pre">while</span> <span class="pre">(1)</span></code> <strong>under</strong> <code class="docutils literal notranslate"><span class="pre">__SYNTHESIS__</span></code> – precisely a bug that
 leaves a design correct in csim and wrong in RTL. The netlists above are from <code class="docutils literal notranslate"><span class="pre">0eff4888</span></code>
 (2026-08-01), 19 days older. But <code class="docutils literal notranslate"><span class="pre">72c70dcb</span></code>’s guard requires <em>a load from a memory port inside
-the loop body</em>, and <code class="docutils literal notranslate"><span class="pre">acc</span></code> is declared <code class="docutils literal notranslate"><span class="pre">args=[]</span></code> (<code class="docutils literal notranslate"><span class="pre">examples/systemc/pe_split.py</span></code>), so
+the loop body</em>, and <code class="docutils literal notranslate"><span class="pre">acc</span></code> is declared <code class="docutils literal notranslate"><span class="pre">args=[]</span></code> (<code class="docutils literal notranslate"><span class="pre">tests/systemc/dot_product_four_links.py</span></code>), so
 the guard structurally cannot fire for it, while its unused <code class="docutils literal notranslate"><span class="pre">i</span></code> does trigger the rewrite. <code class="docutils literal notranslate"><span class="pre">mul</span></code>
 is rewritten too, but it reads Streams, whose handshake makes a free-running loop harmless. The
 proposed fix was to extend the guard so that a <code class="docutils literal notranslate"><span class="pre">get()</span></code> from a <code class="docutils literal notranslate"><span class="pre">Wire</span></code> or <code class="docutils literal notranslate"><span class="pre">Channel</span></code> in the loop
 body counts as evidence of finite streaming. This was stated as a hypothesis from reading source,
 not a measurement.</p>
 <p><strong>The test (2026-09-18,</strong> <code class="docutils literal notranslate"><span class="pre">6b84f7b1</span></code> <strong>): a negative result.</strong> <code class="docutils literal notranslate"><span class="pre">guard_experiment/guard.patch</span></code>
-stops the rewrite for any loop that reads a <code class="docutils literal notranslate"><span class="pre">Wire</span></code>. <code class="docutils literal notranslate"><span class="pre">pe_split.py</span></code> was re-emitted from
+stops the rewrite for any loop that reads a <code class="docutils literal notranslate"><span class="pre">Wire</span></code>. <code class="docutils literal notranslate"><span class="pre">dot_product_four_links.py</span></code> was re-emitted from
 <code class="docutils literal notranslate"><span class="pre">choonsik1/allo:SystemC-emitter</span></code> with and without it, synthesised with Catapult 2024.2, and simulated
 under Xcelium 24.03:</p>
 <table class="docutils align-default">

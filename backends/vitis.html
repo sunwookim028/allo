@@ -170,10 +170,12 @@
 <li class="toctree-l1"><a class="reference internal" href="xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="simulator.html">Multi-Threaded Simulator (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="asic_manifest.html">The ASIC manifest</a></li>
 <li class="toctree-l1"><a class="reference internal" href="aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_tutorial.html">Tutorial: A PyTorch MLP on TinyTPU, Then Change It</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
@@ -705,6 +707,67 @@ backends is <strong>refused</strong>, naming the loop and its style
 unstyled <code class="docutils literal notranslate"><span class="pre">s.pipeline</span></code> reaches every backend exactly as before. The LLVM and
 simulator paths are unaffected: they make no claim about RTL scheduling.</p>
 </section>
+<section id="sharing-one-array-between-dataflow-processes-what-type-shared-reaches">
+<h2>Sharing one array between dataflow processes: what <code class="docutils literal notranslate"><span class="pre">type=shared</span></code> reaches<a class="headerlink" href="#sharing-one-array-between-dataflow-processes-what-type-shared-reaches" title="Link to this heading"><span>¶</span></a></h2>
+<p>A region-scope <code class="docutils literal notranslate"><span class="pre">&#64;</span> <span class="pre">Stateful</span></code> touched by several kernels asks for one buffer
+shared by several concurrent processes. All three HLS emitters refuse it
+(<code class="docutils literal notranslate"><span class="pre">vhls</span></code>, <code class="docutils literal notranslate"><span class="pre">systemc</span></code>, <code class="docutils literal notranslate"><span class="pre">catapult</span></code>), and the refusal used to say the thing is
+“not expressible under <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dataflow</span></code>”. That was too strong as
+written, because Vitis does ship unsynchronised sharing:
+<code class="docutils literal notranslate"><span class="pre">HLSPragma.json</span></code> documents <code class="docutils literal notranslate"><span class="pre">shared</span></code> as “shared among multiple dataflow
+processes, without the need for synchronization” (visibility <strong>Deprecated</strong>,
+replaced by <code class="docutils literal notranslate"><span class="pre">set_directive_stream</span> <span class="pre">type=shared</span></code>), and the live
+<code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">stream</span> <span class="pre">variable=X</span> <span class="pre">type=</span></code> enum is <code class="docutils literal notranslate"><span class="pre">fifo,</span> <span class="pre">pipo,</span> <span class="pre">shared,</span> <span class="pre">unsync</span></code>
+– <em>two</em> unsynchronised modes, not one.</p>
+<p>The install carries no text saying what either mode does with several
+contending clients, so that was measured rather than argued. A 4-element
+<code class="docutils literal notranslate"><span class="pre">int</span></code> array declared in a <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">HLS</span> <span class="pre">dataflow</span></code> region, one process per
+role, <code class="docutils literal notranslate"><span class="pre">xcu250-figd2104-2L-e</span></code> at 3.33 ns, <code class="docutils literal notranslate"><span class="pre">csynth_design</span></code> only:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 25.0%" />
+<col style="width: 55.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>mode</p></th>
+<th class="head"><p>clients</p></th>
+<th class="head"><p>result</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">type=shared</span></code></p></td>
+<td><p>1 writer, 1 reader</p></td>
+<td><p>csynth clean</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">type=shared</span></code></p></td>
+<td><p>1 writer, 2 readers</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ERROR</span> <span class="pre">[HLS</span> <span class="pre">200-1014]</span> <span class="pre">Synchronized</span> <span class="pre">shared</span> <span class="pre">array</span> <span class="pre">'buf'</span> <span class="pre">failed</span> <span class="pre">dataflow</span>
+<span class="pre">checking:</span> <span class="pre">it</span> <span class="pre">can</span> <span class="pre">only</span> <span class="pre">have</span> <span class="pre">a</span> <span class="pre">single</span> <span class="pre">reader</span> <span class="pre">and</span> <span class="pre">a</span> <span class="pre">single</span> <span class="pre">writer.</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">type=shared</span></code></p></td>
+<td><p>2 writers, 1 reader</p></td>
+<td><p>the same 200-1014, plus <code class="docutils literal notranslate"><span class="pre">ERROR</span> <span class="pre">[HLS</span> <span class="pre">200-979]</span> <span class="pre">...</span> <span class="pre">it</span> <span class="pre">can</span> <span class="pre">only</span> <span class="pre">be</span>
+<span class="pre">written</span> <span class="pre">in</span> <span class="pre">one</span> <span class="pre">process</span> <span class="pre">function.</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">type=unsync</span></code></p></td>
+<td><p>2 writers, 1 reader</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ERROR</span> <span class="pre">[HLS</span> <span class="pre">200-979]</span></code>, plus <code class="docutils literal notranslate"><span class="pre">ERROR</span> <span class="pre">[HLS</span> <span class="pre">200-780]</span> <span class="pre">Array</span> <span class="pre">'buf'</span> <span class="pre">...</span>
+<span class="pre">it</span> <span class="pre">has</span> <span class="pre">3</span> <span class="pre">processes</span> <span class="pre">accessing</span> <span class="pre">it</span> <span class="pre">and</span> <span class="pre">only</span> <span class="pre">2</span> <span class="pre">ports.</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>Two things follow. The 1R1W rule is <strong>not</strong> scoped to scalar channels – the
+library string “Scalar channel must only have 1 reader and 1 writer” is just
+the scalar diagnostic; a <code class="docutils literal notranslate"><span class="pre">type=shared</span></code> <em>array</em> carries a 1R1W rule of its
+own (200-1014). And the accurate claim for our error messages is neither “not
+expressible” nor “expressible only unsynchronised”: Vitis HLS 2023.2 <strong>refuses
+it itself</strong> past one reader and one writer. Our emitters refuse the same
+thing, earlier and with the variable and kernels named.</p>
+<p>What this does <em>not</em> settle: whether a shared buffer between contending
+clients should be lowered at all, and by what mechanism. That needs
+arbitration – a decision that has not been made. The guards are guards.</p>
+</section>
 <section id="vitis-2023-2-linker-vs-newer-glibc">
 <h2>Vitis 2023.2 Linker vs. Newer glibc<a class="headerlink" href="#vitis-2023-2-linker-vs-newer-glibc" title="Link to this heading"><span>¶</span></a></h2>
 <p>Vitis HLS 2023.2 ships binutils 2.37, which cannot read the glibc of newer Linux
@@ -751,6 +814,7 @@ details are on <code class="docutils literal notranslate"><span class="pre">dev/
 <li><a class="reference internal" href="#aligned-m-axi-pointers-and-port-widening">Aligned <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> Pointers and Port Widening</a></li>
 <li><a class="reference internal" href="#rtl-co-simulation-of-dataflow-designs">RTL Co-Simulation of Dataflow Designs</a></li>
 <li><a class="reference internal" href="#s-pipeline-style-the-pipeline-control-style"><code class="docutils literal notranslate"><span class="pre">s.pipeline(style=)</span></code>: the pipeline control style</a></li>
+<li><a class="reference internal" href="#sharing-one-array-between-dataflow-processes-what-type-shared-reaches">Sharing one array between dataflow processes: what <code class="docutils literal notranslate"><span class="pre">type=shared</span></code> reaches</a></li>
 <li><a class="reference internal" href="#vitis-2023-2-linker-vs-newer-glibc">Vitis 2023.2 Linker vs. Newer glibc</a></li>
 <li><a class="reference internal" href="#conclusion">Conclusion</a></li>
 </ul>

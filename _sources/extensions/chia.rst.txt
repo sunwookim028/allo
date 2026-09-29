@@ -36,25 +36,46 @@ CHIA2026 account. The agents themselves are driven by
 Quick start
 -----------
 
-Environment (once): the ``allo`` env with this checkout's ``mlir/build``,
-``chia_env`` (py3.10, ``requirements.txt``), opencode via
-``npm ci --prefix examples/tinytpu/chia_agent``, and
-``chia.env`` copied from ``chia.env.example`` at the repository root.
-``chia.env`` is gitignored and must never be committed. Then:
+Environment: ``chia_env`` (py3.10, ``conda create -n chia_env python=3.10``
+then ``requirements.txt``) is created once per host. Everything else is per
+worktree and is what the two setup scripts do --- ``checkout_setup.sh``
+creates ``chia.env`` from ``chia.env.example`` if there is none (never
+overwriting one, and stopping if one names another project), installs
+opencode, creates ``.chia_scratch/``, runs the Ray check, and reports
+``mlir/build``; ``gcp_setup.sh`` checks the cloud side. Both cost $0 and are
+idempotent. ``chia.env`` is gitignored and must never be committed.
 
 .. code-block:: bash
 
+   examples/tinytpu/reproduce.sh --no-cosim     # this checkout's mlir/build + gates
+   examples/tinytpu/chia_agent/checkout_setup.sh  # chia.env, opencode, scratch, Ray
    examples/tinytpu/chia_agent/gcp_setup.sh  # auth, project, billing, APIs, spend report
    conda activate chia_env; set -a; source chia.env; set +a
-   ray start --head --resources='{"opencode_creds": 2}' --include-dashboard=false
+   # chia.env MUST be sourced in this shell, before the head: Ray workers
+   # inherit the raylet's environment (loop.py passes no env_vars), and
+   # opencode is on PATH only because chia.env puts OPENCODE_BIN there.
+   # A private --temp-dir, short enough for a Unix socket (107 bytes), plus
+   # RAY_ADDRESS: never address="auto" on the shared default, never `ray stop`.
+   ray start --head --temp-dir=/tmp/ray-chia \
+       --resources='{"opencode_creds": 2}' --include-dashboard=false
+   export RAY_ADDRESS=<what ray start printed>
    cd examples/tinytpu/chia_agent
-   python test_harness.py --phases e,c    # ~1 min, $0; full suite ~30 min, $0
+   python test_harness.py --phases e,c    # ~2 min, $0; full suite ~30 min, $0
    python preflight.py --budget-usd 30    # the gate alone, $0
-   python swarm.py --workers 2 --iterations 3 --budget-usd 30
+   python swarm.py --workers 2 --iterations 3 --budget-usd 30 --run-dir <run> \
+       2>&1 | tee <run>/swarm.log         # swarm's own stdout is not persisted
+   python swarm.py --status <run>         # any time, from any shell, $0
    python accept.py --out <run>/control                 # the run's control, once
    python accept.py --diff <run>/<worker>/best.diff --out <run>/accept-<worker> \
        --control <run>/control/accept.json              # or omit it and measure again
-   ray stop                               # and remove the Ray session directory
+   python3 spend.py run <run>             # what it cost, from opencode's DB
+   pgrep -f /tmp/ray-chia/session_ | xargs -r kill   # this cluster only;
+                                          # `ray stop` is host-wide
+
+The full procedure, written for someone who has never run this --- what a run
+is and costs, the $0 path, pre-registration, watching a run, reading the
+spend, and abandoning an interrupted one --- is the "Quick start, assuming
+nothing" section of ``examples/tinytpu/chia_agent/README.md``.
 
 ``test_harness.py`` and ``preflight.py`` cost nothing and need no model call,
 so run them first: ``--phases e,c`` takes about a minute and the full suite
@@ -161,37 +182,124 @@ Editable vs. frozen
      - files
      - how it is enforced
    * - **editable**
-     - ``microarch_isa.py``, ``isa_dsl.py``
-     - The agent edits a private copy in ``<run>/<worker>/spec/``, never the
-       repository.
+     - the seventeen paths ``chia_agent/design.py`` names: the instruction set
+       (``isa_spec.json``, the ``isa_encoding.py`` generated from it and the
+       ``isa_ref.py`` built on that), ``microarch_isa.py`` (the parameter set,
+       and the ``CHIA_CONFIG`` declaration below), ``isa_dsl.py`` (the program
+       generator), ``ip/isa.py``, ``ip/tinytpu.py``, ``ip/assembler.py``,
+       ``ip/programs.py``, and the eight units under ``ip/units/``
+     - The agent edits a private copy in ``<run>/<worker>/spec/``, which
+       mirrors the package, never the repository. The hardware left
+       ``microarch_isa.py`` for ``ip/units/`` when the design became a unit
+       library, so an editable set that stopped at the two old file names
+       would no longer contain the machine -- both wins of run 1 landed in
+       what is now ``ip/units/dma_load.py`` and ``ip/units/sequencer.py``.
+       ``isa_encoding.py`` is generated: the ``regenerate_isa`` tool runs the
+       frozen generator on the candidate's own spec, because an agent cannot
+       keep a 700-line generated file byte-identical by hand.
    * - **frozen**
      - main's ``cosim.py`` (testbench, ``SHAPES``, golden reference, every
        Vitis/TCL setting), ``bench_isa.py``, ``stress_isa.py``,
-       ``isa_ref.py``, ``kpn_model.py``; and ``chia_agent/``'s
-       ``evaluate.py``, ``gate_runner.py``, ``param_check.py``,
-       ``spec_policy.py``
-     - Read from git, never from disk; main's five files must also be
-       byte-identical to ``MAIN_BASE`` (``476a70d8``) in ``evaluate.py``.
+       ``kpn_model.py``, ``shapes.py``, ``gen_isa.py``; the workload suite
+       (``workloads/``) and ``chia_agent/area_proxy.py`` -- what prices the
+       design and what it is priced *on*; the design's own machinery
+       (``ip/params.py``, the package ``__init__``\ s, and the reduce IP they
+       import); and ``chia_agent/``'s ``evaluate.py``, ``gate_runner.py``,
+       ``param_check.py``, ``spec_policy.py``, ``mapspace.py``,
+       ``codesign_gate.py``, ``codesign_cosim.py``
+     - Read from git, never from disk; main's design evaluator must also be
+       byte-identical to the base ``evaluate.main_base()`` **derives** -- the
+       merge-base of the frozen ref with main. It was a hand-written
+       ``MAIN_BASE`` constant, and it went stale four times in five days,
+       each time refusing every candidate at stage ``setup`` with a message
+       that blamed the design rather than the pin.
 
-Because ``isa_ref.py`` is frozen and ``stress_isa.py`` checks programs against
-it, **what each instruction means is part of the contract**: the agent may
-change how the hardware executes the ISA and which instructions the generator
-emits, not an instruction's semantics.
+.. _chia-isa-editable:
+
+Why the ISA can move, and what the oracle is
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``isa_spec.json``, ``isa_encoding.py`` and ``isa_ref.py`` were frozen until
+2026-09-25, and the reason was sound: ``isa_ref.py`` is what ``stress_isa.py``
+checks random programs against, so a candidate that could rewrite its own
+reference model could weaken the rule and score strictly better. The cost was
+that the loop could not change the instruction set at all, which is half of a
+co-design space.
+
+**The referee cannot be the editable surface, so the referee moved outside the
+repository.** ``workloads/run.py --verify`` is the one check with something
+this project did not write on one side: ``torch.nn.Linear``'s own forward on
+the model's real weights, with the machine's epilogue applied in torch. It is
+now the FIRST gate, it costs 4 s at MAXDIM=16, and a byte that differs is
+``gate:pytorch``. ``allo/actions.py`` is not the answer to this and was not
+used for it: it is another model of the same ISA *inside* the repository, with
+the same failure mode ``isa_ref`` has.
+
+Two other things carry the weight the freeze used to:
+
+* ``gen_isa.py --conform`` (frozen) is a gate on the candidate's **own** spec:
+  ``isa_encoding.py`` byte-identical to what that spec generates, every
+  software constant and bit slice of the design at the spec's positions, the
+  assembler and generator through the same encoder, the reference model
+  structurally forbidden from importing an opcode number or a field position
+  from the design, and the bit ranges the *emitted HLS* reads. 36 s.
+* **The GEMM goldens were never** ``isa_ref``. ``bench_isa.py``,
+  ``stress_isa.py`` and ``cosim.py``'s testbench each compute their own numpy
+  gold, and all three are frozen. ``isa_ref`` is the reference for *random
+  programs* only.
+
+**What the oracle is worth, stated rather than implied.** 8,912 bytes across
+four MLPs at MAXDIM=64, 92 % of it ``mlp_wide``; ``mlp_bias`` contributes none,
+because it is the probe that must not map. At the scored MAXDIM=16 only two
+models fit, and ``--verify`` draws each eight times (the mapping depends only
+on the shapes, so extra draws are nearly free) for 2,688 bytes over six layers.
+That is an oracle, not a corpus: it adds a reference nobody here can edit, and
+it adds no shape the GEMM sweep does not already cover. Widening it means more
+models that fit a small build, and that is the next thing to do to this gate.
+
+Because the spec is editable and ``isa_ref`` *evaluates* the expressions its
+actions carry, those expressions are held to an expression language -- a name,
+an integer, arithmetic, bitwise and comparison operators -- in two independent
+places: ``spec_policy.expression_violations`` at edit time, and
+``isa_ref.expression``, an AST walk that replaced ``eval``, at run time. An
+``eval`` with emptied builtins still reaches ``().__class__.__bases__[0]`` and
+from there the frame holding ``gate_runner.py``'s nonce.
 
 The evaluator
 ~~~~~~~~~~~~~
 
-- **gate** (functional, Allo simulator, ~30 s): ``bench_isa.py`` (the published
+- **gate** (functional, Allo simulator, ~110 s): ``run.py --verify`` (the
+  PyTorch oracle, first and cheapest -- 4 s), ``gen_isa.py --conform`` (the
+  candidate's own spec against its own generated artefacts and the design's bit
+  slices -- 36 s), ``bench_isa.py`` (the published
   [-4, 4] setup), main's ``stress_isa.py`` (492 runs: full-range, corner and
   boundary int8 at all 64 shapes, ``C`` prefilled and compared in full, vector
   and random programs against ``isa_ref``, many calls on one build), and
-  ``param_check.py`` at ``TPU_MAXDIM=8``, ``12`` and ``TPU_T=8
-  TPU_MAXDIM=32`` (below). Negative control:
-  an int16 partial sum passes ``bench_isa.py`` and every cosim testbench, and
-  ``stress_isa`` rejects it (251/492 exact).
-- **score**: the sum of RTL cosim cycles (Vitis HLS 2023.2 csynth + xsim) at
-  4x4x4 and 16x16x16, each testbench bit-exact, the 3.33 ns clock met. About
-  2-3 min per candidate. Area is recorded, not scored.
+  ``param_check.py`` at three configurations ``evaluate.param_configs``
+  derives from the candidate's own (below). Negative controls, all in
+  ``test_harness.py``: an int16 partial sum passes ``bench_isa.py`` and every
+  cosim testbench and ``stress_isa`` rejects it (251/492 exact); a spec edit
+  without ``regenerate_isa`` is refused at ``gate:isa`` for a stale artefact;
+  and ``isa_ref``'s ReLU primitive weakened to the identity -- a candidate
+  rewriting what used to judge it -- is refused at ``gate:pytorch`` before
+  ``bench_isa`` runs at all.
+- **score**: a THREE-TERM objective, reported per term and never summed.
+  See :ref:`chia-objective` for why each term is there and what it replaced.
+
+  1. ``model`` -- RTL cosim cycles for ``mlp_tiny`` and ``mlp_deep``, the two
+     workload-suite models whose every layer fits one build, over one csynth
+     shared by all six layers. **The primary**, and measured at
+     ``evaluate.SCORED_MODEL_ENV`` --- ``MAXDIM=64``, **not** the GEMM term's
+     16, for the measured reason below.
+  2. ``gemm`` -- RTL cosim cycles at 4x4x4 and 16x16x16, unchanged. **The
+     control**, kept so that a change which helps models and hurts GEMM shapes
+     has to be stated rather than hidden.
+  3. ``area`` -- a standard-cell area ESTIMATE from the candidate's own
+     structural bit census (``chia_agent/area_proxy.py``), in milliseconds.
+     csynth's FPGA resource table is still reported beside it and no longer
+     decides anything.
+
+  Each testbench bit-exact, the 3.33 ns clock met.
 - **acceptance**: ``accept.py`` is the only way a win is claimed. On a clean
   ``git worktree`` with its own ``mlir/`` build it runs ``bench_isa``,
   ``stress_isa``, ``param_check``, cosim at all five shapes, and the
@@ -204,6 +312,228 @@ The evaluator
   that measurement was cross-checked against. Measuring the control per run is
   exactly why the published row having moved twice since -- most recently to
   175 / 265 / 421 / 482 / 674 -- does not invalidate the run.
+
+.. _chia-objective:
+
+The objective, and the two axes it replaced
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Until 2026-09-24 the loop scored on **GEMM shapes** against **csynth's FPGA
+resource table**, and this project had measured both to be misleading.
+
+**The workload class changes the answer by four to eight times.** The same
+optimisation -- widening the operand burst -- is worth **4.3-7.0 %** of runtime
+on GEMM shapes and **25-34 %** on multi-layer models
+(:doc:`/designs/workload_suite`). A model does not make the problem bigger, it
+makes it *longer*, so a fixed per-call cost is repaid at every layer instead of
+amortised by one large problem. A loop ranking changes on GEMM shapes ranks
+them on the workload class **least** sensitive to the cost they remove. So the
+model term is the primary and the GEMM shapes are kept as the control: a
+control that is dropped cannot catch a change that buys models with shapes.
+
+**...but only at MAXDIM=64, and that had to be measured.** Every one of those
+figures was taken at ``TPU_MAXDIM=64``, and the loop scores at 16, where a DRAM
+row is 4 packed words instead of 16 and every operand burst is four times
+shorter. Asked directly --- both models, every layer, one csynth per burst
+width, at ``T=4 MAXDIM=16 QD=16`` --- the widening is worth **zero cycles**:
+861 -> 861 and 1,530 -> 1,530, layer by layer, to the cycle
+(``dev/records/tinytpu/model-term-maxdim-20260924.rst``).
+
+Worse than insensitive: at MAXDIM=16 the relationship **inverts**. The GEMM
+shapes there *do* see the widening --- CHIA run 1 measured
+``0 / 0 / -42 / -59 / -59`` on exactly that configuration --- and the models do
+not. A model term at MAXDIM=16 would be the *less* burst-sensitive of the two
+terms, which is the opposite of the reason for having one. So the model term is
+measured at MAXDIM=64 and the GEMM control stays at 16 because that is the
+published row: **two configurations, two csynths per candidate**, and that is
+what the term costs.
+
+Measured, that price is **348 s** for the model term (one ``csynth`` and six
+layer cosims, returning the published 1 150 and 2 117) on top of a ~230 s
+evaluation --- **2.5x per candidate**. Against run 3's whole-run numbers it is
+about **1.28x wall**, because the model calls dominate and they have not
+changed, and **no change to the spend cap**: the term adds no model calls, so
+the $60 cap still buys the six candidates run 3 got for $20.74. What to watch
+instead is **Vitis load, 2.5x per candidate**, which across a four-worker swarm
+is licence and CPU contention rather than money.
+
+**The FPGA table understates silicon in the components a search most wants to
+change.** The burst widening is +43 % flip-flops and +92 % block RAM on FPGA
+and **+74.4 % cell area** in 45 nm, of which **99.1 % is two AXI master ports**
+that grow 13x when widened. The arithmetic array is **under 4 %** of our
+standard-cell logic while the memory-interface adapters are **40.9 %**
+(:doc:`/paper`). A Design Compiler run is ~70 minutes on another host with a
+licence, so the fix cannot be "run DC in the loop"; it is
+``chia_agent/area_proxy.py``, which **counts the bits the design declares** --
+every array a unit declares, every channel the architecture wires, at the
+candidate's own parameter set -- and prices them, plus the AXI adapters, at
+coefficients fitted to the committed DC runs.
+
+It reports itself as an estimate everywhere, and it states its error:
+
+- **0.33 % mean / 0.91 % worst** in-sample over the seven committed TinyTPU DC
+  runs, **0.62 % / 1.39 %** leave-one-out;
+- its channel census reproduces, **to the bit**, a hand count taken off the
+  emitted RTL's instance list (16,640 bits of queue at ``QD=8``, 33,280 at 16);
+- ``python examples/tinytpu/chia_agent/area_proxy.py --selfcheck`` re-derives
+  every one of those numbers from the committed reports and fails if any moved.
+
+What it is **not**: it is a model of this design and this flow (flip-flop
+memories, ``sram_mode='none'``); the four Gemmini runs are not fitted and not
+predicted by it; it prices *structure*, not synthesis, so a construct Vitis
+renders as a multi-write-port RAM is invisible to it; and the configuration the
+loop scores at, T=4 MAXDIM=16, has exactly **one** committed DC run and is the
+worst-predicted of the seven. That wants a twelfth DC run, not a better fit.
+
+.. _chia-configuration:
+
+The configuration is a candidate's to propose, inside a stated envelope
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Until 2026-09-25 ``evaluate.SCORED`` pinned T=4 MAXDIM=16 and
+``check_invariants`` refused any candidate whose build disagreed, so the loop
+searched the implementation of eight units at one architecture. A candidate now
+declares, at module level in its own ``microarch_isa.py``::
+
+    CHIA_CONFIG = {"T": 8, "MAXDIM": 32}
+
+``evaluate.resolve_config`` reads it with ``ast.literal_eval`` -- no import, no
+candidate code -- before the tree is composed, and every stage then runs pinned
+to it; ``check_invariants`` still requires the build to *report* what was
+declared, so the declaration is a claim with a check on it. A candidate that
+declares nothing is scored at T=4 MAXDIM=16 QD=16, the published row, so no
+existing candidate, control or published number moves.
+
+Four things refuse a proposal, all of them before anything is built, and all of
+them naming what would lift the refusal:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 76
+
+   * - refusal
+     - why
+   * - outside the fitted envelope
+     - ``area_proxy.envelope_refusals``. The coefficients are fitted to five
+       committed DC runs (the two logic-only ones are stubs, not design
+       points), which span T in [4, 8], MAXDIM in [16, 64], QD in [8, 16],
+       DMA_WORDS in [1, 16]. Outside that span the area term would be an
+       extrapolation with no error bar, so ``estimate`` **raises**
+       (``OutsideEnvelope``) instead of returning a number. A missing figure a
+       search must work around is recoverable; a confident wrong one is not.
+       The envelope is derived from ``COMMITTED``, so a twelfth DC run widens
+       it by being added to that dict.
+   * - past a MAXDIM ceiling
+     - ``(MAXDIM // T) * MAXDIM <= 2048`` for the operand layout's addressing
+       and ``MAXDIM**3 // T**2 + MAXDIM**2 // T <= 32767`` for a cubic GEMM's
+       header count: **88 and 76 at T=4, 128 and 120 at T=8**. Computed from
+       the frozen ``isa_encoding.MAXDIM_CEILINGS`` and never typed into the
+       evaluator -- this project has already written one of them down wrong in
+       three documents ("MAXDIM <= 90" against an answer of 88). The refusal
+       names the ceiling and its value.
+   * - ``QD`` other than 16
+     - depth 8 deadlocks legal programs -- three of the ten tiled programs
+       never complete in cosim (:doc:`/developer/limitations` item 24) -- so it
+       is refused rather than left to hang for the 1,800 s cosim timeout.
+   * - ``T < 4`` or ``MAXDIM % T``
+     - ``ip/params.py``'s invariants.
+
+**Inside the envelope is still thin, and the loop should be told so.** The
+(T, MAXDIM) box has one interior point -- MAXDIM=16 at T=4, the
+worst-predicted of the seven runs. The DC runs that would earn the box, in
+order: **T=4 MAXDIM=32** and **T=8 MAXDIM=16** (the corners a co-design loop
+reaches for first), then **T=4 at a ceiling (88 or 76)**, then **a clean QD
+pair at the scored point** -- two exports of one commit, which is the only way
+to replace the +6.8 %-against-+6.6 % agreement of two estimates with a
+measurement. The priority list lives in ``area_proxy.py``'s docstring, beside
+the model it would correct.
+
+**Cost, measured rather than estimated**
+(``dev/records/tinytpu/codesign-space-20260925.rst``). One whole candidate is
+**623.9 s** at the published row and **1050.5 s** at ``T=8 MAXDIM=32`` --
+**1.68x** -- on the unmodified design, same host, both ``ok: true``. The two
+new gates are 37.8 s of the first figure (6.1 %), and ``gen_isa.py --conform``
+is 34.9 s of that because it builds the design down the HLS path to read the
+bit ranges the emitted C++ takes. A candidate was ~578 s before this work. A
+spend ceiling for a search that may propose T=8 should use the T=8 figure, not
+an average.
+
+That T=8 run is also the first co-design point this loop could produce:
+16x16x16 falls from **674 to 426 cycles** (-36.8 %) and ``mlp_tiny`` from
+**1,150 to 783** (-31.9 %) for an area estimate up from **1.20 to 2.23 mm^2**
+(+85.6 %), clock met at 2.431 ns. A trade the objective can now state.
+
+**Two things a T=8 candidate cannot measure, and both are frozen machinery
+rather than the candidate.** ``cosim.py`` asserts every scored dimension is a
+multiple of T, and ``4x4x4`` and ``12x12x12`` are not multiples of 8, so the
+GEMM term at T=8 is ``16x16x16`` alone (``shapes_skipped`` says so). The frozen
+mapper refuses ``mlp_deep``'s 16x16x12 layer for the same reason, so the model
+term is ``mlp_tiny`` alone (``model_skipped``) and the oracle's corpus becomes
+``mlp_tiny`` + ``mlp_small``. Either could have been made a refusal; both were
+made SCOPE, because refusing a candidate for the shape list's choice of numbers
+would leave every T but 4 unreachable and the loop searching one architecture
+again. The consequence is real and is reported per run: **a T=8 candidate is
+measured on a narrower workload than a T=4 one.** Widening it means shapes and
+models legal at more than one T, which is a person's edit to ``shapes.py`` and
+``workloads/models.py``.
+
+Whether the new objective is better: the re-score
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Asserting it would be worthless, so ``chia_agent/rescore.py`` hands both
+objectives the four changes this project has already measured and prints how
+each ranks them::
+
+    python examples/tinytpu/chia_agent/rescore.py
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 38 42
+
+   * - change
+     - old objective
+     - new objective
+   * - burst widening
+     - **could not see it** -- never measured at either search shape
+     - ``trade``: -25 to -34 % on models, **+73.3 % area (est.)**, 99.6 % of
+       it in the adapters
+   * - channel depth ``QD`` 8 -> 16
+     - ``trade``, **kept** on a -7 total over the two scored shapes
+     - ``regression``: the five-shape total is **zero** (+4+4+4-1-11), and
+       +6.8 % area
+   * - operand mirror removal
+     - ``regression`` (+16)
+     - ``regression``; no area measurement of it exists on either axis
+   * - CHIA run 1's burst win
+     - ``trade``, **kept** on -59
+     - ``trade``, kept -- and now **priced**: +24.3 % area (est.), 99.6 % of it
+       in the AXI master ports
+
+**Nothing is reversed**, which is the first thing to check. What changes is
+the classification of the two that matter, and one of them *indicts the old
+objective directly*: the channel-depth change sums to **zero** over the five
+shapes, so no cycle objective over the five can prefer it, and over the two the
+loop actually scored it sums to -7, so the old objective would have kept it for
+the wrong reason. What it really buys is three legal programs going from never
+completing to completing, and **neither objective has a term for that**. That
+gap is open.
+
+Two honest limits on this evidence:
+
+- **Model cycles exist for exactly one of the four changes.** On the other
+  three the new objective is running on its GEMM control, and is the old
+  objective with a better resource axis. The resource axis is supported
+  strongly; the model axis on a single point.
+- And that single point is the one the MAXDIM measurement above qualifies: the
+  model term earns its place at MAXDIM=64 and demonstrably does not at 16. The
+  objective is better *because the term is measured where the effect is*, and
+  the honest form of that sentence names the configuration.
+- The proxy's attribution of run 1's win -- +24.3 % area, 99.6 % in the AXI
+  master ports -- is the same attribution Design Compiler made for the
+  MAXDIM=64 widening (99.1 % in two adapters), reached in milliseconds instead
+  of 56 minutes. It is a *prediction*, and the way to settle it is a DC run on
+  that export.
+
 
 Reference
 ---------
@@ -238,10 +568,27 @@ with ``git show origin/chia-codesign:CODESIGN.md``.
 Guards
 ~~~~~~
 
+Two of these are **derived rather than listed**, because the same defect has
+now broken the loop twice: a value copied into several files with nothing
+comparing the copies to its source. The frozen set is the import closure of
+the evaluation's entry points, computed from the ref (``evaluate.import_closure``),
+and ``compose`` refuses a tree that is not closed under its own imports. The
+published five-shape row is parsed out of ``reproduce.sh``'s ``EXPECTED``
+(``control.reproduced``), and the copies that cannot be derived are gated by
+``control.check_pins``. Both run in ``test_harness.py``'s guard phases, in
+under a minute, rather than after a candidate's evaluation.
+
+What each cost before it was derived: a hand-written ``WORKLOAD_SUITE`` that
+omitted its own runner's imports failed **every** candidate at stage ``model``,
+so the loop could complete no run; and four literal copies of the pre-``TPU_QD=16``
+row in ``swarm.py`` meant every worker a run launched was handed a baseline the
+design had not produced for days.
+
 Mechanical enforcement, not instructions:
 
 1. **Tool surface.** opencode's own file and shell tools are denied; the MCP
-   edit tools accept only the two bare file names.
+   edit tools accept only the paths ``design.EDITABLE`` names, and
+   ``read_spec()`` with no argument lists them.
 2. **Frozen files from git**, a fresh evaluation tree per candidate, anything
    else in the spec directory ignored; ``loop.py`` refuses to start on a dirty
    frozen path.
@@ -267,10 +614,12 @@ Mechanical enforcement, not instructions:
    check's *return value*, and ``numpy``/``allo`` are frozen against
    monkeypatching for the duration; only then is ``CHIA-GATE <check> OK
    <nonce>`` printed, and the evaluator requires that line.
-6. **Parametricity.** The scored configuration is T=4, MAXDIM=16, so a design
-   specialised to it would pass everything. ``param_check.py`` rebuilds the
-   candidate at ``TPU_MAXDIM=8``, ``TPU_MAXDIM=12`` and
-   ``TPU_T=8 TPU_MAXDIM=32``, requires the build to report that configuration,
+6. **Parametricity.** A design specialised to the one configuration it is
+   scored at would pass everything else. ``param_check.py`` rebuilds the
+   candidate at three other configurations -- at the published row,
+   ``TPU_MAXDIM=8``, ``TPU_MAXDIM=12`` and ``TPU_T=8 TPU_MAXDIM=32``, and
+   ``evaluate.param_configs`` moves that list onto whatever configuration the
+   candidate proposed -- requires the build to report that configuration,
    and requires every GEMM shape of it (full-range, corner and boundary
    operands, ``C`` compared in full) and random programs to be exact
    (``gate:param``). The policy requires ``T`` and ``MAXDIM`` to stay
@@ -289,9 +638,10 @@ Mechanical enforcement, not instructions:
 7. **Documentation.** A candidate may not remove, net, more than 15 lines of
    comments and docstrings against the frozen file; rewording is free.
 8. **Memory model and premises.** Every ``TPU_*`` variable but the project path
-   is scrubbed before cosim (``m_axi_latency`` 0, as Gemmini's harness), T == 4,
-   MAXDIM == 16, the 3.33 ns target, and each shape's own cosim log and
-   simulated time must agree with the reported cycles.
+   is scrubbed before cosim (``m_axi_latency`` 0, as Gemmini's harness); the
+   build must report the configuration it is scored at (``check_invariants``,
+   T, MAXDIM and QD); the 3.33 ns target must be met; and each shape's own
+   cosim log and simulated time must agree with the reported cycles.
 9. **Loopback.** The MCP tool servers bind 127.0.0.1 by default; a multi-host
    swarm must opt in with ``TINYTPU_TOOL_HOST=node`` and bring its own
    authentication.
@@ -306,7 +656,7 @@ Mechanical enforcement, not instructions:
     processes are sandboxed to their work directory (guard 4) and so cannot
     write a control record either, and the control's cosim verdict is
     nonce-vouched (guard 5) like every other. ``accept.json`` records it as
-    ``control`` -- cycles, the two editable files' blob ids, the ref, the
+    ``control`` -- cycles, every editable file's blob id, the ref, the
     estimated clock, the wall time, when it was measured -- so an accepted
     result can be re-derived against the same control.
     ``--control <control-run>/accept.json`` reuses one control for the rest of
@@ -376,12 +726,158 @@ and bills the project in the request URL. ``preflight.py`` runs before any
 worker or model call in ``swarm.py``, ``loop.py`` and ``smoke.py``, and refuses
 unless the project bills ``CHIA_BILLING_ACCOUNT``, Vertex AI is enabled,
 ``--budget-usd`` is given, and CHIA's cumulative spend so far plus this run's cap
-fits **``CHIA_TOTAL_CAP_USD`` ($100 in chia.env)**; it prints the account,
+fits **``CHIA_TOTAL_CAP_USD`` ($500 in chia.env, and the committed default in ``preflight.py``)**; it prints the account,
 project, spend so far, remaining and the run's cap. Cumulative spend is
 opencode's own database, attributed to CHIA2026 by the cutover time recorded
 in ``billing.json`` (opencode stores no GCP project with a session). These are
 opencode's figures from its price table, not the invoice; the remaining credit
 is only in the Cloud Console.
+
+A run in flight, and one that was interrupted
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A run is legible from its own directory, with no memory of how it was
+started::
+
+   python swarm.py --status <run>
+
+which prints which iteration each worker is on, every candidate with its
+verdict, whether the run is still alive, the spend so far from opencode's
+database, and the question each worker was asked. It starts nothing and
+spends nothing, and it works equally on a live run, a finished one and a
+committed evidence directory.
+
+What a run writes, and when, is worth knowing before an interruption rather
+than after:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - file
+     - written
+   * - ``<run>/run.json``
+     - once, after the pre-flight gate and before the first worker
+   * - ``<run>/<worker>/worker.log``
+     - continuously, unbuffered --- the only live signal inside an iteration
+   * - ``<run>/<worker>/trace.jsonl``
+     - appended per EVENT, unbuffered --- every turn, every tool call, every
+       model call, as they happen (below)
+   * - ``<run>/<worker>/opencode/run-*.ndjson``
+     - opencode's own event stream, written by opencode as the session runs
+       and kept even when the call is killed
+   * - ``<run>/<worker>/variants.jsonl``
+     - appended once per finished iteration, which can be tens of minutes apart
+   * - ``<run>/<worker>/best.diff``, ``calls.json``
+     - only on a worker's normal exit
+   * - ``<run>/summary.json``, ``<run>/spend.json``
+     - only after every worker has exited
+   * - ``swarm.log``
+     - never, by itself --- pipe ``swarm.py`` through ``tee``, or the
+       ``HARD CAP:`` line is lost
+
+**There is no resume.** No flag, no checkpoint: ``loop.py`` never reads
+``variants.jsonl`` back. ``swarm.py`` refuses a ``--run-dir`` that already
+holds a ``run.json``, because re-using one is worse than starting over: it
+overwrites the tag that attributes the old run's spend, truncates
+``worker.log``, appends a second run's iterations to ``variants.jsonl``, and
+leaves the previous run's edited spec in place --- so the "baseline" the new
+run measures is that design rather than ``HEAD``'s. Start again with a new
+``--run-dir``.
+
+Abandoning one cleanly means recording its cost **before** anything else,
+then killing what a ``SIGTERM`` to the workers does not reach --- opencode is
+a grandchild outside the loops' process groups and keeps spending after its
+driver dies. The sequence is in
+``examples/tinytpu/chia_agent/README.md`` ("If a run was interrupted"). The
+money is already counted either way: the cumulative cap sums every session on
+the account since the cutover, finished run or not, so an abandoned run still
+reduces what the next one may spend.
+
+**Do not edit the checkout while a run or the harness is running.** The
+evaluator compares the checkout's tracked files after every gate and returns
+``tamper`` if they moved. Measured 2026-09-24: editing three ``chia_agent``
+files during a ``test_harness.py`` run turned two ``gate:param`` cases into
+``tamper`` failures; both passed on a clean tree.
+
+What a session writes while it runs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Before 2026-09-25 a session was a black box between its two ends. ``worker.log``
+said an iteration had started and, tens of minutes later, ``variants.jsonl``
+said what the candidate scored; in between nothing recorded how many turns the
+agent took, which tools it called, or where the time went. Run 3 measured what
+that costs: **167 minutes wall, of which all cosim evaluation was 661 s --
+7 %** --- and four model calls that each ran the full 2400 s timeout. The
+calls that consumed the wall clock were exactly the ones that reported
+nothing, because **a timed-out call returns no session id and ``$0`` on
+``usage``**, which is why run 3 reads ``$0.00`` there while opencode's database
+charges ``$20.72``.
+
+The record existed and was being deleted. opencode's ``run --format json``
+emits newline-delimited events live --- one per message part, per model step,
+per tool call --- and CHIA's ``OpenCodeLLM._capture`` streams them into a
+``NamedTemporaryFile`` and then ``os.unlink``\ s it in a ``finally``. So the
+transcript survives only when the call returns; on ``subprocess.TimeoutExpired``
+it is destroyed on the way out.
+
+``chia_agent/session_trace.py`` is the log, and three writers append to it:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 30 48
+
+   * - writer
+     - events
+     - why there
+   * - ``llm.py``
+     - ``model_call.start`` / ``.end`` / ``.timeout``, ``session``, ``stream``
+     - ``_capture`` is overridden to write opencode's run stream to a durable
+       path and tail it in a thread while the call runs. It is the only place
+       that sees a turn that made no tool call --- the 2400 s "thinking"
+       case --- and the only place that can stop the transcript being unlinked.
+   * - ``allo_tool.py``
+     - ``tool.start`` / ``tool.end``
+     - the tool server is the one component that sees a round trip from the
+       far side of the MCP boundary, so its timings do not depend on
+       opencode's stream shape, which is not ours and has changed between
+       releases.
+   * - ``loop.py``
+     - ``run.*``, ``iteration.*``, ``call.*``, ``harness_eval.*``
+     - divides the wall clock into model calls, the agent's tool calls and
+       the harness's own re-scoring. ``calls.json`` is written once, at the
+       end; these lines are written as each call finishes, failures included.
+
+Every event is **one ``os.write`` on an ``O_APPEND`` descriptor** --- one
+syscall, nothing buffered in the process --- so a ``SIGKILL`` loses nothing
+already logged, and the driver, the tool server's Ray actor and the worker
+that runs ``prompt`` can share one file. A buffered log is no better than no
+log when the process is killed.
+
+Read one back with::
+
+   python examples/tinytpu/chia_agent/session_trace.py <run>/<worker>
+
+which prints the timeline --- each turn, each tool call with its duration,
+where the wall went --- and, at the end, **what was still open when the trace
+stopped**. A ``model_call.start`` or a ``tool.start`` with no matching end is
+the signal: it names what the process was doing when it died.
+
+``test_session_trace.py`` (~2 minutes, $0, no Vertex call, no Ray, no tool
+server) covers the cases a passing test would skip: a session **killed
+mid-flight** with ``SIGKILL`` to its process group, and one that hits
+``timeout_seconds``. Both leave a complete, readable trace and the raw
+opencode stream on disk. It drives ``fake_model.py`` through the real
+opencode binary, so the event shapes it parses are opencode's own, not a
+fixture's.
+
+What is still invisible: the *content* of a turn --- the trace records that a
+turn happened, how long it took and what it called, not what the model said or
+thought. The text is in the raw stream beside it, which is kept but not
+summarised. Per-turn **cost** is recorded only when opencode's
+``step-finish`` carries one; the authoritative money still comes from
+opencode's database (``spend.py``), because a killed session never writes its
+final usage anywhere.
 
 The $0 harness test
 ~~~~~~~~~~~~~~~~~~~
@@ -393,7 +889,11 @@ cross-check; **e** frozen-file and import-time attacks, forged verdicts,
 sandbox, and that a candidate can neither write nor fake a control record;
 **c** an int16 partial sum rejected by stress; **g** the
 parametricity and documentation guards; **d** a deadlock killed at 240 s;
-**abf** no-op and a slower design scored concurrently; **loop** the real
+**i** the co-design space -- every configuration refusal (envelope, both
+ceilings, ``QD=8``, the parameter invariants), a spec edit refused at
+``gate:isa`` until ``regenerate_isa`` runs, and a weakened ``isa_ref`` refused
+at ``gate:pytorch``; **abf** no-op and a slower design scored concurrently;
+**loop** the real
 ``swarm -> loop -> opencode -> MCP`` path; **accept** ``accept.py`` on a
 correct-but-slower diff, against a control measured in that same run. 57/57
 at landing (``dev/records/tinytpu/chia-evidence/harness-test-20260919-190240/``).
@@ -404,15 +904,90 @@ Limits and known failures
 - **Every search so far is n=1 per arm.** No rate of discovery is
   demonstrated; see :doc:`/extensions/chia_results`.
 - **Run 2 was stopped after 2 of 5 iterations** by a per-run cap that summed
-  the whole account rather than its own sessions.
-- **The $0 guard suite, 57 cases at landing, does not currently pass** (one
-  stale assertion, one crash in the loop phase).
+  the whole account rather than its own sessions. Fixed: every session a run
+  opens is titled with the run's tag (``--title``), and ``spend.run_spend``
+  sums those and the ids the loop saw returned. Nothing else on the account
+  is counted against a run's cap.
+- **The $0 guard suite passes: 101 cases, 74.5 minutes** (2026-09-25, all nine
+  phases, ``dev/records/tinytpu/chia-evidence/harness-test-20260925-033220/results.json``;
+  it was 98 cases in 46.9 minutes on 2026-09-24).
+  It was 57 at landing and did not pass; the repair that restored it also
+  added phase ``s``, which checks the static guards -- the derived main base,
+  the pinned scored configuration, the spend attribution and the policy's
+  scope -- in twenty seconds and without Ray or a model.
 - **A ``tamper`` verdict on a run that should have been clean** is usually a
   person or another agent editing the checkout while a measurement was in
-  flight, not the candidate (guard 4).
+  flight, not the candidate (guard 4). Confirmed the hard way on 2026-09-24:
+  an agent edited ``chia_agent/README.md`` -- inside ``CHECKOUT_WATCH`` --
+  while a gate was running, and the guard refused the candidate at ``tamper``
+  without attributing anything to it. An unplanned violation is a better test
+  of that guard than a constructed one.
 - **Timed-out opencode sessions are billed but reported as $0** by the
   per-worker figures, which is why every cap reads opencode's database
-  (``spend.py``) instead.
+  (``spend.py``) instead. Measured at run scale on 2026-09-24: all four of run
+  3's large iteration calls ran the full 2400 s timeout and returned no
+  ``usage``, so **the whole run reads $0.00 on ``usage`` and $20.72 on the
+  database**. The known form was one call billed $4.33 and reported as $0.00.
+- **A pinned constant nobody notices going stale is the defect, not its
+  value.** ``MAIN_BASE`` went stale four times in five days and then stopped
+  resolving at all when the design moved to ``examples/tinytpu/``; each time it
+  refused **every** candidate at stage ``setup`` with a message that blamed the
+  design. It is derived now (``evaluate.main_base``). ``control.PUBLISHED`` had
+  gone stale the same way -- still 172 / 262 / 418 / 484 / 686 after the design
+  shipped 175 / 265 / 421 / 482 / 674 -- and now reads ``reproduce.sh``'s
+  ``EXPECTED``, the one row a gate checks on every run.
+- **A Ray head started without ``chia.env`` sourced fails silently.**
+  ``loop.py`` connects with ``runtime_env={"working_dir": ...}`` and no
+  ``env_vars``, so Ray workers inherit the *raylet's* environment --- and
+  ``opencode`` is on ``PATH`` only because ``chia.env`` exports
+  ``OPENCODE_BIN``. Start the head from a shell that has sourced it, not just
+  the shell that runs ``swarm.py``: otherwise workers cannot find the binary,
+  every model call returns empty, and nothing reports an error.
+- **``ray.init(address="auto")`` can hang forever on a dead head.** An orphaned
+  Ray head whose raylet's working directory has been removed accepts the
+  connection and then cannot spawn a single worker: every one dies in
+  ``setup_worker.py`` at ``os.getcwd()``, and the driver blocks in ``ray.get``
+  with no error. Observed 2026-09-24 against a head left by a deleted
+  worktree. ``ray stop`` is not the fix (it is host-wide, see below); start a
+  head with a private ``--temp-dir`` and set ``RAY_ADDRESS``, which overrides
+  even an explicit ``address="auto"`` and leaves
+  ``/tmp/ray/ray_current_cluster`` alone for other tracks. Two things about
+  that temp directory, measured here on 2026-09-24: the path must be **short**,
+  because Ray puts a Unix socket under it and ``AF_UNIX`` caps the path at 107
+  bytes (``/tmp/ray-chia`` is fine, a path under a session scratch directory is
+  not); and to stop only that cluster, match ``<temp-dir>/session_`` rather
+  than the temp directory alone --- the shorter pattern also matches the shell
+  you type it in, and ``pkill`` will kill it. ``kill`` alone left the raylet
+  running; follow it with ``kill -9``.
+  **Checked since 2026-09-25**, after a third occurrence in which a clean
+  worktree found ``/tmp/ray/ray_current_cluster`` naming a head with no
+  ``gcs_server`` and no ``raylet`` behind it, and ``smoke.py`` sat for ten
+  minutes on ``Failed to connect to GCS``: ``preflight.py`` resolves the
+  address a driver would really dial (``RAY_ADDRESS``, else
+  ``<RAY_TMPDIR or /tmp/ray>/ray_current_cluster``), probes it with a three
+  second timeout, and refuses --- naming the address and giving the fix ---
+  before any worker or model call. It refuses the orphan shape too, by reading
+  the local raylet's working directory. ``python preflight.py --check-ray``
+  runs that check alone, at $0.
+- **The tool servers bind fixed ports from 8000 up**, so two ``chia_agent``
+  processes on one host collide. Serialise them.
+- **A checkout under ``/tmp`` cannot run the harness at all**, and it fails in a
+  way that blames the candidate. ``evaluate.sandboxed`` gives every gate
+  ``--tmpfs /tmp`` and then re-binds only the work directory and the composed
+  tree, so a worktree living anywhere else under ``/tmp`` --- an agent
+  scratchpad, for instance --- is **masked inside the sandbox**. ``allo`` is not
+  composed into the tree (``CHECKOUT_WATCH`` guards it instead), so it is looked
+  up on ``PYTHONPATH``, which points at the invisible checkout; the import then
+  falls through to the ``allo`` env's editable install, which resolves to
+  whatever tree last ran ``pip install -e`` --- on this host
+  ``/home/sk3463/allo``, whose HEAD had no ``allo/compose.py``. Every candidate
+  dies at stage ``import`` with ``ModuleNotFoundError: No module named
+  'allo.compose'``, which reads exactly like a broken design. Measured
+  2026-09-25 over two full harness runs. **Put the worktree under ``/home``.**
+  Copying a prebuilt ``mlir/build`` there is not enough either: the bindings
+  carry an RPATH into the old build directory, so inside the sandbox they raise
+  ``ImportError: libAlloMLIRAggregateCAPI.so.22.0git``. Build ``mlir/`` in the
+  worktree that will run the harness.
 
 Running two tracks on one host: ``ray stop`` is global
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

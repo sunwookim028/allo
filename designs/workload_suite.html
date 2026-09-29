@@ -170,10 +170,12 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/asic_manifest.html">The ASIC manifest</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_tutorial.html">Tutorial: A PyTorch MLP on TinyTPU, Then Change It</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
@@ -345,10 +347,21 @@ number, and this suite is about the mapping.</p>
 <span id="workload-suite-what-maps"></span><h2>What maps, and what does not<a class="headerlink" href="#what-maps-and-what-does-not" title="Link to this heading"><span>¶</span></a></h2>
 <p>The design computes <code class="docutils literal notranslate"><span class="pre">int8</span> <span class="pre">x</span> <span class="pre">int8</span> <span class="pre">-&gt;</span> <span class="pre">int32</span></code> with an optional ReLU on the
 accumulator before the narrowing. So:</p>
-<p><strong>Maps.</strong> <code class="docutils literal notranslate"><span class="pre">nn.Linear</span></code> without bias, at any (M, K, N) within <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code>,
-including extents that are not multiples of <code class="docutils literal notranslate"><span class="pre">T</span></code>; and a ReLU that consumes a
-Linear’s result directly and is its only consumer, which becomes the fused
-epilogue rather than a second pass.</p>
+<p><strong>Maps.</strong> <code class="docutils literal notranslate"><span class="pre">nn.Linear</span></code> without bias, with <code class="docutils literal notranslate"><span class="pre">M</span></code> any integer in
+<code class="docutils literal notranslate"><span class="pre">[AR_RAW_DIST,</span> <span class="pre">MAXDIM]</span></code> and <code class="docutils literal notranslate"><span class="pre">K</span></code> and <code class="docutils literal notranslate"><span class="pre">N</span></code> <strong>multiples of ``T``</strong> up to
+<code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code>; and a ReLU that consumes a Linear’s result directly and is its
+only consumer, which becomes the fused epilogue rather than a second pass.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This sentence used to read “at any (M, K, N) within <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code>, including
+extents that are not multiples of <code class="docutils literal notranslate"><span class="pre">T</span></code>”. That is true of <code class="docutils literal notranslate"><span class="pre">M</span></code> and false
+of <code class="docutils literal notranslate"><span class="pre">K</span></code> and <code class="docutils literal notranslate"><span class="pre">N</span></code>: <code class="docutils literal notranslate"><span class="pre">mapspace.residual</span></code> admits an intrinsic only where it
+divides the extent, and the intrinsic is <code class="docutils literal notranslate"><span class="pre">T</span></code> on the reduce and column
+ranks. Corrected by the sweep in
+<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/front_half_scope_20260924.rst</span></code>, which is also where
+the consequence is recorded — at <code class="docutils literal notranslate"><span class="pre">T=8</span></code>, <code class="docutils literal notranslate"><span class="pre">mlp_deep</span></code>’s
+<code class="docutils literal notranslate"><span class="pre">Linear(16,</span> <span class="pre">12)</span></code> stops mapping.</p>
+</div>
 <p><strong>Does not map, and is reported rather than approximated.</strong></p>
 <ul class="simple">
 <li><p><strong>``nn.Linear`` with bias.</strong> The ISA has <code class="docutils literal notranslate"><span class="pre">vadd</span></code> between accumulator rows,
@@ -359,16 +372,25 @@ encoding gap — <code class="docutils literal notranslate"><span class="pre">va
 no unit. <code class="docutils literal notranslate"><span class="pre">vru</span></code> does ReLU.</p></li>
 <li><p><strong>A ReLU that is not the sole consumer of a Linear.</strong> With two consumers the
 unfused value is needed as well, and there is no epilogue to ride on.</p></li>
+<li><p><strong>A ``K`` or ``N`` that is not a multiple of ``T``.</strong> <code class="docutils literal notranslate"><span class="pre">Linear(6,</span> <span class="pre">8)</span></code>
+passes the extractor and then the mapper enumerates <em>no</em> nest and names no
+constraint, so what reaches the user is <code class="docutils literal notranslate"><span class="pre">every</span> <span class="pre">nest</span> <span class="pre">refused</span></code>. The shape is
+genuinely out of scope; the message is a bug, recorded in the dated note and
+not fixed there.</p></li>
 <li><p><strong>Anything above ``MAXDIM`` in any of M, K or N.</strong> The operands are one
 <code class="docutils literal notranslate"><span class="pre">int8[MAXDIM*MAXDIM]</span></code> region, so a shape has to fit the addressable space
 rather than being tiled into it. This is the capability limit
 <a class="reference internal" href="gemmini_comparison.html"><span class="doc">TinyTPU-isa vs Gemmini: A Matched Comparison</span></a> calls worse than the cycle deficit, and the suite
-inherits it exactly.</p></li>
+inherits it exactly. <strong>Below</strong> <code class="docutils literal notranslate"><span class="pre">MAXDIM</span></code> the mapper does tile: an 8x8x8
+GEMM on a <code class="docutils literal notranslate"><span class="pre">T=4</span></code> instruction is enumerated as 680 nests and mapped, not
+rejected.</p></li>
 <li><p><strong>Everything else in a graph</strong> — reshape, concatenation, attention,
 normalisation, residual adds. The extractor names the node and the op.</p></li>
 </ul>
 <p><code class="docutils literal notranslate"><span class="pre">mlp_bias</span></code> exists so that this list is demonstrated and not merely asserted:
-it reports two refusals and maps its one remaining layer.</p>
+it reports two refusals and maps its one remaining layer. The list as a whole
+is demonstrated by <a class="reference internal" href="#workload-suite-scope-map"><span class="std std-ref">the scope map</span></a>, which
+walks each boundary and records how it fails rather than that it does.</p>
 </section>
 <section id="the-extractor">
 <h2>The extractor<a class="headerlink" href="#the-extractor" title="Link to this heading"><span>¶</span></a></h2>
@@ -386,20 +408,25 @@ weight is transposed on the way into DRAM, because <code class="docutils literal
 <section id="verification">
 <h2>Verification<a class="headerlink" href="#verification" title="Link to this heading"><span>¶</span></a></h2>
 <p>Three checks, and a layer that fails any of them is reported, never rounded.</p>
-<ol class="arabic simple">
+<ol class="arabic">
 <li><p><strong>The program against the spec.</strong> <code class="docutils literal notranslate"><span class="pre">act.correctness.check</span></code> runs
 <code class="docutils literal notranslate"><span class="pre">isa_ref.run</span></code> — the ISA as numpy — over four operand distributions and
 compares against <code class="docutils literal notranslate"><span class="pre">spec.gold</span></code>, the einsum in int64, over the output region,
 with everything outside the write window required to be untouched. This is
 the corpus’s own bar and every layer of every model clears it.</p></li>
-<li><p><strong>The chain against PyTorch.</strong> The suite then runs the <em>model</em>: each layer’s
-program in turn through <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code>, with the real weights in DRAM and the
-previous layer’s int8 output as the next layer’s activation, against
-PyTorch’s own evaluation of the same modules with the machine’s epilogue
-(ReLU where fused, then the clip to int8) applied in torch. Every model
-matches on every byte. This is what makes the suite a workload rather than
-a shape table: the machine computes the model, not a GEMM of the model’s
-size.</p></li>
+<li><p><strong>The model against PyTorch.</strong> The suite then runs the <em>model</em>: each layer’s
+program in turn through <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code>, with the real weights in DRAM and each
+layer fed the activation <strong>the fx graph says it consumes</strong>
+(<code class="docutils literal notranslate"><span class="pre">run.layer_sources</span></code>), against PyTorch’s own evaluation of the same
+dataflow with the machine’s epilogue (ReLU where fused, then the clip to
+int8) applied in torch. Every model matches on every byte. This is what
+makes the suite a workload rather than a shape table: the machine computes
+the model, not a GEMM of the model’s size.</p>
+<p>Both sides used to chain layer <em>i</em> into <em>i+1</em> regardless of the graph, and
+<a class="reference internal" href="#workload-suite-fanout"><span class="std std-ref">that was wrong for any graph that is not a chain</span></a>. A graph neither side can represent now raises
+<code class="docutils literal notranslate"><span class="pre">run.Unrepresentable</span></code>, which <code class="docutils literal notranslate"><span class="pre">gate.py</span></code> turns into a failure rather than
+an approximation.</p>
+</li>
 <li><p><strong>The RTL.</strong> Three of the four models’ layers go through <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code>’s
 machinery, below, each compared against <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code> over all 4096 bytes of
 <code class="docutils literal notranslate"><span class="pre">C</span></code> rather than over the result region alone.</p></li>
@@ -465,11 +492,24 @@ one, and the page never adds them together. <code class="docutils literal notran
 confirmed</strong>: its programs agree with <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code> and with PyTorch in software,
 and Vitis csim reports <code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">/</span> <span class="pre">4096</span></code> mismatches, but no RTL run of it has ever
 produced a cycle count (<a class="reference internal" href="#workload-suite-widening"><span class="std std-ref">why</span></a>).</p>
-<p>Two provenance facts that belong with the claims rather than under them:</p>
+<p>Three provenance facts that belong with the claims rather than under them:</p>
 <ul class="simple">
-<li><p><strong>The bit-exactness claims need no bindings.</strong> <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code> is numpy and the
-<code class="docutils literal notranslate"><span class="pre">act/</span></code> core imports numpy only, so “correct” is established by code that
-is entirely this checkout’s.</p></li>
+<li><p><strong>The two bit-exactness checks are not the same strength, and only one of
+them involves PyTorch.</strong> <code class="docutils literal notranslate"><span class="pre">correctness.check</span></code> holds <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code> — a numpy
+model of the ISA written here — against <code class="docutils literal notranslate"><span class="pre">spec.gold</span></code> — a numpy einsum
+written here; agreeing proves the mapper matches our own semantics and puts
+PyTorch on neither side. Only the chained check has <code class="docutils literal notranslate"><span class="pre">torch</span></code> on one side,
+and what is on it is <code class="docutils literal notranslate"><span class="pre">nn.Linear</span></code>’s forward on the graph’s own dataflow.
+Over the whole suite that is <strong>8 912 bytes</strong>, of which <code class="docutils literal notranslate"><span class="pre">mlp_wide</span></code> is 8 192, and
+<code class="docutils literal notranslate"><span class="pre">mlp_bias</span></code> contributes none at all: <code class="docutils literal notranslate"><span class="pre">gate.py</span></code> skips the end-to-end check
+for a probe, so the probe has no PyTorch comparison. The RTL row is a
+<em>record</em> that xsim once printed those cycles, declared in <code class="docutils literal notranslate"><span class="pre">claims.json</span></code>
+(see its <code class="docutils literal notranslate"><span class="pre">source.transcribed</span></code>) and checked for self-consistency and
+configuration, never re-measured. <code class="docutils literal notranslate"><span class="pre">scope.py</span></code> prints all three per entry.</p></li>
+<li><p><strong>The bit-exactness claims are pure numpy.</strong> <code class="docutils literal notranslate"><span class="pre">isa_ref</span></code> is numpy and the
+<code class="docutils literal notranslate"><span class="pre">allo/act/</span></code> core imports numpy only, so “correct” is established by code that
+is entirely this checkout’s — the MLIR bindings are not part of that claim,
+even though importing <code class="docutils literal notranslate"><span class="pre">allo.act</span></code> loads them.</p></li>
 <li><p><strong>The compiled half is borrowed.</strong> This worktree has no <code class="docutils literal notranslate"><span class="pre">mlir/build</span></code>, so
 <code class="docutils literal notranslate"><span class="pre">allo._mlir</span></code> resolves to <code class="docutils literal notranslate"><span class="pre">/home/sk3463/allo-bench</span></code> at <code class="docutils literal notranslate"><span class="pre">ff7beaf1</span></code> —
 <code class="docutils literal notranslate"><span class="pre">tests/act/test_bindings.py</span></code> fails here and names both paths, which is
@@ -477,6 +517,53 @@ what it is for. <code class="docutils literal notranslate"><span class="pre">git
 emitter that produced the HLS for every cosim below is the same source as
 this branch’s. That is the “borrowed, same commit” case <code class="docutils literal notranslate"><span class="pre">dev/toolchains.rst</span></code>
 describes, said out loud as it asks.</p></li>
+</ul>
+</section>
+<section id="the-boundary-as-a-map-rather-than-a-list">
+<span id="workload-suite-scope-map"></span><h3>The boundary, as a map rather than a list<a class="headerlink" href="#the-boundary-as-a-map-rather-than-a-list" title="Link to this heading"><span>¶</span></a></h3>
+<p>The list above is prose, and prose cannot be diffed. <code class="docutils literal notranslate"><span class="pre">workloads/scope.py</span></code>
+measures the same boundary and writes it to <code class="docutils literal notranslate"><span class="pre">workloads/scope_map.json</span></code>,
+keyed by <code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">MAXDIM</span> <span class="pre">QD</span> <span class="pre">DMA_WORDS</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>examples/tinytpu/workloads/scope.py<span class="w">            </span><span class="c1"># print it, ~50 s</span>
+python<span class="w"> </span>examples/tinytpu/workloads/scope.py<span class="w"> </span>--check<span class="w">    </span><span class="c1"># regenerate and diff</span>
+python<span class="w"> </span>examples/tinytpu/workloads/scope.py<span class="w"> </span>--emit<span class="w">     </span><span class="c1"># record this config</span>
+</pre></div>
+</div>
+<p>Four sections, every cell run and none inferred. <strong>ops</strong>: one row per kind of
+<code class="docutils literal notranslate"><span class="pre">torch.fx</span></code> node, over the suite’s five models plus a pre-norm transformer
+block and a small CNN defined in the file, so the refusal list is demonstrated
+rather than asserted. <strong>shapes</strong>: each of M, K and N swept independently
+across its ceiling, every mapped cell verified against <code class="docutils literal notranslate"><span class="pre">spec.gold</span></code>, so a
+shape that maps to a <em>wrong</em> program is a status and not a silence.
+<strong>entries</strong>: per suite entry, which of its checks compares against PyTorch and
+which compares two things this repository wrote — and which dataflow the
+comparison read off the graph. <strong>assumptions</strong>: what the verification
+itself takes for granted, probed.</p>
+<p>There is no hand-maintained expected-value list: the committed map is the
+program’s own output, so a cell can only move by the measurement moving.
+<code class="docutils literal notranslate"><span class="pre">--check</span></code> refuses to compare a configuration it has never recorded, on the
+same principle <code class="docutils literal notranslate"><span class="pre">claims.json</span></code> follows.</p>
+<p id="workload-suite-fanout">Two things the first run found; the first is still open, the second is fixed:</p>
+<ul>
+<li><p><strong>A ``K`` or ``N`` that is not a multiple of ``T`` refuses with no reason
+given</strong> — above.</p></li>
+<li><p><strong>The end-to-end PyTorch check assumed the graph is a chain. FIXED
+2026-09-25.</strong> <code class="docutils literal notranslate"><span class="pre">run.py</span></code> fed layer <em>i</em>’s output to layer <em>i+1</em> on <em>both</em>
+sides of the comparison, so a fan-out graph was compared against a PyTorch
+evaluation that was not the model either, and they agreed. Measured on two
+bias-free Linears off one input: nothing refused, both layers mapped, the
+suite’s own check reported 0 of 128 bytes differing, and the machine’s output
+differed from <code class="docutils literal notranslate"><span class="pre">model(x)</span></code> in <strong>62 of 128</strong>. Both sides now take each layer’s
+activation from <code class="docutils literal notranslate"><span class="pre">run.layer_sources</span></code>, which reads the fx graph; the same
+probe reports 0 and 0, and <code class="docutils literal notranslate"><span class="pre">scope.py</span></code>’s <code class="docutils literal notranslate"><span class="pre">assumptions</span></code> row – which is the
+regression test, and keeps its probe – reads <code class="docutils literal notranslate"><span class="pre">sound</span></code>.</p>
+<p>Every committed model is a chain, so no number on this page moved. What
+moved is that the check is now evidence for graphs that are not chains, and
+that is what made it safe to <em>gate</em> on: <code class="docutils literal notranslate"><span class="pre">run.py</span> <span class="pre">--verify</span></code> is the CHIA
+loop’s first gate, and with the ISA editable it is the only comparison with
+something outside this repository on one side
+(<a class="reference internal" href="../extensions/chia.html#chia-isa-editable"><span class="std std-ref">Why the ISA can move, and what the oracle is</span></a>).</p>
+</li>
 </ul>
 </section>
 </section>
@@ -519,7 +606,7 @@ is a tie broken on the label and not a disagreement about which is better.</p>
 <td><p><code class="docutils literal notranslate"><span class="pre">N4&gt;K4</span></code></p></td>
 <td><p>32</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code> 144</p></td>
-<td><p>407</p></td>
+<td><p>406</p></td>
 <td><p>bit-exact</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_tiny_l1</span></code></p></td>
@@ -528,7 +615,7 @@ is a tie broken on the label and not a disagreement about which is better.</p>
 <td><p><code class="docutils literal notranslate"><span class="pre">N4&gt;K4</span></code></p></td>
 <td><p>28</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code> 144</p></td>
-<td><p>407</p></td>
+<td><p>406</p></td>
 <td><p>bit-exact</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_deep_l0</span></code></p></td>
@@ -537,7 +624,7 @@ is a tie broken on the label and not a disagreement about which is better.</p>
 <td><p><code class="docutils literal notranslate"><span class="pre">N4&gt;K4</span></code></p></td>
 <td><p>32</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code> 144</p></td>
-<td><p>407</p></td>
+<td><p>406</p></td>
 <td><p>bit-exact</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_deep_l1</span></code></p></td>
@@ -546,7 +633,7 @@ is a tie broken on the label and not a disagreement about which is better.</p>
 <td><p><code class="docutils literal notranslate"><span class="pre">N4&gt;K4</span></code></p></td>
 <td><p>32</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code> 144</p></td>
-<td><p>407</p></td>
+<td><p>406</p></td>
 <td><p>bit-exact</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_deep_l2</span></code></p></td>
@@ -555,7 +642,7 @@ is a tie broken on the label and not a disagreement about which is better.</p>
 <td><p><code class="docutils literal notranslate"><span class="pre">N3&gt;K4</span></code></p></td>
 <td><p>25</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code> 108</p></td>
-<td><p>348</p></td>
+<td><p>349</p></td>
 <td><p>bit-exact</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_deep_l3</span></code></p></td>
@@ -564,7 +651,7 @@ is a tie broken on the label and not a disagreement about which is better.</p>
 <td><p><code class="docutils literal notranslate"><span class="pre">N2&gt;K3</span></code></p></td>
 <td><p>13</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">spm</span></code> 54</p></td>
-<td><p>261</p></td>
+<td><p>264</p></td>
 <td><p>bit-exact</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_small_l0</span></code></p></td>
@@ -573,7 +660,7 @@ is a tie broken on the label and not a disagreement about which is better.</p>
 <td><p><code class="docutils literal notranslate"><span class="pre">N8&gt;K8</span></code></p></td>
 <td><p>96</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code> 640</p></td>
-<td><p>1 211</p></td>
+<td><p>1 186</p></td>
 <td><p>bit-exact</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_small_l1</span></code></p></td>
@@ -582,7 +669,7 @@ is a tie broken on the label and not a disagreement about which is better.</p>
 <td><p><code class="docutils literal notranslate"><span class="pre">N4&gt;K8</span></code></p></td>
 <td><p>48</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code> 320</p></td>
-<td><p>692</p></td>
+<td><p>682</p></td>
 <td><p>bit-exact</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_wide_l0</span></code></p></td>
@@ -591,7 +678,7 @@ is a tie broken on the label and not a disagreement about which is better.</p>
 <td><p><code class="docutils literal notranslate"><span class="pre">M2&gt;N16&gt;K16</span></code></p></td>
 <td><p>624</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">accu</span></code> 18 432</p></td>
-<td><p>30 051</p></td>
+<td><p>29 173</p></td>
 <td><p>bit-exact</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_wide_l1</span></code></p></td>
@@ -600,7 +687,7 @@ is a tie broken on the label and not a disagreement about which is better.</p>
 <td><p><code class="docutils literal notranslate"><span class="pre">M2&gt;N16&gt;K16</span></code></p></td>
 <td><p>592</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">vru</span></code> 17 408</p></td>
-<td><p>28 392</p></td>
+<td><p>27 562</p></td>
 <td><p>bit-exact</p></td>
 </tr>
 </tbody>
@@ -608,8 +695,13 @@ is a tie broken on the label and not a disagreement about which is better.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p><strong>These are estimates and one of them is structurally blind.</strong>
-<code class="docutils literal notranslate"><span class="pre">act.cycles.estimate</span></code> is <code class="docutils literal notranslate"><span class="pre">173.2</span> <span class="pre">+</span> <span class="pre">1.621</span> <span class="pre">x</span> <span class="pre">critical</span> <span class="pre">work</span></code>, fitted to the
-five published <code class="docutils literal notranslate"><span class="pre">MAXDIM=16</span></code> cosim points, and its per-unit work counts come
+<code class="docutils literal notranslate"><span class="pre">act.cycles.estimate</span></code> is <code class="docutils literal notranslate"><span class="pre">179.0</span> <span class="pre">+</span> <span class="pre">1.573</span> <span class="pre">x</span> <span class="pre">critical</span> <span class="pre">work</span></code>, refitted on
+2026-09-25 to the five published <code class="docutils literal notranslate"><span class="pre">MAXDIM=16</span></code> cosim points, which
+<code class="docutils literal notranslate"><span class="pre">act/cycles.py</span></code> now derives from <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code> rather than holding as a
+literal. Every estimate in the table above moved with it, and the
+<strong>refit made the fit worse</strong> (worst residual 15.8 to 18.2 cycles on the five
+points, because <code class="docutils literal notranslate"><span class="pre">TPU_QD=16</span></code> moved the small shapes up and the large ones
+down). Its per-unit work counts come
 from the header <code class="docutils literal notranslate"><span class="pre">assemble</span></code> writes — where <code class="docutils literal notranslate"><span class="pre">dma_ld</span></code>’s entry is the
 number of instruction <em>rows</em>, not the number of burst <em>iterations</em>. So the
 estimate cannot see the DMA burst at all. At <code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code> the burst is a
@@ -638,25 +730,25 @@ estimate, for scale.</p>
 <tbody>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_tiny</span></code></p></td>
 <td><p>584 + 566</p></td>
-<td><p>813</p></td>
+<td><p>811</p></td>
 <td><p><strong>1 150</strong></p></td>
 <td><p>29 % low</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_deep</span></code></p></td>
 <td><p>584 + 584 + 542 + 407</p></td>
-<td><p>1 422</p></td>
+<td><p>1 424</p></td>
 <td><p><strong>2 117</strong></p></td>
 <td><p>33 % low</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_small</span></code></p></td>
 <td><p>1 636 + 1 145</p></td>
-<td><p>1 903</p></td>
+<td><p>1 868</p></td>
 <td><p><strong>2 781</strong></p></td>
-<td><p>32 % low</p></td>
+<td><p>33 % low</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mlp_wide</span></code></p></td>
 <td><p>–</p></td>
-<td><p>58 443</p></td>
+<td><p>56 734</p></td>
 <td><p><em>no completion</em></p></td>
 <td><p>–</p></td>
 </tr>
@@ -853,8 +945,23 @@ against <code class="docutils literal notranslate"><span class="pre">isa_ref</sp
 </tr>
 </tbody>
 </table>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>Everything in this section is a MAXDIM=64 measurement, and the split does
+not survive MAXDIM=16.</strong> Asked the same question at <code class="docutils literal notranslate"><span class="pre">T=4</span> <span class="pre">MAXDIM=16</span>
+<span class="pre">QD=16</span></code> — both models, every layer, one <code class="docutils literal notranslate"><span class="pre">csynth</span></code> per burst width — the
+widening is worth <strong>zero cycles</strong>: 861 -&gt; 861 and 1 530 -&gt; 1 530, layer by
+layer, to the cycle. At MAXDIM=16 a DRAM row is 4 packed words instead of
+16, the weight burst is four times shorter, and the per-layer prologue
+covers all of it.</p>
+<p>The relationship also <strong>inverts</strong>: at MAXDIM=16 the GEMM shapes <em>do</em> see the
+widening (CHIA run 1 measured <code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">/</span> <span class="pre">0</span> <span class="pre">/</span> <span class="pre">-42</span> <span class="pre">/</span> <span class="pre">-59</span> <span class="pre">/</span> <span class="pre">-59</span></code> on that
+configuration) and the models do not. So “models are more burst-sensitive
+than shapes” is a statement about MAXDIM=64, not about models.
+<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/model-term-maxdim-20260924.rst</span></code>.</p>
+</div>
 <p><strong>The answer is that the widening is worth four to eight times more on a model
-than the shape table says.</strong> 25 to 34 per cent of a model’s cycles against 4.3
+than the shape table says, at MAXDIM=64.</strong> 25 to 34 per cent of a model’s cycles against 4.3
 to 7.0 per cent of a big GEMM’s. Read only as a GEMM table, <code class="docutils literal notranslate"><span class="pre">TPU_DMA_WIDEN</span></code>
 is a few per cent that shrinks as the shape grows; read on a model, it is a
 quarter to a third of the whole runtime and it does not shrink, because a
@@ -873,13 +980,18 @@ enough, and at four activation rows the rest of the prologue overlaps about a
 hundred cycles of it. So <code class="docutils literal notranslate"><span class="pre">workloads/burst.py</span></code> is a usable screen for which
 layers the widening will help and <strong>not</strong> a substitute for measuring how much.</p>
 <p><strong>The static estimate is accidentally calibrated for a machine we do not
-ship.</strong> <code class="docutils literal notranslate"><span class="pre">act.cycles.estimate</span></code> is 26 to 36 per cent <em>low</em> against the shipped
-<code class="docutils literal notranslate"><span class="pre">DMA_WORDS=1</span></code> build and within 8 per cent of the <em>widened</em> one — it fits
-the widened machine better than the real one. That is not a coincidence: the
-fit was taken at <code class="docutils literal notranslate"><span class="pre">MAXDIM=16</span></code>, where <code class="docutils literal notranslate"><span class="pre">WPR</span></code> is 4 instead of 16 and the burst
-is four times shorter, so the constant absorbed a burst term that no longer
-matches. An estimate carries its calibration regime with it, and this one’s
-regime is not the shipped build.</p>
+ship.</strong> Per model, <code class="docutils literal notranslate"><span class="pre">act.cycles.estimate</span></code> is 29 / 33 / 33 per cent <em>low</em>
+against the shipped <code class="docutils literal notranslate"><span class="pre">DMA_WORDS=1</span></code> build (811, 1 424 and 1 868 against 1 150,
+2 117 and 2 781) and 6.0 per cent low, 7.2 per cent low and 2.6 per cent <em>high</em>
+against the <em>widened</em> one (863, 1 534, 1 821) — it fits the widened machine
+better than the real one. Per layer the shortfall spreads from 27.5 per cent
+(<code class="docutils literal notranslate"><span class="pre">mlp_small_l0</span></code>) to 40.4 per cent (<code class="docutils literal notranslate"><span class="pre">mlp_small_l1</span></code>). That is not a
+coincidence: the fit was taken at <code class="docutils literal notranslate"><span class="pre">MAXDIM=16</span></code>, where <code class="docutils literal notranslate"><span class="pre">WPR</span></code> is 4 instead of
+16 and the burst is four times shorter, so the constant absorbed a burst term
+that no longer matches. An estimate carries its calibration regime with it, and
+this one’s regime is not the shipped build. Refitting it on 2026-09-25 did not
+change that and was not expected to: a refit within the <code class="docutils literal notranslate"><span class="pre">MAXDIM=16</span></code> regime
+cannot fix a regime error (the per-model shortfall moved by under one point).</p>
 </section>
 <section id="the-64x64x64-point-is-missing-and-why">
 <h3>The 64x64x64 point is missing, and why<a class="headerlink" href="#the-64x64x64-point-is-missing-and-why" title="Link to this heading"><span>¶</span></a></h3>
@@ -960,10 +1072,15 @@ does not finish, raise <code class="docutils literal notranslate"><span class="p
 </section>
 <section id="running-it">
 <h2>Running it<a class="headerlink" href="#running-it" title="Link to this heading"><span>¶</span></a></h2>
+<p><strong>One model, every stage printed, run on the design:</strong> <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">mlp</span></code>. The
+walk-through, and two changes to the machine put through it, are
+<a class="reference internal" href="tinytpu_tutorial.html"><span class="doc">Tutorial: A PyTorch MLP on TinyTPU, Then Change It</span></a>.</p>
+<p>The suite’s report, every model:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>examples/tinytpu
 
 python<span class="w"> </span>workloads/run.py<span class="w">                      </span><span class="c1"># every model, static, ~1 min</span>
 python<span class="w"> </span>workloads/run.py<span class="w"> </span>--emit<span class="w">               </span><span class="c1"># and write workloads/specs/</span>
+python<span class="w"> </span>workloads/scope.py<span class="w"> </span>--check<span class="w">            </span><span class="c1"># the scope map, ~50 s</span>
 python<span class="w"> </span>workloads/run.py<span class="w"> </span>--simulator<span class="w">          </span><span class="c1"># also check the built design</span>
 python<span class="w"> </span>workloads/run.py<span class="w"> </span>--burst<span class="w">              </span><span class="c1"># what the widening should be worth</span>
 
@@ -1061,6 +1178,7 @@ exercises them where they were never fitted.</p>
 <li><a class="reference internal" href="#the-extractor">The extractor</a></li>
 <li><a class="reference internal" href="#verification">Verification</a><ul>
 <li><a class="reference internal" href="#what-is-verified-and-what-is-only-executed">What is verified, and what is only executed</a></li>
+<li><a class="reference internal" href="#the-boundary-as-a-map-rather-than-a-list">The boundary, as a map rather than a list</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#the-numbers">The numbers</a><ul>

@@ -123,6 +123,28 @@ callers, so it is simultaneously unrewardable by the objective and undetectably
 broken by the gates. This one structural fact explains both halves of a failed
 run.
 
+**Information can be maximally available and still not be used.** In a paid
+run, one candidate's first iteration rewrote a loop that a comment **three lines
+above it** describes precisely: it names the change, names that it was measured,
+and names why it is worth nothing — *the bursts are already hidden behind the
+sequencer's prefetch*. The agent read the file, **kept the comment** (a
+documentation guard requires it), implemented the change anyway, and scored
+exactly the unchanged cycle count the comment predicted.
+
+This is worth more than the withheld-information version of the same story
+would have been, because there is nothing to argue about: the information was
+in-band, adjacent, specific, and retained in the diff. It is a finding about
+how a model uses what it is given, not about what a harness supplies.
+
+One qualification, offered by its own measurer as a hypothesis rather than a
+result. The objective asks for fewer cycles, and **a decomposed design offers
+many small local rewrites that look like optimisations**. "Merge two loops into
+one" is locally plausible and globally null, and the reason it is null — a
+whole-pipeline fact about prefetch — is precisely what a unit-scoped edit is
+badly placed to weigh. So the decomposition that restored the loop's reach may
+also have made locally-plausible nulls easier to propose. n=1, one worker, one
+iteration; it wants a designed test, not a citation.
+
 **Selection must compare against the incumbent, not the baseline.** Our keep
 rule accepted any candidate whose verdict was in the keep set while scoring
 every candidate against the original design, so all accepted candidates scored

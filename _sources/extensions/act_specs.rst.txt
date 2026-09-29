@@ -323,15 +323,22 @@ else is fixed cost:
 
 .. code-block:: text
 
-   cycles = 173.2 + 1.621 * max(dma_ld, spm, vru, accu, dma_st)
+   cycles = 179.0 + 1.573 * max(dma_ld, spm, vru, accu, dma_st)
 
 Both counts come straight off the header ``assemble`` writes, so the gate
 needs no new model of the machine -- it reads the number the assembler already
 had to compute. The two constants are least squares over the five published
-cosim points, which are Vitis measurements this fork attributes to
-``dev/records/tinytpu/logs/cosim_isa_landed_sweep.log`` at ``e24e433b``. The gate passes a
-submission whose estimate is within 10% of the reference submission's, and
-``--cosim`` measures only what passes.
+cosim points, which ``cycles.py`` now **derives** from ``reproduce.sh``'s
+``EXPECTED`` rather than holding as a literal: it held one, and the literal went
+stale by a whole row. ``refit()`` recovers the constants from those points and
+this module's ``__main__`` fails if the stored pair disagrees. Refitted
+2026-09-25 from ``(173.2, 1.621)``, and **the refit made the fit worse** --
+worst residual 15.8 to 18.2 cycles over the five points, because ``TPU_QD=16``
+moved the three small shapes up and the two large ones down and one slope cannot
+hold both. At the smallest shape the residual is now larger than the 10 % gate
+below, so ``--cosim`` is the answer there rather than the estimate. The gate
+passes a submission whose estimate is within 10% of the reference submission's,
+and ``--cosim`` measures only what passes.
 
 The real measurement is ``act/measure.py``: one ``csynth_design``, then one
 ``cosim_design`` per submission on that same RTL, with a testbench that

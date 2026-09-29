@@ -171,10 +171,12 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/asic_manifest.html">The ASIC manifest</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_tutorial.html">Tutorial: A PyTorch MLP on TinyTPU, Then Change It</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
@@ -799,7 +801,7 @@ instruction stream.</p>
 <h3>MAXDIM -&gt; resources<a class="headerlink" href="#maxdim-resources" title="Link to this heading"><span>¶</span></a></h3>
 <p>One <code class="docutils literal notranslate"><span class="pre">csynth_design</span></code> per configuration, <code class="docutils literal notranslate"><span class="pre">xcu280-fsvh2892-2L-e</span></code>, 3.33 ns
 target (<code class="docutils literal notranslate"><span class="pre">csynth_sweep.py</span></code>; reports kept under
-<code class="docutils literal notranslate"><span class="pre">examples/tinytpu/csynth_reports/</span></code>).</p>
+<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/csynth_reports/</span></code>).</p>
 <table class="docutils align-default">
 <colgroup>
 <col style="width: 8.9%" />
@@ -1053,7 +1055,7 @@ Both sets now pass through <code class="docutils literal notranslate"><span clas
 <li><p>The set a run sweeps is <code class="docutils literal notranslate"><span class="pre">bench_isa.SWEEP</span></code>, <strong>not</strong> <code class="docutils literal notranslate"><span class="pre">bench_isa.SHAPES</span></code>.
 <code class="docutils literal notranslate"><span class="pre">SHAPES</span></code> is re-exported from <code class="docutils literal notranslate"><span class="pre">shapes.py</span></code> (the one definition) and is
 read <em>positionally</em> by <code class="docutils literal notranslate"><span class="pre">act_compile</span></code>, <code class="docutils literal notranslate"><span class="pre">kpn_model</span></code>, <code class="docutils literal notranslate"><span class="pre">isa_dsl</span></code>,
-<code class="docutils literal notranslate"><span class="pre">tests/act/test_tinytpu.py</span></code> and — through <code class="docutils literal notranslate"><span class="pre">accept.BASELINES</span></code> against
+<code class="docutils literal notranslate"><span class="pre">tests/act/test_tinytpu.py</span></code> and — through <code class="docutils literal notranslate"><span class="pre">control.RECORDED</span></code> against
 <code class="docutils literal notranslate"><span class="pre">shapes.NAMES</span></code> — the CHIA harness. <a class="footnote-reference brackets" href="#sweepknobs" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a></p></li>
 </ul>
 </section>
@@ -2390,7 +2392,8 @@ python<span class="w"> </span>csynth_sweep.py<span class="w"> </span>--reparse<s
 python<span class="w"> </span>latency_grid.py<span class="w">                    </span><span class="c1"># shipped, 0/16/64/88/100</span>
 python<span class="w"> </span>latency_grid.py<span class="w"> </span>--widen<span class="w">            </span><span class="c1"># the burst candidate</span>
 
-<span class="c1"># RTL for the ASIC synthesis handoff, into rtl_handoff/&lt;config&gt;/</span>
+<span class="c1"># RTL for the ASIC synthesis handoff,</span>
+<span class="c1"># into dev/records/tinytpu/rtl_handoff/&lt;config&gt;/</span>
 python<span class="w"> </span>export_rtl.py
 </pre></div>
 </div>
@@ -2599,8 +2602,8 @@ which is the exposure that moved the published MAXDIM=16 row by one cycle
 depth became 16 in <code class="docutils literal notranslate"><span class="pre">63ee6ec7</span></code>, and the same sweep on <code class="docutils literal notranslate"><span class="pre">main</span></code> 92f0618f
 returns <strong>286 / 425 / 490</strong> at 8x8x8, 16x16x8 and 16x16x16 and <strong>6916</strong> at
 64x64x64 — <code class="docutils literal notranslate"><span class="pre">+1</span> <span class="pre">/</span> <span class="pre">+1</span> <span class="pre">/</span> <span class="pre">-3</span> <span class="pre">/</span> <span class="pre">-167</span></code>. The re-export in
-<code class="docutils literal notranslate"><span class="pre">rtl_handoff/T8_MAXDIM64/</span></code> carries that row and the invocation it was
-measured with. The <em>claim</em> this paragraph makes survives intact: the
+<code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/rtl_handoff/T8_MAXDIM64/</span></code> carries that row and the
+invocation it was measured with. The <em>claim</em> this paragraph makes survives intact: the
 burst-<code class="docutils literal notranslate"><span class="pre">DMA_WORDS</span></code> refactor left the T=8 column alone, which is why the
 whole of the shift above is attributable to <code class="docutils literal notranslate"><span class="pre">QD</span></code>, and the sign pattern is
 the one <code class="docutils literal notranslate"><span class="pre">63ee6ec7</span></code> measured at T=4 — small shapes pay deeper-FIFO

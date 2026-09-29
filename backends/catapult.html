@@ -170,10 +170,12 @@
 <li class="toctree-l1"><a class="reference internal" href="xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="simulator.html">Multi-Threaded Simulator (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="asic_manifest.html">The ASIC manifest</a></li>
 <li class="toctree-l1"><a class="reference internal" href="aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_tutorial.html">Tutorial: A PyTorch MLP on TinyTPU, Then Change It</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
@@ -317,6 +319,86 @@ Runs Catapult HLS synthesis to generate RTL. This mode invokes the Catapult tool
 <span class="n">s</span><span class="o">.</span><span class="n">unroll</span><span class="p">(</span><span class="s2">"k"</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>     <span class="c1"># Generates: #pragma hls_unroll 4</span>
 </pre></div>
 </div>
+<p><strong>Bit operations are AC, not AP</strong></p>
+<p>The Catapult emitter inherits most of its C++ codegen from the Vitis emitter,
+and bit indexing and slicing are where the two languages genuinely differ.
+Vitis writes a range on an <code class="docutils literal notranslate"><span class="pre">ap_int</span></code>; Catapult has no <code class="docutils literal notranslate"><span class="pre">ap_int</span></code> at all, so
+the same text is a hard front-end error (CRD-20, “identifier ap_int is
+undefined”). The AC spelling is a member call:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Vitis (NOT accepted by Catapult)</span>
+<span class="n">ap_int</span><span class="o">&lt;</span><span class="mi">64</span><span class="o">&gt;</span><span class="w"> </span><span class="n">v16_tmp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v15</span><span class="p">;</span><span class="w">   </span><span class="n">v16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v16_tmp</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+
+<span class="c1">// Catapult</span>
+<span class="n">ac_int</span><span class="o">&lt;</span><span class="mi">64</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="o">&gt;</span><span class="w"> </span><span class="n">_bs_v16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v15</span><span class="p">;</span><span class="w">   </span><span class="n">v16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_bs_v16</span><span class="p">.</span><span class="n">slc</span><span class="o">&lt;</span><span class="mi">16</span><span class="o">&gt;</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">slc&lt;W&gt;(lo)</span></code> reads <code class="docutils literal notranslate"><span class="pre">W</span></code> bits starting at <code class="docutils literal notranslate"><span class="pre">lo</span></code> and <code class="docutils literal notranslate"><span class="pre">set_slc(lo,</span> <span class="pre">v)</span></code>
+writes <code class="docutils literal notranslate"><span class="pre">v</span></code>’s width, so <code class="docutils literal notranslate"><span class="pre">W</span></code> is <code class="docutils literal notranslate"><span class="pre">hi</span> <span class="pre">-</span> <span class="pre">lo</span> <span class="pre">+</span> <span class="pre">1</span></code>. The temporary exists because
+the value being sliced is often a plain C integer (<code class="docutils literal notranslate"><span class="pre">uint64_t</span></code>), which has no
+<code class="docutils literal notranslate"><span class="pre">.slc</span></code>; its <strong>signedness is taken from the source type</strong>, because
+<code class="docutils literal notranslate"><span class="pre">slc&lt;W&gt;()</span></code> returns <code class="docutils literal notranslate"><span class="pre">ac_int&lt;W,</span> <span class="pre">S&gt;</span></code> with <code class="docutils literal notranslate"><span class="pre">S</span></code> inherited from the object it
+is called on – a signed temporary over an unsigned source sign-extends a slice
+that is later widened, which compiles and returns the wrong number.</p>
+<p>A second difference: <code class="docutils literal notranslate"><span class="pre">ac_int</span></code> defines no implicit conversion to a C integer
+beyond 64 bits, so an index computed wide and then narrowed needs the
+conversion spelled out (CRD-413):</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">ac_int</span><span class="o">&lt;</span><span class="mi">65</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="o">&gt;</span><span class="w"> </span><span class="n">v35</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v34</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">8</span><span class="p">;</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">v36</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v35</span><span class="p">.</span><span class="n">to_int64</span><span class="p">();</span><span class="w">          </span><span class="c1">// NOT `int v36 = v35;`</span>
+</pre></div>
+</div>
+</section>
+<section id="the-emit-gate-every-project-is-compiled-before-it-is-handed-off">
+<span id="catapult-emit-gate"></span><h2>The emit gate: every project is compiled before it is handed off<a class="headerlink" href="#the-emit-gate-every-project-is-compiled-before-it-is-handed-off" title="Link to this heading"><span>¶</span></a></h2>
+<p>Both of the constructs above were emitted for months and were first seen on a
+licence host, where they cost a TinyTPU power run: <code class="docutils literal notranslate"><span class="pre">go</span> <span class="pre">analyze</span></code> stopped after
+7 s with 100 errors, no schedule, no simulation and no power. Neither needs a
+licence to find. <code class="docutils literal notranslate"><span class="pre">hlslibs</span></code> publishes <code class="docutils literal notranslate"><span class="pre">ac_types</span></code> under Apache-2.0, and plain
+<code class="docutils literal notranslate"><span class="pre">g++</span></code> against it rejects both.</p>
+<p>So <code class="docutils literal notranslate"><span class="pre">s.build(target=&quot;catapult&quot;,</span> <span class="pre">...)</span></code> now compiles the <code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code> it just
+wrote, in the same call that writes it – not in whichever script does the
+handoff, because an emitter that can emit uncompilable code should fail where
+it emits. The check has two stages:</p>
+<ol class="arabic simple">
+<li><p>a <strong>text</strong> stage that rejects Vitis-only constructs by name (<code class="docutils literal notranslate"><span class="pre">ap_int</span></code>,
+<code class="docutils literal notranslate"><span class="pre">ap_uint</span></code>, <code class="docutils literal notranslate"><span class="pre">ap_fixed</span></code>, <code class="docutils literal notranslate"><span class="pre">hls::stream</span></code>) and needs nothing installed;</p></li>
+<li><p>a <strong>compile</strong> stage, <code class="docutils literal notranslate"><span class="pre">g++</span> <span class="pre">-std=c++11</span> <span class="pre">-fsyntax-only</span></code> against <code class="docutils literal notranslate"><span class="pre">ac_types</span></code>,
+which catches everything a regex cannot – notably the &gt;64-bit narrowing,
+which depends on widths.</p></li>
+</ol>
+<p><code class="docutils literal notranslate"><span class="pre">ac_types</span></code> is looked for in this order, first hit wins:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ALLO_AC_TYPES_INCLUDE            # explicit; the directory holding ac_int.h
+$MGC_HOME/shared/include          # Catapult's own copy, on a licence host
+~/.cache/allo/ac_types/include    # an hlslibs checkout, cached per host
+$ALLO_AC_TYPES_HOME/include
+</pre></div>
+</div>
+<p>On a host with none of them the compile stage <strong>skips loudly</strong> – a banner on
+stderr saying the kernel was not compiled – because a silent skip is exactly
+how this class of defect survived. To get it:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>--depth<span class="w"> </span><span class="m">1</span><span class="w"> </span>https://github.com/hlslibs/ac_types<span class="w"> </span>~/.cache/allo/ac_types
+</pre></div>
+</div>
+<p>Two environment variables control the gate. <code class="docutils literal notranslate"><span class="pre">ALLO_REQUIRE_AC_TYPES=1</span></code> turns
+the loud skip into a failure, which is what CI and any script that produces a
+handoff should set. <code class="docutils literal notranslate"><span class="pre">ALLO_SKIP_CATAPULT_GATE=1</span></code> disables the gate entirely
+and says so on stderr.</p>
+<p>Switching it on immediately found a third defect nobody had reported: an
+<code class="docutils literal notranslate"><span class="pre">f16</span></code> operand is emitted as a bare <code class="docutils literal notranslate"><span class="pre">half</span></code>, and no <code class="docutils literal notranslate"><span class="pre">ac_types</span></code> header
+defines that name (Catapult’s own float support is <code class="docutils literal notranslate"><span class="pre">ac_ieee_float&lt;binary16&gt;</span></code>
+/ <code class="docutils literal notranslate"><span class="pre">ac::bfloat16</span></code> in <code class="docutils literal notranslate"><span class="pre">ac_std_float.h</span></code>). <code class="docutils literal notranslate"><span class="pre">f32</span></code> is fine –
+<code class="docutils literal notranslate"><span class="pre">getCatapultTypeName</span></code> already maps it to <code class="docutils literal notranslate"><span class="pre">ac_ieee_float&lt;binary32&gt;</span></code> – so
+this is one line in that function, left alone here only because another change
+was in flight in it. <code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_bf16_dataflow.py</span></code> records the
+current behaviour: f16 <strong>emits</strong> a <code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code> and the gate then rejects it,
+while bf16 still aborts inside <code class="docutils literal notranslate"><span class="pre">getCatapultTypeName</span></code> before any
+<code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code> exists.</p>
+<p>What the gate does <strong>not</strong> cover: it is Catapult’s <em>front end</em>, not Catapult.
+It says the C++ parses and type-checks; it says nothing about whether the
+design schedules, whether a loop meets its II, or whether a directive names a
+loop that exists. Those still fail on the licence host. It is also
+<code class="docutils literal notranslate"><span class="pre">catapult</span></code> only: <code class="docutils literal notranslate"><span class="pre">target=&quot;systemc&quot;</span></code> emits a <code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code> that needs
+<code class="docutils literal notranslate"><span class="pre">matchlib_connections</span></code> and a SystemC library as well as <code class="docutils literal notranslate"><span class="pre">ac_types</span></code>, and
+nothing gates it – that flow is still checked by hand.</p>
 </section>
 <section id="project-structure">
 <h2>Project Structure<a class="headerlink" href="#project-structure" title="Link to this heading"><span>¶</span></a></h2>
@@ -441,7 +523,7 @@ dataflow designs with it. Catapult is installed on one server the project uses,
 module<span class="w"> </span>load<span class="w"> </span>mentor-Catapult_synthesis_10.5a
 
 <span class="c1"># Option B: manual path, if the module is not installed</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">MGC_HOME</span><span class="o">=</span>/opt/siemens/catapult/2024.2
+<span class="nb">export</span><span class="w"> </span><span class="nv">MGC_HOME</span><span class="o">=</span>/opt/siemens/catapult/2024.2/Mgc_home<span class="w">   </span><span class="c1"># on zhang-21; the /Mgc_home component is part of the root</span>
 <span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="nv">$MGC_HOME</span>/bin:<span class="nv">$PATH</span>
 
 catapult<span class="w"> </span>-version
@@ -635,38 +717,227 @@ multiplexers) and <code class="docutils literal notranslate"><span class="pre">L
 </section>
 <section id="ppa-analysis">
 <h2>PPA Analysis<a class="headerlink" href="#ppa-analysis" title="Link to this heading"><span>¶</span></a></h2>
-<p>Besides <code class="docutils literal notranslate"><span class="pre">csim</span></code> and <code class="docutils literal notranslate"><span class="pre">csyn</span></code>, the Catapult target accepts <code class="docutils literal notranslate"><span class="pre">mode=&quot;ppa&quot;</span></code>. It runs the same
-synthesis flow as <code class="docutils literal notranslate"><span class="pre">csyn</span></code> and then extracts metrics from the reports:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">s</span> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">top</span><span class="p">)</span>
-<span class="c1"># s.partition(...), s.pipeline(...)</span>
-<span class="n">mod</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="s2">"catapult"</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">"ppa"</span><span class="p">,</span> <span class="n">project</span><span class="o">=</span><span class="s2">"my_ppa_project"</span><span class="p">)</span>
-<span class="n">stats</span> <span class="o">=</span> <span class="n">mod</span><span class="p">()</span>   <span class="c1"># runs synthesis, prints a metrics table, returns a dict</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">stats</span><span class="p">)</span>
+<p><code class="docutils literal notranslate"><span class="pre">mode=&quot;ppa&quot;</span></code> runs the <code class="docutils literal notranslate"><span class="pre">csyn</span></code> flow and then the two steps that produce power –
+<code class="docutils literal notranslate"><span class="pre">go</span> <span class="pre">switching</span></code> (simulate the C++ testbench against the pre-power RTL, convert the VCD to SAIF)
+and <code class="docutils literal notranslate"><span class="pre">flow</span> <span class="pre">run</span> <span class="pre">/PowerAnalysis/report_pre_pwropt_Verilog</span></code> (annotate that SAIF, write
+<code class="docutils literal notranslate"><span class="pre">power.rpt</span></code>) – and prints latency, area and <strong>measured</strong> power. It needs a C++ testbench that
+SCVerify can drive and an Xcelium install; with no testbench there is no activity and therefore no
+power, and the build fails at <code class="docutils literal notranslate"><span class="pre">build()</span></code> rather than reporting zeros.</p>
+<section id="quick-start">
+<h3>Quick start<a class="headerlink" href="#quick-start" title="Link to this heading"><span>¶</span></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">MGC_HOME</span><span class="o">=</span>/opt/siemens/catapult/2024.2/Mgc_home
+<span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="nv">$MGC_HOME</span>/bin:<span class="nv">$PATH</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">MGLS_LICENSE_FILE</span><span class="o">=</span><span class="m">1717</span>@en-license-05.coecis.cornell.edu<span class="w">   </span><span class="c1"># Catapult + PowerPro</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">CDS_LIC_FILE</span><span class="o">=</span>...<span class="w">                                          </span><span class="c1"># Xcelium, for the switching sim</span>
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">stats</span></code> contains <code class="docutils literal notranslate"><span class="pre">Latency</span> <span class="pre">(cycles)</span></code> (<code class="docutils literal notranslate"><span class="pre">Max</span> <span class="pre">Latency</span></code> from <code class="docutils literal notranslate"><span class="pre">cycle.rpt</span></code>), <code class="docutils literal notranslate"><span class="pre">Area</span></code>
-(<code class="docutils literal notranslate"><span class="pre">Total</span> <span class="pre">Area</span></code> from <code class="docutils literal notranslate"><span class="pre">area.rpt</span></code>, unit depends on the technology library) and <code class="docutils literal notranslate"><span class="pre">Power</span></code> (from
-<code class="docutils literal notranslate"><span class="pre">power.rpt</span></code> or <code class="docutils literal notranslate"><span class="pre">power_summary.rpt</span></code> if present; <code class="docutils literal notranslate"><span class="pre">N/A</span></code> otherwise), all read from
-<code class="docutils literal notranslate"><span class="pre">&lt;project&gt;/Catapult/&lt;top&gt;.v1/</span></code>. It also carries a <code class="docutils literal notranslate"><span class="pre">hierarchical</span></code> entry: a per-module area
-(and, where reported, power) breakdown parsed from <code class="docutils literal notranslate"><span class="pre">area.rpt</span></code>, so that per-PE and interconnect
-cost can be separated. That breakdown needs a hierarchical design; Catapult preserves the hierarchy
-in the generated RTL unless it is fully flattened.</p>
-<p>Technology library selection is by <code class="docutils literal notranslate"><span class="pre">configs={&quot;device&quot;:</span> <span class="pre">...}</span></code>: anything containing <code class="docutils literal notranslate"><span class="pre">45nm</span></code> or
-<code class="docutils literal notranslate"><span class="pre">nangate</span></code> selects <code class="docutils literal notranslate"><span class="pre">nangate-45nm_beh</span></code> (the default), anything containing <code class="docutils literal notranslate"><span class="pre">sky130</span></code> selects
-<code class="docutils literal notranslate"><span class="pre">sky130</span></code>, and any other string is passed to <code class="docutils literal notranslate"><span class="pre">solution</span> <span class="pre">library</span> <span class="pre">add</span></code> unchanged.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The mode, the parsed report fields and the library selection above were checked against
-<code class="docutils literal notranslate"><span class="pre">allo/backend/catapult.py</span></code> and <code class="docutils literal notranslate"><span class="pre">allo/backend/hls.py</span></code> in this tree; no <code class="docutils literal notranslate"><span class="pre">ppa</span></code> run is recorded
-here. Note also that <code class="docutils literal notranslate"><span class="pre">codegen_tcl</span></code> defaults <code class="docutils literal notranslate"><span class="pre">frequency</span></code> to <strong>100</strong> MHz when it is not given,
-not the 300 MHz stated under <a class="reference internal" href="#configuration-options">Configuration Options</a>.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p><strong>Expect to pass</strong> <code class="docutils literal notranslate"><span class="pre">configs={&quot;ncsim_root&quot;:</span> <span class="pre">...}</span></code>. The switching simulation runs in Xcelium,
+and the backend looks for it in <code class="docutils literal notranslate"><span class="pre">configs[&quot;ncsim_root&quot;]</span></code>, then <code class="docutils literal notranslate"><span class="pre">$NC_ROOT</span></code> / <code class="docutils literal notranslate"><span class="pre">$XCELIUM_HOME</span></code>
+/ <code class="docutils literal notranslate"><span class="pre">$CDS_INST_DIR</span></code>, then <code class="docutils literal notranslate"><span class="pre">xrun</span></code> on <code class="docutils literal notranslate"><span class="pre">PATH</span></code>. On zhang-21 <strong>none of those are set</strong>, so the
+explicit config is what works there; on a host configured like it, a run without one fails
+immediately at <code class="docutils literal notranslate"><span class="pre">build()</span></code>. Nothing is guessed and no path is compiled in: rather than emit a
+tcl with an empty <code class="docutils literal notranslate"><span class="pre">/NCSim/NC_ROOT</span></code> – which would run no simulation and report zero power –
+the build raises.</p>
 </div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">s</span> <span class="o">=</span> <span class="n">allo</span><span class="o">.</span><span class="n">customize</span><span class="p">(</span><span class="n">top</span><span class="p">)</span>
+<span class="n">mod</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">build</span><span class="p">(</span>
+    <span class="n">target</span><span class="o">=</span><span class="s2">"catapult"</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">"ppa"</span><span class="p">,</span>
+    <span class="n">project</span><span class="o">=</span><span class="s2">"my_ppa_project"</span><span class="p">,</span>
+    <span class="n">configs</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">"testbench"</span><span class="p">:</span> <span class="s2">"tb.cpp"</span><span class="p">,</span>       <span class="c1"># REQUIRED: CCS_MAIN + CCS_DESIGN(top)(...)</span>
+        <span class="s2">"ncsim_root"</span><span class="p">:</span> <span class="s2">"/opt/cadence/XCELIUM2403"</span><span class="p">,</span>   <span class="c1"># Xcelium root; zhang-21's, as an example</span>
+        <span class="s2">"clock_period"</span><span class="p">:</span> <span class="mf">5.0</span><span class="p">,</span>         <span class="c1"># ns</span>
+        <span class="s2">"library"</span><span class="p">:</span> <span class="s2">"nangate-45nm_beh"</span><span class="p">,</span>
+    <span class="p">},</span>
+<span class="p">)</span>
+<span class="n">stats</span> <span class="o">=</span> <span class="n">mod</span><span class="p">()</span>   <span class="c1"># runs synthesis + switching + power, prints a table, returns a dict</span>
+</pre></div>
+</div>
+<p>56 s for the 16-tap MAC below on zhang-21. The table it prints carries latency, area, total /
+dynamic / static power, the SAIF annotation coverage, a per-instance power breakdown, and the
+caveat below.</p>
+</section>
+<section id="the-testbench">
+<h3>The testbench<a class="headerlink" href="#the-testbench" title="Link to this heading"><span>¶</span></a></h3>
+<p><strong>A design with no C++ testbench gets no power number.</strong> <code class="docutils literal notranslate"><span class="pre">go</span> <span class="pre">switching</span></code> measures activity by
+simulating; with nothing driving the design the report is zeros or a default-toggle guess – a
+power figure that is wrong in the safe-looking direction. <code class="docutils literal notranslate"><span class="pre">mode=&quot;ppa&quot;</span></code> therefore refuses to run
+without <code class="docutils literal notranslate"><span class="pre">configs[&quot;testbench&quot;]</span></code>.</p>
+<p>The file is ordinary Catapult SCVerify C++: <code class="docutils literal notranslate"><span class="pre">CCS_MAIN(...)</span></code> calling <code class="docutils literal notranslate"><span class="pre">CCS_DESIGN(&lt;top&gt;)(...)</span></code>
+over representative stimulus. The worked example is
+<code class="docutils literal notranslate"><span class="pre">dev/records/catapult_handoff/zhang21_power_2026-09-24/mac_tb.cpp</span></code> (200 transactions):</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;ac_int.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;mc_scverify.h&gt;</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">mac</span><span class="p">(</span><span class="n">ac_int</span><span class="o">&lt;</span><span class="mi">8</span><span class="p">,</span><span class="nb">true</span><span class="o">&gt;</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="mi">16</span><span class="p">],</span><span class="w"> </span><span class="n">ac_int</span><span class="o">&lt;</span><span class="mi">8</span><span class="p">,</span><span class="nb">true</span><span class="o">&gt;</span><span class="w"> </span><span class="n">b</span><span class="p">[</span><span class="mi">16</span><span class="p">],</span><span class="w"> </span><span class="n">ac_int</span><span class="o">&lt;</span><span class="mi">24</span><span class="p">,</span><span class="nb">true</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="n">out</span><span class="p">);</span>
+<span class="n">CCS_MAIN</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">**</span><span class="n">argv</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">ac_int</span><span class="o">&lt;</span><span class="mi">8</span><span class="p">,</span><span class="nb">true</span><span class="o">&gt;</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="mi">16</span><span class="p">],</span><span class="w"> </span><span class="n">b</span><span class="p">[</span><span class="mi">16</span><span class="p">];</span><span class="w"> </span><span class="n">ac_int</span><span class="o">&lt;</span><span class="mi">24</span><span class="p">,</span><span class="nb">true</span><span class="o">&gt;</span><span class="w"> </span><span class="n">o</span><span class="p">;</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">errs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">200</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* stimulus */</span><span class="w"> </span><span class="n">CCS_DESIGN</span><span class="p">(</span><span class="n">mac</span><span class="p">)(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">,</span><span class="w"> </span><span class="n">o</span><span class="p">);</span><span class="w"> </span><span class="p">}</span>
+<span class="w">  </span><span class="n">CCS_RETURN</span><span class="p">(</span><span class="n">errs</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The SystemC flow’s emitted <code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code> does <strong>not</strong> count: its testbench is an <code class="docutils literal notranslate"><span class="pre">sc_main</span></code>,
+which SCVerify does not drive. A SystemC design needs a separate SCVerify testbench for ppa; use
+<code class="docutils literal notranslate"><span class="pre">mode=&quot;csyn&quot;</span></code> for area and latency only.</p>
+<p><strong>A</strong> <code class="docutils literal notranslate"><span class="pre">&#64;df.region()</span></code> <strong>is drivable the same way.</strong> A region reaches this backend as a <em>void</em>
+function whose parameters are the region’s arrays, marked <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">hls_design</span> <span class="pre">top</span></code> with a
+<code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">hls_design</span> <span class="pre">dataflow</span></code> body – the same shape SCVerify wrapped for <code class="docutils literal notranslate"><span class="pre">mac16</span></code>, only wider.
+So the testbench declares the top itself, with <strong>C++ linkage</strong> (the Catapult emitter writes no
+<code class="docutils literal notranslate"><span class="pre">extern</span> <span class="pre">&quot;C&quot;</span></code>, unlike the Vitis emitter, whose testbenches do declare the top <code class="docutils literal notranslate"><span class="pre">extern</span> <span class="pre">&quot;C&quot;</span></code>),
+prefills its output array, calls <code class="docutils literal notranslate"><span class="pre">CCS_DESIGN(&lt;region&gt;)</span></code> and checks the result. Neither
+<code class="docutils literal notranslate"><span class="pre">host.cpp</span></code> nor <code class="docutils literal notranslate"><span class="pre">kernel.h</span></code> is involved in <code class="docutils literal notranslate"><span class="pre">mode=&quot;ppa&quot;</span></code>, so the csim-only defect noted under
+<a class="reference internal" href="#limits-and-known-failures">Limits and known failures</a> is not on this path. The worked example is
+<code class="docutils literal notranslate"><span class="pre">dev/records/catapult_handoff/ppa_tinytpu/</span></code>, generated by
+<code class="docutils literal notranslate"><span class="pre">examples/tinytpu/ppa_catapult.py</span></code>.</p>
+<p>Two things that generator learned, both worth copying:</p>
+<ul class="simple">
+<li><p><strong>Do not write</strong> <code class="docutils literal notranslate"><span class="pre">static</span> <span class="pre">alignas(64)</span> <span class="pre">T</span> <span class="pre">x[N]</span></code>. <code class="docutils literal notranslate"><span class="pre">cosim.py</span></code>’s testbench generator does, to keep
+the <code class="docutils literal notranslate"><span class="pre">align_value(64)</span></code> promise the <em>Vitis</em> <code class="docutils literal notranslate"><span class="pre">m_axi</span></code> path makes; that promise has no Catapult
+counterpart, and the form is ill-formed C++ (a standard attribute in the middle of the
+decl-specifiers) which g++ rejects under <code class="docutils literal notranslate"><span class="pre">-std=c++11</span></code> – the standard the emitted tcl sets.
+Vitis only accepts it because it compiles testbenches with <code class="docutils literal notranslate"><span class="pre">-std=gnu++0x</span></code>.</p></li>
+<li><p><strong>Compile the testbench before handing it over</strong>, against two-line stand-ins for <code class="docutils literal notranslate"><span class="pre">ac_int.h</span></code>
+and <code class="docutils literal notranslate"><span class="pre">mc_scverify.h</span></code> (<code class="docutils literal notranslate"><span class="pre">CCS_MAIN</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">main</span></code>, <code class="docutils literal notranslate"><span class="pre">CCS_DESIGN(x)</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">x</span></code>,
+<code class="docutils literal notranslate"><span class="pre">CCS_RETURN(x)</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">return</span> <span class="pre">(x)</span></code>) and a stand-in design that replays a reference dump. That
+costs nothing on a host with no Catapult and turns “syntax error after a licence checkout”
+into a local failure. <code class="docutils literal notranslate"><span class="pre">ppa_catapult.py</span></code> does this on every regeneration, and also runs the
+doctored cases that prove its <code class="docutils literal notranslate"><span class="pre">errors=</span></code> counter can go nonzero.</p></li>
+</ul>
+</section>
+<section id="reference">
+<h3>Reference<a class="headerlink" href="#reference" title="Link to this heading"><span>¶</span></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Key</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">configs[&quot;testbench&quot;]</span></code></p></td>
+<td><p><strong>Required.</strong> Path to the SCVerify C++ testbench. Copied next to <code class="docutils literal notranslate"><span class="pre">kernel.cpp</span></code> and added
+with <code class="docutils literal notranslate"><span class="pre">-exclude</span> <span class="pre">true</span></code> (compiled for verification, never synthesized).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">configs[&quot;ncsim_root&quot;]</span></code></p></td>
+<td><p>Xcelium install root (the directory holding <code class="docutils literal notranslate"><span class="pre">bin/xrun</span></code>). Falls back to <code class="docutils literal notranslate"><span class="pre">$NC_ROOT</span></code>,
+<code class="docutils literal notranslate"><span class="pre">$XCELIUM_HOME</span></code>, <code class="docutils literal notranslate"><span class="pre">$CDS_INST_DIR</span></code>, then <code class="docutils literal notranslate"><span class="pre">xrun</span></code> on <code class="docutils literal notranslate"><span class="pre">PATH</span></code>. No default path is
+compiled in; the build fails if none resolves.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">configs[&quot;switching_activity_type&quot;]</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">saif</span></code> by default. Catapult’s own default, FSDB, needs Verdi (<code class="docutils literal notranslate"><span class="pre">$NOVAS_INST_DIR</span></code>).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">configs[&quot;use_ccs_block&quot;]</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code>. Set it only when your own sources mark the DUT with the <code class="docutils literal notranslate"><span class="pre">CCS_BLOCK()</span></code> macro;
+Allo emits <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">hls_design</span> <span class="pre">top</span></code>, which SCVerify handles without it.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">CDS_LIC_FILE</span></code></p></td>
+<td><p>Environment, not configuration: Xcelium’s licence. Unset produces a warning, not an error
+(a site may keep the licence in the default <code class="docutils literal notranslate"><span class="pre">~/cds.lic</span></code>).</p></td>
+</tr>
+<tr class="row-odd"><td><p>PowerPro licence</p></td>
+<td><p>Nothing to acquire. <code class="docutils literal notranslate"><span class="pre">PProBase</span></code>, <code class="docutils literal notranslate"><span class="pre">PProAnalysis</span></code>, <code class="docutils literal notranslate"><span class="pre">PProCGopt</span></code>, <code class="docutils literal notranslate"><span class="pre">PProWriteRTL</span></code> and
+<code class="docutils literal notranslate"><span class="pre">PProPAWorker</span></code> check out from the same server as Catapult itself with nothing extra set.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The simulator is Xcelium, not Questa. Catapult defaults to QuestaSim, and pointing it at an
+install without <code class="docutils literal notranslate"><span class="pre">vsim</span></code> is how a power step “succeeds” having simulated nothing – the emitted tcl
+therefore sets <code class="docutils literal notranslate"><span class="pre">/SCVerify/USE_QUESTASIM</span> <span class="pre">false</span></code>, <code class="docutils literal notranslate"><span class="pre">/SCVerify/USE_NCSIM</span> <span class="pre">true</span></code> and
+<code class="docutils literal notranslate"><span class="pre">/NCSim/NC_ROOT</span> <span class="pre">&lt;resolved</span> <span class="pre">root&gt;</span></code>. Host-specific paths (that root, the licence files) are resolved
+from configuration and environment at <code class="docutils literal notranslate"><span class="pre">build()</span></code>, never hardcoded, so the tcl is specific to the
+host that generated it while the backend is not.</p>
+<p><code class="docutils literal notranslate"><span class="pre">stats</span></code> keys: <code class="docutils literal notranslate"><span class="pre">Latency</span> <span class="pre">(cycles)</span></code> (from <code class="docutils literal notranslate"><span class="pre">cycle.rpt</span></code>), <code class="docutils literal notranslate"><span class="pre">Area</span></code>
+(<code class="docutils literal notranslate"><span class="pre">TOTAL</span> <span class="pre">AREA</span> <span class="pre">(After</span> <span class="pre">Assignment)</span></code> from <code class="docutils literal notranslate"><span class="pre">rtl.rpt</span></code> – this flow writes no <code class="docutils literal notranslate"><span class="pre">area.rpt</span></code>), <code class="docutils literal notranslate"><span class="pre">Power</span></code>,
+<code class="docutils literal notranslate"><span class="pre">Power</span> <span class="pre">dynamic</span></code>, <code class="docutils literal notranslate"><span class="pre">Power</span> <span class="pre">static</span></code>, <code class="docutils literal notranslate"><span class="pre">Power</span> <span class="pre">clock</span> <span class="pre">net</span></code> (all µW, from <code class="docutils literal notranslate"><span class="pre">power.rpt</span></code>),
+<code class="docutils literal notranslate"><span class="pre">SAIF</span> <span class="pre">annotated</span></code>, <code class="docutils literal notranslate"><span class="pre">hierarchical</span></code> (per-instance power) and <code class="docutils literal notranslate"><span class="pre">caveat</span></code>. All reports are under
+<code class="docutils literal notranslate"><span class="pre">&lt;project&gt;/Catapult/&lt;top&gt;.v1/</span></code>.</p>
+</section>
+<section id="how-to-read-the-power-number">
+<h3>How to read the power number<a class="headerlink" href="#how-to-read-the-power-number" title="Link to this heading"><span>¶</span></a></h3>
+<p>Every figure this mode reports carries, and needs, this caveat: the activity is <strong>SAIF from
+simulation</strong>, with 100 % of primary inputs and flop outputs annotated and activity propagated to
+internal nets by PowerPro (not simulated). It is therefore <strong>workload-specific – only as
+representative as the testbench</strong> – and <strong>pre-layout</strong>: a wireload model, PowerPro’s clock-tree
+model, no place-and-route parasitics. A power figure without that attached is not usable evidence.</p>
+</section>
+<section id="limits-and-known-failures">
+<h3>Limits and known failures<a class="headerlink" href="#limits-and-known-failures" title="Link to this heading"><span>¶</span></a></h3>
+<ul class="simple">
+<li><p>No testbench, no power: <code class="docutils literal notranslate"><span class="pre">build()</span></code> raises. This is the intended behaviour.</p></li>
+<li><p>No Xcelium root resolvable: <code class="docutils literal notranslate"><span class="pre">build()</span></code> raises rather than emitting a tcl with an empty
+<code class="docutils literal notranslate"><span class="pre">NC_ROOT</span></code> that silently runs no simulation. Discovery from the environment finds nothing on a
+host like zhang-21, where none of the variables are set – pass <code class="docutils literal notranslate"><span class="pre">ncsim_root</span></code>.</p></li>
+<li><p>Zero dynamic power, a missing <code class="docutils literal notranslate"><span class="pre">power.rpt</span></code>, or 0 % SAIF annotation after a run: <code class="docutils literal notranslate"><span class="pre">mod()</span></code> raises
+instead of printing a zero.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">synth_top</span></code> (synthesizing a submodule) is untested with ppa: SCVerify wraps the design top, so
+a testbench must drive that submodule directly. The one attempt on record –
+<code class="docutils literal notranslate"><span class="pre">stream_boundary</span></code>’s <code class="docutils literal notranslate"><span class="pre">compute_0</span></code> – produced no activity.</p></li>
+<li><p>Technology library selection is by <code class="docutils literal notranslate"><span class="pre">configs={&quot;library&quot;:</span> <span class="pre">...}</span></code> (<code class="docutils literal notranslate"><span class="pre">device</span></code> is still accepted);
+see <a class="reference internal" href="#configuration-options">Configuration Options</a>. <code class="docutils literal notranslate"><span class="pre">codegen_tcl</span></code> defaults <code class="docutils literal notranslate"><span class="pre">frequency</span></code> to <strong>100</strong> MHz when neither
+<code class="docutils literal notranslate"><span class="pre">clock_period</span></code> nor <code class="docutils literal notranslate"><span class="pre">frequency</span></code> is given.</p></li>
+<li><p><strong>A</strong> <code class="docutils literal notranslate"><span class="pre">&#64;df.region()</span></code> <strong>cannot be csim’d through this backend</strong>, and this is not fixed. The
+host generator derives its outputs from the top function’s <em>results</em> (<code class="docutils literal notranslate"><span class="pre">func.type.results</span></code>),
+and a region top is <code class="docutils literal notranslate"><span class="pre">void</span></code>, so every argument is treated as an input: <code class="docutils literal notranslate"><span class="pre">host.cpp</span></code> writes no
+<code class="docutils literal notranslate"><span class="pre">output&lt;i&gt;.data</span></code>, <code class="docutils literal notranslate"><span class="pre">mod(*args)</span></code> reads none back, and the caller’s arrays come back unchanged
+with no error. The <code class="docutils literal notranslate"><span class="pre">systemc</span></code> platform already does the right thing – it splits arguments by
+direction with <code class="docutils literal notranslate"><span class="pre">analyze_arg_load_store</span></code> – so the fix is to adopt that split here, in
+<code class="docutils literal notranslate"><span class="pre">codegen_host</span></code> and in the read-back in <code class="docutils literal notranslate"><span class="pre">HLSModule.__call__</span></code>. It is deliberately not done
+blind: it cannot be exercised without a Catapult install, and a change that <em>looks</em> right while
+silently reading the wrong file is the failure mode this backend has already had once.
+<code class="docutils literal notranslate"><span class="pre">mode=&quot;ppa&quot;</span></code> is unaffected – its testbench is the caller’s own and does its own checking.</p></li>
+</ul>
+</section>
+<section id="results-and-history">
+<h3>Results and history<a class="headerlink" href="#results-and-history" title="Link to this heading"><span>¶</span></a></h3>
+<p><strong>The worked example</strong> is <code class="docutils literal notranslate"><span class="pre">dev/records/catapult_handoff/ppa_mac16/</span></code> with its result in
+<code class="docutils literal notranslate"><span class="pre">ppa_mac16/zhang21_run_2026-09-24/</span></code>: the first <code class="docutils literal notranslate"><span class="pre">mode=&quot;ppa&quot;</span></code> run to go end to end through Allo’s
+own emitted tcl, <strong>unmodified</strong>, on zhang-21 (Catapult 2024.2/1130128, Xcelium 24.03-s005, exit 0
+in 56 s). An Allo-emitted 16-tap int8 MAC driven by a 200-transaction SCVerify testbench:
+<strong>272.69 µW = 252.19 dynamic + 20.50 static</strong>, 100.00 % annotation on both flop outputs and user
+nets, <code class="docutils literal notranslate"><span class="pre">MAC16</span> <span class="pre">TB</span> <span class="pre">errors=0</span></code> and SCVerify <code class="docutils literal notranslate"><span class="pre">Simulation</span> <span class="pre">PASSED</span></code>; latency 16 / throughput 18, area
+1180.529 score units, <code class="docutils literal notranslate"><span class="pre">mac16_core_inst</span></code> 272.09 µW with its FSM at 4.07 µW. <code class="docutils literal notranslate"><span class="pre">use_ccs_block</span></code> was
+<strong>not</strong> needed – SCVerify wrapped the <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">hls_design</span> <span class="pre">top</span></code> DUT directly. That directory also
+holds <code class="docutils literal notranslate"><span class="pre">check_ppa.py</span></code>, the success criterion written before the run, which was then shown to go
+red on three doctored copies of the passing outputs (testbench errors, a zeroed dynamic row, 0 %
+annotation).</p>
+<p><strong>The first real design</strong> is <code class="docutils literal notranslate"><span class="pre">dev/records/catapult_handoff/ppa_tinytpu/</span></code>: TinyTPU-isa at
+<code class="docutils literal notranslate"><span class="pre">TPU_T=4</span> <span class="pre">TPU_MAXDIM=16</span></code> – <code class="docutils literal notranslate"><span class="pre">reproduce.sh</span></code>’s pinned build – with the same <code class="docutils literal notranslate"><span class="pre">nangate-45nm_beh</span></code>
+library and 5 ns clock as <code class="docutils literal notranslate"><span class="pre">ppa_mac16</span></code>, so the two differ in the design and not in the technology.
+Its testbench makes four <code class="docutils literal notranslate"><span class="pre">CCS_DESIGN(tinytpu_isa)</span></code> calls on one instance: three 16x16x16 GEMMs
+(one with ReLU) and one <code class="docutils literal notranslate"><span class="pre">isa_dsl.vector_program(8)</span></code>, all with <strong>uniform full-range int8</strong>
+operands rather than the <code class="docutils literal notranslate"><span class="pre">[-4,</span> <span class="pre">4]</span></code> the cycle benchmarks use – that distribution exists to match
+Gemmini’s <code class="docutils literal notranslate"><span class="pre">allo_cmp.c</span></code> for a like-for-like <em>cycle</em> comparison, and it would hold the top five
+bits of every operand constant, biasing power low. Each call prefills the whole result array and
+compares all of it, counting cells the program should write separately from cells it should not
+touch; <code class="docutils literal notranslate"><span class="pre">errors=0</span></code> is the criterion and the clobber count is informative. <strong>It has not been run:</strong>
+ace-01 has no Catapult, so what exists is the handoff – project, testbench, tcl and a
+<code class="docutils literal notranslate"><span class="pre">check_ppa.py</span></code> written before the run and shown to go red on eight doctored copies of the
+<code class="docutils literal notranslate"><span class="pre">ppa_mac16</span></code> outputs. What the resulting number will and will not represent is set out in that
+directory’s <code class="docutils literal notranslate"><span class="pre">RUNME.md</span></code>; the short version is one shape, one operand distribution, at
+<code class="docutils literal notranslate"><span class="pre">MAXDIM=16</span></code>, pre-layout. Regenerating at the shipped <code class="docutils literal notranslate"><span class="pre">MAXDIM=64</span></code> is one environment variable
+and changes only array extents, not structure.</p>
+<p>The earlier measured run, by hand rather than through this mode, is <code class="docutils literal notranslate"><span class="pre">dev/records/catapult_handoff/zhang21_power_2026-09-24/</span></code> (zhang-21,
+Catapult 2024.2/1130128 with PowerPro, nangate45 <code class="docutils literal notranslate"><span class="pre">typical</span></code> 1.1 V, 5 ns clock): a 16-tap int8 MAC
+driven by 200 transactions, <strong>248.47 µW total – 229.67 dynamic, 18.80 static</strong>. The control with
+every input zero gives 83.80 µW dynamic, with combinational power falling 147.96 → 15.03 µW while
+the clock network stays at 19.93 µW. The number tracks activity, which is what makes it a
+measurement rather than a default-toggle estimate.</p>
+<p>That one had to be run by hand, because <code class="docutils literal notranslate"><span class="pre">mode=&quot;ppa&quot;</span></code> did not work: it emitted the <code class="docutils literal notranslate"><span class="pre">csyn</span></code> tcl
+(stopping at <code class="docutils literal notranslate"><span class="pre">go</span> <span class="pre">extract</span></code>, so no power step ever ran), and its parser looked for a
+<code class="docutils literal notranslate"><span class="pre">Total</span> <span class="pre">Power:</span></code> string that PowerPro’s report does not contain, so it would have printed <code class="docutils literal notranslate"><span class="pre">N/A</span></code>
+even for a successful run. Both are fixed, the parser is tested against that committed report, and
+the <code class="docutils literal notranslate"><span class="pre">ppa_mac16</span></code> run above is the confirmation on the licence host. The two figures differ
+(272.69 vs 248.47 µW) because the Allo-emitted top has a different port interface and netlist from
+the hand-written <code class="docutils literal notranslate"><span class="pre">mac.cpp</span></code>; the stimulus is the same.</p>
 <p><strong>RTL-to-GDSII with OpenROAD.</strong> For physical PPA, the synthesizable RTL at
 <code class="docutils literal notranslate"><span class="pre">&lt;project&gt;/Catapult/&lt;top&gt;.v1/rtl.v</span></code> can be passed to
 <a class="reference external" href="https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts">OpenROAD-flow-scripts</a>: set up
 OpenROAD, write a <code class="docutils literal notranslate"><span class="pre">config.mk</span></code> pointing at the generated Verilog, run <code class="docutils literal notranslate"><span class="pre">make</span></code> in the OpenROAD
 directory, and use OpenROAD’s reports for post-route timing and power. This flow is described, not
 exercised, in this repository.</p>
+</section>
 </section>
 <section id="using-the-allo-backend-on-rhel-8">
 <h2>Using the Allo Backend on RHEL 8<a class="headerlink" href="#using-the-allo-backend-on-rhel-8" title="Link to this heading"><span>¶</span></a></h2>
@@ -825,6 +1096,7 @@ RTL is correct.</p>
 <li><a class="reference internal" href="#kernel-definition">Kernel Definition</a></li>
 <li><a class="reference internal" href="#code-generation-for-catapult-hls">Code Generation for Catapult HLS</a></li>
 <li><a class="reference internal" href="#generated-code-features">Generated Code Features</a></li>
+<li><a class="reference internal" href="#the-emit-gate-every-project-is-compiled-before-it-is-handed-off">The emit gate: every project is compiled before it is handed off</a></li>
 <li><a class="reference internal" href="#project-structure">Project Structure</a></li>
 <li><a class="reference internal" href="#example-matrix-multiplication">Example: Matrix Multiplication</a></li>
 <li><a class="reference internal" href="#configuration-options">Configuration Options</a></li>
@@ -840,7 +1112,15 @@ RTL is correct.</p>
 <li><a class="reference internal" href="#reading-the-reports">Reading the Reports</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#ppa-analysis">PPA Analysis</a></li>
+<li><a class="reference internal" href="#ppa-analysis">PPA Analysis</a><ul>
+<li><a class="reference internal" href="#quick-start">Quick start</a></li>
+<li><a class="reference internal" href="#the-testbench">The testbench</a></li>
+<li><a class="reference internal" href="#reference">Reference</a></li>
+<li><a class="reference internal" href="#how-to-read-the-power-number">How to read the power number</a></li>
+<li><a class="reference internal" href="#limits-and-known-failures">Limits and known failures</a></li>
+<li><a class="reference internal" href="#results-and-history">Results and history</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#using-the-allo-backend-on-rhel-8">Using the Allo Backend on RHEL 8</a></li>
 <li><a class="reference internal" href="#c-emitter-vs-systemc-emitter">C++ Emitter vs. SystemC Emitter</a></li>
 <li><a class="reference internal" href="#troubleshooting">Troubleshooting</a></li>

@@ -119,6 +119,101 @@ Allo's scheduling primitives are translated to Catapult-specific pragmas:
    s.unroll("j")        # Generates: #pragma hls_unroll
    s.unroll("k", 4)     # Generates: #pragma hls_unroll 4
 
+**Bit operations are AC, not AP**
+
+The Catapult emitter inherits most of its C++ codegen from the Vitis emitter,
+and bit indexing and slicing are where the two languages genuinely differ.
+Vitis writes a range on an ``ap_int``; Catapult has no ``ap_int`` at all, so
+the same text is a hard front-end error (CRD-20, "identifier ap_int is
+undefined"). The AC spelling is a member call:
+
+.. code-block:: cpp
+
+   // Vitis (NOT accepted by Catapult)
+   ap_int<64> v16_tmp = v15;   v16 = v16_tmp(15, 0);
+
+   // Catapult
+   ac_int<64, false> _bs_v16 = v15;   v16 = _bs_v16.slc<16>(0);
+
+``slc<W>(lo)`` reads ``W`` bits starting at ``lo`` and ``set_slc(lo, v)``
+writes ``v``'s width, so ``W`` is ``hi - lo + 1``. The temporary exists because
+the value being sliced is often a plain C integer (``uint64_t``), which has no
+``.slc``; its **signedness is taken from the source type**, because
+``slc<W>()`` returns ``ac_int<W, S>`` with ``S`` inherited from the object it
+is called on -- a signed temporary over an unsigned source sign-extends a slice
+that is later widened, which compiles and returns the wrong number.
+
+A second difference: ``ac_int`` defines no implicit conversion to a C integer
+beyond 64 bits, so an index computed wide and then narrowed needs the
+conversion spelled out (CRD-413):
+
+.. code-block:: cpp
+
+   ac_int<65, true> v35 = v34 + 8;
+   int v36 = v35.to_int64();          // NOT `int v36 = v35;`
+
+.. _catapult-emit-gate:
+
+The emit gate: every project is compiled before it is handed off
+-----------------------------------------------------------------
+Both of the constructs above were emitted for months and were first seen on a
+licence host, where they cost a TinyTPU power run: ``go analyze`` stopped after
+7 s with 100 errors, no schedule, no simulation and no power. Neither needs a
+licence to find. ``hlslibs`` publishes ``ac_types`` under Apache-2.0, and plain
+``g++`` against it rejects both.
+
+So ``s.build(target="catapult", ...)`` now compiles the ``kernel.cpp`` it just
+wrote, in the same call that writes it -- not in whichever script does the
+handoff, because an emitter that can emit uncompilable code should fail where
+it emits. The check has two stages:
+
+1. a **text** stage that rejects Vitis-only constructs by name (``ap_int``,
+   ``ap_uint``, ``ap_fixed``, ``hls::stream``) and needs nothing installed;
+2. a **compile** stage, ``g++ -std=c++11 -fsyntax-only`` against ``ac_types``,
+   which catches everything a regex cannot -- notably the >64-bit narrowing,
+   which depends on widths.
+
+``ac_types`` is looked for in this order, first hit wins:
+
+.. code-block:: text
+
+   $ALLO_AC_TYPES_INCLUDE            # explicit; the directory holding ac_int.h
+   $MGC_HOME/shared/include          # Catapult's own copy, on a licence host
+   ~/.cache/allo/ac_types/include    # an hlslibs checkout, cached per host
+   $ALLO_AC_TYPES_HOME/include
+
+On a host with none of them the compile stage **skips loudly** -- a banner on
+stderr saying the kernel was not compiled -- because a silent skip is exactly
+how this class of defect survived. To get it:
+
+.. code-block:: bash
+
+   git clone --depth 1 https://github.com/hlslibs/ac_types ~/.cache/allo/ac_types
+
+Two environment variables control the gate. ``ALLO_REQUIRE_AC_TYPES=1`` turns
+the loud skip into a failure, which is what CI and any script that produces a
+handoff should set. ``ALLO_SKIP_CATAPULT_GATE=1`` disables the gate entirely
+and says so on stderr.
+
+Switching it on immediately found a third defect nobody had reported: an
+``f16`` operand is emitted as a bare ``half``, and no ``ac_types`` header
+defines that name (Catapult's own float support is ``ac_ieee_float<binary16>``
+/ ``ac::bfloat16`` in ``ac_std_float.h``). ``f32`` is fine --
+``getCatapultTypeName`` already maps it to ``ac_ieee_float<binary32>`` -- so
+this is one line in that function, left alone here only because another change
+was in flight in it. ``tests/dataflow/test_bf16_dataflow.py`` records the
+current behaviour: f16 **emits** a ``kernel.cpp`` and the gate then rejects it,
+while bf16 still aborts inside ``getCatapultTypeName`` before any
+``kernel.cpp`` exists.
+
+What the gate does **not** cover: it is Catapult's *front end*, not Catapult.
+It says the C++ parses and type-checks; it says nothing about whether the
+design schedules, whether a loop meets its II, or whether a directive names a
+loop that exists. Those still fail on the licence host. It is also
+``catapult`` only: ``target="systemc"`` emits a ``kernel.cpp`` that needs
+``matchlib_connections`` and a SystemC library as well as ``ac_types``, and
+nothing gates it -- that flow is still checked by hand.
+
 Project Structure
 -----------------
 The generated project (e.g., ``vvadd.prj``) includes:
@@ -236,7 +331,7 @@ Use the environment module if it is available, and set the path by hand otherwis
    module load mentor-Catapult_synthesis_10.5a
 
    # Option B: manual path, if the module is not installed
-   export MGC_HOME=/opt/siemens/catapult/2024.2
+   export MGC_HOME=/opt/siemens/catapult/2024.2/Mgc_home   # on zhang-21; the /Mgc_home component is part of the root
    export PATH=$MGC_HOME/bin:$PATH
 
    catapult -version
@@ -432,35 +527,222 @@ multiplexers) and ``LOGIC`` (control logic).
 
 PPA Analysis
 ------------
-Besides ``csim`` and ``csyn``, the Catapult target accepts ``mode="ppa"``. It runs the same
-synthesis flow as ``csyn`` and then extracts metrics from the reports:
+``mode="ppa"`` runs the ``csyn`` flow and then the two steps that produce power --
+``go switching`` (simulate the C++ testbench against the pre-power RTL, convert the VCD to SAIF)
+and ``flow run /PowerAnalysis/report_pre_pwropt_Verilog`` (annotate that SAIF, write
+``power.rpt``) -- and prints latency, area and **measured** power. It needs a C++ testbench that
+SCVerify can drive and an Xcelium install; with no testbench there is no activity and therefore no
+power, and the build fails at ``build()`` rather than reporting zeros.
+
+Quick start
+~~~~~~~~~~~
+
+.. code-block:: bash
+
+   export MGC_HOME=/opt/siemens/catapult/2024.2/Mgc_home
+   export PATH=$MGC_HOME/bin:$PATH
+   export MGLS_LICENSE_FILE=1717@en-license-05.coecis.cornell.edu   # Catapult + PowerPro
+   export CDS_LIC_FILE=...                                          # Xcelium, for the switching sim
+
+.. important::
+
+   **Expect to pass** ``configs={"ncsim_root": ...}``. The switching simulation runs in Xcelium,
+   and the backend looks for it in ``configs["ncsim_root"]``, then ``$NC_ROOT`` / ``$XCELIUM_HOME``
+   / ``$CDS_INST_DIR``, then ``xrun`` on ``PATH``. On zhang-21 **none of those are set**, so the
+   explicit config is what works there; on a host configured like it, a run without one fails
+   immediately at ``build()``. Nothing is guessed and no path is compiled in: rather than emit a
+   tcl with an empty ``/NCSim/NC_ROOT`` -- which would run no simulation and report zero power --
+   the build raises.
 
 .. code-block:: python
 
    s = allo.customize(top)
-   # s.partition(...), s.pipeline(...)
-   mod = s.build(target="catapult", mode="ppa", project="my_ppa_project")
-   stats = mod()   # runs synthesis, prints a metrics table, returns a dict
-   print(stats)
+   mod = s.build(
+       target="catapult",
+       mode="ppa",
+       project="my_ppa_project",
+       configs={
+           "testbench": "tb.cpp",       # REQUIRED: CCS_MAIN + CCS_DESIGN(top)(...)
+           "ncsim_root": "/opt/cadence/XCELIUM2403",   # Xcelium root; zhang-21's, as an example
+           "clock_period": 5.0,         # ns
+           "library": "nangate-45nm_beh",
+       },
+   )
+   stats = mod()   # runs synthesis + switching + power, prints a table, returns a dict
 
-``stats`` contains ``Latency (cycles)`` (``Max Latency`` from ``cycle.rpt``), ``Area``
-(``Total Area`` from ``area.rpt``, unit depends on the technology library) and ``Power`` (from
-``power.rpt`` or ``power_summary.rpt`` if present; ``N/A`` otherwise), all read from
-``<project>/Catapult/<top>.v1/``. It also carries a ``hierarchical`` entry: a per-module area
-(and, where reported, power) breakdown parsed from ``area.rpt``, so that per-PE and interconnect
-cost can be separated. That breakdown needs a hierarchical design; Catapult preserves the hierarchy
-in the generated RTL unless it is fully flattened.
+56 s for the 16-tap MAC below on zhang-21. The table it prints carries latency, area, total /
+dynamic / static power, the SAIF annotation coverage, a per-instance power breakdown, and the
+caveat below.
 
-Technology library selection is by ``configs={"device": ...}``: anything containing ``45nm`` or
-``nangate`` selects ``nangate-45nm_beh`` (the default), anything containing ``sky130`` selects
-``sky130``, and any other string is passed to ``solution library add`` unchanged.
+The testbench
+~~~~~~~~~~~~~
+**A design with no C++ testbench gets no power number.** ``go switching`` measures activity by
+simulating; with nothing driving the design the report is zeros or a default-toggle guess -- a
+power figure that is wrong in the safe-looking direction. ``mode="ppa"`` therefore refuses to run
+without ``configs["testbench"]``.
 
-.. note::
+The file is ordinary Catapult SCVerify C++: ``CCS_MAIN(...)`` calling ``CCS_DESIGN(<top>)(...)``
+over representative stimulus. The worked example is
+``dev/records/catapult_handoff/zhang21_power_2026-09-24/mac_tb.cpp`` (200 transactions):
 
-   The mode, the parsed report fields and the library selection above were checked against
-   ``allo/backend/catapult.py`` and ``allo/backend/hls.py`` in this tree; no ``ppa`` run is recorded
-   here. Note also that ``codegen_tcl`` defaults ``frequency`` to **100** MHz when it is not given,
-   not the 300 MHz stated under `Configuration Options`_.
+.. code-block:: cpp
+
+   #include <ac_int.h>
+   #include <mc_scverify.h>
+   void mac(ac_int<8,true> a[16], ac_int<8,true> b[16], ac_int<24,true> &out);
+   CCS_MAIN(int argc, char **argv) {
+     ac_int<8,true> a[16], b[16]; ac_int<24,true> o; int errs = 0;
+     for (int t = 0; t < 200; ++t) { /* stimulus */ CCS_DESIGN(mac)(a, b, o); }
+     CCS_RETURN(errs != 0);
+   }
+
+The SystemC flow's emitted ``kernel.cpp`` does **not** count: its testbench is an ``sc_main``,
+which SCVerify does not drive. A SystemC design needs a separate SCVerify testbench for ppa; use
+``mode="csyn"`` for area and latency only.
+
+**A** ``@df.region()`` **is drivable the same way.** A region reaches this backend as a *void*
+function whose parameters are the region's arrays, marked ``#pragma hls_design top`` with a
+``#pragma hls_design dataflow`` body -- the same shape SCVerify wrapped for ``mac16``, only wider.
+So the testbench declares the top itself, with **C++ linkage** (the Catapult emitter writes no
+``extern "C"``, unlike the Vitis emitter, whose testbenches do declare the top ``extern "C"``),
+prefills its output array, calls ``CCS_DESIGN(<region>)`` and checks the result. Neither
+``host.cpp`` nor ``kernel.h`` is involved in ``mode="ppa"``, so the csim-only defect noted under
+`Limits and known failures`_ is not on this path. The worked example is
+``dev/records/catapult_handoff/ppa_tinytpu/``, generated by
+``examples/tinytpu/ppa_catapult.py``.
+
+Two things that generator learned, both worth copying:
+
+* **Do not write** ``static alignas(64) T x[N]``. ``cosim.py``'s testbench generator does, to keep
+  the ``align_value(64)`` promise the *Vitis* ``m_axi`` path makes; that promise has no Catapult
+  counterpart, and the form is ill-formed C++ (a standard attribute in the middle of the
+  decl-specifiers) which g++ rejects under ``-std=c++11`` -- the standard the emitted tcl sets.
+  Vitis only accepts it because it compiles testbenches with ``-std=gnu++0x``.
+* **Compile the testbench before handing it over**, against two-line stand-ins for ``ac_int.h``
+  and ``mc_scverify.h`` (``CCS_MAIN`` -> ``main``, ``CCS_DESIGN(x)`` -> ``x``,
+  ``CCS_RETURN(x)`` -> ``return (x)``) and a stand-in design that replays a reference dump. That
+  costs nothing on a host with no Catapult and turns "syntax error after a licence checkout"
+  into a local failure. ``ppa_catapult.py`` does this on every regeneration, and also runs the
+  doctored cases that prove its ``errors=`` counter can go nonzero.
+
+Reference
+~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+
+   * - Key
+     - Meaning
+   * - ``configs["testbench"]``
+     - **Required.** Path to the SCVerify C++ testbench. Copied next to ``kernel.cpp`` and added
+       with ``-exclude true`` (compiled for verification, never synthesized).
+   * - ``configs["ncsim_root"]``
+     - Xcelium install root (the directory holding ``bin/xrun``). Falls back to ``$NC_ROOT``,
+       ``$XCELIUM_HOME``, ``$CDS_INST_DIR``, then ``xrun`` on ``PATH``. No default path is
+       compiled in; the build fails if none resolves.
+   * - ``configs["switching_activity_type"]``
+     - ``saif`` by default. Catapult's own default, FSDB, needs Verdi (``$NOVAS_INST_DIR``).
+   * - ``configs["use_ccs_block"]``
+     - ``False``. Set it only when your own sources mark the DUT with the ``CCS_BLOCK()`` macro;
+       Allo emits ``#pragma hls_design top``, which SCVerify handles without it.
+   * - ``CDS_LIC_FILE``
+     - Environment, not configuration: Xcelium's licence. Unset produces a warning, not an error
+       (a site may keep the licence in the default ``~/cds.lic``).
+   * - PowerPro licence
+     - Nothing to acquire. ``PProBase``, ``PProAnalysis``, ``PProCGopt``, ``PProWriteRTL`` and
+       ``PProPAWorker`` check out from the same server as Catapult itself with nothing extra set.
+
+The simulator is Xcelium, not Questa. Catapult defaults to QuestaSim, and pointing it at an
+install without ``vsim`` is how a power step "succeeds" having simulated nothing -- the emitted tcl
+therefore sets ``/SCVerify/USE_QUESTASIM false``, ``/SCVerify/USE_NCSIM true`` and
+``/NCSim/NC_ROOT <resolved root>``. Host-specific paths (that root, the licence files) are resolved
+from configuration and environment at ``build()``, never hardcoded, so the tcl is specific to the
+host that generated it while the backend is not.
+
+``stats`` keys: ``Latency (cycles)`` (from ``cycle.rpt``), ``Area``
+(``TOTAL AREA (After Assignment)`` from ``rtl.rpt`` -- this flow writes no ``area.rpt``), ``Power``,
+``Power dynamic``, ``Power static``, ``Power clock net`` (all µW, from ``power.rpt``),
+``SAIF annotated``, ``hierarchical`` (per-instance power) and ``caveat``. All reports are under
+``<project>/Catapult/<top>.v1/``.
+
+How to read the power number
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Every figure this mode reports carries, and needs, this caveat: the activity is **SAIF from
+simulation**, with 100 % of primary inputs and flop outputs annotated and activity propagated to
+internal nets by PowerPro (not simulated). It is therefore **workload-specific -- only as
+representative as the testbench** -- and **pre-layout**: a wireload model, PowerPro's clock-tree
+model, no place-and-route parasitics. A power figure without that attached is not usable evidence.
+
+Limits and known failures
+~~~~~~~~~~~~~~~~~~~~~~~~~
+* No testbench, no power: ``build()`` raises. This is the intended behaviour.
+* No Xcelium root resolvable: ``build()`` raises rather than emitting a tcl with an empty
+  ``NC_ROOT`` that silently runs no simulation. Discovery from the environment finds nothing on a
+  host like zhang-21, where none of the variables are set -- pass ``ncsim_root``.
+* Zero dynamic power, a missing ``power.rpt``, or 0 % SAIF annotation after a run: ``mod()`` raises
+  instead of printing a zero.
+* ``synth_top`` (synthesizing a submodule) is untested with ppa: SCVerify wraps the design top, so
+  a testbench must drive that submodule directly. The one attempt on record --
+  ``stream_boundary``'s ``compute_0`` -- produced no activity.
+* Technology library selection is by ``configs={"library": ...}`` (``device`` is still accepted);
+  see `Configuration Options`_. ``codegen_tcl`` defaults ``frequency`` to **100** MHz when neither
+  ``clock_period`` nor ``frequency`` is given.
+* **A** ``@df.region()`` **cannot be csim'd through this backend**, and this is not fixed. The
+  host generator derives its outputs from the top function's *results* (``func.type.results``),
+  and a region top is ``void``, so every argument is treated as an input: ``host.cpp`` writes no
+  ``output<i>.data``, ``mod(*args)`` reads none back, and the caller's arrays come back unchanged
+  with no error. The ``systemc`` platform already does the right thing -- it splits arguments by
+  direction with ``analyze_arg_load_store`` -- so the fix is to adopt that split here, in
+  ``codegen_host`` and in the read-back in ``HLSModule.__call__``. It is deliberately not done
+  blind: it cannot be exercised without a Catapult install, and a change that *looks* right while
+  silently reading the wrong file is the failure mode this backend has already had once.
+  ``mode="ppa"`` is unaffected -- its testbench is the caller's own and does its own checking.
+
+Results and history
+~~~~~~~~~~~~~~~~~~~
+**The worked example** is ``dev/records/catapult_handoff/ppa_mac16/`` with its result in
+``ppa_mac16/zhang21_run_2026-09-24/``: the first ``mode="ppa"`` run to go end to end through Allo's
+own emitted tcl, **unmodified**, on zhang-21 (Catapult 2024.2/1130128, Xcelium 24.03-s005, exit 0
+in 56 s). An Allo-emitted 16-tap int8 MAC driven by a 200-transaction SCVerify testbench:
+**272.69 µW = 252.19 dynamic + 20.50 static**, 100.00 % annotation on both flop outputs and user
+nets, ``MAC16 TB errors=0`` and SCVerify ``Simulation PASSED``; latency 16 / throughput 18, area
+1180.529 score units, ``mac16_core_inst`` 272.09 µW with its FSM at 4.07 µW. ``use_ccs_block`` was
+**not** needed -- SCVerify wrapped the ``#pragma hls_design top`` DUT directly. That directory also
+holds ``check_ppa.py``, the success criterion written before the run, which was then shown to go
+red on three doctored copies of the passing outputs (testbench errors, a zeroed dynamic row, 0 %
+annotation).
+
+**The first real design** is ``dev/records/catapult_handoff/ppa_tinytpu/``: TinyTPU-isa at
+``TPU_T=4 TPU_MAXDIM=16`` -- ``reproduce.sh``'s pinned build -- with the same ``nangate-45nm_beh``
+library and 5 ns clock as ``ppa_mac16``, so the two differ in the design and not in the technology.
+Its testbench makes four ``CCS_DESIGN(tinytpu_isa)`` calls on one instance: three 16x16x16 GEMMs
+(one with ReLU) and one ``isa_dsl.vector_program(8)``, all with **uniform full-range int8**
+operands rather than the ``[-4, 4]`` the cycle benchmarks use -- that distribution exists to match
+Gemmini's ``allo_cmp.c`` for a like-for-like *cycle* comparison, and it would hold the top five
+bits of every operand constant, biasing power low. Each call prefills the whole result array and
+compares all of it, counting cells the program should write separately from cells it should not
+touch; ``errors=0`` is the criterion and the clobber count is informative. **It has not been run:**
+ace-01 has no Catapult, so what exists is the handoff -- project, testbench, tcl and a
+``check_ppa.py`` written before the run and shown to go red on eight doctored copies of the
+``ppa_mac16`` outputs. What the resulting number will and will not represent is set out in that
+directory's ``RUNME.md``; the short version is one shape, one operand distribution, at
+``MAXDIM=16``, pre-layout. Regenerating at the shipped ``MAXDIM=64`` is one environment variable
+and changes only array extents, not structure.
+
+The earlier measured run, by hand rather than through this mode, is ``dev/records/catapult_handoff/zhang21_power_2026-09-24/`` (zhang-21,
+Catapult 2024.2/1130128 with PowerPro, nangate45 ``typical`` 1.1 V, 5 ns clock): a 16-tap int8 MAC
+driven by 200 transactions, **248.47 µW total -- 229.67 dynamic, 18.80 static**. The control with
+every input zero gives 83.80 µW dynamic, with combinational power falling 147.96 → 15.03 µW while
+the clock network stays at 19.93 µW. The number tracks activity, which is what makes it a
+measurement rather than a default-toggle estimate.
+
+That one had to be run by hand, because ``mode="ppa"`` did not work: it emitted the ``csyn`` tcl
+(stopping at ``go extract``, so no power step ever ran), and its parser looked for a
+``Total Power:`` string that PowerPro's report does not contain, so it would have printed ``N/A``
+even for a successful run. Both are fixed, the parser is tested against that committed report, and
+the ``ppa_mac16`` run above is the confirmation on the licence host. The two figures differ
+(272.69 vs 248.47 µW) because the Allo-emitted top has a different port interface and netlist from
+the hand-written ``mac.cpp``; the stimulus is the same.
 
 **RTL-to-GDSII with OpenROAD.** For physical PPA, the synthesizable RTL at
 ``<project>/Catapult/<top>.v1/rtl.v`` can be passed to

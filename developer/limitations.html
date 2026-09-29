@@ -170,10 +170,12 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/asic_manifest.html">The ASIC manifest</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_tutorial.html">Tutorial: A PyTorch MLP on TinyTPU, Then Change It</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
@@ -541,6 +543,23 @@ modules. Workaround: import the sub-region’s globals into the caller</p></td>
 <td><p>~5 lines (merge the callee’s own module globals over the caller’s);
 not prototyped</p></td>
 <td><p><a class="reference external" href="https://github.com/sunwookim028/allo/blob/main/tests/limits/new_subregion_foreign_globals.py">new_subregion_foreign_globals.py</a></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#limitation-i"><span class="std std-ref">I</span></a></p></td>
+<td><p>PARTLY FIXED (fork-only) – bf16 emits and is bit-exact on Vitis; three
+residual divergences below</p></td>
+<td><p>emitter</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">bf16</span></code> had no branch in any <code class="docutils literal notranslate"><span class="pre">getTypeName</span></code>; every emitter fell through
+to <code class="docutils literal notranslate"><span class="pre">assert(1</span> <span class="pre">==</span> <span class="pre">0</span> <span class="pre">&amp;&amp;</span> <span class="pre">&quot;Got</span> <span class="pre">unsupported</span> <span class="pre">type.&quot;)</span></code> – a SIGABRT, not an
+exception. Vitis HLS 2023.2 has no bf16 type to point at, so the emitter
+now ships an <code class="docutils literal notranslate"><span class="pre">allo_bfloat16</span></code> shim; Catapult and SystemC use
+<code class="docutils literal notranslate"><span class="pre">ac::bfloat16</span></code>.</p></td>
+<td><p>unblocks the BF16 MiniTPU model, which could not be emitted at all.
+On Vitis a bf16 MAC still costs a <strong>full fp32</strong> multiplier (3 DSP) and
+adder – the win is storage and bandwidth, not arithmetic</p></td>
+<td><p>landed (emitters + <code class="docutils literal notranslate"><span class="pre">infer.py</span></code> bitcast); Catapult synthesis untested
+(no licence on this host)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">tests/dataflow/test_bf16_hls.py</span></code>,
+<code class="docutils literal notranslate"><span class="pre">tests/test_vhls.py::test_unsupported_type_is_a_diagnostic_not_an_abort</span></code></p></td>
 </tr>
 </tbody>
 </table>
@@ -1296,7 +1315,7 @@ kernel’s outermost loop into <code class="docutils literal notranslate"><span 
 induction variable is unused) made <code class="docutils literal notranslate"><span class="pre">acc</span></code> run unthrottled, and that
 <code class="docutils literal notranslate"><span class="pre">72c70dcb</span></code>’s guard missed it because <code class="docutils literal notranslate"><span class="pre">acc</span></code> has no memory port. The guard was
 extended to any loop body containing a <code class="docutils literal notranslate"><span class="pre">WireGetOp</span></code> (<code class="docutils literal notranslate"><span class="pre">guard_experiment/</span></code> under
-<code class="docutils literal notranslate"><span class="pre">tests/systemc/rtlsim/</span></code>), <code class="docutils literal notranslate"><span class="pre">examples/systemc/pe_split.py</span></code> was re-emitted from
+<code class="docutils literal notranslate"><span class="pre">tests/systemc/rtlsim/</span></code>), <code class="docutils literal notranslate"><span class="pre">tests/systemc/dot_product_four_links.py</span></code> was re-emitted from
 <code class="docutils literal notranslate"><span class="pre">choonsik1/allo:SystemC-emitter</span></code> with and without it, synthesised with Catapult
 2024.2, and simulated under Xcelium 24.03:</p>
 <ul class="simple">
@@ -1490,7 +1509,10 @@ published row to <strong>175 / 265 / 421 / 482 / 674</strong>
 (<a class="reference internal" href="#limitation-24-price"><span class="std std-ref">What QD=16 costs the shipped design</span></a>). The item still reproduces at <code class="docutils literal notranslate"><span class="pre">TPU_QD=8</span></code>,
 which is now an override rather than the shipped configuration, and the
 <em>predicate</em> – which programs need which depth – remains open, so this is
-a cure and not a characterisation. Cheap half:
+a cure and not a characterisation. Because the predicate is open, the CHIA
+loop does not let a candidate choose the depth: <code class="docutils literal notranslate"><span class="pre">QD</span></code> is proposable so that
+the refusal can name this item, and 16 is the only value
+<code class="docutils literal notranslate"><span class="pre">evaluate.config_refusals</span></code> accepts (<a class="reference internal" href="../extensions/chia.html#chia-configuration"><span class="std std-ref">The configuration is a candidate’s to propose, inside a stated envelope</span></a>). Cheap half:
 <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">tests/limits/item24_cosim_hang.py</span></code> (seconds, no Vitis). RTL half:
 <code class="docutils literal notranslate"><span class="pre">ALLO_LIMITS_COSIM=1</span></code> on the same file (one csynth, ten cosims, tens of
 minutes). Family and bisection:
@@ -2014,6 +2036,60 @@ anything that cosims a program which may not finish should do the same.</p></li>
 </ul>
 </section>
 </section>
+<section id="bfloat16-runs-in-the-simulator-and-aborts-the-process-in-every-hls-emitter">
+<span id="limitation-25"></span><h3>25. <code class="docutils literal notranslate"><span class="pre">bfloat16</span></code> runs in the simulator and aborts the process in every HLS emitter<a class="headerlink" href="#bfloat16-runs-in-the-simulator-and-aborts-the-process-in-every-hls-emitter" title="Link to this heading"><span>¶</span></a></h3>
+<div class="admonition-status-2026-09-24-closed-see-item-i-which-supersedes-this admonition">
+<p class="admonition-title">Status (2026-09-24): CLOSED – see item I, which supersedes this</p>
+<p>Fixed the same day it was written. The account below is kept because it is
+the state a reader of <code class="docutils literal notranslate"><span class="pre">examples/minitpu</span></code> would have found, and because two
+of its three guesses about the C++ spelling were wrong in ways worth
+recording: <code class="docutils literal notranslate"><span class="pre">ap_bfloat16</span></code> and <code class="docutils literal notranslate"><span class="pre">hls::bfloat16</span></code> <strong>do not exist</strong> – Vitis
+HLS 2023.2 ships no bf16 type at all, and its one arbitrary-precision float,
+<code class="docutils literal notranslate"><span class="pre">ap_float</span></code>, segfaults <code class="docutils literal notranslate"><span class="pre">csynth</span></code> at every width – so Vitis needed an
+emitted shim rather than a vendor type. <code class="docutils literal notranslate"><span class="pre">ac_std_float&lt;16,</span> <span class="pre">8&gt;</span></code> was right,
+and is what Catapult and SystemC now use. SystemC turned out to be the
+<em>cheapest</em> of the three, not a design decision: <code class="docutils literal notranslate"><span class="pre">ac_marshaller.h</span></code> already
+carries a wrapper for it.</p>
+</div>
+<div class="admonition-the-original-entry-2026-09-24-open-simulator-only admonition">
+<p class="admonition-title">The original entry (2026-09-24): OPEN, simulator-only</p>
+<p><code class="docutils literal notranslate"><span class="pre">bfloat16</span></code> is a complete arithmetic type in the dataflow simulator – as a
+<code class="docutils literal notranslate"><span class="pre">Stream</span></code> element, as an operand, widened to <code class="docutils literal notranslate"><span class="pre">float32</span></code> and rounded back –
+and it has no emission path at all. <code class="docutils literal notranslate"><span class="pre">EmitVivadoHLS.cpp:115</span></code>,
+<code class="docutils literal notranslate"><span class="pre">EmitCatapultHLS.cpp:102</span></code> and <code class="docutils literal notranslate"><span class="pre">EmitSystemC.cpp</span></code> each fall through their
+<code class="docutils literal notranslate"><span class="pre">getTypeName</span></code> chain to <code class="docutils literal notranslate"><span class="pre">assert(1</span> <span class="pre">==</span> <span class="pre">0</span> <span class="pre">&amp;&amp;</span> <span class="pre">&quot;Got</span> <span class="pre">unsupported</span> <span class="pre">type.&quot;)</span></code>, which
+is a <strong>SIGABRT</strong>, not a catchable exception: the process dumps core with an
+LLVM crash banner and no diagnostic naming the type. Repro:
+<code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">pytest</span> <span class="pre">tests/dataflow/test_bf16_dataflow.py</span></code> (15 s, no Vitis) –
+<code class="docutils literal notranslate"><span class="pre">float16</span></code> emits on all three targets, <code class="docutils literal notranslate"><span class="pre">bfloat16</span></code> dumps core on all three.</p>
+</div>
+<p>This is the trap the guidance on extensions is meant to catch: a design can be
+built, run and validated end to end in the simulator and then be impossible to
+emit, with the failure arriving as a core dump rather than as an error.
+<code class="docutils literal notranslate"><span class="pre">examples/minitpu</span></code> is exactly that design – MiniTPU is a BF16 machine, so its
+model is simulator-only today.</p>
+<p>What emission needs:</p>
+<ul class="simple">
+<li><p>A <code class="docutils literal notranslate"><span class="pre">BFloat16Type</span></code> case in each of the three <code class="docutils literal notranslate"><span class="pre">getTypeName</span></code> functions, ahead
+of the <code class="docutils literal notranslate"><span class="pre">Float16Type</span></code> case (they are distinct MLIR types; <code class="docutils literal notranslate"><span class="pre">bf16</span></code> does not
+match <code class="docutils literal notranslate"><span class="pre">Float16Type</span></code>, which is why it falls through).</p></li>
+<li><p><strong>The C++ spelling is genuinely unknown.</strong> <code class="docutils literal notranslate"><span class="pre">ap_bfloat16</span></code> and
+<code class="docutils literal notranslate"><span class="pre">hls::bfloat16</span></code> are the plausible Vitis names and neither has been tried
+here; Catapult’s <code class="docutils literal notranslate"><span class="pre">ac_std_float.h</span></code> offers <code class="docutils literal notranslate"><span class="pre">ac_std_float&lt;16,</span> <span class="pre">8&gt;</span></code>, which has
+BF16’s field layout but has not been tried either. SystemC has no BF16 type
+at all, so the emitter would need a 16-bit container plus conversion, which
+is a design decision and not a type-table entry.</p></li>
+<li><p>Whatever spelling is chosen, <code class="docutils literal notranslate"><span class="pre">bf16</span></code> arithmetic must round the same way the
+simulator does, or a model that validates in simulation will not validate in
+cosim. That is a second piece of work, not a consequence of the first.</p></li>
+</ul>
+<p>Adjacent, and separate: the <code class="docutils literal notranslate"><span class="pre">int</span> <span class="pre">-&gt;</span> <span class="pre">float</span></code> bitcast rule at
+<code class="docutils literal notranslate"><span class="pre">allo/ir/infer.py:1195-1207</span></code> derives its result type from the bit count alone,
+so 16 bits always gives <code class="docutils literal notranslate"><span class="pre">float16</span></code> and a 16-bit lane can never be bitcast to
+<code class="docutils literal notranslate"><span class="pre">bfloat16</span></code>. A 24-bit float accumulator can still be emulated – through the
+32-bit bitcast pair, as <code class="docutils literal notranslate"><span class="pre">examples/minitpu/microarch.py</span></code> does – but a bf16
+bitcast cannot be spelled.</p>
+</section>
 </section>
 <section id="surfaced-by-the-2026-09-19-re-verification-and-impact-analysis">
 <h2>Surfaced by the 2026-09-19 re-verification and impact analysis<a class="headerlink" href="#surfaced-by-the-2026-09-19-re-verification-and-impact-analysis" title="Link to this heading"><span>¶</span></a></h2>
@@ -2181,6 +2257,112 @@ trips the separate re-parse <code class="docutils literal notranslate"><span cla
 <p>Fix: merge the callee’s own module globals over the caller’s when building a
 sub-region – about five lines, not yet prototyped.</p>
 </section>
+<section id="i-bf16-ran-in-the-simulator-and-aborted-every-hls-emitter">
+<span id="limitation-i"></span><h3>I. <code class="docutils literal notranslate"><span class="pre">bf16</span></code> ran in the simulator and aborted every HLS emitter<a class="headerlink" href="#i-bf16-ran-in-the-simulator-and-aborted-every-hls-emitter" title="Link to this heading"><span>¶</span></a></h3>
+<p>Found and fixed 2026-09-24. <code class="docutils literal notranslate"><span class="pre">bfloat16</span></code> worked end to end in the dataflow
+simulator – as a <code class="docutils literal notranslate"><span class="pre">Stream</span></code> element type and as an arithmetic type – and
+killed the process in every C++ emitter: <code class="docutils literal notranslate"><span class="pre">EmitVivadoHLS.cpp:115</span></code>,
+<code class="docutils literal notranslate"><span class="pre">EmitCatapultHLS.cpp:102</span></code> and <code class="docutils literal notranslate"><span class="pre">EmitTapaHLS.cpp:94</span></code> all reached
+<code class="docutils literal notranslate"><span class="pre">assert(1</span> <span class="pre">==</span> <span class="pre">0</span> <span class="pre">&amp;&amp;</span> <span class="pre">&quot;Got</span> <span class="pre">unsupported</span> <span class="pre">type.&quot;)</span></code>, which is <code class="docutils literal notranslate"><span class="pre">abort()</span></code>. A Python
+caller did not get an exception; the interpreter died, so “this type is not
+supported” was indistinguishable from “the emitter crashed”. That failure mode
+was the worst part of the gap and is now gone everywhere, including in the
+backends that still do not support bf16.</p>
+<p><strong>What C++ type a bf16 becomes, and why.</strong> This was the open question; the
+answer differs per toolchain and neither guess from the documentation survived
+contact with the installation.</p>
+<ul>
+<li><p><strong>Vitis HLS 2023.2: nothing native exists.</strong> <code class="docutils literal notranslate"><span class="pre">grep</span> <span class="pre">-ri</span> <span class="pre">bfloat</span></code> over
+<code class="docutils literal notranslate"><span class="pre">/opt/xilinx/Vitis_HLS/2023.2/include</span></code> returns <strong>no hits at all</strong> – there
+is no <code class="docutils literal notranslate"><span class="pre">hls::bfloat16</span></code> and no <code class="docutils literal notranslate"><span class="pre">ap_bfloat16</span></code>. <code class="docutils literal notranslate"><span class="pre">__bf16</span></code> is rejected by its
+clang (<code class="docutils literal notranslate"><span class="pre">ERROR:</span> <span class="pre">[HLS</span> <span class="pre">207-3801]</span> <span class="pre">unknown</span> <span class="pre">type</span> <span class="pre">name</span> <span class="pre">'__bf16'</span></code>). The one
+arbitrary-precision float it does ship, <code class="docutils literal notranslate"><span class="pre">ap_float&lt;W,</span> <span class="pre">E&gt;</span></code> from
+<code class="docutils literal notranslate"><span class="pre">ap_float.h</span></code>, accepts <code class="docutils literal notranslate"><span class="pre">ap_float&lt;16,</span> <span class="pre">8&gt;</span></code> and is <strong>csim-exact</strong> – but
+<code class="docutils literal notranslate"><span class="pre">csynth_design</span></code> <strong>segfaults</strong> on it, in CDFG construction, after
+<code class="docutils literal notranslate"><span class="pre">WARNING:</span> <span class="pre">[SYN</span> <span class="pre">201-506]</span> <span class="pre">Unknown</span> <span class="pre">intrinsic</span> <span class="pre">op</span>
+<span class="pre">[_ssdm_op_FloatingPoint_Mul.i16.i16.i16]</span></code>. The crash is not bf16-specific:
+<code class="docutils literal notranslate"><span class="pre">ap_float&lt;16,</span> <span class="pre">5&gt;</span></code> and even <code class="docutils literal notranslate"><span class="pre">ap_float&lt;32,</span> <span class="pre">8&gt;</span></code> segfault csynth the same
+way, so <code class="docutils literal notranslate"><span class="pre">ap_float</span></code> is unsynthesizable in this release at any width.
+(<code class="docutils literal notranslate"><span class="pre">std::bfloat16_t</span></code>, which the Python type maps used to name, needs
+<code class="docutils literal notranslate"><span class="pre">-std=c++23</span></code> and <code class="docutils literal notranslate"><span class="pre">&lt;stdfloat&gt;</span></code>; these flows compile at c++11/c++17.)</p>
+<p>So the Vivado/Vitis emitter <strong>defines its own</strong>: <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">allo_bfloat16</span></code>,
+emitted into the generated header, and only when the module actually uses
+bf16, so non-bf16 designs keep byte-identical output. It stores a raw
+<code class="docutils literal notranslate"><span class="pre">uint16_t</span></code> (not <code class="docutils literal notranslate"><span class="pre">ap_uint&lt;16&gt;</span></code>: the emitter implements <code class="docutils literal notranslate"><span class="pre">arith.bitcast</span></code>
+with a <code class="docutils literal notranslate"><span class="pre">union</span></code>, and a union member with a non-trivial default constructor
+deletes the union’s own), widens to <code class="docutils literal notranslate"><span class="pre">float</span></code> for arithmetic – exact for a
+bf16 product or sum – and rounds back with round-to-nearest-even, so each
+operation rounds exactly once, as <code class="docutils literal notranslate"><span class="pre">arith.mulf</span></code>/<code class="docutils literal notranslate"><span class="pre">arith.addf</span></code> on bf16 do.</p>
+</li>
+<li><p><strong>Catapult: ``ac::bfloat16``</strong> from <code class="docutils literal notranslate"><span class="pre">ac_std_float.h</span></code>, which Catapult ships
+in <code class="docutils literal notranslate"><span class="pre">$MGC_HOME/shared/include</span></code> and the generated header already included.
+It compiles at <code class="docutils literal notranslate"><span class="pre">-std=c++11</span></code> and works inside <code class="docutils literal notranslate"><span class="pre">ac_channel</span></code>.</p></li>
+<li><p><strong>SystemC: ``ac::bfloat16`` as well</strong>, and it was <em>cheaper</em> to support there
+than f32 was. The SystemC emitter shares <code class="docutils literal notranslate"><span class="pre">getCatapultTypeName</span></code>, so the type
+came for free; what each float type additionally needs there is a set of
+shims – raw-bit access for <code class="docutils literal notranslate"><span class="pre">arith.bitcast</span></code> and memory ports
+(<code class="docutils literal notranslate"><span class="pre">data_ac_int()</span></code> / <code class="docutils literal notranslate"><span class="pre">set_data()</span></code>, which <code class="docutils literal notranslate"><span class="pre">ac::bfloat16</span></code> has), text input
+for the testbench, and <code class="docutils literal notranslate"><span class="pre">sc_trace</span></code> – plus a Connections <code class="docutils literal notranslate"><span class="pre">Wrapped&lt;&gt;</span></code>
+payload specialization. bf16 needs <strong>no</strong> <code class="docutils literal notranslate"><span class="pre">Wrapped&lt;&gt;</span></code>:
+<code class="docutils literal notranslate"><span class="pre">ac_marshaller.h</span></code> already has
+<code class="docutils literal notranslate"><span class="pre">AC_SPECIAL_FLOAT_WRAPPER(ac::bfloat16,</span> <span class="pre">16)</span></code>, where <code class="docutils literal notranslate"><span class="pre">ac_ieee_float</span></code> has
+none and this fork had to write one by hand for f32
+(<code class="docutils literal notranslate"><span class="pre">EmitSystemC.cpp</span></code>, <code class="docutils literal notranslate"><span class="pre">ALLO_IEEE_FLOAT_MARSHALL_DEF</span></code>). So a bf16
+<code class="docutils literal notranslate"><span class="pre">Stream</span></code> lowers to <code class="docutils literal notranslate"><span class="pre">Connections::In/Out/Combinational/Fifo&lt;</span>
+<span class="pre">ac::bfloat16</span> <span class="pre">&gt;</span></code> with nothing hand-written behind it. Untested against a real
+Catapult/MatchLib install – there is no licence on this host.</p></li>
+</ul>
+<p><strong>Residual divergences – the part that is still a trap.</strong></p>
+<ol class="arabic simple">
+<li><p><strong>On Vitis, bf16 arithmetic is fp32 arithmetic.</strong> Synthesis of an
+Allo-emitted 8x8 bf16 GEMM (xcu280, 3.33 ns) instantiates
+<code class="docutils literal notranslate"><span class="pre">fmul_32ns_32ns_32_4_max_dsp</span></code> (3 DSP each) and
+<code class="docutils literal notranslate"><span class="pre">fadd_32ns_32ns_32_7_full_dsp</span></code> (2 DSP each) – the same operators a
+<code class="docutils literal notranslate"><span class="pre">float</span></code> design gets. A 16-element bf16 MAC costs 3 DSP / 243 FF / 338 LUT
+for the adder and 3 DSP / 143 FF / 78 LUT for the multiplier, identical to
+the <code class="docutils literal notranslate"><span class="pre">float</span></code> version of the same kernel, at the same II. What bf16 <em>does</em>
+buy on this toolchain is storage: 34 vs 62 BRAM_18K and 6629 vs 10822 FF
+over the whole MAC kernel. Any area model that assumes a bf16 multiplier is
+cheaper than an fp32 one is wrong here. A genuinely narrow bf16 multiplier
+would have to be written out field-by-field in the shim.</p></li>
+<li><p><strong>Catapult’s float-to-bf16 conversion truncates.</strong>
+<code class="docutils literal notranslate"><span class="pre">ac::bfloat16</span></code>’s <em>operators</em> default to <code class="docutils literal notranslate"><span class="pre">AC_TRN_ZERO</span></code>; the generated
+header now sets <code class="docutils literal notranslate"><span class="pre">AC_STD_FLOAT_BFLOAT16_ROUND_OVERRIDE</span></code> to <code class="docutils literal notranslate"><span class="pre">AC_RND_CONV</span></code>
+before including <code class="docutils literal notranslate"><span class="pre">ac_std_float.h</span></code>, which makes add/sub/mul/div round to
+nearest-even and agree with MLIR. Its <code class="docutils literal notranslate"><span class="pre">float</span></code> <strong>constructor</strong>, however,
+hard-codes <code class="docutils literal notranslate"><span class="pre">AC_TRN_ZERO</span></code> (<code class="docutils literal notranslate"><span class="pre">ac_std_float.h</span></code>,
+<code class="docutils literal notranslate"><span class="pre">convert&lt;width,e_width,AC_TRN_ZERO&gt;()</span></code>) and is not overridable, so an
+<code class="docutils literal notranslate"><span class="pre">arith.truncf</span></code> from f32 to bf16 in Catapult output truncates where the
+simulator rounds. Constants are unaffected (a bf16-valued literal converts
+exactly under any mode). Fixing it means emitting an explicit
+<code class="docutils literal notranslate"><span class="pre">convert&lt;16,8,AC_RND_CONV&gt;()</span></code> for that cast rather than a plain
+assignment.</p></li>
+<li><p><strong>intel, tapa and xls still do not support bf16</strong> – deliberately not
+implemented. They now name the type and the backend in an MLIR error and
+return failure instead of aborting. (<code class="docutils literal notranslate"><span class="pre">EmitIntelHLS.cpp</span></code> additionally used
+to call <code class="docutils literal notranslate"><span class="pre">val.getDefiningOp()-&gt;emitError(...)</span></code>, which null-derefs for a
+block argument.)</p></li>
+</ol>
+<p><strong>Separately fixed: an int-to-float bitcast could never produce a bf16.</strong>
+<code class="docutils literal notranslate"><span class="pre">infer.py</span></code> derived the result type of <code class="docutils literal notranslate"><span class="pre">x.bitcast()</span></code> from the source
+bitwidth alone, so 16 bits meant <code class="docutils literal notranslate"><span class="pre">float16</span></code> – a bf16 could be packed into a
+<code class="docutils literal notranslate"><span class="pre">UInt(16)</span></code> but never unpacked. <code class="docutils literal notranslate"><span class="pre">bitcast</span></code> now takes an optional target type,
+<code class="docutils literal notranslate"><span class="pre">u.bitcast(bfloat16)</span></code>, checked against the source width;
+<code class="docutils literal notranslate"><span class="pre">builder.py:2903</span></code> already passed <code class="docutils literal notranslate"><span class="pre">node.dtype</span></code> through and needed no change.
+The no-argument form is unchanged.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>A numbered item recording the <em>same</em> blocker from the MiniTPU side (the BF16
+design that could not be taken to hardware) was in flight while this was
+written. It was not on <code class="docutils literal notranslate"><span class="pre">origin/main</span></code> at <code class="docutils literal notranslate"><span class="pre">e3f289aa</span></code>; if it lands, merge it
+into this entry rather than keeping two.</p>
+</div>
+<p><strong>Evidence.</strong> An Allo-emitted 8x8 bf16 GEMM is <strong>bit-exact</strong> against the
+simulator under both <code class="docutils literal notranslate"><span class="pre">g++</span></code> and Vitis <code class="docutils literal notranslate"><span class="pre">csim_design</span></code> (64/64 elements), and
+<code class="docutils literal notranslate"><span class="pre">csynth_design</span></code> completes: 396 cycles, 10 DSP, 2044 FF, 4325 LUT, estimated
+Fmax 393.55 MHz. Catapult output is checked at the text level only; there is
+no Catapult licence on this host.</p>
+</section>
 </section>
 </section>
 
@@ -2255,6 +2437,7 @@ sub-region – about five lines, not yet prototyped.</p>
 <li><a class="reference internal" href="#the-decision-and-what-landing-it-left-open">The decision, and what landing it left open</a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#bfloat16-runs-in-the-simulator-and-aborts-the-process-in-every-hls-emitter">25. <code class="docutils literal notranslate"><span class="pre">bfloat16</span></code> runs in the simulator and aborts the process in every HLS emitter</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#surfaced-by-the-2026-09-19-re-verification-and-impact-analysis">Surfaced by the 2026-09-19 re-verification and impact analysis</a><ul>
@@ -2267,6 +2450,7 @@ sub-region – about five lines, not yet prototyped.</p>
 <li><a class="reference internal" href="#f-the-aie-cpp-style-typing-rules-reject-every-bitwise-op">F. The AIE <code class="docutils literal notranslate"><span class="pre">cpp-style</span></code> typing rules reject every bitwise op</a></li>
 <li><a class="reference internal" href="#g-0-on-an-array-is-a-runtime-zero-fill-loop">G. <code class="docutils literal notranslate"><span class="pre">=</span> <span class="pre">0</span></code> on an array is a runtime zero-fill loop</a></li>
 <li><a class="reference internal" href="#h-a-sub-region-from-another-module-is-type-checked-against-the-caller-s-globals">H. A sub-region from another module is type-checked against the caller’s globals</a></li>
+<li><a class="reference internal" href="#i-bf16-ran-in-the-simulator-and-aborted-every-hls-emitter">I. <code class="docutils literal notranslate"><span class="pre">bf16</span></code> ran in the simulator and aborted every HLS emitter</a></li>
 </ul>
 </li>
 </ul>

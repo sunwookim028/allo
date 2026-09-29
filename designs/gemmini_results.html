@@ -171,10 +171,12 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/asic_manifest.html">The ASIC manifest</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_tutorial.html">Tutorial: A PyTorch MLP on TinyTPU, Then Change It</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
@@ -468,23 +470,41 @@ did the opposite, and the burst DMA was worth more.</p>
 does not move with size. Measured on its own RTL over a 12x sweep of output
 column tiles (<code class="docutils literal notranslate"><span class="pre">[32,192]&#64;[192,16</span> <span class="pre">/</span> <span class="pre">64</span> <span class="pre">/</span> <span class="pre">192]</span></code>: 2,455 / 8,524 / 24,708 cycles for
 98,304 / 393,216 / 1,179,648 useful MACs), it is 48.6 MAC/cycle = 19.0% at both
-steps, to three digits. Two distinctions matter, and an earlier revision got the
-first one wrong:</p>
+steps, to three digits. Three distinctions matter, and earlier revisions got the
+first two wrong:</p>
 <ul class="simple">
-<li><p><strong>19.0% is the measured marginal; 36.4% is a bound.</strong> One
-<code class="docutils literal notranslate"><span class="pre">mxu_matrix_ctrl</span></code> FSM cannot hold a <code class="docutils literal notranslate"><span class="pre">vmatpush</span></code> and a <code class="docutils literal notranslate"><span class="pre">vmatpop</span></code> at once,
-which permits 4 output rows per 11 cycles = 93.1 MAC/cycle = 36.4% of its 256
-peak. The emitter delivers 48.6 of those 93.1 – <strong>52% of the bound</strong> – so
-roughly half the distance to peak is the FSM and the other half is elsewhere
-in the schedule and is, as of this writing, unattributed. Quoting 36.4% as the
-machine’s marginal conflates a bound with a measurement.</p></li>
-<li><p><strong>Flat versus rising is the real difference, not the number.</strong> Our 37.0% and
-its 36.4% looked like the same quantity and are not: ours rises 26.9% -&gt;
-52.9% and would keep climbing, theirs sits at 19.0% and does not move.</p></li>
+<li><p><strong>19.0% is the measured marginal.</strong> It is theirs, from their RTL, and it is
+the figure to compare a marginal against.</p></li>
+<li><p><strong>36.4% is a different measurement, not a bound.</strong> See the correction below.</p></li>
+<li><p><strong>Flat versus rising is the real difference, not the number.</strong> Ours rises
+26.9% -&gt; 52.9% and would keep climbing; their marginal sits at 19.0% and does
+not move.</p></li>
 </ul>
-<p>A ceiling and an overhead are different objects. Ours is an overhead: a fixed
-charge the sweep is paying off. Theirs is a ceiling: no amount of amortisation
-reaches past it without changing the emitter.</p>
+<div class="admonition-corrected-2026-09-24-36-4-is-a-measurement-of-another-quantity admonition">
+<p class="admonition-title">CORRECTED 2026-09-24 – 36.4% is a measurement of another quantity</p>
+<p>This section said one <code class="docutils literal notranslate"><span class="pre">mxu_matrix_ctrl</span></code> FSM “cannot hold a <code class="docutils literal notranslate"><span class="pre">vmatpush</span></code>
+and a <code class="docutils literal notranslate"><span class="pre">vmatpop</span></code> at once”, giving 4 output rows per 11 cycles = 93.1
+MAC/cycle = 36.4% of peak as a <strong>bound</strong>, and then priced our emitter at
+“52% of the bound”. <strong>Both halves are wrong.</strong></p>
+<p>The mechanism does not exist. <code class="docutils literal notranslate"><span class="pre">vmatload</span></code> and <code class="docutils literal notranslate"><span class="pre">vmatpush</span></code> share
+<code class="docutils literal notranslate"><span class="pre">mxu_stream_engine</span></code>; <code class="docutils literal notranslate"><span class="pre">vmatpop</span></code> runs on its own <code class="docutils literal notranslate"><span class="pre">mxu_pop_engine</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">mxu_matrix_ctrl.sv:6-7</span></code> states “They share no resource, so a pop runs
+while a load or push streams”. <code class="docutils literal notranslate"><span class="pre">mxu_matrix_ctrl</span></code> holds no FSM at all.</p>
+<p>And 36.4% is a measurement, of <strong>whole-model utilisation</strong> – arithmetic
+performed over array peak – not a marginal and not a ceiling. Per
+MiniTPU’s owner: <code class="docutils literal notranslate"><span class="pre">gpt2-124m.prefill.offline.b1t256</span></code>: 1,104 launches, 1.315 s wall,
+194.67 tok/s, 34.91 GFLOP/s against a 96.0 GFLOP/s array peak, PL busy
+92.8 %, a <strong>board measurement at 187.498 MHz</strong>, five repetitions, wall
+spread 0.15-0.79 %.
+Neighbouring rows of the same table read 36.1%, 34.7% and 32.6% at other
+shapes.</p>
+<p>So 19.0% (a marginal, from an RTL sweep) and 36.4% (whole-model utilisation
+on one board workload) are not two readings of one quantity and must not be
+divided by one another. <strong>The “52% of the bound” attribution is withdrawn</strong>:
+how much of the distance to peak is structural is, on this evidence,
+unknown. Read from <code class="docutils literal notranslate"><span class="pre">~/core/minitpu</span></code> on 2026-09-24 and confirmed by
+MiniTPU’s owner.</p>
+</div>
 <p>An earlier analysis of this page read Gemmini’s marginal efficiency off a
 two-point difference and put it at “essentially 100% of peak”; that reading was
 corrected — see <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
@@ -933,7 +953,7 @@ at three configurations — 1,136,598 at <code class="docutils literal notransla
 comparing cycles against Gemmini at a matched array size. A cycle comparison
 with an area column on only one side is not a comparison; it is an
 advertisement. This section is the correction, and the RTL that makes it
-possible is in <code class="docutils literal notranslate"><span class="pre">examples/tinytpu/gemmini_rtl/</span></code>.</p>
+possible is in <code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/gemmini_rtl/</span></code>.</p>
 <section id="the-comparable-unit-is-gemmini-not-the-soc">
 <h3>The comparable unit is <code class="docutils literal notranslate"><span class="pre">Gemmini</span></code>, not the SoC<a class="headerlink" href="#the-comparable-unit-is-gemmini-not-the-soc" title="Link to this heading"><span>¶</span></a></h3>
 <p>Chipyard elaborates a whole system-on-chip: a Rocket core, an L1 instruction
@@ -1389,9 +1409,9 @@ blocker.</p>
 </section>
 <section id="the-handoff">
 <h3>The handoff<a class="headerlink" href="#the-handoff" title="Link to this heading"><span>¶</span></a></h3>
-<p><code class="docutils literal notranslate"><span class="pre">gemmini_rtl/DIM4_int8_capmatched/</span></code> and <code class="docutils literal notranslate"><span class="pre">gemmini_rtl/DIM8_int8_capmatched/</span></code>,
-written by <code class="docutils literal notranslate"><span class="pre">export_gemmini_rtl.py</span></code>, in the shape <code class="docutils literal notranslate"><span class="pre">rtl_handoff/</span></code> already
-uses: flat RTL, <code class="docutils literal notranslate"><span class="pre">sv2v_manifest.f</span></code> in dependency order, <code class="docutils literal notranslate"><span class="pre">MANIFEST.json</span></code>
+<p><code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/gemmini_rtl/DIM4_int8_capmatched/</span></code> and its
+<code class="docutils literal notranslate"><span class="pre">DIM8_int8_capmatched/</span></code> sibling, written by <code class="docutils literal notranslate"><span class="pre">export_gemmini_rtl.py</span></code>, in the
+shape <code class="docutils literal notranslate"><span class="pre">dev/records/tinytpu/rtl_handoff/</span></code> already uses: flat RTL, <code class="docutils literal notranslate"><span class="pre">sv2v_manifest.f</span></code> in dependency order, <code class="docutils literal notranslate"><span class="pre">MANIFEST.json</span></code>
 naming the top module and carrying the configuration, and a README stating the
 elaborating commit and every cut. The exporter refuses an export whose named
 top module is undefined and one whose resource record is empty — the two guards

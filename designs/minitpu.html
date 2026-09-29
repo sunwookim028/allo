@@ -170,10 +170,12 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/asic_manifest.html">The ASIC manifest</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="tinytpu_tutorial.html">Tutorial: A PyTorch MLP on TinyTPU, Then Change It</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
@@ -238,6 +240,12 @@ earlier pass, now empty), and neither travels to zhang-21. This records what we
 findings outlive the tree. Everything was read-only. Distilled from two rescued
 scratchpad reports; <em>(verified)</em> means re-checked against <code class="docutils literal notranslate"><span class="pre">~/core/minitpu</span></code> on
 2026-09-18.</p>
+<p>An Allo model of this machine’s compute core lives at <code class="docutils literal notranslate"><span class="pre">examples/minitpu</span></code>
+(<code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">examples/minitpu/run.py</span></code>). It is component-for-component with the
+RTL and says nothing about cycles. Its README lists both where the model
+diverges from the machine and, separately, where <strong>this page</strong> disagreed with
+the source. Reading the RTL for that model found nine such places; each is
+corrected below and marked <strong>CORRECTED 2026-09-24</strong>.</p>
 <section id="shipped-bitstream-qor-xczu7ev-ffvc1156-2-e-vivado-2023-2">
 <h2>1. Shipped-bitstream QoR (xczu7ev-ffvc1156-2-e, Vivado 2023.2)<a class="headerlink" href="#shipped-bitstream-qor-xczu7ev-ffvc1156-2-e-vivado-2023-2" title="Link to this heading"><span>¶</span></a></h2>
 <p>Every figure here is a <strong>board measurement of a named bitstream</strong>, reported by
@@ -429,11 +437,15 @@ Their arithmetic semantics are documented by them at
 <code class="docutils literal notranslate"><span class="pre">core/minitpu/docs/ARITHMETIC.md</span></code>, which is the source of record.</p></td>
 </tr>
 <tr class="row-odd"><td><p>Accumulator</p></td>
-<td><p><strong>24-bit float</strong> per PE (sign + 8 exp + 15 frac, <code class="docutils literal notranslate"><span class="pre">MXU_ACC_W</span></code>), not fixed point</p></td>
+<td><p><strong>24-bit float</strong> per PE (sign + 8 exp + 15 frac, <code class="docutils literal notranslate"><span class="pre">MXU_ACC_W</span></code>), not fixed
+point. Subnormals are <strong>enabled</strong> here; both multipliers flush them and
+neither adder does (<code class="docutils literal notranslate"><span class="pre">ARITHMETIC.md</span></code> §5) — CORRECTED 2026-09-24</p></td>
 </tr>
 <tr class="row-even"><td><p>Bundle</p></td>
-<td><p><strong>128-bit VLIW</strong>: slots V / M / MEM / S / C, shared immediate, <strong>7-bit DELAY</strong>
-(<code class="docutils literal notranslate"><span class="pre">DELAY_W</span> <span class="pre">=</span> <span class="pre">7</span></code>, <code class="docutils literal notranslate"><span class="pre">sequencer_pkg.sv:23</span></code>) <em>(verified)</em>. MEM’s two kinds, LDST
+<td><p><strong>128-bit VLIW</strong>: slots V / M / MEM / S / C, shared immediate,
+<strong>7-bit DELAY</strong> (<code class="docutils literal notranslate"><span class="pre">DELAY_W</span> <span class="pre">=</span> <span class="pre">7</span></code>,
+<code class="docutils literal notranslate"><span class="pre">src/core/sequencer/sequencer_pkg.sv:33</span></code> — CORRECTED 2026-09-24; there
+is no <code class="docutils literal notranslate"><span class="pre">src/pkg/sequencer_pkg.sv</span></code>). MEM’s two kinds, LDST
 (<code class="docutils literal notranslate"><span class="pre">vld</span></code>/<code class="docutils literal notranslate"><span class="pre">vst</span></code>) and DESC (<code class="docutils literal notranslate"><span class="pre">vmemld</span></code>/<code class="docutils literal notranslate"><span class="pre">vmemst</span></code>), cannot share a bundle</p></td>
 </tr>
 <tr class="row-odd"><td><p>Hazards</p></td>
@@ -479,6 +491,13 @@ must match <code class="docutils literal notranslate"><span class="pre">docs/isa
 Stated rather than restated, because this is another team’s design and
 their tree is the record: the depth to quote is whatever
 <code class="docutils literal notranslate"><span class="pre">MINITPU_MXU_OUTPUT_FIFO_DEPTH</span></code> is at the commit being discussed.</p>
+<p><strong>CORRECTED 2026-09-24, on the unit as well as the number.</strong> The depth
+counts <strong>result rows</strong>, not entries: <code class="docutils literal notranslate"><span class="pre">mxu.sv:114-117</span></code> keeps 64 rows as
+<code class="docutils literal notranslate"><span class="pre">OUTPUT_GROUP_ENTRIES</span> <span class="pre">=</span> <span class="pre">16</span></code> entries of <code class="docutils literal notranslate"><span class="pre">OUTPUT_GROUP_W</span> <span class="pre">=</span> <span class="pre">64</span></code> bits, each
+entry a group of <code class="docutils literal notranslate"><span class="pre">NUM_SUBLANES</span> <span class="pre">=</span> <span class="pre">4</span></code> BF16 results, with an elaboration
+<code class="docutils literal notranslate"><span class="pre">$error</span></code> on non-divisibility. The rule a schedule needs is four rows per
+<code class="docutils literal notranslate"><span class="pre">vmatpush</span></code>, so at most 16 pushes outstanding (<code class="docutils literal notranslate"><span class="pre">asm.py:933-955</span></code>).
+“32/lane” was wrong in the number and in the unit.</p>
 </div>
 <p>The bundle’s fixed bit layout, from <code class="docutils literal notranslate"><span class="pre">sequencer_pkg.sv</span></code>’s
 <code class="docutils literal notranslate"><span class="pre">encoded_bundle_t</span></code>, which is declared MSB first so that the struct <em>is</em> the
@@ -495,7 +514,11 @@ bits:  20      8      34      13       7      24       7      15
 payload, or a descriptor’s displacement – and <strong>exactly one slot may claim it
 per bundle</strong>; <code class="docutils literal notranslate"><span class="pre">encode_bundle</span></code> fails the build if two do, because the losers
 would silently read the winner’s constant. <code class="docutils literal notranslate"><span class="pre">DELAY_W</span> <span class="pre">=</span> <span class="pre">7</span></code> holds issue 0..127
-cycles, sized so one field covers the MXU’s 82-cycle result latency.</p>
+cycles, sized so one field covers the MXU’s result latency. (That latency is
+<strong>85</strong>, not the 82 this page carried — CORRECTED 2026-09-24: 82 survives only
+in a stale comment at <code class="docutils literal notranslate"><span class="pre">sequencer_pkg.sv:32</span></code>, against 85 in
+<code class="docutils literal notranslate"><span class="pre">docs/isa_latency.json</span></code> and <code class="docutils literal notranslate"><span class="pre">docs/ISA_AND_INTERFACES.md:57</span></code>. <code class="docutils literal notranslate"><span class="pre">DELAY_W</span> <span class="pre">=</span> <span class="pre">7</span></code>
+covers either.)</p>
 <p>Why BF16: accumulator width was chosen first from the LUT/DSP budget, and an
 8-bit-exponent format is what fits it — “there is no FP32 state anywhere in this
 design… fp32’s extra 8 bits could only ever hold zeros there”
@@ -512,7 +535,21 @@ URAM array</strong> — one compute port, one DMA port, whole words only — wit
 arbiter and no interlock</strong>; its own comment: “same-word collisions across the
 two ports are undefined, as on the FPGA” <em>(verified)</em>. No banking, no conflict
 cost model, nothing to model as a conditional latency. Do not build against the
-banked model.</p>
+banked model. VMEM is 4096 words of 128 B — 512 KiB — one word being exactly
+one VREG (<code class="docutils literal notranslate"><span class="pre">vpu_pkg.sv:88-92</span></code>).</p>
+<div class="admonition-corrected-2026-09-24-the-banking-is-real-it-is-just-not-in-vmem admonition">
+<p class="admonition-title">CORRECTED 2026-09-24 — the banking is real, it is just not in VMEM</p>
+<p>This section reads as though “4 banks per lane” were a fiction. The phrase
+is in the live tree: <code class="docutils literal notranslate"><span class="pre">NUM_SUBLANES</span> <span class="pre">=</span> <span class="pre">4</span></code> is commented “== banks per lane”
+(<code class="docutils literal notranslate"><span class="pre">vpu_pkg.sv:45</span></code>), and the <strong>vector register file</strong> really is four banks —
+<code class="docutils literal notranslate"><span class="pre">vpu_vreg_stripe.sv:73-87</span></code> instantiates <code class="docutils literal notranslate"><span class="pre">NUM_SUBLANES</span></code> copies of
+<code class="docutils literal notranslate"><span class="pre">vpu_regfile</span></code>, each 256 bits wide and 32 deep, because every lane of a
+sublane shares the broadcast VREG address. What the rescued report got
+wrong is <em>which structure</em> is banked and what it costs: the VREG banks are
+not a conflict source (one address, all four banks, per access), and VMEM —
+the thing it built a <code class="docutils literal notranslate"><span class="pre">gcd(stride,4)</span></code> latency model on — is flat. Keep the
+conclusion; drop the implication that nothing in this machine is banked.</p>
+</div>
 </section>
 </section>
 <section id="measured-performance-and-the-bound-that-is-not-a-measurement">
@@ -526,27 +563,84 @@ re-measured over 20 points with <strong>maximum residual 0</strong>:</p>
 </div>
 <p>The fit this page carried before the <code class="docutils literal notranslate"><span class="pre">vmatpop</span></code> occupancy correction
 (<code class="docutils literal notranslate"><span class="pre">72c8b78</span></code>) is kept in <a class="reference internal" href="#earlier-measurements-and-corrections">Earlier measurements and corrections</a>.</p>
-<p>The <strong>matrix step is 52 cycles</strong>, and the bottleneck is the <strong>write port of the
-3R1W vector-register file</strong> — port C is shared by store and matrix — <strong>not the
-array</strong> (from MiniTPU’s owner).</p>
+<p>The <strong>matrix step is 52 cycles</strong>, and the bottleneck is a port of the <strong>3R1W
+vector-register file</strong> — port C, shared by store and matrix — <strong>not the array</strong>
+(from MiniTPU’s owner).</p>
+<div class="admonition-corrected-2026-09-24-port-c-is-a-read-port-not-the-write-port admonition">
+<p class="admonition-title">CORRECTED 2026-09-24 — port C is a READ port, not the write port</p>
+<p>This paragraph said “the write port … port C”. Port C is one of the three
+<strong>read</strong> ports (<code class="docutils literal notranslate"><span class="pre">raddr_c</span></code>, <code class="docutils literal notranslate"><span class="pre">vpu_regfile.sv:16-27</span></code>); its two readers are
+the store path’s data read and the matrix stream engine, and
+<code class="docutils literal notranslate"><span class="pre">vpu.sv:429-431</span></code> is a fixed-priority mux the matrix wins, with no
+interlock and no stall. The <strong>single write port</strong> is a different structure:
+an OR-mux over six sources (<code class="docutils literal notranslate"><span class="pre">vpu.sv:289-305</span></code>) whose only guard is a
+<code class="docutils literal notranslate"><span class="pre">$onehot0</span></code> simulation assertion. Both are real contention points and a
+cost model needs both — <code class="docutils literal notranslate"><span class="pre">tools/gemm_cycle_model.py</span></code>’s <code class="docutils literal notranslate"><span class="pre">step_bounds()</span></code>
+books the write port separately from the stream engine.</p>
+</div>
 <ul class="simple">
-<li><p><strong>19.0 % of peak is the MEASURED figure</strong> at the margin.</p></li>
-<li><p><strong>36.4 % of peak is a BOUND</strong>, set by the matrix controller not overlapping a
-push with a pop.</p></li>
-<li><p><strong>Never present the bound as a measurement.</strong> That error was made once already
-and corrected.</p></li>
+<li><p><strong>19.0 % of peak is the MEASURED marginal efficiency</strong>, from their own RTL
+sweep, and it does not move with size.</p></li>
+<li><p><strong>36.4 % of peak is also a MEASUREMENT, of a different quantity</strong> –
+whole-model utilisation, arithmetic performed over array peak, on
+<code class="docutils literal notranslate"><span class="pre">gpt2-124m.prefill.offline.b1t256</span></code>: 1,104 launches, 1.315 s wall,
+194.67 tok/s, 34.91 GFLOP/s against a 96.0 GFLOP/s array peak, PL busy
+92.8 %, a <strong>board measurement at 187.498 MHz</strong>, five repetitions, wall
+spread 0.15-0.79 %. It says nothing about controllers.</p></li>
 </ul>
-<p>A 16×16×16 matmul takes <strong>168 cycles</strong>, capped by the serialized matrix-command
-FSM (push and pop share one controller). (<em>Originally from the rescued
-comparison work and not stated in either surviving source doc; MiniTPU’s owner
-now reports the same 168 for the 16×16 GEMM Verilator workload, so it is
-corroborated.</em>)</p>
-<p>The rest of the gap is result latency — 82 cycles from <code class="docutils literal notranslate"><span class="pre">vmatpush</span></code> to first
+<div class="admonition-corrected-2026-09-24-36-4-is-a-measurement-not-a-bound admonition">
+<p class="admonition-title">CORRECTED 2026-09-24 – 36.4 % is a measurement, not a bound</p>
+<p>This page, and <a class="reference internal" href="gemmini_results.html"><span class="doc">TinyTPU-isa vs Gemmini: Results and History</span></a>, presented 36.4 % as a
+structural <strong>ceiling</strong> set by “the matrix controller not overlapping a push
+with a pop”. It is nothing of the kind. Per MiniTPU’s owner it is the
+utilisation of one workload, and the neighbouring rows of the same table
+read <strong>36.1 %, 34.7 % and 32.6 %</strong> at other shapes – a workload figure
+moves with the workload; a structural ceiling does not. The supposed
+mechanism does not exist either: push and pop run on separate engines (see
+below). <strong>Do not quote 36.4 % as a bound, a ceiling or a limit.</strong> The
+warning that used to sit here – “never present the bound as a
+measurement” – was exactly backwards.</p>
+</div>
+<p>A 16×16×16 matmul takes <strong>168 cycles</strong> (<em>originally from the rescued comparison
+work and not stated in either surviving source doc; MiniTPU’s owner now reports
+the same 168 for the 16×16 GEMM Verilator workload, so it is corroborated</em>).</p>
+<div class="admonition-corrected-2026-09-24-push-and-pop-do-not-share-one-controller admonition">
+<p class="admonition-title">CORRECTED 2026-09-24 — push and pop do NOT share one controller</p>
+<p>This sentence attributed the 168 to “the serialized matrix-command FSM (push
+and pop share one controller)”. The live RTL has <strong>two</strong> engines.
+<code class="docutils literal notranslate"><span class="pre">vmatload</span></code> and <code class="docutils literal notranslate"><span class="pre">vmatpush</span></code> share <code class="docutils literal notranslate"><span class="pre">mxu_stream_engine</span></code> — one three-state
+FSM, one VREG read port C, one input FIFO — so <em>those two</em> can never
+overlap. <code class="docutils literal notranslate"><span class="pre">vmatpop</span></code> runs on its own <code class="docutils literal notranslate"><span class="pre">mxu_pop_engine</span></code>, concurrently:
+<code class="docutils literal notranslate"><span class="pre">mxu_matrix_ctrl.sv:6-7</span></code> reads “They share no resource, so a pop runs
+while a load or push streams”. <code class="docutils literal notranslate"><span class="pre">mxu_matrix_ctrl</span></code> holds no FSM of its own;
+it is a container plus a busy reduction.</p>
+<p><strong>The 36.4 % bound above was derived from the one-controller reading, so it
+should be restated against the two-engine machine before it is quoted
+again.</strong> Relatedly, <code class="docutils literal notranslate"><span class="pre">matrix_busy</span></code> is a naming trap: <code class="docutils literal notranslate"><span class="pre">vpu.sv:195</span></code> assigns
+it <code class="docutils literal notranslate"><span class="pre">matrix_command_blocked</span></code> — “this bundle’s M command found its engine
+busy”, a schedule-violation flag — and the genuinely-busy signal is dropped
+(<code class="docutils literal notranslate"><span class="pre">vpu.sv:433-434</span></code>). It stalls nothing.</p>
+</div>
+<p>The rest of the gap is result latency — 85 cycles from <code class="docutils literal notranslate"><span class="pre">vmatpush</span></code> to first
 result — and it <strong>cannot be hidden by reordering</strong>: loading the next weights
-early corrupts the tile in flight, because weight-commit reaches every PE on one
-cycle (<code class="docutils literal notranslate"><span class="pre">mxu_pe.sv</span></code>). Recovering it needs hardware (hold commit until the array
-drains, or a second weight bank); splitting the matrix controller alone was
+early corrupts the tile in flight. Splitting the matrix controller alone was
 measured and gains nothing.</p>
+<div class="admonition-corrected-2026-09-24-the-commit-is-skewed-and-the-second-bank-exists admonition">
+<p class="admonition-title">CORRECTED 2026-09-24 — the commit is skewed, and the second bank exists</p>
+<p>Two errors in the sentence this replaces. (a) Weight commit does <strong>not</strong>
+reach every PE on one cycle. It enters the west edge per row skewed by
+<code class="docutils literal notranslate"><span class="pre">row</span> <span class="pre">*</span> <span class="pre">MXU_PE_LATENCY</span></code> (<code class="docutils literal notranslate"><span class="pre">mxu.sv:230</span></code>) and then walks east one PE per
+cycle, so PE <code class="docutils literal notranslate"><span class="pre">(r,</span> <span class="pre">c)</span></code> commits at <code class="docutils literal notranslate"><span class="pre">r*4</span> <span class="pre">+</span> <span class="pre">c</span></code>; the span is
+<code class="docutils literal notranslate"><span class="pre">WEIGHT_SWITCH_SPAN</span> <span class="pre">=</span> <span class="pre">(DIM-1)*PE_LATENCY</span> <span class="pre">+</span> <span class="pre">(DIM-1)</span> <span class="pre">=</span> <span class="pre">75</span></code> (<code class="docutils literal notranslate"><span class="pre">mxu.sv:60</span></code>),
+and the switch is armed not by the load ending but by the <em>next</em> activation
+(<code class="docutils literal notranslate"><span class="pre">tile_starts</span></code>, <code class="docutils literal notranslate"><span class="pre">mxu.sv:170</span></code>). (b) A second weight bank is not hardware
+still to be built — it is already there. <code class="docutils literal notranslate"><span class="pre">MXU_WEIGHT_BANKS</span> <span class="pre">=</span> <span class="pre">2</span></code>
+(<code class="docutils literal notranslate"><span class="pre">vpu_pkg.sv:108</span></code>), with an elaboration <code class="docutils literal notranslate"><span class="pre">$error</span></code> if it is ever not 2,
+because the bank pointers are literal toggles. The 75-cycle rule <em>is</em> the
+two-bank contract: a <code class="docutils literal notranslate"><span class="pre">vmatload</span></code> refills the bank of the load two before
+it, and issuing it sooner overwrites weights a PE has not switched to —
+wrong results, no fault (<code class="docutils literal notranslate"><span class="pre">mxu.sv:246-262</span></code>, <code class="docutils literal notranslate"><span class="pre">asm.py:1313-1330</span></code>).</p>
+</div>
 <p><strong>Board-validated</strong> means exactly three bring-up kernels: <code class="docutils literal notranslate"><span class="pre">halt</span></code> 4 cy,
 <code class="docutils literal notranslate"><span class="pre">vreg</span></code> 12 cy, <code class="docutils literal notranslate"><span class="pre">scalar</span></code> 8 cy. <strong>Nothing else on this page is a board cycle
 count.</strong></p>
@@ -583,9 +677,15 @@ exactly it; doubling VREG count needs 5 bits that do not exist.</p>
 <h2>6. Defects reported outward to that design’s owner<a class="headerlink" href="#defects-reported-outward-to-that-design-s-owner" title="Link to this heading"><span>¶</span></a></h2>
 <ul class="simple">
 <li><p>The stale <strong>7.255 W</strong> README figure (shipped: 8.255 W) — since fixed.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">src/core/mxu/mxu_adapter.sv</span></code> <strong>is dead code</strong>: listed in <code class="docutils literal notranslate"><span class="pre">core.f</span></code> and <code class="docutils literal notranslate"><span class="pre">vpu.f</span></code>,
-instantiated nowhere in <code class="docutils literal notranslate"><span class="pre">src/</span></code> or <code class="docutils literal notranslate"><span class="pre">tb/</span></code> <em>(verified, still present)</em>.
-<strong>CORRECTION</strong>: the rescued report treats the MXU adapter path as live.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">src/core/mxu/mxu_adapter.sv</span></code> was reported outward as <strong>dead code</strong>: listed
+in <code class="docutils literal notranslate"><span class="pre">core.f</span></code> and <code class="docutils literal notranslate"><span class="pre">vpu.f</span></code>, instantiated nowhere. <strong>CORRECTED 2026-09-24:
+the file does not exist.</strong> <code class="docutils literal notranslate"><span class="pre">grep</span> <span class="pre">-rn</span> <span class="pre">mxu_adapter</span></code> over <code class="docutils literal notranslate"><span class="pre">src/</span></code>, <code class="docutils literal notranslate"><span class="pre">tb/</span></code>,
+the <code class="docutils literal notranslate"><span class="pre">.f</span></code> filelists and the build scripts returns nothing, and there is no
+such file anywhere under <code class="docutils literal notranslate"><span class="pre">~/core</span></code>. The MXU/VPU boundary shims are
+<code class="docutils literal notranslate"><span class="pre">mxu_serializer</span></code> / <code class="docutils literal notranslate"><span class="pre">mxu_deserializer</span></code>, both pass-through wires in one
+file (<code class="docutils literal notranslate"><span class="pre">mxu_serializer.sv:14,27-28</span></code>). The rescued report treating the MXU
+adapter path as live is wrong twice over: the path is not live, and the file
+is gone.</p></li>
 <li><p>A stale <code class="docutils literal notranslate"><span class="pre">matrix_busy_o</span></code> doc comment.</p></li>
 </ul>
 </section>
@@ -616,8 +716,10 @@ and has moved. Do not mix vocabularies:</p>
 </tbody>
 </table>
 <p>Both agree on: 16×16 BF16 array, 24-bit accumulator, 128-bit bundle, no
-interlocks, 24-bundle loop buffer, 32-entry MXU output FIFO, 82-cycle
-push→result latency.</p>
+interlocks, 24-bundle loop buffer — and on two figures they both get wrong, a
+32-entry MXU output FIFO and an 82-cycle push→result latency. <strong>CORRECTED
+2026-09-24: 64 result rows per lane, and 85 cycles</strong>; see §3 and §4. Two
+reports agreeing is not verification when both descend from one reading.</p>
 <p>Consequence: <strong>the rescued report’s 8-stage TinyTPU scaling plan rests on the
 banked-VMEM model and a live MXU adapter, so it is invalidated in those parts.</strong>
 Not reproduced here; what survives of it is §5.</p>

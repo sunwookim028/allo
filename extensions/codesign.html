@@ -170,10 +170,12 @@
 <li class="toctree-l1"><a class="reference internal" href="../backends/xls.html">Google XLS (ASIC)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/simulator.html">Multi-Threaded Simulator (CPU)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/nonblocking_streams.html">Non-Blocking Stream Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backends/asic_manifest.html">The ASIC manifest</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../backends/aie/index.html">AMD MLIR-AIE (AI Engine)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Accelerator Case Study</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_tutorial.html">Tutorial: A PyTorch MLP on TinyTPU, Then Change It</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa.html">TinyTPU-isa: A Programmable GEMM Accelerator</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_spec.html">TinyTPU-isa: The ISA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../designs/tinytpu_isa_results.html">TinyTPU-isa: Results and History</a></li>
@@ -426,10 +428,12 @@ rebinding, and only then prints the line the evaluator requires.</p>
 </section>
 <section id="the-control">
 <h2>The control<a class="headerlink" href="#the-control" title="Link to this heading"><span>¶</span></a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">accept.py</span></code>’s <code class="docutils literal notranslate"><span class="pre">BASELINES</span></code> table is keyed on the git blob of the two spec
-files, so prose-only edits invalidate it. The co-design loop therefore
-<strong>measures its control in the same run</strong>: <code class="docutils literal notranslate"><span class="pre">loop.py</span></code> iteration 0, and
-<code class="docutils literal notranslate"><span class="pre">test_codesign.py</span></code> case k1.</p>
+<p><code class="docutils literal notranslate"><span class="pre">control.RECORDED</span></code> is keyed on the git blobs of the editable design files
+— fourteen paths since the unit library landed, not the two it was when this
+was written — so prose-only edits invalidate it. (<code class="docutils literal notranslate"><span class="pre">accept.py</span></code> has no
+baseline table at all and no cycle literal: it measures its control per run.)
+The co-design loop therefore <strong>measures its control in the same run</strong>:
+<code class="docutils literal notranslate"><span class="pre">loop.py</span></code> iteration 0, and <code class="docutils literal notranslate"><span class="pre">test_codesign.py</span></code> case k1.</p>
 <p>Measured 2026-09-22, unmodified design, same environment and tool state:</p>
 <table class="docutils align-default">
 <colgroup>
