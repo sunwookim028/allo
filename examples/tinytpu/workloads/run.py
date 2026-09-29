@@ -171,25 +171,39 @@ def quantized_reference(model, extraction, x, gm=None):
     return [o.numpy().astype(np.int8) for o in outs]
 
 
-def run_on_machine(model, extraction, programs, x, gm=None):
+def layer_buffers(model, layer, act):
+    """The flat DRAM images `A`, `B`, `C` for one layer: the activation in
+    `A`, the Linear's weight transposed into `B` (`nn.Linear` holds it
+    `(out, in)`, the spec's `B` is `kn`), and a zeroed `C`."""
+    A = np.zeros((MAXDIM, MAXDIM), np.int8)
+    B = np.zeros((MAXDIM, MAXDIM), np.int8)
+    C = np.zeros((MAXDIM, MAXDIM), np.int8)
+    A[:layer.m, :layer.k] = act
+    weight = model.get_submodule(layer.module).weight.detach().numpy()
+    B[:layer.k, :layer.n] = weight.T.astype(np.int8)
+    return A.reshape(-1), B.reshape(-1), C.reshape(-1)
+
+
+def run_on_machine(model, extraction, programs, x, gm=None,
+                   execute=isa_ref.run, on_layer=None):
     """The model executed as the machine executes it: one program per layer,
     DRAM in and DRAM out, nothing carried over between layers.
 
     Which activation each program is handed is the graph's answer, the same
-    `layer_sources` the reference above uses."""
+    `layer_sources` the reference above uses. `execute(prog, A, B, C) -> C`
+    runs a program: `isa_ref.run` (the ISA in numpy, the default) or a built
+    design. `on_layer(layer, prog, A, B, C, out)` sees every layer's buffers,
+    for a caller that checks each one."""
     gm = _graph_of(model, extraction, x, gm)
     sources = layer_sources(gm, extraction)
     first = x.numpy().astype(np.int8)
     done, outs = {}, []
     for i, (layer, prog) in enumerate(zip(extraction.layers, programs)):
         act = first if sources[i] < 0 else done[sources[i]]
-        A = np.zeros((MAXDIM, MAXDIM), np.int8)
-        B = np.zeros((MAXDIM, MAXDIM), np.int8)
-        C = np.zeros((MAXDIM, MAXDIM), np.int8)
-        A[:layer.m, :layer.k] = act
-        weight = model.get_submodule(layer.module).weight.detach().numpy()
-        B[:layer.k, :layer.n] = weight.T.astype(np.int8)
-        out = isa_ref.run(prog, A.reshape(-1), B.reshape(-1), C.reshape(-1))
+        A, B, C = layer_buffers(model, layer, act)
+        out = execute(prog, A, B, C)
+        if on_layer is not None:
+            on_layer(layer, prog, A, B, C, out)
         done[i] = out.reshape(MAXDIM, MAXDIM)[:layer.m, :layer.n].copy()
         outs.append(done[i])
     return outs
