@@ -22,6 +22,7 @@ from .._mlir.passmanager import PassManager
 
 from .config import DEFAULT_CONFIG, PART_NUMBER
 from . import asic_manifest
+from . import systemc
 from .vitis import (
     codegen_host,
     postprocess_hls_code,
@@ -425,21 +426,8 @@ class HLSModule:
                     'target="systemc" for wire/channel, or Stream for other '
                     "HLS backends."
                 )
-            # Stamp per-arg I/O direction (in/out/both/scalar) so the SystemC
-            # backend can emit the right port direction — analyze_arg_load_store
-            # derives it from actual loads/stores (propagated through calls),
-            # unlike `itypes` which only carries the datatype/signedness.
             if platform == "systemc":
-                _dir_char = {"in": "i", "out": "o", "both": "b", "scalar": "_"}
-                # stamp EVERY func (top + kernels): the emitter needs each memref
-                # arg's direction — kernel memref args too, to pick Connections::In
-                # vs Out when stream-ifying a boundary array.
-                for _fname, _dirs in analyze_arg_load_store(self.module).items():
-                    _f = find_func_in_module(self.module, _fname)
-                    if _f is not None:
-                        _f.attributes["arg_dirs"] = StringAttr.get(
-                            "".join(_dir_char.get(d, "_") for d in _dirs)
-                        )
+                systemc.stamp_arg_dirs(self.module)
             # fix: num_output_args
             if self.num_output_args is None and len(func.type.results) == 0:
                 load_store_mapping = analyze_arg_load_store(self.module)
@@ -540,21 +528,8 @@ class HLSModule:
                 # Catapult 2024.2 dropped `solution app` csim, so provide a
                 # standalone runner: compile+run with the bundled g++/libsystemc.
                 if platform == "systemc" and mode == "csim":
-                    csim_sh = (
-                        "#!/bin/bash\n"
-                        "# Standalone SystemC behavioral csim for the self-contained\n"
-                        "# kernel.cpp (compile+run its sc_main tb with Catapult's g++).\n"
-                        "set -e\n"
-                        ': "${MGC_HOME:?set MGC_HOME to your Catapult Mgc_home}"\n'
-                        'GXX="$MGC_HOME/bin/g++"\n'
-                        'INC="$MGC_HOME/shared/include"\n'
-                        'LIB=$(ls -d "$MGC_HOME"/shared/lib/Linux/gcc-*-64 2>/dev/null | head -1)\n'
-                        '"$GXX" -std=c++11 -DSC_INCLUDE_DYNAMIC_PROCESSES -I"$INC" \\\n'
-                        '  kernel.cpp -o csim_sim -L"$LIB" -Wl,-rpath,"$LIB" -lsystemc\n'
-                        'LD_LIBRARY_PATH="$MGC_HOME/lib:$LIB" ./csim_sim\n'
-                    )
                     with open(f"{project}/csim.sh", "w", encoding="utf-8") as f:
-                        f.write(csim_sh)
+                        f.write(systemc.CSIM_SCRIPT)
                     os.chmod(f"{project}/csim.sh", 0o755)
             copy_ext_libs(ext_libs, project)
             if self.platform == "vitis_hls":
@@ -1118,19 +1093,10 @@ class HLSModule:
                 ) as outfile:
                     outfile.write(header)
 
-                # Write input data. A systemc region is a void function whose args
-                # are all "inputs" by signature, so split by actual direction
-                # (arg_dirs): 'in' -> input<k>.data (read by the emitted testbench),
-                # 'out' -> filled from output<k>.data after the run.
                 if self.platform == "systemc":
-                    dirs = analyze_arg_load_store(self.module)[self.top_func_name]
-                    _ii = 0
-                    for (in_dtype, in_shape), arg, d in zip(inputs, args, dirs):
-                        if d in ("in", "both"):  # 'both' arrays are preloaded too
-                            write_tensor_to_file(
-                                arg, in_shape, f"{self.project}/input{_ii}.data"
-                            )
-                            _ii += 1
+                    dirs = systemc.write_inputs(
+                        self.module, self.top_func_name, inputs, args, self.project
+                    )
                 else:
                     for i, ((in_dtype, in_shape), arg) in enumerate(
                         zip(inputs, args[: len(inputs)])
@@ -1155,25 +1121,7 @@ class HLSModule:
                     )
 
                 if self.platform == "systemc":
-                    systemc_home = os.environ.get("SYSTEMC_HOME", "")
-                    if not systemc_home:
-                        raise RuntimeError("Set SYSTEMC_HOME for systemc csim.")
-                    lib_dir = os.path.join(systemc_home, "lib-linux64")
-                    if not os.path.isdir(lib_dir):
-                        lib_dir = os.path.join(systemc_home, "lib")
-                    # Connections/matchlib ship under $MGC_HOME/shared/include alongside ac_types
-                    # Option A: kernel.cpp is self-contained (its own sc_main); no host.cpp.
-                    # ALLO_CXX_EXTRA: host-specific extra flags (e.g. a newer libstdc++
-                    # dir: libsystemc needs GLIBCXX_3.4.26, absent from zhang-21's system
-                    # libstdc++ -> `-L<conda>/lib -Wl,-rpath,<conda>/lib`).
-                    cxx_extra = os.environ.get("ALLO_CXX_EXTRA", "")
-                    cmd = (
-                        f"cd {self.project}; g++ -std=c++17 "
-                        f"-I{ac_include} -I{systemc_home}/include "
-                        f"{cxx_extra} kernel.cpp "
-                        f"-L{lib_dir} -Wl,-rpath,{lib_dir} -lsystemc "
-                        f"-o sim"
-                    )
+                    cmd = systemc.compile_command(self.project, ac_include, "csim")
                 else:
                     cmd = f"cd {self.project}; g++ -std=c++11 -I{ac_include} kernel.cpp host.cpp -o sim"
                 print(
@@ -1204,22 +1152,7 @@ class HLSModule:
 
                 # Read outputs
                 if self.platform == "systemc":
-                    # Option B: the emitted testbench wrote each 'out' arg to
-                    # output<k>.data; read them back into the numpy args (same
-                    # arg_dirs split as the inputs above; `dirs` is in scope).
-                    _oo = 0
-                    for (out_dtype, out_shape), out_arg, d in zip(inputs, args, dirs):
-                        if d in ("out", "both"):  # 'both' arrays are read back too
-                            fpath = f"{self.project}/output{_oo}.data"
-                            if not os.path.exists(fpath):
-                                raise RuntimeError(
-                                    f"Output file {fpath} not found. Simulation might have failed."
-                                )
-                            store_output(
-                                out_arg,
-                                read_tensor_from_file(out_dtype, out_shape, fpath),
-                            )
-                            _oo += 1
+                    systemc.read_outputs(inputs, args, dirs, self.project, store_output)
                     return
                 for i, ((out_dtype, out_shape), out_arg) in enumerate(
                     zip(outputs, args[len(inputs) :])
@@ -1269,16 +1202,9 @@ class HLSModule:
                 ) as outfile:
                     outfile.write(header)
 
-                # A systemc region is a void function whose args are all "inputs" by
-                # signature; split by actual direction (arg_dirs) as csim does.
-                dirs = analyze_arg_load_store(self.module)[self.top_func_name]
-                _ii = 0
-                for (in_dtype, in_shape), arg, d in zip(inputs, args, dirs):
-                    if d in ("in", "both"):
-                        write_tensor_to_file(
-                            arg, in_shape, f"{self.project}/input{_ii}.data"
-                        )
-                        _ii += 1
+                dirs = systemc.write_inputs(
+                    self.module, self.top_func_name, inputs, args, self.project
+                )
 
                 # ---- 1. golden: compile+run the SystemC testbench in software ----
                 _find_catapult_binary()  # resolves MGC_HOME as a side effect
@@ -1289,19 +1215,7 @@ class HLSModule:
                         "/opt/siemens/catapult/."
                     )
                 ac_include = os.path.join(mgc_home, "shared/include")
-                systemc_home = os.environ.get("SYSTEMC_HOME", "")
-                if not systemc_home:
-                    raise RuntimeError("Set SYSTEMC_HOME for systemc cosim.")
-                lib_dir = os.path.join(systemc_home, "lib-linux64")
-                if not os.path.isdir(lib_dir):
-                    lib_dir = os.path.join(systemc_home, "lib")
-                cxx_extra = os.environ.get("ALLO_CXX_EXTRA", "")
-                gcmd = (
-                    f"cd {self.project}; g++ -std=c++17 "
-                    f"-I{ac_include} -I{systemc_home}/include "
-                    f"{cxx_extra} kernel.cpp "
-                    f"-L{lib_dir} -Wl,-rpath,{lib_dir} -lsystemc -o sim"
-                )
+                gcmd = systemc.compile_command(self.project, ac_include, "cosim")
                 print(
                     f"[{time.strftime('%H:%M:%S', time.gmtime())}] "
                     "cosim: building software golden ..."

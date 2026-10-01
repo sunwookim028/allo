@@ -33,6 +33,11 @@ This backend came from the ``choonsik1/allo`` fork's ``SystemC-emitter`` branch 
 with its history, so ``git log`` on ``mlir/lib/Translation/EmitSystemC.cpp`` attributes it
 correctly.
 
+The code is in three places. The emitter is ``mlir/lib/Translation/EmitSystemC.cpp``. The
+Python entry point, :mod:`allo.backend.systemc`, holds the SystemC-only steps: argument
+directions, testbench data files, and the csim compile command. The flow around them is
+shared with Catapult (``allo/backend/hls.py``, ``catapult.py``, ``allo/harness/catapult``).
+
 Quick start
 -----------
 
