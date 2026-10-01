@@ -82,8 +82,9 @@ entry it supersedes.
 - **Vitis HLS is the *measurement* backend** for the TinyTPU line (cycles,
   and RTL for the ASIC flow) until another backend reproduces those numbers.
   New design features must not depend on Vitis-only semantics.
-- **SystemC → Catapult is the near-term *target* backend.** Emission and a
-  behavioural csim run on this host; Catapult itself runs on zhang-21.
+- **SystemC → Catapult is the near-term *target* backend.** Allo emits SystemC
+  and Catapult synthesizes it, on zhang-21. Here, only emission and a functional
+  csim stand-in on pinned open-source libraries run; Catapult is the authority.
 - **The open HLS stack is the long-term target.** That is Kai Shao's RTLGen
   plus [AMC](https://github.com/cornell-zhang/amc-dialect), emitting
   SystemVerilog for Verilator and the open-source ASIC flow.
@@ -142,7 +143,7 @@ after M0 are reviewed again once M0 is done.
 | | milestone, and its pass check | uses as-is | fixes | integrates | upgrades |
 | --- | --- | --- | --- | --- | --- |
 | **M0** | **Settled.** Layout as in D-3, stale docs fixed. *Check:* a clean checkout passes `reproduce.sh --no-cosim`, the SystemC emit tests and `pytest tests/act` | Allo core, TinyTPU gates | stale docs | choonsik1's unmerged commits (simulator math lowering, RISC-V-as-IP, EVA) | the layout of D-3; `AGENTS.md` |
-| **P** | **Expressiveness probes.** Small designs with MiniTPU's hard shapes: several state machines over **addressed memories** (VREG, VMEM), shared and contended ports, a two-ported memory, fixed-latency delay lines, a double-buffered commit, a VLIW bundle issued to several slots at once, and a stall interlock. *Check:* a matrix showing each shape expressed, refused, or wrong in the Allo simulator and in SystemC csim | Allo simulator, SystemC emitter | whatever the probes expose | open-source SystemC/MatchLib as a documented toolchain step | — |
+| **P** | **Expressiveness probes.** Small designs with MiniTPU's hard shapes: several state machines over **addressed memories** (VREG, VMEM), shared and contended ports, a two-ported memory, fixed-latency delay lines, a double-buffered commit, a VLIW bundle issued to several slots at once, and a stall interlock. *Check:* a matrix showing each shape expressed, refused, or wrong in the Allo simulator and in SystemC csim | Allo simulator, SystemC emitter, the pinned csim stand-in | whatever the probes expose | Catapult on zhang-21: compare its csim with the stand-in once, and a first `go analyze` of TinyTPU's SystemC | — |
 | M1 | **MiniTPU compute core as a composed template**, bit-exact against MiniTPU's RTL on programs from MiniTPU's own assembler. *Check:* `RTL-MATCH n/n` on the Allo simulator and on SystemC csim | Allo simulator, SystemC emitter, Verilator 5.051, MiniTPU's `asm.py` and testbench (read-only) | csim's dependence on a `catapult` binary; csim's output arrays starting at zero; the composition limits found by P | a reference harness that runs MiniTPU program images on its Verilator RTL | `compose` gains optional modules and swappable engines; interlocks; bf16/acc24 through csim; the simulator scaled to about 280 kernels |
 | M2 | **TinyTPU as an instance of the template.** *Check:* `stress_isa` passes on the instance, and its cosim cycles are reported against the frozen reference | Vitis cosim; the stress, mutate and `gen_isa` gates | — | — | ISA spec and `gen_isa` generalised to instances; Actions on the template |
 | M3 | **Template → RTL, matched and measured.** *Check:* MiniTPU core RTL bit-exact in Verilator, plus a QoR table against MiniTPU's ZCU104 build | Catapult (zhang-21), Verilator, Vivado 2023.2 (this host) | SystemC refuses or translates `s.dependence`, partitions and pipelining instead of dropping them; memory-port ready pins; `Wire` in RTL | `Wire` combinational mode (`c7402f9f`); a runbook for zhang-21 | bf16 through Catapult synthesis |
@@ -160,8 +161,9 @@ The table says where each flow runs; the second column is this host (ace-01).
 | Allo frontend, `compose`, Actions | yes | | one design family; no optional modules or swappable engines yet |
 | Allo dataflow simulator | yes | | functional only; one OS thread per kernel; no math dialect yet |
 | Vitis HLS csynth + cosim | yes | | every published cycle count; Vitis csim is not used (it hangs on misordered processes) |
-| SystemC emit + behavioural csim | yes, with open-source libraries | | TinyTPU emits and runs; schedule directives are dropped; no cycles |
-| Catapult csyn / cosim / PPA | no | zhang-21 | never run on a TPU design |
+| SystemC emit | yes | | TinyTPU and EVA emit; schedule directives are dropped |
+| SystemC csim, functional stand-in (`scripts/systemc-csim-setup.sh`, pinned open-source libraries) | yes | | TinyTPU and EVA simulate correctly; not yet compared against Catapult's own csim; no synthesis, no cycles |
+| Catapult csim / csyn / cosim / PPA (the SystemC flow's real target) | no | zhang-21 | EVA verified in RTL cosim (choonsik1); a small design synthesized; `ppa_tinytpu` failed in `go analyze`; TinyTPU's SystemC never synthesized |
 | Vivado (incl. Zynq UltraScale+) | yes | | not yet used |
 | Verilator 5.051 | yes | | not yet used |
 | Design Compiler + mflowgen (FreePDK45) | no | zhang-21 | TinyTPU and Gemmini area, measured |

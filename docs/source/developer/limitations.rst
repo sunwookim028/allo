@@ -1192,13 +1192,14 @@ Two incidental findings
   affects ``pe_stream`` and ``pe_channel`` equally, **including the design the
   branch reports as Xcelium-cosim bit-exact**, which suggests these netlists
   were never simulated standalone.
-- **SystemC csim on this host** (``ace-01``). *Corrected 2026-10-01: an earlier
-  version said there was no SystemC library here.* SystemC 2.3.1 ships with Vitis
-  (``/opt/xilinx/Vitis/2023.2/lnx64/tools/systemc``). With the open-source MatchLib
-  Connections and ``ac_simutils`` headers, csim of the emitted design compiles and
-  runs here; TinyTPU's did on 2026-10-01. ``csim`` still insists on finding a
-  ``catapult`` binary (``hls.py``, ``_find_catapult_binary``), although it only uses
-  g++. Catapult synthesis and cosim need zhang-21.
+- **No Catapult on this host** (``ace-01``), and so no Catapult csim. *Corrected
+  2026-10-01: an earlier version said there was no SystemC library here.* A
+  functional stand-in runs instead: ``scripts/systemc-csim-setup.sh`` uses
+  open-source hlslibs at pinned commits, plus the Accellera SystemC 2.3.1 that
+  ships inside Vitis. TinyTPU's emission simulated correctly on it on
+  2026-10-01. It has not been compared against Catapult's own csim, and it says
+  nothing about synthesis. ``csim`` still insists on finding a ``catapult``
+  binary (``hls.py``, ``_find_catapult_binary``), although it only uses g++.
 
 .. _limitation-23:
 

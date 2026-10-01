@@ -36,15 +36,15 @@ The link-type contract those blocks are wired against is
 
 ## Reproduce
 
-On a host without Catapult (e.g. ace-01), csim runs against open-source
-libraries: SystemC 2.3.1 from Vitis
-(`SYSTEMC_HOME=/opt/xilinx/Vitis/2023.2/lnx64/tools/systemc`), plus the MatchLib
-Connections and `ac_simutils` headers, plus `ac_types`, all under one
-`MGC_HOME/shared/include`. Add a stub `MGC_HOME/bin/catapult`, because csim still
-looks for it (see `docs/source/developer/limitations.rst`). Set
-`ALLO_CXX_EXTRA="-DSC_INCLUDE_DYNAMIC_PROCESSES -DCONNECTIONS_ACCURATE_SIM"`.
-`cosim_eva_systemc.py` passed bit-exact this way on 2026-10-01. Note that it
-rewrites `generated/`.
+This design targets Catapult. On a host without Catapult (e.g. ace-01), a
+functional stand-in runs on pinned open-source libraries:
+
+```bash
+eval "$(scripts/systemc-csim-setup.sh --env)"   # run once without --env to fetch
+python examples/eva/cosim_eva_systemc.py         # PASS (bit-exact) on 2026-10-01; rewrites generated/
+```
+
+It checks function only, not Catapult synthesis.
 
 With Catapult:
 

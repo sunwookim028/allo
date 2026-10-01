@@ -179,7 +179,8 @@ which is the third place the Catapult emit gate looks (the gate is documented
 on the published Catapult page, ``docs/source/backends/catapult.rst``), after ``$ALLO_AC_TYPES_INCLUDE`` and ``$MGC_HOME/shared/include``. It is
 a cache, not a checked-in copy -- recreate it with::
 
-    git clone --depth 1 https://github.com/hlslibs/ac_types ~/.cache/allo/ac_types
+    git clone https://github.com/hlslibs/ac_types ~/.cache/allo/ac_types
+    git -C ~/.cache/allo/ac_types checkout e9ed172a464e0a9b45a23c712ab526782c668952
 
 Without it, ``s.build(target="catapult", ...)`` still runs the gate's text
 stage but skips the compile stage with a banner on stderr. Any script that
@@ -191,6 +192,86 @@ There is also a 2016-vintage vendored copy at
 **not** a substitute: it has no ``ac_std_float.h``, so any kernel with an
 ``f32`` operand (which the emitter maps to ``ac_ieee_float<binary32>``) will
 not compile against it.
+
+SystemC csim without Catapult: a pinned stand-in
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``target="systemc"`` emits SystemC **for Catapult**. On a Catapult host, csim is
+compiled against Catapult's own copies of SystemC, MatchLib Connections and
+``ac_types`` (``$MGC_HOME/shared``). ``scripts/systemc-csim-setup.sh`` builds a
+stand-in for hosts without Catapult. It assembles the open-source equivalents
+at pinned commits in the same layout, and prints the variables to export.
+
+It is a functional pre-check and nothing more:
+
+- nothing in it synthesizes, schedules or produces RTL;
+- its library versions are not matched to Catapult 2024.2's.
+
+Comparing it once against Catapult's own csim on zhang-21 is still to be done.
+On 2026-10-01, TinyTPU (three ``stress_isa`` cases) and EVA
+(``cosim_eva_systemc.py``) gave the same results on it as on the unpinned
+probe.
+
+Pinned external dependencies
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Every external dependency of a flow is pinned by commit, version or checksum.
+A row marked **unpinned** is an open defect.
+
+.. list-table::
+   :header-rows: 1
+
+   * - dependency
+     - pin
+     - where recorded
+   * - LLVM
+     - ``6b09f739`` (submodule)
+     - ``.gitmodules``, ``externals/``
+   * - past-python-bindings
+     - ``65f989b`` wheel
+     - ``requirements.txt``
+   * - hlslibs ``ac_types`` / ``ac_simutils`` / ``matchlib_connections``
+     - ``e9ed172`` / ``f1a3cc6`` / ``fd79d73``
+     - ``scripts/systemc-csim-setup.sh``
+   * - Accellera SystemC 2.3.1, as shipped in Vitis 2023.2
+     - sha256 ``f868dbe5...`` of ``libsystemc.a``
+     - ``scripts/systemc-csim-setup.sh``
+   * - Vitis HLS / Vivado
+     - 2023.2, by install path
+     - this page
+   * - Verilator
+     - 5.051, ``devel rev vUNKNOWN-built20260904-2286359``
+     - this page
+   * - PyTorch (ACT tutorial)
+     - ``torch==2.14.0`` CPU
+     - ``docs/source/designs/tinytpu_tutorial.rst``
+   * - ``ucb-bar/chia``, opencode
+     - ``16c35e9``, ``opencode-ai@1.18.25``
+     - ``examples/tinytpu/chia_agent/requirements.txt``, ``package-lock.json``
+   * - Julian Bushlow's ASIC flow
+     - vendored at ``e903e36``
+     - ``allo/backend/asic/PROVENANCE.md``
+   * - FreePDK45 standard cells
+     - ``stdcells.db`` md5 in each run's settings snapshot
+     - ``dev/records/tinytpu/``
+   * - Design Compiler, mflowgen (zhang-21)
+     - W-2024.09; mflowgen 0.8.0 at ``aee0e5d6``
+     - ``examples/tinytpu/asic_synthesis/``
+   * - Catapult (zhang-21)
+     - 2024.2/1130128
+     - ``dev/records/catapult_handoff/``
+   * - Chipyard / Gemmini
+     - ``e0207441`` / ``25809f7`` / rocc-tests ``1a1a1c6``
+     - ``examples/tinytpu/gemmini/CONFIG_DELTA.txt``
+   * - Kai Shao's ACT (reference)
+     - ``kai/act`` ``3c1ad38``
+     - ``ATTRIBUTION.md``
+   * - MiniTPU (``~/core/minitpu``)
+     - **unpinned**: ``docs/source/designs/minitpu.rst`` says "at its HEAD"
+     - to pin before P/M1
+   * - Python packages other than the above
+     - **unpinned** (``requirements.txt`` has ranges or nothing; upstream practice)
+     - ``requirements.txt``
 
 Vitis binutils vs. glibc ``.relr.dyn``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
