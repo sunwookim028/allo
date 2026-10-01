@@ -1,31 +1,31 @@
-# probe_b.py
-import allo
-from allo.ir.types import int32
-import allo.dataflow as df
-from allo.customize import customize as _customize
-from allo.ir.utils import get_global_vars
+# Copyright Allo authors. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+"""Run an array-ported C++ IP inside an Allo dataflow kernel."""
+
+from pathlib import Path
+
 import numpy as np
+import allo
+import allo.dataflow as df
+from allo.ir.types import int32
 
-vadd = allo.IPModule(
-    top="vadd",
-    impl="/home/vsy5/allo/tests/ip_integration/vadd.cpp",
-    link_hls=False,          # no vitis_hls on your PATH; skips the include-path probe
-)
 
-@df.region()
-def top(A: int32[32], B: int32[32], C: int32[32]):
-    @df.kernel(mapping=[1], args=[A, B, C])
-    def compute(a: int32[32], b: int32[32], c: int32[32]):
-        vadd(a, b, c)
+def test_array_ip_dataflow():
+    vadd = allo.IPModule(
+        top="vadd",
+        impl=Path(__file__).with_name("vadd.cpp"),
+        link_hls=False,
+    )
 
-print("=== PRE-HOIST ===");  print(_customize(top, global_vars=get_global_vars(top)).module)
-print("=== POST-HOIST ==="); print(df.customize(top).module)
+    @df.region()
+    def top(A: int32[32], B: int32[32], C: int32[32]):
+        @df.kernel(mapping=[1], args=[A, B, C])
+        def compute(a: int32[32], b: int32[32], c: int32[32]):
+            vadd(a, b, c)
 
-mod = df.build(top, target="simulator")
-np_A = np.random.randint(0, 100, (32,)).astype(np.int32)
-np_B = np.random.randint(0, 100, (32,)).astype(np.int32)
-allo_C = np.zeros(32).astype(np.int32)
-mod(np_A, np_B, allo_C)
-np.testing.assert_allclose(allo_C, np.add(np_A, np_B), atol=1e-5)
-print(f"A: ", np_A, "\n" "B: ", np_B, "\n", "C: ", allo_C) 
-print("simulation passed")
+    mod = df.build(top, target="simulator")
+    a = np.arange(-16, 16, dtype=np.int32)
+    b = np.arange(32, dtype=np.int32)
+    c = np.zeros(32, dtype=np.int32)
+    mod(a, b, c)
+    np.testing.assert_array_equal(c, a + b)

@@ -1945,7 +1945,9 @@ class LLVMOMPModule(LLVMModule):
                 # buffer each stream becomes.
                 call_ext_libs_in_ptr(self.module, ext_libs, allow_stream_ip=True)
 
-            self.pe_counts = build_dataflow_simulator(self.module, self.top_func_name, ext_libs)
+            self.pe_counts = build_dataflow_simulator(
+                self.module, self.top_func_name, ext_libs
+            )
             # Attach necessary attributes
             func = find_func_in_module(self.module, top_func_name)
             if func is None:

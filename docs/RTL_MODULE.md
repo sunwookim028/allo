@@ -371,7 +371,7 @@ python -m pytest tests/ip_integration/test_rtl_adapter.py \
   tests/ip_integration/test_rtl.py \
   tests/ip_integration/test_stream_ip.py \
   tests/ip_integration/test_stream_ip_sim.py \
-  tests/test_backend_utils.py \
+  tests/utils/test_backend_utils.py \
   --deselect tests/ip_integration/test_stream_ip.py::test_stream_ip_csynth -q
 ```
 

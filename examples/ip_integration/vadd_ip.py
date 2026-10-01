@@ -83,7 +83,6 @@ def top(
     out_s: Stream[int32, N]  # output stream
     enable_s: Stream[int1, 1]  # Enable for the datapath
 
-
     # Sequencer: the hand-written IP, in its own kernel so that it gets its own
     # concurrent process. Note the instruction memory lives inside the IP (as a
     # C `static`), not in the Allo region.
