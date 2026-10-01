@@ -11,7 +11,7 @@
 # compiled and simulated functionally without a licence.
 #
 # It is a functional pre-check only. Nothing here synthesizes, schedules or
-# produces RTL, and these library versions are not matched to Catapult's.
+# produces RTL. The library versions match Catapult 2024.2's; the compiler does not.
 # Catapult on a licence host is the authority.
 #
 # Usage:
@@ -22,15 +22,14 @@ set -euo pipefail
 
 PREFIX="${ALLO_CSIM_HOME:-$HOME/.cache/allo/systemc-csim}"
 
-# hlslibs at the commits validated on 2026-10-01 (TinyTPU and EVA csim).
-AC_TYPES_SHA=e9ed172a464e0a9b45a23c712ab526782c668952
-AC_SIMUTILS_SHA=f1a3cc6d5e23830611def4ab238dcd602a507262
-CONNECTIONS_SHA=fd79d73d0abad49cd813eee0aa05460ff0439083
-
-# Accellera SystemC 2.3.1, as shipped inside Vitis 2023.2, pinned by checksum.
-SYSTEMC_HOME_DEFAULT=/opt/xilinx/Vitis/2023.2/lnx64/tools/systemc
-LIBSYSTEMC_SHA256=f868dbe5173e649f1192edcc50df16f49eb5d269b76f54e45d95cde2a49a095b
-SYSTEMC_HOME="${SYSTEMC_HOME:-$SYSTEMC_HOME_DEFAULT}"
+# The versions Catapult 2024.2/1130128 bundles under $MGC_HOME/shared (read on
+# zhang-21 on 2026-10-01), as hlslibs and Accellera tags, pinned to commits.
+AC_TYPES_SHA=f542cd681bf388f98bc5676e9a8d12952c3e65db         # ac_types 4.9.0
+AC_SIMUTILS_SHA=9aada6f55dc56b28ac74630ceb44f064deff427a      # ac_simutils 1.6.0
+CONNECTIONS_SHA=6a3003b85c251c88dd2f02881bb98ce71f9aa42b      # matchlib_connections 2.2.0
+SYSTEMC_SHA=38b8a2c61aafe40de44296bee0c9c28ac4e80b01          # Accellera SystemC 2.3.3
+# Catapult builds its libsystemc with its own g++ 10.3.0; this uses the host's.
+SYSTEMC_HOME="$PREFIX/systemc"
 
 print_env() {
     echo "export MGC_HOME=$PREFIX/mgc"
@@ -43,10 +42,10 @@ if [ "${1:-}" = "--env" ]; then
     exit 0
 fi
 
-fetch() {  # fetch <repo> <sha> <dir>
+fetch() {  # fetch <github org/repo> <sha> <dir>
     local repo=$1 sha=$2 dir=$3
     if [ ! -d "$dir/.git" ]; then
-        git clone -q "https://github.com/hlslibs/$repo.git" "$dir"
+        git clone -q "https://github.com/$repo.git" "$dir"
     fi
     git -C "$dir" fetch -q origin "$sha" 2>/dev/null || git -C "$dir" fetch -q origin
     git -C "$dir" checkout -q --detach "$sha"
@@ -56,23 +55,28 @@ fetch() {  # fetch <repo> <sha> <dir>
 
 mkdir -p "$PREFIX/src"
 echo "== hlslibs (pinned)"
-fetch ac_types "$AC_TYPES_SHA" "$PREFIX/src/ac_types"
-fetch ac_simutils "$AC_SIMUTILS_SHA" "$PREFIX/src/ac_simutils"
-fetch matchlib_connections "$CONNECTIONS_SHA" "$PREFIX/src/matchlib_connections"
+fetch hlslibs/ac_types "$AC_TYPES_SHA" "$PREFIX/src/ac_types"
+fetch hlslibs/ac_simutils "$AC_SIMUTILS_SHA" "$PREFIX/src/ac_simutils"
+fetch hlslibs/matchlib_connections "$CONNECTIONS_SHA" "$PREFIX/src/matchlib_connections"
+fetch accellera-official/systemc "$SYSTEMC_SHA" "$PREFIX/src/systemc"
 
-echo "== SystemC"
-lib="$SYSTEMC_HOME/lib/libsystemc.a"
-[ -f "$lib" ] || lib="$SYSTEMC_HOME/lib-linux64/libsystemc.a"
-if [ ! -f "$lib" ]; then
-    echo "error: no libsystemc.a under SYSTEMC_HOME=$SYSTEMC_HOME" >&2
-    exit 1
+echo "== SystemC (built from source, C++17)"
+stamp="$SYSTEMC_HOME/.built-$SYSTEMC_SHA"
+if [ ! -f "$stamp" ]; then
+    rm -rf "$PREFIX/build-systemc" "$SYSTEMC_HOME"
+    step() {  # step <log> <cmd...>: run, and on failure show the log's tail
+        local log=$1; shift
+        "$@" > "$log" 2>&1 || { tail -20 "$log" >&2; echo "error: see $log" >&2; exit 1; }
+    }
+    # SystemC 2.3.3 declares cmake_minimum_required(3.1); CMake 4 needs the floor raised.
+    step "$PREFIX/systemc-cmake.log" cmake -S "$PREFIX/src/systemc" -B "$PREFIX/build-systemc" \
+        -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+        -DCMAKE_INSTALL_PREFIX="$SYSTEMC_HOME" -DCMAKE_INSTALL_LIBDIR=lib -DBUILD_SHARED_LIBS=ON
+    step "$PREFIX/systemc-build.log" cmake --build "$PREFIX/build-systemc" -j "$(nproc)"
+    step "$PREFIX/systemc-install.log" cmake --install "$PREFIX/build-systemc"
+    touch "$stamp"
 fi
-got=$(sha256sum "$lib" | cut -d' ' -f1)
-if [ "$got" = "$LIBSYSTEMC_SHA256" ]; then
-    echo "  $lib (sha256 matches the pin)"
-else
-    echo "  WARNING: $lib has sha256 $got, not the pinned $LIBSYSTEMC_SHA256" >&2
-fi
+echo "  $SYSTEMC_HOME"
 
 # The layout Allo's csim expects: $MGC_HOME/shared/include holds the headers.
 echo "== assembling $PREFIX/mgc"

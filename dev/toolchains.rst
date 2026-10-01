@@ -180,7 +180,7 @@ on the published Catapult page, ``docs/source/backends/catapult.rst``), after ``
 a cache, not a checked-in copy -- recreate it with::
 
     git clone https://github.com/hlslibs/ac_types ~/.cache/allo/ac_types
-    git -C ~/.cache/allo/ac_types checkout e9ed172a464e0a9b45a23c712ab526782c668952
+    git -C ~/.cache/allo/ac_types checkout f542cd681bf388f98bc5676e9a8d12952c3e65db   # 4.9.0, Catapult 2024.2's
 
 Without it, ``s.build(target="catapult", ...)`` still runs the gate's text
 stage but skips the compile stage with a banner on stderr. Any script that
@@ -202,10 +202,12 @@ compiled against Catapult's own copies of SystemC, MatchLib Connections and
 stand-in for hosts without Catapult. It assembles the open-source equivalents
 at pinned commits in the same layout, and prints the variables to export.
 
-It is a functional pre-check and nothing more:
+Its library versions match what Catapult 2024.2/1130128 bundles, read on
+zhang-21 on 2026-10-01: SystemC 2.3.3, Connections 2.2.0, ``ac_types`` 4.9.0
+and ``ac_simutils`` 1.6.0. Only the compiler differs: the host's g++ against
+Catapult's 10.3.0. It is a functional pre-check and nothing more:
 
 - nothing in it synthesizes, schedules or produces RTL;
-- its library versions are not matched to Catapult 2024.2's.
 
 Comparing it once against Catapult's own csim on zhang-21 is still to be done.
 On 2026-10-01, TinyTPU (three ``stress_isa`` cases) and EVA
@@ -231,10 +233,12 @@ A row marked **unpinned** is an open defect.
      - ``65f989b`` wheel
      - ``requirements.txt``
    * - hlslibs ``ac_types`` / ``ac_simutils`` / ``matchlib_connections``
-     - ``e9ed172`` / ``f1a3cc6`` / ``fd79d73``
+     - tags 4.9.0 / 1.6.0 / 2.2.0 (``f542cd6`` / ``9aada6f`` / ``6a3003b``), the
+       versions Catapult 2024.2 bundles
      - ``scripts/systemc-csim-setup.sh``
-   * - Accellera SystemC 2.3.1, as shipped in Vitis 2023.2
-     - sha256 ``f868dbe5...`` of ``libsystemc.a``
+   * - Accellera SystemC
+     - 2.3.3 (``38b8a2c``), built from source with the host g++ (Catapult's is
+       2.3.3 built with its g++ 10.3.0)
      - ``scripts/systemc-csim-setup.sh``
    * - Vitis HLS / Vivado
      - 2023.2, by install path
