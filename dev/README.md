@@ -1,3 +1,6 @@
+<!--- Copyright Allo authors. All Rights Reserved. -->
+<!--- SPDX-License-Identifier: Apache-2.0  -->
+
 # dev/
 
 Working notes for whoever is developing this fork next, not documentation

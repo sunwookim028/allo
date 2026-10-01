@@ -1,3 +1,6 @@
+<!--- Copyright Allo authors. All Rights Reserved. -->
+<!--- SPDX-License-Identifier: Apache-2.0  -->
+
 # Catapult SystemC toolchain on zhang-21 — inventory, 2026-10-01
 
 Read-only version queries by the `zhang21` agent session. Nothing was changed on

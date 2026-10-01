@@ -1,3 +1,6 @@
+<!--- Copyright Allo authors. All Rights Reserved. -->
+<!--- SPDX-License-Identifier: Apache-2.0  -->
+
 > **Retired 2026-10-01.** Direction, decisions and milestones now live in
 > `README.md`; this file is kept unchanged below for the references that cite it. The project is not organised as a paper (README).
 

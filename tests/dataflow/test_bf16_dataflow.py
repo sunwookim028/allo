@@ -203,9 +203,9 @@ def test_both_half_precision_types_emit(target, tmp_path):
     """
     for dtype in ("float16", "bfloat16"):
         out = _emit(dtype, target, tmp_path)
-        assert "EMITTED" in out.stdout, (
-            f"{dtype} should emit on {target}: {out.stderr[-800:]}"
-        )
+        assert (
+            "EMITTED" in out.stdout
+        ), f"{dtype} should emit on {target}: {out.stderr[-800:]}"
         assert out.returncode == 0, (
             f"{dtype} emitted but exited {out.returncode} on {target}: "
             f"{out.stderr[-800:]}"

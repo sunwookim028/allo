@@ -1,3 +1,6 @@
+<!--- Copyright Allo authors. All Rights Reserved. -->
+<!--- SPDX-License-Identifier: Apache-2.0  -->
+
 # CHIA evidence: every run, what it asked, and what it cost
 
 This is the index of the series. One row per agent run, in order, whether or

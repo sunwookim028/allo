@@ -1,3 +1,6 @@
+<!--- Copyright Allo authors. All Rights Reserved. -->
+<!--- SPDX-License-Identifier: Apache-2.0  -->
+
 # EVA on the Allo SystemC backend
 
 End-to-end example of emitting the EVA chip (`eva_sb_syscredit_rtprime`, the

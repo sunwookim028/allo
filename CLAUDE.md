@@ -1,3 +1,6 @@
+<!--- Copyright Allo authors. All Rights Reserved. -->
+<!--- SPDX-License-Identifier: Apache-2.0  -->
+
 # allo — Coding Agent Notes
 
 **Direction, decisions (D-n), milestones and their status live in `README.md`;

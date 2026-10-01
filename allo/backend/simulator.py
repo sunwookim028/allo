@@ -404,7 +404,9 @@ def _process_function_streams(
                     rhs=const_fifo_depth.result,
                     ip=replace_ip,
                 )
-                head_val_op = memref_d.LoadOp(memref=head_ptr, indices=[], ip=replace_ip)
+                head_val_op = memref_d.LoadOp(
+                    memref=head_ptr, indices=[], ip=replace_ip
+                )
                 is_full = arith_d.CmpIOp(
                     0, lhs=head_val_op.result, rhs=tail_next_op.result, ip=replace_ip
                 )
@@ -463,10 +465,9 @@ def _process_function_streams(
                     fifo_element_type = stream_type.element_type
                     store_value = data
                     if data.type != fifo_element_type:
-                        if (
-                            isinstance(data.type, (IntegerType, IndexType))
-                            and isinstance(fifo_element_type, (IntegerType, IndexType))
-                        ):
+                        if isinstance(
+                            data.type, (IntegerType, IndexType)
+                        ) and isinstance(fifo_element_type, (IntegerType, IndexType)):
                             if isinstance(data.type, IndexType):
                                 store_value = index_d.CastSOp(
                                     fifo_element_type, data, ip=then_ip
@@ -516,8 +517,12 @@ def _process_function_streams(
             if isinstance(stream_access_op, allo_d.StreamTryGetOp):
                 # Flush before reading pointers to ensure we see the latest updates
                 openmp_d.FlushOp([], ip=replace_ip)
-                head_val_op = memref_d.LoadOp(memref=head_ptr, indices=[], ip=replace_ip)
-                tail_val_op = memref_d.LoadOp(memref=tail_ptr, indices=[], ip=replace_ip)
+                head_val_op = memref_d.LoadOp(
+                    memref=head_ptr, indices=[], ip=replace_ip
+                )
+                tail_val_op = memref_d.LoadOp(
+                    memref=tail_ptr, indices=[], ip=replace_ip
+                )
                 is_empty = arith_d.CmpIOp(
                     0, lhs=head_val_op.result, rhs=tail_val_op.result, ip=replace_ip
                 )
@@ -640,7 +645,9 @@ def _process_function_streams(
                         expected_type, 0.0, ip=else_ip
                     ).result
                 else:
-                    raise NotImplementedError(f"Unsupported stream type for dummy data: {expected_type}")
+                    raise NotImplementedError(
+                        f"Unsupported stream type for dummy data: {expected_type}"
+                    )
                 false_val = arith_d.ConstantOp(
                     IntegerType.get_signless(1, module.context), 0, ip=else_ip
                 )
@@ -1007,9 +1014,8 @@ def _process_function_streams(
                 fifo_element_type = stream_type.element_type
                 store_value = data
                 if data.type != fifo_element_type:
-                    if (
-                        isinstance(data.type, (IntegerType, IndexType))
-                        and isinstance(fifo_element_type, (IntegerType, IndexType))
+                    if isinstance(data.type, (IntegerType, IndexType)) and isinstance(
+                        fifo_element_type, (IntegerType, IndexType)
                     ):
                         if isinstance(data.type, IndexType):
                             store_value = index_d.CastSOp(

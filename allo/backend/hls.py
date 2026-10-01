@@ -123,8 +123,11 @@ def _find_catapult_binary():
     if os.path.isdir(siemens_root):
         # Pick the most recent version (sort descending)
         versions = sorted(
-            (d for d in os.listdir(siemens_root)
-             if os.path.isdir(os.path.join(siemens_root, d))),
+            (
+                d
+                for d in os.listdir(siemens_root)
+                if os.path.isdir(os.path.join(siemens_root, d))
+            ),
             reverse=True,
         )
         for ver in versions:
@@ -246,7 +249,7 @@ def write_ip_directives(ext_libs, project, design_top):
             if not d:
                 continue
             if d.startswith("/"):
-                rest = d.split("/", 2)          # ['', '<ip-top>', 'the rest...']
+                rest = d.split("/", 2)  # ['', '<ip-top>', 'the rest...']
                 if len(rest) == 3:
                     d = f"/{design_top}/{rest[2]}"
             lines.append(f"directive set {d}")
@@ -338,7 +341,6 @@ def separate_header(hls_code, top=None, extern_c=True):
     return sig_str, args
 
 
-
 def _run_group_timeout(cmd, timeout, what, **kwargs):
     """subprocess.run(timeout=...) whose timeout actually kills the process TREE.
 
@@ -417,8 +419,7 @@ class HLSModule:
             # emission for them (the base emitter no-ops), which would silently
             # produce wrong output -- so fail loud here instead.
             if platform != "systemc" and (
-                "!allo.wire" in str(self.module)
-                or "!allo.channel" in str(self.module)
+                "!allo.wire" in str(self.module) or "!allo.channel" in str(self.module)
             ):
                 raise NotImplementedError(
                     "Wire and Channel links are only supported by the SystemC "
@@ -497,8 +498,17 @@ class HLSModule:
             os.makedirs(project, exist_ok=True)
             path = os.path.dirname(__file__)
             path = os.path.join(path, "../harness/")
-            if platform in {"vivado_hls", "vitis_hls", "tapa", "pynq", "catapult", "systemc"}:
-                harness_dir = "catapult" if platform == "systemc" else platform.split("_")[0]
+            if platform in {
+                "vivado_hls",
+                "vitis_hls",
+                "tapa",
+                "pynq",
+                "catapult",
+                "systemc",
+            }:
+                harness_dir = (
+                    "catapult" if platform == "systemc" else platform.split("_")[0]
+                )
                 os.system("cp " + path + f"{harness_dir}/* " + project)
                 configs["platform"] = platform  # tcl codegen distinguishes systemc
                 # The IPs' own synthesis constraints, re-rooted at this design's
@@ -1101,7 +1111,9 @@ class HLSModule:
                     for i, ((in_dtype, in_shape), arg) in enumerate(
                         zip(inputs, args[: len(inputs)])
                     ):
-                        write_tensor_to_file(arg, in_shape, f"{self.project}/input{i}.data")
+                        write_tensor_to_file(
+                            arg, in_shape, f"{self.project}/input{i}.data"
+                        )
 
                 # Compilation with g++
                 # Assuming 'g++' is in PATH.
@@ -1222,7 +1234,10 @@ class HLSModule:
                 )
                 if subprocess.Popen(gcmd, shell=True).wait() != 0:
                     raise RuntimeError("cosim: golden g++ compile failed.")
-                if subprocess.Popen(f"cd {self.project}; ./sim", shell=True).wait() != 0:
+                if (
+                    subprocess.Popen(f"cd {self.project}; ./sim", shell=True).wait()
+                    != 0
+                ):
                     raise RuntimeError("cosim: golden simulation failed.")
                 # Set the golden aside; the RTL run overwrites output<k>.data.
                 for f in _glob.glob(f"{self.project}/output*.data"):
@@ -1407,7 +1422,9 @@ class HLSModule:
                 if self.platform == "systemc":
                     rpt_dir = os.path.join(self.project, "build")
                     os.makedirs(rpt_dir, exist_ok=True)
-                    cmd = f"cd {rpt_dir}; {catapult_cmd} -shell -f {self.project}/run.tcl"
+                    cmd = (
+                        f"cd {rpt_dir}; {catapult_cmd} -shell -f {self.project}/run.tcl"
+                    )
                 else:
                     rpt_dir = self.project
                     cmd = f"cd {self.project}; {catapult_cmd} -shell -f run.tcl"
