@@ -1,6 +1,8 @@
 # allo — Coding Agent Notes
 
-Fork knowledge lives in the Sphinx docs (`docs/source/`, published at
+**Direction, decisions (D-n), milestones and their status live in `README.md`;
+defects stay in the fork's GitHub issues.** Read the README's Decisions before
+proposing work. Fork knowledge lives in the Sphinx docs (`docs/source/`, published at
 https://sunwookim028.github.io/allo/), not in Markdown notes. Read the page
 before working in its area; when you learn something worth keeping, add it to
 the page, not to a new `.md` file. The fork-only pages:
