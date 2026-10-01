@@ -1,3 +1,6 @@
+> **Retired 2026-10-01.** Direction, decisions and milestones now live in
+> `README.md`; this file is kept unchanged below for the references that cite it. The project is not organised as a paper (README).
+
 # Paper outline — claims, evidence, and what is still missing
 
 A working note, not a draft. One row per intended section: the **claim** it

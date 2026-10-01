@@ -1,3 +1,6 @@
+> **Retired 2026-10-01.** Direction, decisions and milestones now live in
+> `README.md`; this file is kept unchanged below for the references that cite it. Its standing hazards and known-failing tests moved to `dev/fork_maintenance.rst`.
+
 # Roadmap to the end state
 
 The end state, as the owner stated it on 2026-09-24:

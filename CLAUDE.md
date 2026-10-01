@@ -33,7 +33,7 @@ Dev notes (not published):
 | Dated measurement records, and measured negatives | `dev/records/` |
 | Target layout for designs, flows and the core package | `dev/repo_layout.md` |
 | SystemC emitter author's own notes (merged as-is) | `dev/systemc/` |
-| Session report, paper outline, ASIC handoff | `dev/` |
+| ASIC handoff; standing hazards | `dev/asic_handoff.md`; `dev/fork_maintenance.rst` |
 
 ## Quick pitfalls
 

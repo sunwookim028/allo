@@ -36,7 +36,7 @@ page table for what belongs here versus in `docs/source/`, and why.
   this one's, and `SIMULATOR.md` documents the timed dataflow simulator on
   `SystemC-emitter` that this fork has **not** merged.
 - `docs_style.md` -- how the published pages are written.
-- `roadmap.md` -- what is next, and what each numbered step depends on.
-- `paper_outline.md` -- claim, evidence and gap per section.
+- `roadmap.md`, `paper_outline.md` -- retired 2026-10-01 (README holds direction,
+  decisions and milestones); kept for the references that cite them.
 - `asic_handoff.md` -- the ASIC/PD evaluation handoff.
-- `SESSION_REPORT.md` -- what the last working session produced.
+- `SESSION_REPORT.md` -- retired 2026-10-01; kept for the references that cite it.

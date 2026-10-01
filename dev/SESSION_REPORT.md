@@ -1,3 +1,6 @@
+> **Retired 2026-10-01.** Direction, decisions and milestones now live in
+> `README.md`; this file is kept unchanged below for the references that cite it.
+
 # Session report — 2026-09-21/22
 
 Five sentences, then the figures. Updated at the end of 2026-09-22; where an

@@ -205,3 +205,159 @@ Live state is judged from git and GitHub, not from a checked-in status file:
   (https://github.com/sunwookim028/allo/issues/5#issuecomment-4977128476).
 - The LLVM builds and worktree layout that the procedure above has to respect
   are described in ``docs/source/developer/toolchains.rst``.
+
+
+Standing hazards
+----------------
+
+Moved from ``dev/roadmap.md`` on 2026-10-01, when that file was retired.
+
+Recorded because each cost real work today.
+
+- **Never run a tree-wide git operation in a checkout another agent is writing
+  to.** This destroyed an agent's work once and nearly a second time.
+- **Removing a worktree can orphan a daemon that keeps accepting connections.**
+  Third instance of "removing a worktree is not free". A Ray head started
+  2026-09-22 had its raylet's cwd inside a worktree removed later that day.
+  It kept listening, kept accepting connections, and **could not spawn a single
+  worker** -- every one died in ``setup_worker.py`` at ``os.getcwd()``. A driver
+  using ``address="auto"`` blocked in ``ray.get`` with no error, because
+  ``/tmp/ray/ray_current_cluster`` still named it. It cost an agent 25 minutes to
+  diagnose, and it is the same fails-open shape: the service was up, the
+  connection succeeded, and nothing worked.
+  **Third occurrence, 2026-09-25**, and the one that produced a check: a clean
+  worktree found ``/tmp/ray/ray_current_cluster`` naming ``128.84.48.164:6399``
+  with no ``gcs_server`` and no ``raylet`` behind it, and the first ``smoke.py`` sat
+  for ten minutes printing nothing but ``Failed to connect to GCS``.
+  **This is now checked.** ``preflight.py`` -- which ``swarm.py``, ``loop.py`` and
+  ``smoke.py`` run before any worker and any model call, and which
+  ``checkout_setup.sh`` runs as its step 4 -- resolves the address a driver
+  would really dial (``RAY_ADDRESS``, else
+  ``<RAY_TMPDIR or /tmp/ray>/ray_current_cluster``), probes it with a 3 s
+  timeout, and refuses with the address named and the fix spelled out. It also
+  refuses a head that *does* accept the connection but whose raylet's working
+  directory is deleted, which is the 2026-09-22 shape above. Run it alone with
+  ``python examples/tinytpu/chia_agent/preflight.py --check-ray`` ($0).
+  *Do not fix this with ``ray stop``* -- it matches by process name across the
+  whole host and would kill every other track's raylet. Kill the orphaned
+  session's PIDs, owner confirmed. To avoid it: start a head with a private
+  ``--temp-dir`` and port and export ``RAY_ADDRESS``, which overrides even an
+  explicit ``address="auto"``, so no code change is needed and
+  ``ray_current_cluster`` is left alone for everyone else. The temp-dir path
+  must be **short** -- ``/tmp/ray-<track>``, not one under a scratch directory:
+  Ray puts a Unix socket under it and AF_UNIX caps the path at 107 bytes.
+  Related: the CHIA tool servers bind fixed ports from 8000 upward, so two
+  ``chia_agent`` processes collide. Serialise them.
+- **Remove a worktree when its agent finishes, not when the disk fills.** Each
+  costs 0.6–1.9 GB; five live agents accrue ~2 GB.
+- **``/tmp`` is 15 GB and shared.** When it fills, the harness cannot create its
+  output-capture file, so *every* command fails including the escape hatch, and
+  the only way out is a terminal outside the tool.
+- **The configuration trap**: the worktree default is not ``MAXDIM=16``, and
+  ``TPU_QD`` now defaults to 16. State the variables beside every number. This
+  produced two published mistakes and two near-misses in two days.
+- **The ``allo`` conda env's editable install pointed at a removed worktree.**
+  Repointed to ``/home/sk3463/allo`` on 2026-09-24. It broke silently: `import
+  allo` still worked from inside a checkout and failed everywhere else, so it
+  surfaced only when an agent ran a docs build from its own worktree. Removing
+  a worktree is not free if anything outside git references it.
+- **A test whose subprocess does not pin ``PYTHONPATH`` is not testing your
+  checkout.** Sharper than the editable-install entry above, and worse: there
+  ``import allo`` *failed* and you noticed. Here it *succeeds against the wrong
+  tree*. ``tests/dataflow/test_bf16_dataflow.py`` ran its emitter probes through
+  ``subprocess.run([sys.executable, script])`` with no ``env=``, so they resolved
+  ``allo`` through the editable install -- ``/home/sk3463/allo``, a checkout at
+  ``31a8e9ce`` predating every fix of 2026-09-25. Those arms had been going red
+  and green for reasons unrelated to the code under test, and the red was read
+  as "bf16 still aborts" when bf16 had emitted for hours. Fixed by pinning the
+  root via the ``pyproject.toml`` marker. **If a test shells out, pass ``env`` with
+  the checkout root on ``PYTHONPATH``.**
+- **A pipeline hides the exit code of everything but its last command.**
+  ``pytest ... | tail -3`` returns *tail's* status, which is always 0, so a
+  chained ``&& git push`` runs on a failing test suite. I did exactly that on
+  2026-09-25 and pushed before knowing the result; it happened to be clean, and
+  the 18 failures I had seen were a stale-bindings artefact. Redirect to a file
+  and check ``$?``, or use ``PIPESTATUS``. Read the output *and* the code -- the
+  house rule "read the output, not the exit code" guards against a different
+  failure and does not cover this one.
+- **Test a check's failure path, not only its pass path.** A check that has
+  only ever said ok proves nothing. The ASIC preflight's library-checksum
+  branch was confirmed by copying a real ``stdcells.db``, appending one null
+  byte, and pointing the preflight at it: it reported the mismatch, named both
+  digests, said the areas were not comparable with the committed set, and
+  **refused to print the run sequence**. That is discrimination; a passing run
+  alone would not have shown it. The same tool has one branch still untested --
+  what it does when committed snapshots disagree about the library -- for the
+  good reason that there is no second library to test it with, and that is
+  recorded rather than glossed.
+- **Some provenance cannot be recovered after the fact — capture it at run
+  time or not at all.** A content digest over an export's files identifies
+  which RTL a synthesis run actually read, where a file-list checksum does not
+  (two of our exports hash identically, because the manifest lists the same
+  filenames). But it can only be computed while the files the run read still
+  exist at the path it read them from. An attempt to recover it by matching
+  directory basenames would have stamped a 2026-09-22 area with RTL
+  re-emitted two days later — a plausible lie, written by a tool. The fallback
+  was deleted; the tool now reports the directory unreadable and computes
+  nothing.
+- **An instrument can fail by eating the evidence, not only by missing it.**
+  The first attempt at that re-capture **overwrote four good snapshots** with
+  "unresolved", because their directories had moved. Same shape as the other
+  fails-open findings, one step worse: the check did not merely fail to see
+  something, it destroyed what was there. Nothing was committed in that state.
+  A re-capture now **keeps** the earlier record, marks it ``recaptured``, and
+  says so. Treat any tool that rewrites a record in place as a tool that can
+  lose one.
+- **A refactor can silently remove an agentic loop's reach, and nothing fails.**
+  The CHIA loop's editable set was ``("microarch_isa.py", "isa_dsl.py")``. The
+  decomposition that made the design a composable library moved the hardware
+  into eight ``ip/units/`` modules, so **the editable set no longer contained the
+  machine** — the loop could still run, still build, still be graded, and could
+  no longer change the thing it was searching over. Both of run 1's wins landed
+  in files that are now ``dma_load.py`` and ``sequencer.py``, so that run is not
+  reproducible against today's tree. Nothing in the harness noticed, because
+  every gate still passed on a candidate that had edited nothing that mattered.
+  The fix is one definition of the editable paths (``chia_agent/design.py``)
+  rather than a literal list that a refactor can orphan. **Generalise: when a
+  harness names the files it may touch, a refactor must move that list too, and
+  the list should be derived rather than written.**
+- **Subagents do not reliably have ``ListAgents``.** An agent told to announce
+  its path claim to its peers could not see them, and guessing at names
+  returned "no agent reachable". Pass peer agent IDs explicitly in a brief
+  rather than instructing an agent to look them up — and when an agent cannot
+  reach a peer it should say so and let the dispatcher relay, not guess.
+- **The session scratchpad is shared between concurrent agents.** Two agents
+  writing ``reproduce.sh`` output to the same scratchpad path truncated one
+  another's log mid-cosim; the verdict survived only because the summary block
+  happened to be contiguous at its own offset. An agent that reads a truncated
+  log sees a run that did not finish, or worse a run that appears to have
+  finished differently. Give every agent a distinct path, and prefer a
+  worktree-local file to a shared scratch directory.
+- **Never resolve a repository root by counting levels.** Search upward for a
+  marker, or take the path as an argument. Hit three times in two days: a
+  construct script counting three ``dirname``s landed on ``examples/`` rather than
+  the root and could not find its node library from a clean checkout (and was
+  *announced fixed without being run* -- a different check was run and taken as
+  coverage); the TinyTPU rename found ~30 ``ROOT``/``REPO`` values derived by
+  counting, **three already wrong** and made correct only by accident of the
+  move; and the first fix was itself a re-count that happened to suit the new
+  layout. A relative path that encodes tree shape is a latent break in any
+  repository being reorganised, and this one is mid-reorganisation.
+- **A licence-free check cannot report a licensed branch as passing.** The
+  ASIC preflight's ADK-checksum branch reports as *correctly missing* without a
+  licence, which is not the same as passing. Say which branches a run could not
+  reach rather than reporting the run as green.
+- **Read a gate's output, never its exit code**, and confirm what ran is what is
+  being claimed. Four instruments were caught reporting success without having
+  run; three further checks ran against the wrong object and passed.
+
+Known-failing tests
+-------------------
+
+*Known-failing tests, so nobody chases them.* ``pytest tests/`` does not collect
+on this host: 25 errors, all ``tests/dataflow/aie/*``, no ``aie`` module. With that
+directory ignored: **800 passed, 64 skipped, 2 xfailed, 7 failed** — and those
+same seven fail on a clean ``main``, so they are pre-existing and unrelated to
+anything recent: ``test_hierachical_mesh::test_2x2``, three in
+``ip_integration/test_external.py``, ``test_builder::test_minmax_cast``, and two in
+``test_stateful.py``.
