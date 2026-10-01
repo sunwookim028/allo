@@ -94,6 +94,10 @@ def test_stream_ip_codegen():
         assert (Path(tmpdir) / "vadd_stream.cpp").exists()
         assert '#include "vadd_stream.cpp"' in (Path(tmpdir) / "kernel.cpp").read_text()
         assert "add_files vadd_stream.cpp" in (Path(tmpdir) / "run.tcl").read_text()
+        assert (
+            "config_compile -pipeline_loops 0"
+            not in (Path(tmpdir) / "run.tcl").read_text()
+        )
 
 
 def test_stream_ip_sequential_cpu_paths_rejected():

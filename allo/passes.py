@@ -478,6 +478,22 @@ def decompose_library_function(module):
         return module
 
 
+def _nested_ops(op):
+    """Yield every operation under `op`, at any depth.
+
+    `entry_block.operations` only sees the top level of a function body, so an
+    IP call inside a loop used to be left un-rewritten -- while this pass had
+    already erased the declaration it referred to, leaving a dangling callee
+    that failed to lower. A fixed-width IP tiled over a larger problem is the
+    ordinary way to use one, so that call is very often inside a loop.
+    """
+    for region in op.regions:
+        for block in region.blocks:
+            for child in block.operations:
+                yield child
+                yield from _nested_ops(child)
+
+
 def call_ext_libs_in_ptr(module, ext_libs, allow_stream_ip=False):
     # This rewrite turns each IP call into a call through unranked-memref
     # pointers -- an `hls::stream<T>` port has no such representation, so a
@@ -532,7 +548,9 @@ def call_ext_libs_in_ptr(module, ext_libs, allow_stream_ip=False):
                 # `not op.is_external`: a declaration has no entry block to walk.
                 # Reachable now that a stream IP's declaration is deliberately
                 # left in place here (it is lowered by backend/simulator.py).
-                for body_op in op.entry_block.operations:
+                # Walk nested blocks too, and materialise the list first: the
+                # rewrite below inserts memref.cast ops into blocks being walked.
+                for body_op in list(_nested_ops(op)):
                     # update call function
                     if (
                         isinstance(body_op, func_d.CallOp)

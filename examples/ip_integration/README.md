@@ -58,3 +58,12 @@ deadlocks rather than merely running slowly.
   run under the CPU dataflow simulator, including the FIFO protocol and the ABI.
 - [`tests/ip_integration/`](../../tests/ip_integration/) — smaller, more focused
   cases, including IPs with plain array interfaces.
+
+## RTL IP integration
+
+See [RTLModule documentation](../../docs/RTL_MODULE.md) and
+[`rtl_accumulator.py`](rtl_accumulator.py) for Verilator simulation and Vitis
+black-box project generation with a supplied RTL wrapper.
+
+[`rtl_adapter.py`](rtl_adapter.py) demonstrates automatic ready/valid-to-FIFO
+wrapper generation, simulation of the generated wrapper, and Vitis project export.
