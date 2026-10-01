@@ -1,6 +1,6 @@
 # Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-"""BF16 in the dataflow simulator, and the emitters that cannot take it.
+"""BF16 in the dataflow simulator, and in the emitters.
 
 ``examples/minitpu`` is a BF16 machine, so it rests on three facts that
 nothing else in the tree pins down:
@@ -10,10 +10,10 @@ nothing else in the tree pins down:
 2. A 24-bit float accumulator (1 sign + 8 exponent + 15 fraction, MiniTPU's
    ``MXU_ACC_W``) can be emulated with the ``float32``/``uint32`` bitcast pair,
    so a design does not need a new MLIR type to model one.
-3. The same design **cannot be emitted**.  ``EmitVivadoHLS.cpp:115``,
-   ``EmitCatapultHLS.cpp:102`` and ``EmitSystemC.cpp`` all reach
-   ``assert(1 == 0 && "Got unsupported type.")`` on a ``bf16``, which is a
-   SIGABRT and not a catchable exception -- so that one runs in a subprocess.
+3. The Vitis, Catapult and SystemC emitters accept ``bf16`` and ``f16``.
+   They used to reach ``assert(1 == 0 && "Got unsupported type.")``, which is a
+   SIGABRT rather than a catchable exception, so emission still runs in a
+   subprocess. Only emission is checked here, not csim or synthesis.
 
 See ``docs/source/developer/limitations.rst``.
 """

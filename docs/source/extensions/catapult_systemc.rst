@@ -75,8 +75,8 @@ remotes is in ``dev/fork_maintenance.rst``.
    is Allo's, not Vitis's: Vitis shares an on-chip array between two processes
    under ``#pragma HLS stream type=unsync`` (:ref:`limitation-shared-memory`).
 
-``AlloMemPins`` **is** an unarbitrated 1R1W dual-port RAM, and it synthesizes. It is **not** in
-this checkout's working tree; it lives in ``mlir/lib/Translation/EmitSystemC.cpp`` on
+``AlloMemPins`` **is** an unarbitrated 1R1W dual-port RAM, and it synthesizes. It is in
+``mlir/lib/Translation/EmitSystemC.cpp`` on ``main`` since the 2026-09-24 merge of
 ``choonsik1/allo:SystemC-emitter``. Read there (verified 2026-09-18), the module has separate read and
 write pin bundles (``radr``/``re``/``q`` and ``wadr``/``d``/``we``) over one ``T mem[SIZE]``, with
 both accesses serviced in a single ``wait()``-delimited cycle and both ready lines tied high; its

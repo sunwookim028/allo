@@ -239,7 +239,7 @@ Open
        instance's two pin sets)
      - `impact/probe_shared/ <https://github.com/sunwookim028/allo/tree/main/examples/tinytpu/impact/probe_shared>`__
    * - :ref:`A <limitation-a>`
-     - REPRODUCES
+     - FIXED (``6675130a``)
      - simulator
      - The simulator pipeline has no math-to-LLVM pass
        (``simulator.py:1674-1686``), so ``allo.exp`` / ``allo.log`` fail there.
@@ -1192,10 +1192,13 @@ Two incidental findings
   affects ``pe_stream`` and ``pe_channel`` equally, **including the design the
   branch reports as Xcelium-cosim bit-exact**, which suggests these netlists
   were never simulated standalone.
-- **No SystemC library or MatchLib on this host** (``ace-01``): no ``libsystemc*``,
-  ``systemc.h``, ``connections.h`` or ``mc_connections.h`` anywhere. csim cannot run
-  here for any design. SystemC 2.3.x + NVlabs MatchLib would be a few hours and
-  no licence.
+- **SystemC csim on this host** (``ace-01``). *Corrected 2026-10-01: an earlier
+  version said there was no SystemC library here.* SystemC 2.3.1 ships with Vitis
+  (``/opt/xilinx/Vitis/2023.2/lnx64/tools/systemc``). With the open-source MatchLib
+  Connections and ``ac_simutils`` headers, csim of the emitted design compiles and
+  runs here; TinyTPU's did on 2026-10-01. ``csim`` still insists on finding a
+  ``catapult`` binary (``hls.py``, ``_find_catapult_binary``), although it only uses
+  g++. Catapult synthesis and cosim need zhang-21.
 
 .. _limitation-23:
 
@@ -1934,6 +1937,9 @@ The simulator's own pipeline in ``LLVMOMPModule.__init__``
 backend lowers the same op (``populateMathToLLVMConversionPatterns`` in
 ``lower_allo_to_llvm``). This also breaks item 4's documented workaround on the
 simulator. Fix: 1 line, verified. Repro: ``tests/limits/new_sim_math_lowering.py``.
+
+**Fixed** by ``6675130a``, choonsik1's ``convert-math-to-llvm`` pass cherry-picked
+from ``choonsik1/allo``. The repro now prints ``FIXED``.
 
 .. _limitation-b:
 
