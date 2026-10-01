@@ -22,9 +22,15 @@
 - `main` is the fork's integration HEAD, its default branch, and the home for all fork-local docs. This is the working branch. It is NOT a mirror of upstream.
 - Upstream (`cornell-zhang/allo`) is tracked via the `upstream` remote; compare against `upstream/main`. There is no local mirror branch and no `next` branch.
 - Remote convention: `origin` = `sunwookim028/allo` (the fork), `upstream` = `cornell-zhang/allo`.
-- New features/fixes go on `feature/*` or `fix/*` branches based on `upstream/main`, one branch per upstream PR.
-- Fork-local files (fork docs pages, CLAUDE.md) live on `main` only - never on feature branches destined for upstream.
-- Project state (open PRs, branch dependencies, fork-vs-upstream feature map) is judged from git/GitHub, not checked-in `.md` snapshots. The living feature map is the pinned fork issue https://github.com/sunwookim028/allo/issues/13.
+- Two kinds of branch:
+  - **Upstream PR branches** (`feature/*`, `fix/*`) are based on `upstream/main`, one branch per upstream PR, and carry no fork-local files.
+  - **Fork work branches** are based on `main` and merge back into `main` once their result is solid.
+- Fork-local files (fork docs pages, CLAUDE.md) live on `main` only - never on upstream PR branches.
+- Direction, decisions and milestones are in `README.md`; defects are fork GitHub issues; the fork-vs-upstream feature map is the pinned fork issue https://github.com/sunwookim028/allo/issues/13.
+- Commit messages follow upstream style: `[Tag][Tag] Imperative summary`.
+
+# Fork exceptions
+- Vitis HLS runs (csynth, cosim) are part of the fork's measurement flow (README, D-1); agents may run them, but tell the user first when a run takes longer than a few minutes.
 
 # Don'ts
 - Do not modify repository structure without approval
