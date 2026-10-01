@@ -35,6 +35,19 @@ The link-type contract those blocks are wired against is
 `dev/records/agent_interconnect_2026-08-15.md`.
 
 ## Reproduce
+
+On a host without Catapult (e.g. ace-01), csim runs against open-source
+libraries: SystemC 2.3.1 from Vitis
+(`SYSTEMC_HOME=/opt/xilinx/Vitis/2023.2/lnx64/tools/systemc`), plus the MatchLib
+Connections and `ac_simutils` headers, plus `ac_types`, all under one
+`MGC_HOME/shared/include`. Add a stub `MGC_HOME/bin/catapult`, because csim still
+looks for it (see `docs/source/developer/limitations.rst`). Set
+`ALLO_CXX_EXTRA="-DSC_INCLUDE_DYNAMIC_PROCESSES -DCONNECTIONS_ACCURATE_SIM"`.
+`cosim_eva_systemc.py` passed bit-exact this way on 2026-10-01. Note that it
+rewrites `generated/`.
+
+With Catapult:
+
 ```bash
 # env (adjust MGC_HOME to your Catapult install)
 export MGC_HOME=/opt/siemens/catapult/2024.2/Mgc_home
@@ -42,7 +55,7 @@ SCH=<a dir with>: include -> $MGC_HOME/shared/include, lib -> $MGC_HOME/shared/l
 export SYSTEMC_HOME=$SCH
 export ALLO_CXX_EXTRA="-DSC_INCLUDE_DYNAMIC_PROCESSES -Wl,-rpath,$MGC_HOME/lib"
 export LD_LIBRARY_PATH=$MGC_HOME/lib:$SCH/lib:$LD_LIBRARY_PATH
-export PYTHONPATH=<allo checkout>          # e.g. /home/zsm9/allo_sup
+export PYTHONPATH=<allo checkout>
 
 # emit, then compile + run
 python build_eva_systemc.py
@@ -76,3 +89,18 @@ cd generated && ./csim.sh
   instances -> a much larger emit/compile (feasibility unverified); the captured
   8x8 mmm/fft goldens would require it, but a 1x1 numpy-golden cosim already
   proves functional correctness of the systemc emission.
+
+## Elsewhere
+
+These stay on `choonsik1/allo` (branch `main`) and are not imported here:
+
+- `EVA/`: the full EVA project. Its design of record is
+  `designs/v16_VERIFIED_credfree_uniform/`: RTL-cosim verified at 8x8 (640 outputs,
+  0 mismatches), meeting timing at 2.0 ns. It also holds the earlier versions, the
+  dead ends and the probes.
+- `ip_integration/`: a RISC-V core as an Allo stream IP programming the EVA PE grid.
+  Five designs pass RTL cosim (Vitis 2025.1).
+
+The Allo-side support this work needed (SystemC IP parsing and instantiation) is
+on this `main`.
+

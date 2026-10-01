@@ -108,9 +108,12 @@ entry it supersedes.
   (D-4), and is retired at M2, when the TinyTPU instance imports from the
   template.
 - SystemC gets a front door, `allo/backend/systemc.py`.
-- The agent harness moves to a root-level `agents/`, which joins
-  `examples/tinytpu/chia_agent/` and `chia_abstraction/`. Inside it, a
-  method-agnostic core is split from a CHIA adapter.
+- New agent-harness code goes in a root-level `agents/`. The existing CHIA
+  harness (`examples/tinytpu/chia_agent/`, `chia_abstraction/`) stays where it
+  is, frozen like TinyTPU: its guards rebuild trees from git at older commits
+  by path, so moving it would break replays. It moves or retires when a method
+  replaces it (D-5). Almost all of it is ours; only the agent loop and the
+  model client come from `ucb-bar/chia`.
 - Designs stay flat under `examples/`, with no intermediate folder such as
   `accelerator/`.
 - Fork-only knowledge stays in the Sphinx docs (`docs/source/`).
