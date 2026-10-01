@@ -1,0 +1,202 @@
+{
+ "phases": [
+  "e",
+  "c"
+ ],
+ "seconds": 101,
+ "head": "e6cb93d8dbd80e22d52ddbfa06603a7430b2a848",
+ "results": [
+  {
+   "case": "e.tool-surface",
+   "expected": "exactly the 7 spec tools",
+   "actual": [
+    "tpta_apply_spec_patch",
+    "tpta_insert_after",
+    "tpta_read_reference",
+    "tpta_read_spec",
+    "tpta_replace_text",
+    "tpta_run_functional_check",
+    "tpta_score_cycles"
+   ],
+   "pass": true
+  },
+  {
+   "case": "e.patch cosim.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "'Rejected: patches may touch only microarch_isa.py and isa_dsl.py (bare names). Everything else is frozen.', unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.patch microarch_isa.py + cosim.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "'Rejected: patches may touch only microarch_isa.py and isa_dsl.py (bare names). Everything else is frozen.', unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.patch ../cosim.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "'Rejected: patches may touch only microarch_isa.py and isa_dsl.py (bare names). Everything else is frozen.', unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.replace_text cosim.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "'Rejected: path must be microarch_isa.py or isa_dsl.py.', unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.replace_text ../cosim.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "'Rejected: path must be microarch_isa.py or isa_dsl.py.', unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.replace_text absolute repo path",
+   "expected": "Rejected, spec unchanged",
+   "actual": "'Rejected: path must be microarch_isa.py or isa_dsl.py.', unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.insert_after bench_isa.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "'Rejected: path must be microarch_isa.py or isa_dsl.py.', unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: import cosim",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: imports 'cosim', which is not allow\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: from examples ... import cosim",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: imports 'examples.accelerator.tinyt\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: import subprocess",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: imports 'subprocess', which is not \", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: open() write",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: uses 'open'. Describe hardware; do \", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: __import__",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: uses '__import__'. Describe hardwar\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: sys.modules",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: uses '.modules'; microarch_isa.py: \", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: numpy.savetxt over stress_isa.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: uses '.savetxt'. Describe hardware;\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: ndarray.tofile over stress_isa.py",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: uses '.tofile'. Describe hardware; \", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: SystemExit forged verdict",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: uses 'SystemExit'. Describe hardwar\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: monkeypatch numpy RNG via an alias",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: assigns to '_r.default_rng', an att\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.import-time: frame walk",
+   "expected": "Rejected, spec unchanged",
+   "actual": "\"Rejected: the edit is outside what a spec may contain -- microarch_isa.py: uses '.gi_frame'. Describe hardware\", unchanged=True",
+   "pass": true
+  },
+  {
+   "case": "e.read_reference outside the list",
+   "expected": "Unknown reference",
+   "actual": "Unknown reference; choose one of ['bench_isa.py', 'cosim.py'",
+   "pass": true
+  },
+  {
+   "case": "e.on-disk import cosim -> evaluator",
+   "expected": "ok=false at stage policy",
+   "actual": "ok=False stage=policy",
+   "pass": true
+  },
+  {
+   "case": "e.on-disk narrow16 + numpy.savetxt over stress_isa.py -> evaluator",
+   "expected": "ok=false",
+   "actual": "ok=False stage=policy",
+   "pass": true,
+   "detail": "microarch_isa.py: uses '.savetxt'\n{\"frozen_ref\": \"e6cb93d8dbd80e22d52ddbfa06603a7430b2a848\", \"measurement\": \"cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape\", \"ok\": false, \"seconds\": 0.2, \"shapes\": [\"4x4x4\", \"16x16x16\"], \"stage\": \"policy\"}"
+  },
+  {
+   "case": "e.on-disk narrow16 + ndarray.tofile over stress_isa.py -> evaluator",
+   "expected": "ok=false",
+   "actual": "ok=False stage=policy",
+   "pass": true,
+   "detail": "microarch_isa.py: uses '.tofile'\n{\"frozen_ref\": \"e6cb93d8dbd80e22d52ddbfa06603a7430b2a848\", \"measurement\": \"cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape\", \"ok\": false, \"seconds\": 0.2, \"shapes\": [\"4x4x4\", \"16x16x16\"], \"stage\": \"policy\"}"
+  },
+  {
+   "case": "e.on-disk narrow16 + SystemExit forged verdict -> evaluator",
+   "expected": "ok=false",
+   "actual": "ok=False stage=policy",
+   "pass": true,
+   "detail": "microarch_isa.py: uses 'SystemExit'\n{\"frozen_ref\": \"e6cb93d8dbd80e22d52ddbfa06603a7430b2a848\", \"measurement\": \"cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape\", \"ok\": false, \"seconds\": 0.2, \"shapes\": [\"4x4x4\", \"16x16x16\"], \"stage\": \"policy\"}"
+  },
+  {
+   "case": "e.on-disk narrow16 + method-self numpy patch -> evaluator",
+   "expected": "policy misses it; gate_runner refuses it (ok=false)",
+   "actual": "policy-missed=True ok=False stage=gate:bench_isa",
+   "pass": true,
+   "detail": " AttributeError(f\"CHIA gate: {self.__name__}.{name} is frozen\")\nAttributeError: CHIA gate: numpy.random.default_rng is frozen\nCHIA-GATE bench_isa FAIL importing the candidate raised AttributeError; tamper: ['refused rebinding numpy.random.default_rng']\n\n{\"frozen_ref\": \"e6cb93d8dbd80e22d52ddbfa06603a7430b2a848\", \"invariants\": {\"IMEM_SIZE\": 56, \"MAXDIM\": 16, \"T\": 4}, \"measurement\": \"cosim: Vitis HLS 2023.2 csynth + xsim C/RTL cosim (RTL), m_axi_latency default 0, one bit-exact TB per shape\", \"ok\": false, \"sandbox\": true, \"seconds\": 2.5, \"shapes\": [\"4x4x4\", \"16x16x16\"], \"stage\": \"gate:bench_isa\"}"
+  },
+  {
+   "case": "e.forged cosim.py/stress_isa.py in spec dir",
+   "expected": "ignored: real stress_isa n/n, vouched",
+   "actual": "STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)",
+   "pass": true
+  },
+  {
+   "case": "e.forged verdict past the policy",
+   "expected": "stdout forged (rc 0 + STRESS OK), runner vouches for neither gate",
+   "actual": "stdout-forged=True; runner={'bench_isa': (False, ['CHIA-GATE bench_isa FAIL importing the candidate raised SystemExit']), 'stress_isa': (False, ['CHIA-GATE stress_isa FAIL importing the candidate raised SystemExit'])}",
+   "pass": true
+  },
+  {
+   "case": "e.sandbox",
+   "expected": "only the work dir (not tree/repo/evaluator/home) writable",
+   "actual": "writable=['/home/sk3463/allo/.chia_scratch/harness-test-20260922-031048/sandbox-probe/isa_sweep.prj']",
+   "pass": true
+  },
+  {
+   "case": "c.narrow16",
+   "expected": "edit accepted; bench_isa passes; REJECTED at gate:stress",
+   "actual": "'Replaced 1 occurrence in microarch_isa.py.'; ok=False stage=gate:stress stress=STRESS FAILED: 251/492",
+   "pass": true
+  },
+  {
+   "case": "hygiene.no-orphans-at-exit",
+   "expected": "no process under the scratch dir",
+   "actual": "none",
+   "pass": true
+  }
+ ]
+}

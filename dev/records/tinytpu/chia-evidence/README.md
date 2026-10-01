@@ -49,6 +49,7 @@ None of these is an agent run and none cost money.
 | `timeline-476a70d8-16x16x16/` | per-process cosim timeline of that design at 16x16x16; the source of run 1's and run 3's seed facts, on the agent's reading list |
 | latest $0 verification | **101/101 cases, 74.5 min**, all nine phases, 2026-09-25 (`harness-test-20260925-033220/results.json`) -- the first full-suite pass recorded here. It was 90/90 on `--phases s,control,e,c,g,loop` on 2026-09-24 |
 | `harness-test-20260925-033220/` | the 101/101 full-suite run of 2026-09-25, on the refit commit |
+| `harness-test-20260922-031048/` | a partial $0 run of 2026-09-22 (phases e and c only, 30/30, 101 s) at `e6cb93d8`, harvested from `chia_runs/` on 2026-10-01. Its spec copies were byte-identical to that commit's design files, so only `results.json` was kept |
 | `harness-test-*/` | LLM-free `test_harness.py` runs (`results.json`: every case, expected against measured) and their `accept.py` on case b |
 | `codesign-suite-20260922.json` | the co-design harness's own suite, 11/11 cases, $0 |
 
