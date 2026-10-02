@@ -1,0 +1,330 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+################################################################
+U1 Record: ``vpu_alu`` Composed out of Allo Units
+################################################################
+
+.. note::
+
+   **Dated measurement record**, 2026-10-02. zhang-21, branch ``u1-alu`` off
+   ``u1-pilot`` (``bb3bc24c``), worktree ``scratch/wt-u1-alu`` (``mlir/build``
+   symlinked to ``wt-sc-fix``'s), ``source examples/minitpu/harness/env-zhang21.sh``
+   (conda ``allo``, ``OMP_NUM_THREADS=8``, Catapult 2024.2 SystemC). Oracle:
+   MiniTPU ``b3ba0a4`` ``vpu_alu.sv`` (with ``vpu_bf16_add_pipe.sv``,
+   ``vpu_bf16_mul.sv``, ``vpu_pkg.sv``) under Verilator 5.052, measured
+   latency 3 = declared ``VPU_ALU_LATENCY``. Stimulus: ``alu.stimulus()``,
+   **5,079,552** vectors: all 16 op codes, each over ``binary_bf16()``
+   (251,936 pairs) plus every ``a`` against a random ``b`` (65,536).
+
+The probe question for this unit is **composition** (README D-9; Design
+target: parameters, optional modules, swappable engines). ``vpu_alu.sv``
+instantiates ``vpu_bf16_add_pipe`` and ``vpu_bf16_mul_pipe``, computes every
+op on every pair, and muxes the result by the op that rode alongside. The
+Allo ALU here is built the same way, out of Allo engine units, instead of
+re-inlining arithmetic: the U1 pilot's bit-exact adder is **reused**, and the
+question is what each Allo mechanism let that reuse be.
+
+.. contents::
+   :local:
+   :depth: 1
+
+Result
+======
+
+Every variant, both backends, full stimulus
+(``python -m examples.minitpu.harness.check alu --backend simulator --backend
+systemc``; raw lines in ``u1_alu/check_alu.out``):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 40 19 19
+
+   * - Variant
+     - How it is composed
+     - Simulator
+     - SystemC csim
+   * - ``bits``
+     - RTL structure: ``engine_add`` (= ``bf16_add.add_bits``, reused),
+       ``engine_mul`` (``mul_bits``), ``bf16_gt`` on every pair, then the mux
+     - **UNIT-MATCH** 5,079,552
+     - **UNIT-MATCH** 5,079,552
+   * - ``bits_dispatch``
+     - same engines, each called only under its op (SUB calls the adder a
+       second time)
+     - **UNIT-MATCH**
+     - **UNIT-MATCH**
+   * - ``netlist``
+     - engines as ``@df.unit`` instances on streams; issue and writeback are
+       nested kernels
+     - **UNIT-MATCH** (97.8 s)
+     - **UNIT-MATCH** (88.3 s)
+   * - ``native``
+     - ``bfloat16`` ``+ - * max min`` in one kernel
+     - DIFF 5,051,836
+     - DIFF 5,064,720
+   * - ``engines_native``
+     - ``bits``'s skeleton, ``bfloat16`` engines swapped in (bitcast
+       wrappers)
+     - DIFF 5,069,695
+     - DIFF 5,067,236
+   * - ``add_bits_mul_native``
+     - one engine of each kind
+     - DIFF 5,072,213
+     - DIFF 5,072,282
+   * - ``netlist_native``
+     - ``netlist`` with the ``bfloat16`` engine units
+     - DIFF 5,069,696
+     - DIFF 5,067,236
+
+``latency=3`` on a verdict line is the RTL's (measured, equal to the declared
+value); the Allo side is untimed in both backends. Every DIFF is classified;
+none is unexplained:
+
+.. code-block:: text
+
+   native, simulator                                   native, SystemC csim
+     3810  ADD/SUB/MUL NaN: allo keeps sign/payload      6249  ADD/SUB/MUL NaN: ac::bfloat16 0x7fff/0xffff
+     6065  MUL: rtl flushes (1320 operand, 4745 result)  6065  MUL: rtl flushes (same 1320 + 4745)
+        2  (+0)+(-0), (+0)-(+0): rtl -0                     2  (+0)+(-0), (+0)-(+0): rtl -0
+     4859  MAX/MIN with NaN: maximumf (NaN wins)         2514  MAX/MIN with NaN: std::max drops it (C8)
+    12980  MOV / default arm: NaN `a` loses its             2  MAX/MIN of -0, +0: std::max returns `a` (C8)
+           payload through a bf16 phi (C7)
+
+The engine variants isolate the causes: with the ``bits`` skeleton (MOV and
+MAX/MIN on ``uint16``), C7 and C8 disappear, and ``engines_native`` differs
+only on NaN encodings, ``(+0)±0`` and MUL's flush. ``add_bits_mul_native``
+differs only on MUL. Swapping one engine moves exactly that engine's
+semantic mismatches and nothing else, which is the behaviour a swappable
+engine should have.
+
+Changes made to get here (``examples/minitpu`` only; nothing in ``allo/`` or
+``mlir/``):
+
+* ``units/bf16_add.py``: the ``bits`` adder was a closure inside its kernel,
+  so nothing else could call it. Its body is hoisted, unchanged, into
+  module-level ``add_bits(a_i, b_i) -> uint16`` (and ``leading_zeros17``), and
+  the kernel calls it. Re-checked: ``UNIT-MATCH bf16_add bits`` 251,936 /
+  251,936 in the simulator and SystemC csim.
+* ``units/alu.py``: the variants above; ``mul_bits``, a line-for-line
+  ``vpu_bf16_mul_pipe`` (a stand-in: ``units/bf16_mul.py`` has no Allo
+  variant on ``u1-pilot``, and branch ``u1-mul`` was not on ``origin`` during
+  this session; when it lands, ``_engines`` should import its function and
+  this one should go); ``bf16_gt``; classification rules for C7/C8.
+* ``harness/check.py``: example vectors print every stimulus column (an ALU
+  vector is ``op+a+b``).
+
+Composition: what each mechanism allows
+=======================================
+
+**Python function reuse inside a kernel works, in both backends.** A
+module-level function with scalar ``uint16`` parameters, called from a kernel,
+becomes a ``func.func`` and a ``func.call``. That holds across modules (alu.py
+calling ``bf16_add.add_bits``, which calls its own module's
+``leading_zeros17``) and for nested ``def``\ s inside the called function. The
+SystemC emitter keeps every one as a C++ function (``engine_add`` ->
+``add_bits`` -> ``leading_zeros17``). This is the mechanism ``bits`` uses, and
+it is enough for a bit-exact ALU. Its hazards are C1-C5 and C10 below; two of
+them (C3, C4) are **silent miscompiles**.
+
+**A swappable engine at function level exists only by convention.** A call
+is bound by the name at the call site and the callee is emitted under its def
+name (C1), so ``composed(n, add=add_native)`` with ``engine(...)`` in the
+kernel does not link. The convention that works is one wrapper per engine
+whose def name is the slot's (``engine_add``/``engine_mul``), chosen by a
+Python factory (``_engines``). Two engines for one slot can never share a
+region (C2).
+
+**``@df.unit`` gives the RTL's structure, and its swap is real.** A unit
+instantiation resolves the *value* bound to its name, so
+``netlist(n, add_unit=..., mul_unit=...)`` swaps engines with no convention.
+The engines then sit on streams the way ``vpu_alu.sv``'s instances sit on
+wires. But a unit's names, both its port shapes and its body's trip counts,
+are a snapshot taken at the decorator, and there is no instantiation-site
+parameter (C9). A module-level engine unit is fixed at one vector count. The
+workaround is one factory per engine that decorates the unit per ``n``, with
+``n`` as a closure variable. The unit body still calls its engine by def
+name, so it is one factory per (slot, engine) pair: four factories for two
+slots with two engines each.
+
+**``compose`` (``allo/compose.py``) was not run on this unit.** It composes a
+region's *source* out of kernel-level units and channels, and binds every free
+name (sizes included) when the ``Architecture`` emits the region. That would
+remove C9's binding-time problem. It says nothing about arithmetic inside a
+kernel: an ``Architecture`` wires units and never says what they compute. It
+is the right tool when the ALU is a lane of the VPU (U3), not for the engine
+reuse probed here.
+
+**Actions were not run on this unit.** ``Action(unit="alu", port=...,
+at=3, compute="...")`` can state that vadd..vmin each spend the ALU's issue
+port and land 3 cycles later. That is worth having, because the RTL's own
+comment says an opcode-dependent latency "would go unnoticed, with no
+interlock". But ``compute`` is a free string, so the op-to-engine binding
+would be declared a second time, beside the mux. ``actions.rst`` already
+classes arithmetic as "No, and never" derivable.
+
+**Nested functions** work in both backends: the pilot's ``leading_zeros17``
+was one, and a ``def`` nested inside a called function was checked.
+
+What the op dispatch becomes
+----------------------------
+
+* **Front end (MLIR):** exactly as written. ``if/elif`` on ``op`` is an
+  ``scf.if`` chain, and a conditional expression is ``arith.select``.
+  ``bits`` has one unconditional call per engine (``engine_add``,
+  ``engine_mul``, ``bf16_gt``) and 4 ``scf.if``. ``bits_dispatch`` has the
+  calls inside the branches: ``engine_add`` twice, ``bf16_gt`` twice, 5
+  ``scf.if``. Allo neither speculates nor shares; that is left to the
+  backend.
+* **Simulator (LLVM -O2, x86):** control flow, so ``bits_dispatch`` runs
+  fewer engine calls (0.1 s vs 0.7 s for 5.08 M vectors). For ``bfloat16``
+  values the merged result is a ``phi bfloat``, which x86 legalizes through
+  f32 and ``__truncsfbf2`` (C7).
+* **SystemC:** the same ``if``/``else`` chain over C++ function calls. The
+  engine hierarchy survives as functions, which Catapult inlines.
+* **Catapult** (csyn only, n=16, ``s.pipeline("alu_0:i")``, 2.0 ns,
+  ``nangate-45nm_beh``; ``u1_alu/catapult/``, ``u1_alu/emit_csyn_alu.py``):
+
+  .. list-table::
+     :header-rows: 1
+     :widths: 22 26 26 26
+
+     * - Form
+       - Real ops
+       - Area score
+       - Loop / slack
+     * - ``bits`` (compute all, mux)
+       - 292
+       - **4138.1**
+       - II=1, 19 cy / 16 vectors; slack -1.34 ns
+     * - ``bits_dispatch``
+       - 508
+       - 5211.9 (+26 %)
+       - II=1, 19 cy / 16 vectors; slack -1.28 ns
+
+  Catapult builds hardware per call site and does not share the ADD and SUB
+  adders across exclusive branches. The RTL's form (every engine once, then a
+  mux) is the cheaper way to write the unit, and Allo keeps whichever form is
+  written. Neither run closes 2.0 ns (rtl.rpt slack), and the loop lands in
+  the SC_THREAD's reset action, as for ``bf16_add``. Not simulated as RTL and
+  not compared with MiniTPU's area. Both runs needed
+  ``s.unroll("leading_zeros17:offset")``. Without it the 17-step loop inside
+  the reused adder cannot be scheduled at II=1 (``SCHD-30``, "could not
+  schedule even with unlimited resources"), and the ALU's build script has to
+  name the adder's internal loop (C10).
+
+Is the result a reusable unit?
+------------------------------
+
+Partly. **Swappable engine:** yes for ``netlist`` (by passing a unit
+factory). For the function-level ALU it is a convention, and it breaks if two
+engines share a def name. **Parameters:** the vector count, only through
+closures and factories (C9). The bf16 format is fixed in every engine (no
+width parameters were attempted). **Optional modules:** not applicable to
+this unit. **Composition with schedules:** no; a reused function's
+directives do not travel with it (C10).
+
+Findings
+========
+
+Classes are README D-9's. Minimal repros: ``u1_alu/repros.py`` (each repro
+runs in a subprocess and prints one line; all nine reproduced on this tree,
+37 s). The ALU's own workarounds for B1 (spare top bit: ``mul_bits``'s 9-bit
+compares held in 10 bits, ``bf16_gt``'s 16-bit keys in 17) are marked
+``(B1)`` in ``alu.py``.
+
+C1. An engine passed as a value does not link -- **bug**
+   ``builder.py`` ``build_Call`` names the call ``func_name = obj_name`` (the
+   name at the call site) but builds the callee from ``node.tree``, whose
+   ``FunctionDef`` name is the def name. ``c[i] = eng(a[i])`` with
+   ``eng = twice`` gives ``'func.call' op 'eng' does not reference a valid
+   function``. This is what blocks the obvious swappable-engine signature.
+C2. A function's identity is its def name -- **missing abstraction**
+   Two engines both called ``add`` (from two modules) in one region:
+   ``redefinition of symbol named 'add'``. Engine variants must have
+   distinct def names, and then (C1) the caller must spell the one it wants.
+C3. A reused function reads the caller's globals -- **bug, silent**
+   ``get_global_vars`` walks every reachable function and merges all their
+   modules' globals into one dict, first name wins. A function ``scale``
+   from ``engine_lib`` (``K = 3``, ``x * K``) called from a module with its
+   own ``K = 5`` computes ``x * 5``: allo ``[0 5 10 15]``, Python
+   ``[0 3 6 9]``. No error. Every cross-module reuse (``alu.py`` ->
+   ``bf16_add.add_bits``) is exposed to it; the ALU is correct today only
+   because no name collides.
+C4. A module-level numpy array shadows a kernel parameter -- **bug, silent**
+   ``infer.py`` ``visit_assignment_val`` checks ``global_vars`` for a numpy
+   array of the subscripted name before the kernel's own scope. With
+   ``a = np.full(4, 7)`` at module level and a parameter ``a``,
+   ``x: int32[1] = a[1:2]`` reads the global: allo ``[7 7 7 7]``, want
+   ``[1 1 1 1]``. With a loop index it is a ``NameError: name 'i' is not
+   defined`` instead (how it was found: a test script had globals ``a``/``b``).
+C5. Call arguments are not converted to the parameter type -- **bug**
+   ``f(b ^ 0x8000)`` with ``f(x: uint16)``: ``operand type mismatch:
+   expected 'i16', provided 'i32'``. An assignment converts; a call does not.
+   Workaround: a typed local (``bits_dispatch``'s ``neg_b``).
+C6. B2 at a new site -- **bug** (known, ``core-uint-compare``)
+   ``r[15] = b[15] ^ (op == 1)`` is an ``i1 ^ i4`` ``xori``. The ALU's SUB
+   select goes through ``is_sub: uint1`` first.
+C7. Simulator: a ``bfloat16`` phi loses NaN payloads -- **semantic mismatch**
+   With two or more conditional assignments to a ``bfloat16`` local, LLVM
+   forms ``phi bfloat``. x86 promotes it to f32 and truncates back with
+   ``__truncsfbf2``, which returns the canonical quiet NaN with the sign
+   kept: ``7f81 7fc1 ffff`` passed through untouched come out ``7fc0 7fc0
+   ffc0``. A single conditional assignment (no phi) keeps them, and so does
+   SystemC. It costs ``native`` 12,980 vectors (MOV and the default arm). The
+   simulator and SystemC therefore disagree on whether a bf16 *copy* is bit
+   exact. Checked in the lowered IR (``mlir-translate`` + ``llc -O2``: the
+   phi, then 72 ``__truncsfbf2`` calls).
+C8. SystemC: ``max``/``min`` on floats are ``std::max`` -- **bug** (emitter)
+   Allo's ``max`` is ``arith.maximumf`` (IEEE 754-2019 maximum: NaN wins,
+   ``-0 < +0``), and the simulator honours it. The Vivado-derived body prints
+   ``max(a, b)``, which the SystemC prelude binds to ``std::max`` (``a < b ? b
+   : a``): it returns ``a`` on an unordered or equal compare. ``max(0, NaN)``
+   is ``7fc0`` in the simulator and ``0000`` in SystemC; ``max(-0, +0)`` is
+   ``0000`` and ``8000``. The two Allo backends disagree on one program
+   (2,516 ``native`` vectors). The Vitis path prints the same text, and
+   ``hls::max`` was not checked.
+C9. A ``@df.unit`` cannot be sized at instantiation, and resizing it fails late -- **missing abstraction**
+   ``UnitSpec`` keeps ``get_global_vars(func)``, a snapshot taken at the
+   decorator, while the region reads its names at build. Setting the
+   module's ``N`` afterwards gives ``memref<4xi32>`` vs ``memref<8xi32>`` at
+   the call for an array port. A stream-only unit instead loops the old count
+   and **deadlocks** the region; this happened first, and ran until killed
+   at 10 min. ``stream_ports.rst`` names the parameter half ("cannot be
+   parametrized at the instantiation site"). The snapshot timing, and that
+   it surfaces as a deadlock, are new. Workaround: decorate inside a
+   per-``n`` factory.
+C10. A reused function's schedule does not travel with it -- **missing abstraction**
+   Catapult needs ``leading_zeros17``'s loop unrolled for II=1. The ALU's
+   build has to know the adder's internals to say
+   ``s.unroll("leading_zeros17:offset")``; ``"add_bits:offset"`` is refused
+   ("Cannot find the band"). ``compose`` units carry their directives
+   (``tinytpu_library.rst``); plain functions and ``@df.unit`` do not.
+C11. Engine selection by def-name factories -- **workaround**
+   ``_engines`` and the four ``_unit_*`` factories exist only because of C1,
+   C2 and C9. They distort the source, not the unit: the hardware is the same.
+
+Proposals (no code changes made)
+================================
+
+1. **C1/C2:** in ``build_Call``, key the callee ``func.func`` on the Python
+   function object (a symbol made unique per object, e.g.
+   ``<def name>_<n>``) and emit the call to that symbol. An engine passed as
+   a value then works, and two engines with one def name coexist.
+2. **C3:** resolve each function's free names in its own ``__globals__``
+   (plus its closure), not in one flattened dict. This is a correctness fix
+   and should not wait for the composition work.
+3. **C4:** in ``visit_assignment_val``, consult the kernel's own symbols
+   (parameters, locals) before ``global_vars`` constant arrays.
+4. **C5:** cast call arguments to the parameter types, as assignment does.
+5. **C8:** emit ``arith.maximumf``/``minimumf`` as a NaN- and
+   signed-zero-correct helper in the SystemC (and Vitis) emitters, or lower
+   them to ``cmpf`` + ``select`` before emission. Add a csim test with NaN
+   and ``±0`` operands.
+6. **C7:** part of triage item 3 (NaN policy). Either document that the
+   simulator's bf16 values are not payload-preserving through control flow,
+   or carry bf16 through phis as ``i16`` in the simulator's lowering.
+7. **C9/C10** belong to the U3 Design-target work (``compose`` optional
+   modules and swappable engines). Unit parameters at the instantiation
+   (``stream_ports.rst``'s "obvious next step"), and a schedule that a
+   function or unit carries with it, are D-n entries before code.

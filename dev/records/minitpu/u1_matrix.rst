@@ -155,6 +155,69 @@ in what Allo can say.
        AMC (D-2) after triage. Also T1: at a 3.333 ns target AMC's delay
        model misses by 1.24 ns
 
+``vpu_alu`` (composition probe)
+-------------------------------
+
+The ALU is built out of Allo engine units, as ``vpu_alu.sv`` is built out of
+its adder and multiplier: the pilot's ``bits`` adder is *reused*, hoisted out
+of its kernel into ``bf16_add.add_bits``. 5,079,552 vectors (all 16 op codes).
+Composition findings C1-C11 are in ``u1_alu_2026-10-02.rst``, with repros in
+``u1_alu/repros.py``. Two of them are **silent miscompiles in the front end**
+that any cross-module reuse is exposed to (C3, C4). *[provisional: fix them
+before more units are composed; proposals 2-3 in the record]*
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 40 42
+
+   * - Tool
+     - Cell
+     - Evidence / note
+   * - Allo simulator, ``bits`` / ``bits_dispatch`` / ``netlist``
+     - **match** 5,079,552/5,079,552 each, **after workarounds**: B1 spare
+       bits (``mul_bits``, ``bf16_gt``), B2 (C6), engine selection by def-name
+       factories (C11, forced by **bugs** C1, C5 and the **missing
+       abstractions** C2, C9)
+     - Function reuse across modules works; an engine passed as a value does
+       not link (C1). ``netlist`` (engines as ``@df.unit`` on streams) swaps
+       engines by value, but a unit cannot be sized at instantiation and a
+       stale size deadlocks (C9). **C3, C4: bugs, silent** (a reused
+       function reads the caller's same-named globals; a module-level numpy
+       array shadows a kernel parameter).
+   * - Allo simulator, ``native``
+     - **finding, semantic mismatch**: 5,051,836 match. The rest: NaN
+       encodings 3,810, MUL flush 6,065, ``(+0)±0`` 2, MAX/MIN with NaN 4,859
+       (``maximumf``: NaN wins), and **C7**: 12,980 MOV/default-arm NaNs lose
+       their payload through a ``phi bfloat`` (x86 ``__truncsfbf2``)
+     - Engine swaps isolate each cause: ``engines_native`` 5,069,695,
+       ``add_bits_mul_native`` 5,072,213 (MUL only), ``netlist_native``
+       5,069,696.
+   * - SystemC csim, ``bits`` / ``bits_dispatch`` / ``netlist``
+     - **match** 5,079,552/5,079,552 each
+     - 24.9-88.3 s. The emitter fixes merged in ``u1-pilot`` are enough;
+       the engine hierarchy survives as C++ functions.
+   * - SystemC csim, ``native``
+     - **finding, bug + semantic mismatch**: 5,064,720 match. NaN 6,249
+       (``ac::bfloat16`` ``0x7fff``), MUL flush 6,065, zeros 2, and **C8**:
+       Allo ``max``/``min`` (``arith.maximumf``) are emitted as ``std::max``,
+       which returns ``a`` on NaN or ``±0``, so 2,516 MAX/MIN vectors differ
+       from the simulator's own answer
+     - ``engines_native``/``netlist_native`` 5,067,236;
+       ``add_bits_mul_native`` 5,072,282. C7 does not occur here.
+   * - Catapult csyn, ``bits`` vs ``bits_dispatch``
+     - **finding, missing abstraction** (C10): II=1 needs
+       ``s.unroll("leading_zeros17:offset")``, the reused adder's internal
+       loop, named by the ALU's build (``SCHD-30`` without it). Then both
+       pipeline at II=1: area score **4138.1** (compute all, mux) vs
+       **5211.9** (dispatch, +26 %: one adder per call site, no sharing
+       across exclusive branches). rtl.rpt slack -1.34/-1.28 ns at 2.0 ns
+     - ``u1_alu/catapult/``. csyn only; not simulated as RTL, no DC. The
+       RTL's own form is the cheaper one to write, and Allo keeps whichever
+       is written.
+   * - RTLGen, AMC
+     - **not tried**
+     - Out of this session's scope.
+
 Environment findings met on the way
 -----------------------------------
 

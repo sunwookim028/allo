@@ -101,7 +101,7 @@ def main(argv=None):
                 bad_any = True
                 for name, idx in classify(stim, got, want, getattr(u, "EXPLAIN", [])).items():
                     ex = ", ".join(
-                        f"{stim[i, 0]:04x}+{stim[i, 1]:04x}: allo {got[i]:04x} rtl {want[i]:04x}"
+                        f"{'+'.join(f'{x:04x}' for x in stim[i])}: allo {got[i]:04x} rtl {want[i]:04x}"
                         for i in idx[:3]
                     )
                     print(f"    {len(idx):7d}  {name}  e.g. {ex}")
