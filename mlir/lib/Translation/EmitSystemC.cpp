@@ -135,18 +135,32 @@ static bool isFloatCType(const std::string &t) {
          t.find("ieee_float") != std::string::npos;
 }
 
-// The width of an integer element type the tb cannot move through `long long`
-// (`ap_int<W>`/`ap_uint<W>`/`ac_int<W,..>` with W > 64, see getSCTypeName), else 0.
-static int wideIntWidth(const std::string &t) {
+// How the tb moves an element type through its data files:
+//   'a' an ac_int / ap_int / ap_uint of ANY width: decimal text by digit
+//       arithmetic on the ac_int itself (_rdwide/_wrwide). `long long` is wrong
+//       for these twice over: a plain ac_int above 64 bits has no conversion to
+//       it under __SYNTHESIS__ (Catapult CRD-413, S7), and `>> long long` of a
+//       64-bit value >= 2^63 overflows, stores LLONG_MAX and sets failbit, which
+//       sticks: every later value of that file was lost (S8).
+//   'u' a native unsigned (uintN_t / bool): unsigned long long;
+//   's' a native signed: long long;  'f' a float (raw bits, see _fbits).
+static char tbIntKind(const std::string &t) {
+  if (isFloatCType(t))
+    return 'f';
   size_t lt = t.find('<');
-  if (lt == std::string::npos)
-    return 0;
-  std::string head = t.substr(0, lt);
-  if (head != "ap_int" && head != "ap_uint" && head != "ac_int")
-    return 0;
-  int w = std::atoi(t.c_str() + lt + 1);
-  return w > 64 ? w : 0;
+  if (lt != std::string::npos) {
+    std::string head = t.substr(0, lt);
+    if (head == "ap_int" || head == "ap_uint" || head == "ac_int")
+      return 'a';
+  }
+  if (t.rfind("uint", 0) == 0 || t.rfind("unsigned", 0) == 0 || t == "bool")
+    return 'u';
+  return 's';
 }
+// After `_f >> _v` / _rdwide: a value the tb could not read is an error, never
+// a silent LLONG_MAX (S8).
+static const char *TB_READ_CHECK =
+    "if (_f.fail()) { std::cerr << \"TB: unreadable value in \" << _fn << \" at \" << f << std::endl; std::abort(); } ";
 
 // A Channel's PROTOCOL picks genuinely different hardware, not a cosmetic label:
 //   valid_ready -> Connections::Combinational<T>              (full handshake, back-pressure)
@@ -3608,9 +3622,12 @@ template <class T> inline void _rdwide(std::istream &f, T &v) {
   if (neg) v = T(-v);
 }
 template <class T> inline void _wrwide(std::ostream &f, const T &v) {
-  T u = v; bool neg = (u < 0); if (neg) u = T(-u);
+  // The magnitude in a type one bit wider: T(-v) of a signed T's minimum
+  // (ac_int<8,true> -128) wraps back to itself and the digits came out below '0'.
+  typedef ac_int<T::width + 1, true> U;
+  U u = v; bool neg = (u < 0); if (neg) u = U(-u);
   std::string s;
-  do { s.insert(s.begin(), (char)('0' + (u % 10).to_int())); u = T(u / 10); } while (u != 0);
+  do { s.insert(s.begin(), (char)('0' + (u % 10).to_int())); u = U(u / 10); } while (u != 0);
   if (neg) s.insert(s.begin(), '-');
   f << s;
 }
@@ -4173,13 +4190,16 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         std::string conv = isF ? "_ffrombits< " + a.ctype + " >(_v)"
                                : "(" + a.ctype + ")_v";
         std::string rd = "_f >> _v;";
-        if (wideIntWidth(a.ctype)) { // > 64 bits: no long long (see _rdwide)
+        char kind = tbIntKind(a.ctype);
+        if (kind == 'a') { // any-width ac_int: no long long (see tbIntKind)
           rt = a.ctype;
           conv = "_v";
           rd = "_rdwide(_f, _v);";
+        } else if (kind == 'u') {
+          rt = "unsigned long long";
         }
-        os << "{ std::ifstream _f(\"input" << a.fileIdx << ".data\"); " << rt
-           << " _v; for (int f = 0; f < " << a.total << "; ++f) { " << rd << " ch_"
+        os << "{ const char *_fn = \"input" << a.fileIdx << ".data\"; std::ifstream _f(_fn); " << rt
+           << " _v; for (int f = 0; f < " << a.total << "; ++f) { " << rd << " " << TB_READ_CHECK << "ch_"
            << a.member << ".Push(" << conv << "); } }\n";
         reduceIndent();
         indent(); os << "}\n";
@@ -4198,7 +4218,7 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
              << ".data\"); for (int f = 0; f < " << a.total
              << "; ++f) _f << _fbits(ch_" << a.member
              << ".Pop()) << \"\\n\"; }\n";
-        else if (wideIntWidth(a.ctype)) // > 64 bits: no long long (see _wrwide)
+        else if (tbIntKind(a.ctype) == 'a') // any-width ac_int: no long long (see _wrwide)
           os << "{ std::ofstream _f(\"output" << a.fileIdx
              << ".data\"); for (int f = 0; f < " << a.total << "; ++f) { "
              << a.ctype << " _v = ch_" << a.member
@@ -4206,7 +4226,8 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         else
           os << "{ std::ofstream _f(\"output" << a.fileIdx
              << ".data\"); for (int f = 0; f < " << a.total
-             << "; ++f) _f << (long long)(ch_" << a.member
+             << "; ++f) _f << (" << (tbIntKind(a.ctype) == 'u' ? "unsigned long long" : "long long")
+             << ")(ch_" << a.member
              << ".Pop()) << \"\\n\"; }\n";
         indent(); os << "if (++_snk_done == " << numStreamOut << ") sc_stop();\n";
         reduceIndent();
@@ -4246,15 +4267,18 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         std::string conv = isF ? "_ffrombits< " + mi.ctype + " >(_v)"
                                : "(" + mi.ctype + ")_v";
         std::string rd = "_f >> _v;";
-        if (wideIntWidth(mi.ctype)) { // > 64 bits: no long long (see _rdwide)
+        char kind = tbIntKind(mi.ctype);
+        if (kind == 'a') { // any-width ac_int: no long long (see tbIntKind)
           rt = mi.ctype;
           conv = "_v";
           rd = "_rdwide(_f, _v);";
+        } else if (kind == 'u') {
+          rt = "unsigned long long";
         }
         // Exposed memories live in the tb; replicated ones are still inside the DUT.
         std::string owner = mi.exposed ? "t." : "t.dut.";
-        os << "{ std::ifstream _f(\"input" << mi.inIdx << ".data\"); " << rt
-           << " _v; for (int f = 0; f < " << mi.total << "; ++f) { " << rd << " "
+        os << "{ const char *_fn = \"input" << mi.inIdx << ".data\"; std::ifstream _f(_fn); " << rt
+           << " _v; for (int f = 0; f < " << mi.total << "; ++f) { " << rd << " " << TB_READ_CHECK
            << owner << mi.chan << "_mem.mem[f] = " << conv << "; } }\n";
       }
     indent(); os << "t.rst = 0; sc_start(1, SC_NS);\n";
@@ -4309,12 +4333,13 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         // +0 (all-zero bits) elsewhere, so OR-ing their bits merges them exactly
         // (a float sum would turn -0 into +0 and could not carry NaN bits).
         bool isFloat = isFloatCType(m.ctype);
-        bool isWide = wideIntWidth(m.ctype) > 0; // > 64 bits: no long long
+        bool isWide = tbIntKind(m.ctype) == 'a'; // any-width ac_int: no long long
         indent();
         if (isWide)
           os << "    " << m.ctype << " _s = 0;\n";
         else
-          os << (isFloat ? "    unsigned long long _s = 0;\n" : "    long long _s = 0;\n");
+          os << (isFloat || tbIntKind(m.ctype) == 'u' ? "    unsigned long long _s = 0;\n"
+                                                        : "    long long _s = 0;\n");
         for (auto &mi : memInsts)
           if (mi.dir != 'i' && mi.outIdx == m.outIdx) {
             // Exposed memories live in the tb; replicated ones inside the DUT.
@@ -4326,8 +4351,8 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
               os << "    _s = " << m.ctype << "(_s + " << owner << mi.chan
                  << "_mem.mem[f]);\n";
             else
-              os << "    _s += (long long) " << owner << mi.chan
-                 << "_mem.mem[f];\n";
+              os << "    _s += (" << (tbIntKind(m.ctype) == 'u' ? "unsigned long long" : "long long")
+                 << ") " << owner << mi.chan << "_mem.mem[f];\n";
           }
         indent();
         if (isWide)

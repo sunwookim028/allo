@@ -7,11 +7,14 @@ on the Connections stream the array is turned into, so the stream fell out
 of step with the loop: wrong values, no diagnostic. Such an array is now a
 memory port, which is read at the index the body asks for.
 
-S7: the testbench moved every integer port through ``long long``: a
+S7/S8: the testbench moved every integer port through ``long long``: a
 ``UInt(256)`` port failed at read-back (``KeyError 'ui256'``) and Catapult
-refused the file (CRD-413). Wide ports now go through decimal text of any
-length (``_rdwide``/``_wrwide``), the same text the Python side writes and
-parses, at any width.
+refused the file (CRD-413); a 64-bit value >= 2^63 overflowed the
+extraction, which stored LLONG_MAX, set failbit and lost every later value
+of that file (2/67,717 slots at the word array). Every ac_int port, at any
+width, now goes through decimal text by digit arithmetic
+(``_rdwide``/``_wrwide``), the same text the Python side writes and parses;
+an unreadable value aborts the testbench instead of sticking.
 
 The emit-only tests run everywhere; the csim ones compile and run the
 testbench and skip without Catapult (``MGC_HOME``) and ``SYSTEMC_HOME``.
@@ -96,6 +99,8 @@ def _wide_memory_region(T):
 
 WIDE_U = [0, (1 << 64) + 5, (1 << 200) + 3, (1 << 256) - 2]
 WIDE_S = [-1, -(1 << 127), (1 << 127) - 2, 7]
+U64 = [1, (1 << 63) - 1, (1 << 63) + 5, (1 << 64) - 2]  # S8: >= 2^63 and after
+U1024 = [1, (1 << 1023) + 7, (1 << 1024) - 2, 3]
 
 
 # --- emit-only -----------------------------------------------------------
@@ -121,12 +126,26 @@ def test_wide_port_testbench_avoids_long_long():
         assert "(long long)" not in tb and "long long _v" not in tb, tb
 
 
-def test_narrow_port_testbench_unchanged():
+def test_every_integer_port_takes_the_digit_reader():
+    """Ports are Catapult-native ac_int at every width (int32 included), so
+    none of them goes through `long long` any more; a float port keeps its
+    raw-bits path."""
     T = int32
     code = df.build(_wide_stream_region(T), target="systemc").hls_code
     tb = code.split("SC_MODULE(tb)")[1]
-    assert "_rdwide(" not in tb and "_wrwide(" not in tb
-    assert "long long _v" in tb
+    assert "_rdwide(" in tb and "_wrwide(" in tb
+    assert "long long _v" not in tb
+
+
+def test_64bit_ac_int_port_avoids_long_long():
+    """S8: a UInt(64) port is an ac_int<64, false>; `>> long long` of a
+    value >= 2^63 fails and sticks, so it takes the digit reader too."""
+    T = UInt(64)
+    code = df.build(_wide_stream_region(T), target="systemc").hls_code
+    tb = code.split("SC_MODULE(tb)")[1]
+    assert "_rdwide(" in tb and "_wrwide(" in tb, tb
+    assert "long long _v" not in tb
+    assert "_f.fail()" in tb  # an unreadable value aborts, never LLONG_MAX
 
 
 # --- csim ----------------------------------------------------------------
@@ -149,12 +168,29 @@ def test_s6_conditional_read_matches_simulator():
 @needs_csim
 @pytest.mark.parametrize(
     "T, vals",
-    [(UInt(256), WIDE_U), (Int(128), WIDE_S), (UInt(72), [1 << 70, 1, 2, (1 << 72) - 2])],
+    [
+        (UInt(64), U64),  # S8
+        (UInt(256), WIDE_U),
+        (UInt(1024), U1024),
+        (Int(128), WIDE_S),
+        (UInt(72), [1 << 70, 1, 2, (1 << 72) - 2]),
+    ],
 )
-def test_s7_wide_stream_ports_round_trip(T, vals):
+def test_s7_s8_wide_stream_ports_round_trip(T, vals):
     b = _obj([0] * 4)
     _csim(_wide_stream_region(T), _obj(vals), b)
     assert b.tolist() == [v + 1 for v in vals]
+
+
+@needs_csim
+def test_s8_uint64_numpy_array_round_trip():
+    """The record's repro: a uint64 numpy array with a value >= 2^63; every
+    value after it used to read back as LLONG_MAX."""
+    T = UInt(64)
+    a = np.array([1, 2**63 - 1, 2**63 + 5, 7], np.uint64)
+    b = np.zeros(4, np.uint64)
+    _csim(_wide_stream_region(T), a, b)
+    assert b.tolist() == [2, 2**63, 2**63 + 6, 8]
 
 
 @needs_csim
