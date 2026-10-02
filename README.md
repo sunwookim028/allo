@@ -236,6 +236,26 @@ backend, and one `Stateful` has one kernel.**
 - Verdicts in the unit ladder use single-call traces until the
   implementation lands (branch `core-stateful`).
 
+**D-13 (2026-10-02). A combinational output is declared, never inferred.**
+- A unit port written as `Wire[T, comb]` (or `Wire(..., comb=True)`) is a
+  same-cycle output: its value is a function of the unit's `Wire` inputs and
+  of state loaded before any store in the iteration, with no register on the
+  path. SystemC emits it as a combinational process (`SC_METHOD`) over
+  signal storage; Catapult then builds a clockless block. Measured at U2: a
+  register file with three such read ports is bit-exact against MiniTPU's
+  `vpu_regfile.sv` at read latency 0, write visible after 1
+  (`dev/records/minitpu/u2_comb_read_2026-10-02.rst`).
+- A backend that cannot build it refuses, naming the port: RTLGen and AMC
+  always register an output. The emitter refuses a `comb` cone that reads a
+  stream, a store of the same iteration, or anything clocked.
+- `latency.json` reports such a port as `comb`, not `0`; a `comb` port and
+  `latency=` are different things (D-10).
+- Explicit rather than inferred: an inferred form would change a port's
+  latency silently when its cone changed shape, which D-1 forbids.
+- Generated storage is reset (Catapult requires it; MiniTPU's register file
+  is not): a recorded deviation, reported as the reset-flop share of
+  sequential area, unless an unreset form proves well supported.
+
 ## Milestones
 
 Each milestone passes on **one acceptance check** and names the tools it uses

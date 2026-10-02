@@ -77,6 +77,18 @@ pilot, ``u2_regfile_2026-10-02.rst``):
   array + muxes (ASIC cells) or SRAM macro are per-backend lowerings stated
   in ``memory.json``, never part of the declaration.
 
+**Owner's decisions, 2026-10-02, checkpoint 5** (on the combinational read,
+``u2_comb_read_2026-10-02.rst``):
+
+- F2: a combinational output is an **explicit marker** (``Wire[T, comb]``),
+  refused where a backend cannot build it. README D-13. Implementation on
+  review branch ``backend-comb-wire``.
+- F3: **look for an unreset storage form** in Catapult; accept the reset as a
+  recorded deviation if none is well supported.
+- Form e (thread for the write, combinational process for the reads) is the
+  regfile's Catapult cell. F5 (``s.partition`` on a ``Stateful`` crashes)
+  goes with the ``core-uint-index`` batch.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
