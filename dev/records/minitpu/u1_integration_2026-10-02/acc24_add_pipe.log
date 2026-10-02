@@ -1,0 +1,31 @@
+RTL mxu_acc24_add_pipe: 352116 vectors, latency [3] (declared 3), 0.1s
+UNIT-DIFF  acc24_add_pipe native simulator 350021/352116 latency=untimed (rtl 3) (build 0.2s, run 0.1s)
+
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+       1981  NaN encoding: allo keeps payload/sign, rtl always +0x7fc000  e.g. 0000+7f8001: allo 7fc001 rtl 7fc000, 0000+7fffff: allo 7fffff rtl 7fc000, 0000+ffc000: allo ffc000 rtl 7fc000
+          1  (+0)+(-0) = -0 (IEEE RNE: +0)  e.g. 0000+800000: allo 0000 rtl 800000
+        113  double rounding: float32 add then acc24 round, one acc24 ulp off (divergence 5)  e.g. 3f8000+378001: allo 3f8000 rtl 3f8001, 400000+b78001: allo 400000 rtl 3fffff, 378001+3f8000: allo 3f8000 rtl 3f8001
+[07:48:39] Compiling with g++ ...
+[07:48:43] Running simulation ...
+UNIT-DIFF  acc24_add_pipe native systemc 349935/352116 latency=unchecked (rtl 3) (build 0.2s, run 6.1s)
+       2067  NaN becomes a zero: ac_ieee_float's NaN is 0x7fffffff, and native's acc24 round carries its payload into the sign  e.g. 0000+7fc000: allo 800000 rtl 7fc000, 0000+7f8001: allo 800000 rtl 7fc000, 0000+7fffff: allo 800000 rtl 7fc000
+          1  (+0)+(-0) = -0 (IEEE RNE: +0)  e.g. 0000+800000: allo 0000 rtl 800000
+        113  double rounding: float32 add then acc24 round, one acc24 ulp off (divergence 5)  e.g. 3f8000+378001: allo 3f8000 rtl 3f8001, 400000+b78001: allo 400000 rtl 3fffff, 378001+3f8000: allo 3f8000 rtl 3f8001
+UNIT-MATCH acc24_add_pipe bits simulator 352116/352116 latency=untimed (rtl 3) (build 0.6s, run 0.1s)
+
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[07:48:46] Compiling with g++ ...
+[07:48:50] Running simulation ...
+UNIT-MATCH acc24_add_pipe bits systemc 352116/352116 latency=unchecked (rtl 3) (build 0.4s, run 7.3s)
+UNIT-MATCH acc24_add_pipe staged simulator 352116/352116 latency=untimed (rtl 3) (build 0.8s, run 10.2s)
+
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[07:49:05] Compiling with g++ ...
+[07:49:09] Running simulation ...
+UNIT-MATCH acc24_add_pipe staged systemc 352116/352116 latency=unchecked (rtl 3) (build 0.6s, run 8.9s)
