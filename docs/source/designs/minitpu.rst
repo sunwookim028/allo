@@ -26,9 +26,11 @@ MiniTPU is the reference architecture the TinyTPU-isa work benchmarked
 against (see :doc:`/designs/gemmini_comparison`). Originally titled "MiniTPU --
 reference architecture we benchmarked against".
 
-**Not our design, and not ours to modify.** MiniTPU is another engineer's
-machine; its source is ``~/core/minitpu`` (live) and ``~/core/npu`` (read by an
-earlier pass, now empty), and neither travels to zhang-21. This records what we
+*Corrected 2026-10-01: earlier text called MiniTPU another engineer's machine.
+It has the same owner as this project, and is the design target (README).*
+Its source is ``~/core/minitpu`` (live, pinned for this project at
+``b3ba0a4d``) and ``~/core/npu`` (read by an earlier pass, now empty), and
+neither travels to zhang-21. This records what we
 *found* about a reference architecture we benchmarked against, because the
 findings outlive the tree. Everything was read-only. Distilled from two rescued
 scratchpad reports; *(verified)* means re-checked against ``~/core/minitpu`` on

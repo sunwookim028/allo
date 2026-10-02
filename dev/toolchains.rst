@@ -271,8 +271,8 @@ A row marked **unpinned** is an open defect.
      - ``kai/act`` ``3c1ad38``
      - ``ATTRIBUTION.md``
    * - MiniTPU (``~/core/minitpu``)
-     - **unpinned**: ``docs/source/designs/minitpu.rst`` says "at its HEAD"
-     - to pin before P/M1
+     - ``b3ba0a4d4fb69d39091c55f5f00d1f237082a4f1`` (2026-09-30)
+     - README (design target)
    * - Python packages other than the above
      - **unpinned** (``requirements.txt`` has ranges or nothing; upstream practice)
      - ``requirements.txt``

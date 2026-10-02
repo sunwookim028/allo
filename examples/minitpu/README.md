@@ -8,7 +8,7 @@ It runs a BF16 GEMM in the Allo dataflow simulator and checks the result
 against MiniTPU's own arithmetic -- the acc24 chain, the single rounding to
 BF16 at the array edge, and the BF16 `vadd` that sums 16-deep tiles.
 
-MiniTPU is another engineer's machine (`~/core/minitpu`); this is a model read
+MiniTPU (`~/core/minitpu`, pinned at `b3ba0a4d`) has the same owner as this project; this is a model read
 out of that RTL, not a copy of it and not a reproduction of its cycle counts.
 The reference page is [`docs/source/designs/minitpu.rst`](../../docs/source/designs/minitpu.rst).
 Building this model turned up nine places where that page disagreed with the

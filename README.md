@@ -57,7 +57,7 @@ the modelling abstractions. The legality-check discovery runs are a case study.
   instance. DotTree, and later Jalapeño, are instances with an adder-tree
   matrix engine.
 - **What counts as a match.** The Allo MiniTPU must match the real RTL
-  (`~/core/minitpu`, another engineer's design, read-only to us): its own
+  (`~/core/minitpu`, pinned at `b3ba0a4d`; same owner as this project): its own
   programs give bit-exact results, and its resources are reported beside
   MiniTPU's. The Allo version may add interlocks; that is a recorded deviation.
 
