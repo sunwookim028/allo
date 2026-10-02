@@ -2452,11 +2452,18 @@ void SystemCModuleEmitter::emitStreamTryPut(StreamTryPutOp op) {  // override (b
   if (isLocalStream(op->getOperand(0))) {
     // self-FIFO producer end: <success> = <stream>_enq.PushNB(<value>);
     // occupancy += success (bool -> 0/1) so empty()/full() track the logical fill.
+    // Gated by the synchronous counter: the enq Combinational holds one value
+    // in flight beyond the AlloFifo's depth, so a bare PushNB still SUCCEEDS at
+    // full() and the counter ran to depth + 1 -- full() was then never true
+    // again (u2_fifo S9: six try_puts into Stream[int32, 4] gave full
+    // [0,0,0,1,0,0] for the simulator's [0,0,0,1,1,1]). try_put is refused
+    // exactly when full(), as in the simulator.
     Value s = op.getResult();
     std::string sn = std::string(getName(op->getOperand(0)).str());
+    int64_t depth = llvm::cast<StreamType>(op->getOperand(0).getType()).getDepth();
     indent();
     emitValue(s);
-    os << " = " << sn << "_enq.PushNB(";
+    os << " = (" << sn << "_cnt < " << depth << ") && " << sn << "_enq.PushNB(";
     emitValue(op->getOperand(1));
     os << "); " << sn << "_cnt += ";
     emitValue(s);
