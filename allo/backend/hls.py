@@ -50,6 +50,7 @@ from .catapult import (
     PPA_ACTIVITY_CAVEAT,
 )
 from .ip import IPModule
+from .rtl import RTLModule
 from .report import parse_xml
 from ..passes import (
     _mlir_lower_pipeline,
@@ -263,6 +264,8 @@ def write_ip_directives(ext_libs, project, design_top):
 
 def copy_ext_libs(ext_libs, project):
     for ext_lib in ext_libs:
+        if isinstance(ext_lib, RTLModule):
+            continue
         impl_path = ext_lib.impl
         cpp_file = impl_path.split("/")[-1]
         assert cpp_file != "kernel.cpp", "kernel.cpp is reserved for the top function"
@@ -397,6 +400,9 @@ class HLSModule:
         self.project = project
         self.platform = platform
         self.ext_libs = [] if ext_libs is None else ext_libs
+        for lib in self.ext_libs:
+            if isinstance(lib, RTLModule):
+                lib.validate_hls(platform, mode)
         self.num_output_args = None  # Will be set from configs if provided
         user_configs = configs if configs is not None else {}
         # For Catapult (ASIC), start with ASIC-appropriate defaults instead of FPGA defaults.
@@ -609,6 +615,8 @@ class HLSModule:
                     with open(cfg_path, "w", encoding="utf-8") as cfg_file:
                         cfg_file.write(cfg_content)
                 for lib in self.ext_libs:
+                    if isinstance(lib, RTLModule):
+                        continue
                     cpp_file = lib.impl.split("/")[-1]
                     with open(f"{project}/{cpp_file}", "r", encoding="utf-8") as infile:
                         new_code = postprocess_hls_code(
@@ -763,6 +771,32 @@ class HLSModule:
                     outfile.write(self.host_code)
             if len(ext_libs) > 0:
                 for lib in ext_libs:
+                    if isinstance(lib, RTLModule):
+                        header, manifest = lib.export_hls(project)
+                        kernel_path = os.path.join(project, "kernel.cpp")
+                        with open(kernel_path, encoding="utf-8") as infile:
+                            code = infile.read()
+                        with open(kernel_path, "w", encoding="utf-8") as outfile:
+                            outfile.write(f'#include "{header}"\n' + code)
+                        tcl_path = os.path.join(project, "run.tcl")
+                        with open(tcl_path, encoding="utf-8") as infile:
+                            tcl = infile.read()
+                        # Vitis rejects ap_ctrl_chain black boxes in pipeline
+                        # regions, including automatically pipelined call loops.
+                        if "config_compile -pipeline_loops 0" not in tcl:
+                            tcl = tcl.replace(
+                                "# Run HLS",
+                                "# RTLModule calls must remain sequential.\n"
+                                "config_compile -pipeline_loops 0\n\n# Run HLS",
+                            )
+                        with open(tcl_path, "w", encoding="utf-8") as outfile:
+                            outfile.write(
+                                tcl.replace(
+                                    "# Add design and testbench files",
+                                    f"# Add design and testbench files\nadd_files -blackbox {{{manifest}}}",
+                                )
+                            )
+                        continue
                     # Update kernel.cpp
                     new_kernel = ""
                     with open(
