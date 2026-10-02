@@ -1378,11 +1378,12 @@ class HLSModule:
                             f"cosim: RTL produced no output{_oo}.data (see "
                             f"{self.project}/cosim.log)."
                         )
-                    rtl = read_tensor_from_file(out_dtype, out_shape, rtl_f)
+                    rtl = systemc.read_data(out_dtype, out_shape, rtl_f)
                     store_output(out_arg, rtl)
                     if os.path.exists(gold_f):
-                        gold = read_tensor_from_file(out_dtype, out_shape, gold_f)
-                        if not np.array_equal(rtl, gold):
+                        gold = systemc.read_data(out_dtype, out_shape, gold_f)
+                        # floats compare as bits: NaN == NaN, -0 != +0
+                        if not systemc.bits_equal(out_dtype, rtl, gold):
                             mismatches.append(_oo)
                     _oo += 1
 

@@ -98,3 +98,63 @@ def test_testbench_feeds_streams_independently():
     _csim(_two_in_two_out(N), a, b, c, d)
     np.testing.assert_array_equal(c, a + b)
     np.testing.assert_array_equal(d, a - b)
+
+
+def _copy(T, N, reverse):
+    """``reverse=False``: in-order scans (stream ports). ``True``: reversed
+    indexing, which makes both boundary arrays addressable memory ports (the
+    preload / read-out path of the testbench)."""
+    if reverse:
+
+        @df.region()
+        def top(A: T[N], B: T[N]):
+            @df.kernel(mapping=[1], args=[A, B])
+            def k(a: T[N], b: T[N]):
+                for i in range(N):
+                    b[N - 1 - i] = a[N - 1 - i]
+
+    else:
+
+        @df.region()
+        def top(A: T[N], B: T[N]):
+            @df.kernel(mapping=[1], args=[A, B])
+            def k(a: T[N], b: T[N]):
+                for i in range(N):
+                    b[i] = a[i]
+
+    return top
+
+
+_SPECIAL_BITS = {
+    # +0, +-inf, NaN of both signs and several payloads, smallest/largest
+    # subnormal, smallest normal, and values whose shortest decimal reads back
+    # BELOW them through a truncating float->bf16 conversion (1 + ulp, 3 ulps).
+    # -0 is in test_signed_zero_survives_a_signal: it needs the signal fix too.
+    bfloat16: [0x0000, 0x7F80, 0xFF80, 0x7FC0, 0xFFC0, 0x7F81, 0xFFFF,
+               0x0001, 0x807F, 0x0080, 0x3F81, 0x3F83, 0xC0A3, 0x7F7F, 0x3EAB],
+    float16: [0x0000, 0x7C00, 0xFC00, 0x7E00, 0xFE00, 0x7C01, 0xFFFF,
+              0x0001, 0x83FF, 0x0400, 0x3C01, 0x3555, 0xC248, 0x7BFF, 0x2E66],
+    float32: [0x00000000, 0x7F800000, 0xFF800000, 0x7FC00000,
+              0xFFC00000, 0x7F800001, 0xFFFFFFFF, 0x00000001, 0x807FFFFF,
+              0x00800000, 0x3F800001, 0x3EAAAAAB, 0xC0490FDB, 0x7F7FFFFF,
+              0x3DCCCCCD],
+}
+
+
+@needs_csim
+@pytest.mark.parametrize("reverse", [False, True], ids=["stream", "memport"])
+@pytest.mark.parametrize("T", [bfloat16, float16, float32])
+def test_float_io_is_bit_exact(T, reverse):
+    """Bug 3: the testbench's data files carried floats as decimal text.
+
+    ``>> float`` fails on "nan"/"inf" and every read after it, NaN sign and
+    payload were lost, and ac::bfloat16(float) truncates, so a bf16 value's
+    shortest decimal came back as the bf16 below it. Files now carry raw bits.
+    A copy must return every pattern unchanged, NaNs included.
+    """
+    bits = np.array(_SPECIAL_BITS[T], dtype=np.uint32 if T is float32 else np.uint16)
+    a = bits.view(_NP[T])
+    b = np.zeros(len(a), dtype=_NP[T])
+    _csim(_copy(T, len(a), reverse), a, b)
+    got = b.view(bits.dtype)
+    assert [hex(x) for x in got] == [hex(x) for x in bits]
