@@ -431,6 +431,9 @@ private:
   // under __SYNTHESIS__ so Catapult pipelines the body (see emitAffineFor).
   bool isSteadyStateLoop(affine::AffineForOp op);
   void emitAffineFor(affine::AffineForOp op) override;
+  // A constant-trip loop nested in a Wire kernel's steady-state loop gets
+  // `#pragma hls_unroll` unless the schedule already says unroll/parallel.
+  void emitLoopDirectivesPreheader(Operation *op) override;
 
   // Sequential-stream body transform: a boundary memref arg becomes a Connections
   // stream port, so load a[i] -> port.Pop(), store b[i]=v -> port.Push(v).
@@ -1142,6 +1145,44 @@ void SystemCModuleEmitter::emitAffineFor(affine::AffineForOp op) {  // override 
   reduceIndent();
   indent();
   os << "}\n";
+}
+
+// A Wire kernel's steady-state loop IS the clock: one iteration, one sampled
+// step. A constant-trip loop inside it (a shift-register pipe, `for k in
+// range(1, 3): p[3-k] = p[2-k]`) emitted rolled is MERGED by Catapult into the
+// pipelined loop -- "Prescheduled LOOP '/wa_0/run/while' (2 c-steps) (SCHD-7)",
+// after "Loop '/wa_0/run/l_S_k_0_k' is left rolled. (LOOP-4)" -- so the unit
+// samples its Wire inputs every second cycle while reporting II=1 (u2_word_array
+// C-W1: 19,502/67,717; `s.unroll` on the loop made the RTL cycle-exact). Unroll
+// such a loop here unless the schedule already has unroll/parallel on it; a
+// Connections kernel is left alone (its merged loop is caught by the latency
+// manifest, which a Wire kernel's measured step is not).
+void SystemCModuleEmitter::emitLoopDirectivesPreheader(Operation *op) {
+  CatapultModuleEmitter::emitLoopDirectivesPreheader(op);
+  auto forOp = llvm::dyn_cast<affine::AffineForOp>(op);
+  if (!forOp || !forOp.hasConstantBounds())
+    return;
+  if (allo::getLoopDirective(op, "unroll") ||
+      allo::getLoopDirective(op, "parallel"))
+    return;
+  bool underSteady = false;
+  for (Operation *p = op->getParentOp(); p && !underSteady; p = p->getParentOp())
+    if (auto anc = llvm::dyn_cast<affine::AffineForOp>(p))
+      underSteady = isSteadyStateLoop(anc);
+  if (!underSteady)
+    return;
+  auto func = op->getParentOfType<func::FuncOp>();
+  bool wireKernel = false;
+  func.walk([&](Operation *o) {
+    if (isa<allo::WireGetOp, allo::WirePutOp>(o))
+      wireKernel = true;
+  });
+  if (!wireKernel)
+    return;
+  indent();
+  os << "#pragma hls_unroll  // constant-trip loop in a Wire kernel's step: "
+        "rolled, Catapult merges it into the pipelined loop (SCHD-7) and one "
+        "step takes several cycles\n";
 }
 
 // Local reimplementation of the base's file-local affine-expr emitter: walk the
