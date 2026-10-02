@@ -183,14 +183,74 @@ are in ``dev/records/catapult_handoff/zhang21_inventory_2026-10-01.md``.
 - **Disk:** ``/work/shared/users`` is NFS with 9.4 TB free; put clones and
   projects there. ``/scratch`` is local, 195 GB free. ``/home`` is full, so
   avoid ``$HOME``.
-- **Verilator: not installed.** Options: conda-forge 5.052 (there is no 5.051)
-  in a separate env, or build the pinned version from source with
-  ``gcc-toolset-13``. The build dependencies are present.
+- **Verilator:** 5.052 installed 2026-10-02 (below).
 - **Vivado:** 2019.2, 2022.1, 2023.2 and 2024.2 under ``/opt/xilinx/Vivado``, and
   2026.1 under ``/opt/xilinx/2026.1``. All have the ``xczu7ev`` part. The 2026.1
   module sets ``XILINXD_LICENSE_FILE``; a licence checkout has not been tested.
-- **Python (allo env):** 3.12.12, numpy 2.4.0, torch 2.10.0+cu128. That is not the
-  pinned ``torch==2.14.0`` CPU, so the ACT flow needs a separate env there.
+- **Python (allo env):** 3.12.12, numpy 2.4.0, torch 2.10.0+cu128. The pinned
+  ``torch==2.14.0`` CPU is in a separate env, ``allo-torch214`` (below).
+- **LLVM_BUILD_DIR:** on this host ``conda activate allo`` *does* set it, to the
+  shared build ``/work/shared/common/llvm-project-main/build-rhel8``
+  (``activate.d/env_vars.sh``; llvm-project ``6b09f739``, Release,
+  ``clang;mlir;openmp``). That is also the build this checkout's bindings link
+  against (``mlir/build/CMakeCache.txt``). **Do not export**
+  ``/home/sk3463/llvm-allo-6b09f739/build`` here: that directory no longer
+  exists on zhang-21 (already gone at 2026-10-01 22:41 EDT; who removed it is not
+  established, ``/home`` is full and was being cleaned that evening), and
+  exporting it makes the simulator fail with ``Failed to create MemoryBuffer
+  for .../libmlir_runner_utils.so`` followed by ``RuntimeError: Unknown
+  function <top>``.
+
+Installed 2026-10-02
+^^^^^^^^^^^^^^^^^^^^
+
+Both pinned installs of README D-8, by the ``zhang21`` session.
+
+**Verilator 5.052** (conda-forge ``verilator==5.052=py312pl5321h9d6c286_0``),
+in its own prefix so no shared env changes::
+
+   ALLO_VERILATOR_HOME=/work/shared/users/phd/sk3463/tools/verilator scripts/verilator-setup.sh
+   eval "$(ALLO_VERILATOR_HOME=/work/shared/users/phd/sk3463/tools/verilator scripts/verilator-setup.sh --env)"
+   # -> Verilator 5.052 2026-09-05 rev conda-forge build (82 s; conda's package
+   #    cache is already on /work: .../miniconda3/pkgs)
+
+Verilator compiles its generated C++ with the host g++; use ``gcc-toolset-13``
+(``scl enable gcc-toolset-13 -- bash -c '...'``). A ``--binary --timing``
+smoke test builds and runs with g++ 13.3.1. MiniTPU, cloned at
+``/work/shared/users/phd/sk3463/minitpu`` (``b3ba0a4d4fb69d39091c55f5f00d1f237082a4f1``):
+
+.. code-block:: text
+
+   $ scl enable gcc-toolset-13 -- bash -c 'export PATH=/work/shared/users/phd/sk3463/tools/verilator/bin:$PATH; bash tb/run_verilator_unit_suite.sh'
+   PASS tb_copy_abi_v9 ... PASS tb_isa_conformance
+   == unit suite complete: 14 testbenches          # 14/14 PASS, 80 s wall
+
+**torch 2.14.0 CPU**, in a new env cloned from ``allo`` rather than in ``allo``
+itself: every session on this host shares ``allo``, and Allo's PyTorch
+frontend imports torch, so swapping its torch under them was not worth the
+risk (the host has no GPU; nothing in ``allo`` requires torch by package)::
+
+   conda create -n allo-torch214 --clone allo          # ~30 min on NFS, 8 GB
+   PIP_CACHE_DIR=/work/shared/users/phd/sk3463/.cache/pip \
+     $CONDA_PREFIX/bin/python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.0
+   python -c "import torch; print(torch.__version__)"   # 2.14.0+cpu
+
+The clone keeps the CUDA wheels' ``nvidia-*`` packages; they are unused.
+Verified with ``conda activate allo-torch214`` and no ``LLVM_BUILD_DIR``
+export (see above):
+
+.. code-block:: text
+
+   $ cd examples/tinytpu && make mlp PYTHON=python      # 24 s
+     mlp_small_l0   8x32x32   design vs isa_ref over all 4096 bytes of C: 0 differ
+     mlp_small_l1   8x32x16   design vs isa_ref over all 4096 bytes of C: 0 differ
+   [✓] Against PyTorch
+     0 of 384 output bytes differ
+
+``PYTHON=python`` matters: the Makefile probes ``python -c 'import allo'``,
+which fails because allo is not pip-installed (scripts put the repo on
+``sys.path``), and then falls back to ``conda run -n allo`` -- the *other*
+env, with torch 2.10.
 
 hlslibs ``ac_types`` (no Catapult licence needed)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
