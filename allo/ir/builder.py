@@ -1945,7 +1945,22 @@ class ASTTransformer(ASTBuilder):
                 # Create the initial value attribute
                 np_dtype = allo_to_numpy_dtype(dtype)
 
-                if isinstance(initial_value, np.ndarray):
+                wide_splat = (
+                    isinstance(dtype, (Int, UInt))
+                    and dtype.bits > 64
+                    and not isinstance(initial_value, np.ndarray)
+                )
+                if wide_splat:
+                    # Wider than any NumPy integer (e.g. a UInt(256) register
+                    # file): a scalar initialiser becomes a splat attribute
+                    # directly; the NumPy buffer path cannot hold the element.
+                    if not -(2**63) <= int(initial_value) < 2**63:
+                        raise RuntimeError(
+                            f"Stateful variable '{node.target.id}' of {dtype} takes "
+                            "a scalar initial value within 64 bits"
+                        )
+                    np_values = None
+                elif isinstance(initial_value, np.ndarray):
                     # Already an array, just convert dtype
                     np_values = initial_value.astype(np_dtype)
                     # Verify shape matches
@@ -1959,7 +1974,13 @@ class ASTTransformer(ASTBuilder):
                 else:
                     np_values = np.full(shape, initial_value, dtype=np_dtype)
 
-                value_attr = DenseElementsAttr.get(np_values, type=dtype.build())
+                if wide_splat:
+                    value_attr = DenseElementsAttr.get_splat(
+                        RankedTensorType.get(list(shape), dtype.build()),
+                        IntegerAttr.get(dtype.build(), int(initial_value)),
+                    )
+                else:
+                    value_attr = DenseElementsAttr.get(np_values, type=dtype.build())
 
                 # Declare global at module level
                 global_op = memref_d.GlobalOp(
@@ -1972,6 +1993,14 @@ class ASTTransformer(ASTBuilder):
                     ip=InsertionPoint(ctx.top_func),
                 )
                 global_op.attributes["static"] = UnitAttr.get()
+                # README D-14: storage declared ``Stateful(reset=False)``. The
+                # SystemC emitter reads this attribute; every other backend
+                # refuses it (allo/backend/hls.py); the simulator ignores it.
+                # The attribute holds the user's name for refusal messages.
+                if getattr(dtype, "unreset", False):
+                    global_op.attributes["allo.unreset"] = StringAttr.get(
+                        node.target.id
+                    )
 
                 # Track in stateful_var_map
                 if not hasattr(ctx, "stateful_var_map"):

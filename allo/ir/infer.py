@@ -189,12 +189,25 @@ class TypeInferer(ASTVisitor):
             # e.g., A: Ty[M] @ stateful
             dtype, shape, node_left_layout = TypeInferer.visit_type_hint(ctx, node.left)
             spec = ASTResolver.resolve(node.right, ctx.global_vars)
+            if (
+                spec is None
+                and isinstance(node.right, ast.Call)
+                and ASTResolver.resolve(node.right.func, ctx.global_vars) is Stateful
+            ):
+                # ASTResolver swallows a constructor's exception and returns
+                # None, which would silently drop the Stateful; say why instead.
+                raise RuntimeError(
+                    "Stateful(...) takes only `reset=True` or `reset=False` "
+                    f"(a literal), got `{ast.unparse(node.right)}`"
+                )
             if isinstance(spec, list):
                 spec = Layout(spec)
-            if spec is Stateful:
-                # Create a copy with stateful=True
+            if spec is Stateful or isinstance(spec, Stateful):
+                # Create a copy with stateful=True; ``Stateful(reset=False)``
+                # also marks the storage unreset (README D-14).
                 stateful_dtype = copy.deepcopy(dtype)
                 stateful_dtype.stateful = True
+                stateful_dtype.unreset = isinstance(spec, Stateful) and not spec.reset
                 return stateful_dtype, shape, node_left_layout
             return dtype, shape, spec
         raise RuntimeError("Unsupported function argument type")

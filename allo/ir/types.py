@@ -60,6 +60,8 @@ class AlloType:
         self.fracs = fracs
         self.name = name
         self.stateful = False
+        # README D-14: a Stateful declared ``reset=False`` (unreset storage).
+        self.unreset = False
         self.constexpr = False
 
     def build(self):
@@ -99,7 +101,28 @@ class Stateful:
     Usage:
         acc: Int(4) @ Stateful = 0          # Stateful scalar
         window: float32[4] @ Stateful       # Stateful array
+        mem: UInt(16)[32] @ Stateful(reset=False)   # unreset storage (README D-14)
+
+    ``@ Stateful`` and ``@ Stateful()`` are reset storage: the hardware reset
+    restores the initial value. ``reset=False`` declares storage whose contents
+    survive reset (only the unit's control is reset), as a register file's or a
+    FIFO's contents do in hand-written RTL. It is a declaration, never inferred
+    (README D-14): the SystemC backend lowers its write to a clock-edge process
+    with no reset action; a backend that cannot leave storage unreset refuses,
+    naming the storage; the simulator treats it as ordinary storage. Its
+    contents before the first write are undefined in hardware (the initial value
+    is what the simulator starts from).
     """
+
+    def __init__(self, reset=True):
+        if reset is not True and reset is not False:  # `bool` is an Allo type here
+            raise TypeError(
+                f"Stateful(reset=...) takes a bool, got {type(reset).__name__}"
+            )
+        self.reset = reset
+
+    def __repr__(self):
+        return "Stateful" if self.reset else "Stateful(reset=False)"
 
 
 class Index(AlloType):
