@@ -1,0 +1,3 @@
+cycle time: 403057
+RAN amc none trace N=80609 26.7s
+   rpt {'name': 'wa', 'hash': 'f2a7d82fbaf92d093cdadcce5d8665205b700023981b91a69f662ff2d15a9496', 'time': '10/02/2026, 14:28:57', 'version': {'verilator': 'Verilator 5.052 2026-09-05 rev conda-forge build'}, 'cycles': 403057}

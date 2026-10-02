@@ -1,0 +1,25 @@
+ 
+****************************************
+Report : reference
+Design : wa_0
+Version: W-2024.09
+Date   : Fri Oct  2 14:38:44 2026
+****************************************
+
+Attributes:
+    b - black box (unknown)
+   bo - allows boundary optimization
+    d - dont_touch
+   mo - map_only
+    h - hierarchical
+    n - noncombinational
+    r - removable
+    s - synthetic operator
+    u - contains unmapped logic
+
+Reference          Library       Unit Area   Count    Total Area   Attributes
+-----------------------------------------------------------------------------
+wa_0_run                       7641.382204       1   7641.382204  b, h, n
+-----------------------------------------------------------------------------
+Total 1 references                                   7641.382204
+1

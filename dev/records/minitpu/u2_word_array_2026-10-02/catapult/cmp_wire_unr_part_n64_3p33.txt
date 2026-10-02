@@ -1,0 +1,12 @@
+RTL-TRACE vpu_word_array:narrow wire_unr_part_n64_3p33: defined 67717/67717 at output-row offset compute +0 rows vs MiniTPU 33775/33775, dma +0 rows vs MiniTPU 33942/33942; 93501 masked; 80609 cycles; 1.1s
+    first-3000 hits by L, compute_rdata_o: {0: 184, 1: 1068, 2: 734, 3: 521, 4: 374, 5: 312, 6: 272, 7: 211, 8: 181, 9: 142}
+    first-3000 hits by L, dma_rdata_o: {0: 198, 1: 1108, 2: 716, 3: 498, 4: 362, 5: 285, 6: 237, 7: 187, 8: 157, 9: 121}
+    PROBE read compute: declared 3; MiniTPU 3; Catapult 3
+    PROBE read dma: declared 2; MiniTPU 2; Catapult 2
+    PROBE write compute -> read compute (visibility): declared 1; MiniTPU 1; Catapult 1
+    PROBE write compute -> read dma (visibility): declared 1; MiniTPU 1; Catapult 1
+    PROBE write dma -> read compute (visibility): declared 1; MiniTPU 1; Catapult 1
+    PROBE write dma -> read dma (visibility): declared 1; MiniTPU 1; Catapult 1
+    kernel port-to-port latency, measured = read probe - (L - 1): {'compute': 1, 'dma': 1}
+    LATENCY-MISMATCH wa_0: reported 2 ii=1 (scheduled), measured 1; unit declares 3
+    manifest wa_0: latency=2, ii=1, status=scheduled, port_style=wire, loop=while, loop_c_steps=1

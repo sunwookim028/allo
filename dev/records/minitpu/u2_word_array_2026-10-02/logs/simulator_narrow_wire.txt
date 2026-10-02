@@ -1,0 +1,3 @@
+RTL vpu_word_array:narrow: 80609 cycles in 14 traces, 67717 defined slots, RTL vs reference on defined: 67717/67717 (0.4s)
+loc("-":2:3): error: cannot be converted to LLVM IR: missing `LLVMTranslationDialectInterface` registration for dialect for op: func.func
+UNIT-FAIL  vpu_word_array wire simulator: RuntimeError: Failure while creating the ExecutionEngine.

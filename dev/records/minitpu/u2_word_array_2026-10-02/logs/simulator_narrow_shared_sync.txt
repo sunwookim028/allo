@@ -1,0 +1,8 @@
+RTL vpu_word_array:narrow: 80609 cycles in 14 traces, 67717 defined slots, RTL vs reference on defined: 67717/67717 (0.3s)
+/work/shared/users/phd/sk3463/scratch/wt-u2wa/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui1[0m
+  warnings.warn(self.message, category=self.category)
+/work/shared/users/phd/sk3463/scratch/wt-u2wa/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui3[0m
+  warnings.warn(self.message, category=self.category)
+UNIT-MATCH vpu_word_array:narrow shared_sync simulator 67717/67717 defined (93501 masked: collision=2693, no read=41104, uninit=7, write cycle=48344, ww collision=1353; allo==rtl on 37498) cycle=order-only (build 0.7s, run 2.5s)

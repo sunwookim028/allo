@@ -1,0 +1,81 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : mtpu_wa_narrow
+Version: W-2024.09
+Date   : Fri Oct  2 14:32:58 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: dma_addr_i[2]
+              (input port clocked by ideal_clock)
+  Endpoint: u/mem_reg[5][12]
+            (rising edge-triggered flip-flop clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  mtpu_wa_narrow     5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                        Fanout     Trans      Incr       Path
+  ---------------------------------------------------------------------
+  clock ideal_clock (rise edge)                      0.00       0.00
+  clock network delay (ideal)                        0.00       0.00
+  input external delay                               0.00       0.00 r
+  dma_addr_i[2] (in)                       0.02      0.02       0.02 r
+  dma_addr_i[2] (net)            7                   0.00       0.02 r
+  U138/A1 (NAND2_X1)                       0.02      0.02       0.04 r
+  U138/ZN (NAND2_X1)                       0.01      0.02       0.06 f
+  n11 (net)                      2                   0.00       0.06 f
+  U139/A2 (NOR2_X1)                        0.01      0.01       0.07 f
+  U139/ZN (NOR2_X1)                        0.13      0.16       0.23 r
+  n149 (net)                    13                   0.00       0.23 r
+  U86/A (BUF_X1)                           0.13      0.02       0.24 r
+  U86/Z (BUF_X1)                           0.10      0.14       0.38 r
+  n353 (net)                    20                   0.00       0.38 r
+  U69/A (BUF_X1)                           0.10      0.02       0.40 r
+  U69/Z (BUF_X1)                           0.10      0.14       0.53 r
+  n461 (net)                    20                   0.00       0.53 r
+  U56/A (BUF_X1)                           0.10      0.02       0.56 r
+  U56/Z (BUF_X1)                           0.08      0.11       0.66 r
+  n587 (net)                    15                   0.00       0.66 r
+  U792/A1 (NAND2_X1)                       0.08      0.02       0.69 r
+  U792/ZN (NAND2_X1)                       0.07      0.12       0.80 f
+  n640 (net)                    18                   0.00       0.80 f
+  U105/A (BUF_X1)                          0.07      0.02       0.82 f
+  U105/Z (BUF_X1)                          0.05      0.11       0.93 f
+  n639 (net)                    20                   0.00       0.93 f
+  U91/A (BUF_X1)                           0.05      0.02       0.95 f
+  U91/Z (BUF_X1)                           0.03      0.08       1.03 f
+  n641 (net)                    14                   0.00       1.03 f
+  U31/A (INV_X1)                           0.03      0.02       1.05 f
+  U31/ZN (INV_X1)                          0.11      0.13       1.18 r
+  n638 (net)                    20                   0.00       1.18 r
+  U1297/A1 (AOI22_X1)                      0.11      0.03       1.21 r
+  U1297/ZN (AOI22_X1)                      0.03      0.02       1.23 f
+  u/N1419 (net)                  1                   0.00       1.23 f
+  u/mem_reg[5][12]/D (DFF_X1)              0.03      0.01       1.24 f
+  data arrival time                                             1.24
+
+  clock ideal_clock (rise edge)                      2.00       2.00
+  clock network delay (ideal)                        0.00       2.00
+  u/mem_reg[5][12]/CK (DFF_X1)                       0.00       2.00 r
+  library setup time                                -0.05       1.95
+  data required time                                            1.95
+  ---------------------------------------------------------------------
+  data required time                                            1.95
+  data arrival time                                            -1.24
+  ---------------------------------------------------------------------
+  slack (MET)                                                   0.71
+
+
+1

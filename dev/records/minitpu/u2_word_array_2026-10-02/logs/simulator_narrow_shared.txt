@@ -1,0 +1,13 @@
+RTL vpu_word_array:narrow: 80609 cycles in 14 traces, 67717 defined slots, RTL vs reference on defined: 67717/67717 (0.3s)
+/work/shared/users/phd/sk3463/scratch/wt-u2wa/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui1[0m
+  warnings.warn(self.message, category=self.category)
+/work/shared/users/phd/sk3463/scratch/wt-u2wa/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui3[0m
+  warnings.warn(self.message, category=self.category)
+UNIT-DIFF  vpu_word_array:narrow shared simulator 34240/67717 defined (93501 masked: collision=2693, no read=41104, uninit=7, write cycle=48344, ww collision=1353; allo==rtl on 20334) cycle=order-only (build 0.6s, run 0.2s)
+    differing defined slots by trace: wr-offsets-dma->compute=12, ww-collision=3, idle-gaps=3, random-legal-0=8669, random-legal-1=8934, random-any-0=7980, random-any-1=7864, wr-offsets-compute->dma=9, both-read-one-word=3
+    e.g. wr-offsets-dma->compute cycle 251 compute_rdata_o: allo 282f0548c8e2578a rtl 8ad639b9cff0f9a7
+    e.g. wr-offsets-dma->compute cycle 259 compute_rdata_o: allo 282f0548c8e2578a rtl 0
+    e.g. wr-offsets-dma->compute cycle 268 compute_rdata_o: allo 282f0548c8e2578a rtl d426144b09b76fb2
+    e.g. wr-offsets-dma->compute cycle 278 compute_rdata_o: allo 282f0548c8e2578a rtl 2a2741d71da20e67

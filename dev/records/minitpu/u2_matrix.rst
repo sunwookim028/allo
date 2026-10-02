@@ -128,3 +128,83 @@ decide before the rest of U2" in ``u2_regfile_2026-10-02.rst``. In short:
        partition **blocked** (``problem is infeasible`` / ``exposed read port produced no
        rd_data signal``)
      - ``u2_regfile_2026-10-02/amc/``.
+
+``vpu_word_array`` (U2 unit 2, narrow: 8 x 64 b; narrow16 / mid where marked)
+------------------------------------------------------------------------------
+
+Record: ``u2_word_array_2026-10-02.rst`` (branch ``u2-word-array``). Read
+latency 3 (compute) / 2 (DMA), write visibility 1; two read/write ports;
+same-word cross-port collisions undefined and masked.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 40 42
+
+   * - Tool
+     - Cell
+     - Evidence / note
+   * - Allo simulator, ``trace``/``trace_rw``/``issue``/``ported``/``annotated``/``shared_sync``
+     - **match** 67,717/67,717 defined (93,501 masked), first time on ``trace``. The read
+       pipe written as data (``pc: W[3]``) or left as a row offset (``issue`` +
+       ``RESP_SHIFT``) check the same. Two minor loud frontend findings on the way: **F3**
+       (negative-step ``range`` refused), **F4** (a closure ``bool`` under ``if`` lowered
+       as ``i32``)
+     - ``logs/simulator_narrow_*.txt``; ``repros.py``.
+   * - Allo simulator, ``shared``
+     - **finding, semantic mismatch** (M2): 34,240/67,717, no diagnostic; the two port
+       kernels on a region Stateful run unordered. With a per-cycle barrier
+       (``shared_sync``) it matches: two clients of one memory are honoured only when the
+       clock's order is written as streams
+     - ``logs/simulator_narrow_shared*.txt``.
+   * - Allo simulator, ``wire``; 1024 b
+     - **blocked** (``Wire`` reaches the ExecutionEngine); 1024 b **blocked** at the host
+       data path (builds; no numpy dtype, H8)
+     - ``logs/full_n2000.txt``.
+   * - SystemC csim, 64 b (every variant)
+     - **finding, bug S8** (silent, high): the testbench reads ports through ``long long``;
+       a word >= 2^63 fails extraction and every later word of that file is lost:
+       2/67,717 on every variant
+     - ``logs/systemc_narrow_*.txt``; ``repros.py`` S8.
+   * - SystemC csim, 16 b (``narrow16``), ``trace``/``trace_rw``/``issue``/``ported``/``annotated``
+     - **match** 68,666/68,666
+     - ``logs/systemc_narrow16_*.txt``.
+   * - SystemC csim, ``shared``/``shared_sync``
+     - **refused** ("stateful variable ... is used by 2 kernels"; D-1 honoured). G1 again:
+       one memory, two ports, two state machines has no accepted expression
+     - ``logs/systemc_narrow16_shared*.txt``.
+   * - SystemC csim, ``wire``
+     - **finding, semantic mismatch**: 7,330/68,666; src/sink not cycle-locked to the unit
+       (limitation 22)
+     - ``logs/systemc_narrow16_wire.txt``.
+   * - Catapult, ``wire`` as emitted
+     - **finding, workaround C-W1** (high): the two constant-trip shift loops are emitted
+       rolled; Catapult merges them into the pipelined loop (2 c-steps at "II=1") and the
+       unit samples its inputs every second cycle: 19,502/67,717. The D-10 manifest flagged
+       the latency ``unreliable`` and named the loop
+     - ``catapult/wire_n64_3p33/``, ``catapult/cmp_wire_n64_3p33.txt``.
+   * - Catapult, ``wire`` + ``s.unroll`` on both loops
+     - **match, cycle-exact**: 67,717/67,717 at the same output row; step probes read
+       **3 / 2**, write->read **1** on all four port pairs, both clocks. Partition: no
+       effect (registers already). **finding C-M1**: manifest ``latency=2`` counts the reset
+       c-step; measured port-to-port 1 (``LATENCY-MISMATCH``). DC: +39 % area over
+       MiniTPU's (merged-block) simulation model, both clocks close
+     - ``catapult/wire2_unr_*``, ``catapult/cmp_wire2_unr_n64_3p33.txt``, ``dc/``.
+   * - Catapult, ``mid`` (4,096 x 64 b)
+     - **refused** (SCHD-30, loud): ``mem`` -> ``ccs_ram_sync_1R1W`` by default; with a
+       ``MAP_TO_MODULE ccs_ram_sync_dualport`` hand-patch and one ``if/else`` per port it
+       still refuses at II=1 -- a *chained feedback dependency* through the RAM (write in one
+       iteration, read in the next), which MiniTPU's XPM honours (write visible next cycle);
+       at **II=2** it schedules on the dual-port RAM (half VMEM's command rate). Allo can
+       state neither the port kind nor the RAW contract (``RAM_T2P``/``latency`` dropped, H3)
+     - ``catapult/wire_unr_mid_3p33/``, ``wire2_unr_mid_dp_*``.
+   * - RTLGen
+     - **match** 67,717/67,717 (``trace``, ``trace_part``, ``trace_rw``), all at 161,219
+       cycles (**II=2**); ``mem`` is 8 registers by RTLGen's own choice
+     - ``rtlgen/``.
+   * - AMC
+     - **match** 67,717/67,717 unscheduled (403,057 cycles). **finding, bug A1** (D-1):
+       ``s.pipeline`` prints ``problem is infeasible`` and returns a design that is wrong
+       (12,425/67,717, II=3), nothing raised. **finding, missing abstraction** (H10): 5
+       logical ports ``(w, r, r, w, w)``, all registered, on **1RW + 1R** physical -- not
+       VMEM's 2RW; the 3-entry pipes become 7- and 5-port memories
+     - ``amc/``.

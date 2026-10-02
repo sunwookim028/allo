@@ -1,0 +1,78 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : mtpu_wa_narrow
+Version: W-2024.09
+Date   : Fri Oct  2 14:31:47 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: dma_addr_i[2]
+              (input port clocked by ideal_clock)
+  Endpoint: u/clk_gate_mem_reg[5]/latch
+            (gating element for clock ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  mtpu_wa_narrow     5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                                       Fanout     Trans      Incr       Path
+  ------------------------------------------------------------------------------------
+  clock ideal_clock (rise edge)                                     0.00       0.00
+  clock network delay (ideal)                                       0.00       0.00
+  input external delay                                              0.00       0.00 r
+  dma_addr_i[2] (in)                                      0.02      0.02       0.02 r
+  dma_addr_i[2] (net)                           7                   0.00       0.02 r
+  U70/A1 (NAND2_X1)                                       0.02      0.02       0.04 r
+  U70/ZN (NAND2_X1)                                       0.01      0.02       0.06 f
+  n11 (net)                                     2                   0.00       0.06 f
+  U71/A2 (NOR2_X1)                                        0.01      0.01       0.07 f
+  U71/ZN (NOR2_X1)                                        0.13      0.15       0.23 r
+  n149 (net)                                   13                   0.00       0.23 r
+  U5/A (CLKBUF_X1)                                        0.13      0.01       0.24 r
+  U5/Z (CLKBUF_X1)                                        0.10      0.16       0.40 r
+  n353 (net)                                   20                   0.00       0.40 r
+  U3/A (CLKBUF_X1)                                        0.10      0.02       0.42 r
+  U3/Z (CLKBUF_X1)                                        0.10      0.16       0.57 r
+  n461 (net)                                   20                   0.00       0.57 r
+  U218/A (BUF_X1)                                         0.10      0.02       0.59 r
+  U218/Z (BUF_X1)                                         0.08      0.11       0.70 r
+  n585 (net)                                   15                   0.00       0.70 r
+  U747/A1 (NAND2_X1)                                      0.08      0.02       0.72 r
+  U747/ZN (NAND2_X1)                                      0.05      0.09       0.81 f
+  n638 (net)                                   13                   0.00       0.81 f
+  U748/A (CLKBUF_X1)                                      0.05      0.01       0.82 f
+  U748/Z (CLKBUF_X1)                                      0.10      0.16       0.98 f
+  n639 (net)                                   20                   0.00       0.98 f
+  U749/A (OAI21_X1)                                       0.10      0.03       1.01 f
+  U749/ZN (OAI21_X1)                                      0.03      0.05       1.06 r
+  u/N1440 (net)                                 1                   0.00       1.06 r
+  u/clk_gate_mem_reg[5]/EN (SNPS_CLOCK_GATE_HIGH_vpu_word_array_4)
+                                                                    0.00       1.06 r
+  u/clk_gate_mem_reg[5]/EN (net)                                    0.00       1.06 r
+  u/clk_gate_mem_reg[5]/latch/E (CLKGATETST_X1)           0.03      0.01       1.06 r
+  data arrival time                                                            1.06
+
+  clock ideal_clock (rise edge)                                     3.33       3.33
+  clock network delay (ideal)                                       0.00       3.33
+  u/clk_gate_mem_reg[5]/latch/CK (CLKGATETST_X1)                    0.00       3.33 r
+  clock gating setup time                                          -0.09       3.24
+  data required time                                                           3.24
+  ------------------------------------------------------------------------------------
+  data required time                                                           3.24
+  data arrival time                                                           -1.06
+  ------------------------------------------------------------------------------------
+  slack (MET)                                                                  2.18
+
+
+1

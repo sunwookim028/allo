@@ -1,0 +1,28 @@
+RAN llvm none trace N=256 0.2s
+cycle time: 1036
+RAN amc none trace N=256 17.7s
+   rpt {'name': 'wa', 'hash': 'd7e0223e42ed347a77a29acc2e3367007881fff974f1f05505122212e54b9c3f', 'time': '10/02/2026, 14:24:30', 'version': {'verilator': 'Verilator 5.052 2026-09-05 rev conda-forge build'}, 'cycles': 1036}
+LoopBand(['S_t_0'])
+loc("-":11:5): error: problem is infeasible
+loc("-":11:5): error: problem is infeasible
+cycle time: 783
+RAN amc pipeline trace N=256 16.4s
+   rpt {'name': 'wa', 'hash': 'a25d779b996dcced51c28d0e0b4d17017d1f8950d5a5cee5a08b24c3e54ce963', 'time': '10/02/2026, 14:24:49', 'version': {'verilator': 'Verilator 5.052 2026-09-05 rev conda-forge build'}, 'cycles': 783}
+WARNING: This design uses banks with more ports than the architecture allows for (2). This will cause an inefficiency in RTL synthesis.
+WARNING: This design uses banks with more ports than the architecture allows for (2). This will cause an inefficiency in RTL synthesis.
+WARNING: This design uses banks with more ports than the architecture allows for (2). This will cause an inefficiency in RTL synthesis.
+WARNING: This design uses banks with more ports than the architecture allows for (2). This will cause an inefficiency in RTL synthesis.
+WARNING: This design uses banks with more ports than the architecture allows for (2). This will cause an inefficiency in RTL synthesis.
+cycle time: 784
+RAN amc part trace N=256 15.8s
+   rpt {'name': 'wa', 'hash': '7a9d9b50647cde4ac6ea36c5b9af99f690cd6a80a7dc43f9971d21d06c502573', 'time': '10/02/2026, 14:25:07', 'version': {'verilator': 'Verilator 5.052 2026-09-05 rev conda-forge build'}, 'cycles': 784}
+LoopBand(['S_t_0'])
+loc("-":11:5): error: problem is infeasible
+loc("-":11:5): error: problem is infeasible
+cycle time: 783
+RAN amc pipeline trace_rw N=256 15.9s
+   rpt {'name': 'wa', 'hash': '97658aa013103a2e5ce5792d6ba67f785f493aeb54e38a112d0809b686f7a4cb', 'time': '10/02/2026, 14:25:24', 'version': {'verilator': 'Verilator 5.052 2026-09-05 rev conda-forge build'}, 'cycles': 783}
+loc("-":11:5): error: problem is infeasible
+cycle time: 241842
+RAN amc pipeline trace N=80609 28.5s
+   rpt {'name': 'wa', 'hash': '423546794cc2d7a0bf669dfa5c76d6a5fe027b67a0c26e57db718670a2974aed', 'time': '10/02/2026, 14:25:42', 'version': {'verilator': 'Verilator 5.052 2026-09-05 rev conda-forge build'}, 'cycles': 241842}

@@ -1,0 +1,3 @@
+MATCH rtlgen:got_trace_80609: 67717/67717 defined over the first 80609 cycles (93501 masked)
+MATCH rtlgen:got_trace_part_80609: 67717/67717 defined over the first 80609 cycles (93501 masked)
+MATCH rtlgen:got_trace_rw_80609: 67717/67717 defined over the first 80609 cycles (93501 masked)

@@ -1,0 +1,17 @@
+{
+ "clock_period_ns": 3.33,
+ "definition": "latency: rising edges from the input-accepting edge to the edge after which the output is visible, no stall; ii: cycles between iterations of the I/O loop",
+ "solution": "/work/shared/users/phd/sk3463/scratch/u2wa/cat/wire2_unr_n64_3p33.prj/build/Catapult/wa_0.v1",
+ "tool": "catapult",
+ "units": {
+  "wa_0": {
+   "ii": 1,
+   "latency": 2,
+   "loop": "while",
+   "loop_c_steps": 1,
+   "port_style": "wire",
+   "process": "/wa_0/run",
+   "status": "scheduled"
+  }
+ }
+}

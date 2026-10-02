@@ -16,6 +16,9 @@ Instances (``vpu_pkg`` defines and ``-G`` parameters):
 ``narrow``      ``MINITPU_NUM_LANES=1``, ``MINITPU_VMEM_ENTRIES_PER_LANE=16``:
                 8 words of 64 b, latencies 3/2 -- dense collisions, fast
 ``narrow_rl2``  the same with ``READ_LATENCY=2``
+``narrow16``    ``MINITPU_NUM_SUBLANES=1`` too: 32 words of 16 b (added for the SystemC
+                csim column, whose testbench moves data through ``long long``)
+``mid``         ``MINITPU_NUM_LANES=1`` alone: 4096 words of 64 b (the Catapult RAM-mapping probe)
 ``full``        the default geometry: 4096 words of 1024 b, latencies 3/2
 ``full_rl2``    ``READ_LATENCY=2``: what ``tb_vpu_word_array`` instantiates
 
@@ -23,17 +26,78 @@ Legal traces keep the two ports off one word in a cycle when either writes
 (``vpu_vmem_simd.sv:121-131`` asserts it in simulation; nothing else checks
 it). Illegal traces break that rule on purpose.
 
-No Allo variant yet (U2 plan, checkpoint 1).
+Allo variants (U2, ``dev/records/minitpu/u2_word_array_2026-10-02.rst``),
+mirroring ``vpu_regfile.py``'s: every variant is driven by the SAME per-cycle
+command trace as the RTL (one array per input port, one element per cycle)
+and returns one array per ``rdata`` port, one element per cycle. Addresses
+are ``UInt(AW)``, data ``UInt(W)``, ``en``/``we`` ``uint1``.
+
+The new element against the regfile is the **registered read**: a read
+issued in cycle ``t`` leaves ``rdata`` in row ``t + L - 1`` (``L`` = 3 on
+the compute port, 2 on the DMA port). Two expressions:
+
+``trace`` (plan W1, pipe as data)
+    One kernel, kernel-local ``mem: W[WORDS]`` and one shift-register pipe
+    per port (``pc: W[3]``, ``pd: W[2]``), the RTL's ``*_read_pipe``
+    transcribed: per iteration the pipes shift, each enabled port reads
+    (*old* word, before this cycle's writes) or writes -- one access per
+    port per cycle, as the board's XPM port does (``WRITE_MODE no_change``:
+    on a write cycle the pipe head holds, which is a masked slot) -- then
+    ``q[t] = pipe[L - 1]``. The latency is an iteration shift inside the
+    kernel, so every backend reproduces the row offset by construction.
+``issue`` (W1 as the plan words it, latency left to the RTL)
+    The same accesses with no pipe: ``q[t]`` is the read issued at ``t``.
+    ``RESP_SHIFT`` tells ``check.py`` to compare ``q[t]`` with the RTL's row
+    ``t + L - 1``. The delivery delay is then a contract outside the kernel
+    (D-10's ``latency=L``), which no backend can state per port today.
+``trace_rw``
+    The simulation model transcribed literally: every enabled port reads
+    *and* (if ``we``) writes in one cycle -- two accesses per port per
+    cycle. Same defined slots as ``trace``; the Catapult probe of a 4-access
+    iteration.
+``ported`` (R3)
+    ``trace`` as a ``@df.unit`` with 8 command + 2 response ``Stream`` ports,
+    lockstep, between a driver and a sink kernel.
+``shared`` / ``shared_sync`` (W2: the true two-client case)
+    A region-scope ``mem @ Stateful`` and one kernel per physical port
+    (``compute`` and ``dma``), each with its own read pipe. ``shared`` has
+    no link between them; ``shared_sync`` adds a per-cycle barrier (a token
+    each way), which is the ordering the RTL gets from the clock. Within a
+    cycle the order of the two ports is free: same-word collisions are
+    undefined and masked.
+``annotated``
+    ``trace`` with ``mem @ Memory(resource="URAM", storage_type="RAM_T2P",
+    latency=3, depth=WORDS)``: the D-1 sweep (what reaches each backend).
+``wire``
+    ``trace``'s body with every port a ``Wire`` (``sc_in``/``sc_out``), the
+    port shape of MiniTPU's module; unit kernel ``wa`` (``synth_top="wa_0"``).
+    SystemC/Catapult only. Each port's access is one ``if we: write else:
+    read`` (two RAM ports for Catapult, not four); the two shift loops must
+    be ``s.unroll``-ed, or Catapult merges them into the pipelined loop.
+
+Workarounds carried from the regfile pilot: B4 (every address widened to
+``int32`` before indexing), B5 (a stream/wire address read into ``UInt(AW)``
+first), S6 (every port array read unconditionally; only the access is under
+``if``).
 """
+
+import numpy as np
+
+import allo.dataflow as df
+from allo.ir.types import Stateful, Stream, UInt, Wire, int32, uint1
+from allo.memory import Memory
 
 from examples.minitpu.harness import ref, rtl
 from examples.minitpu.harness.traces import Trace, hot_addr, rng_for, word
 
 SOURCES = ["src/core/vpu/vpu_pkg.sv", "src/core/vpu/vpu_word_array.sv"]
 NARROW = ["MINITPU_NUM_LANES=1", "MINITPU_VMEM_ENTRIES_PER_LANE=16"]
+NARROW16 = NARROW + ["MINITPU_NUM_SUBLANES=1"]
 GEOM = {  # instance: (word bits, words, address bits, compute latency, dma latency)
     "narrow": (64, 8, 3, 3, 2),
+    "narrow16": (16, 32, 5, 3, 2),  # NUM_SUBLANES = 1: words below 64 b (csim's long long path, S8)
     "narrow_rl2": (64, 8, 3, 2, 2),
+    "mid": (64, 4096, 12, 3, 2),  # NUM_LANES = 1 at the default depth: a RAM-sized array of 64 b words
     "full": (1024, 4096, 12, 3, 2),
     "full_rl2": (1024, 4096, 12, 2, 2),
 }
@@ -51,16 +115,19 @@ def _unit(inst):
         inputs=ins,
         outputs=[(f"{p}_rdata_o", ww, "post") for p in PORTS],
         shape="trace",
-        defines=NARROW if inst.startswith("narrow") else [],
+        defines=NARROW16 if inst == "narrow16" else NARROW if inst.startswith("narrow")
+        else NARROW[:1] if inst == "mid" else [],
         params={} if rl == 3 else {"READ_LATENCY": rl},
         assertions=True,
     )
 
 
 INSTANCES = {k: _unit(k) for k in GEOM}
+WIDTH = {k: g[0] for k, g in GEOM.items()}
 DEFAULT = "narrow"
 RTL = INSTANCES[DEFAULT]
-VARIANTS = {}
+CMD = tuple(f"{p}_{f}_i" for p in PORTS for f in ("en", "we", "addr", "wdata"))
+RESP = tuple(f"{p}_rdata_o" for p in PORTS)
 LATENCY_SOURCE = "vpu_pkg.sv:58-59 (VMEM_READ_LATENCY = 3, VMEM_DMA_READ_LATENCY = 2)"
 
 
@@ -221,3 +288,513 @@ def seeds():
                                  clk="clk_i", unit=INSTANCES["full_rl2"])
     return [("tb_vpu_word_array", "full_rl2", cmd, seen, True),
             ("tb_vpu_word_array@RL3", "full", cmd, None, True)]
+
+
+# ---------------------------------------------------------------------------
+# Allo variants. Each ``make(n, w, inst)`` returns a region over per-port
+# arrays of n cycles (``w`` is the word width, ``inst`` the geometry); each
+# runner takes the built module and a command trace and returns
+# ``{resp port: array of ints}``.
+# ---------------------------------------------------------------------------
+
+
+def _np(w):
+    return np.uint8 if w <= 8 else np.uint16 if w <= 16 else np.uint32 if w <= 32 else np.uint64
+
+
+def _args(cmd, n, w):
+    """The trace as the region's input arrays (narrow dtypes: the simulator
+    checks the element width), plus zeroed outputs."""
+    ins = []
+    for p in CMD:
+        if p.endswith("wdata_i"):
+            ins.append(np.asarray([int(x) for x in cmd[p][:n]], dtype=_np(w)))
+        elif p.endswith("addr_i"):
+            ins.append(np.asarray(cmd[p][:n], dtype=np.uint16 if max(cmd[p][:n]) > 255 else np.uint8))
+        else:
+            ins.append(np.asarray(cmd[p][:n], dtype=np.uint8))
+    outs = [np.zeros(n, dtype=_np(w)) for _ in RESP]
+    return ins, outs
+
+
+def _run_flat(mod, cmd, n, w):
+    ins, outs = _args(cmd, n, w)
+    mod(*ins, *outs)
+    return {p: o for p, o in zip(RESP, outs)}
+
+
+def _geom(inst):
+    ww, words, aw, rl, drl = GEOM[inst]
+    return ww, words, aw, rl, drl
+
+
+def trace(n, w=64, inst="narrow"):
+    ww, words, aw, rl, drl = _geom(inst)
+    assert ww == w
+    W, A = UInt(w), UInt(aw)
+
+    @df.region()
+    def top(CE: uint1[n], CW: uint1[n], CA: A[n], CD: W[n],
+            DE: uint1[n], DW: uint1[n], DA: A[n], DD: W[n], QC: W[n], QD: W[n]):
+        @df.kernel(mapping=[1], args=[CE, CW, CA, CD, DE, DW, DA, DD, QC, QD])
+        def wa(ce: uint1[n], cw: uint1[n], ca: A[n], cd: W[n],
+               de: uint1[n], dw: uint1[n], da: A[n], dd: W[n], qc: W[n], qd: W[n]):
+            mem: W[words]
+            pc: W[rl]  # compute read pipe, the RTL's compute_read_pipe
+            pd: W[drl]  # DMA read pipe
+            for t in range(n):
+                # the pipes shift (stage k takes stage k - 1)
+                for k in range(1, rl):  # negative-step range is refused (minor finding)
+                    pc[rl - k] = pc[rl - k - 1]
+                for j in range(1, drl):  # own variable: Catapult unrolls it by name
+                    pd[drl - j] = pd[drl - j - 1]
+                e_c: uint1 = ce[t]  # S6: every port array read unconditionally
+                w_c: uint1 = cw[t]
+                a_c: int32 = ca[t]  # B4: widen before indexing
+                d_c: W = cd[t]
+                e_d: uint1 = de[t]
+                w_d: uint1 = dw[t]
+                a_d: int32 = da[t]  # B4
+                d_d: W = dd[t]
+                # reads first: a read sees the word before this cycle's writes
+                if e_c == 1:
+                    if w_c == 0:
+                        pc[0] = mem[a_c]
+                if e_d == 1:
+                    if w_d == 0:
+                        pd[0] = mem[a_d]
+                if e_c == 1:
+                    if w_c == 1:
+                        mem[a_c] = d_c
+                if e_d == 1:
+                    if w_d == 1:
+                        mem[a_d] = d_d
+                qc[t] = pc[rl - 1]
+                qd[t] = pd[drl - 1]
+
+    return top
+
+
+def trace_rw(n, w=64, inst="narrow"):
+    """The simulation model literally: an enabled port reads the old word into
+    its pipe whether or not it writes (two accesses per port per cycle)."""
+    ww, words, aw, rl, drl = _geom(inst)
+    W, A = UInt(w), UInt(aw)
+
+    @df.region()
+    def top(CE: uint1[n], CW: uint1[n], CA: A[n], CD: W[n],
+            DE: uint1[n], DW: uint1[n], DA: A[n], DD: W[n], QC: W[n], QD: W[n]):
+        @df.kernel(mapping=[1], args=[CE, CW, CA, CD, DE, DW, DA, DD, QC, QD])
+        def wa(ce: uint1[n], cw: uint1[n], ca: A[n], cd: W[n],
+               de: uint1[n], dw: uint1[n], da: A[n], dd: W[n], qc: W[n], qd: W[n]):
+            mem: W[words]
+            pc: W[rl]
+            pd: W[drl]
+            for t in range(n):
+                for k in range(1, rl):  # negative-step range is refused (minor finding)
+                    pc[rl - k] = pc[rl - k - 1]
+                for j in range(1, drl):  # own variable: Catapult unrolls it by name
+                    pd[drl - j] = pd[drl - j - 1]
+                e_c: uint1 = ce[t]
+                w_c: uint1 = cw[t]
+                a_c: int32 = ca[t]  # B4
+                d_c: W = cd[t]
+                e_d: uint1 = de[t]
+                w_d: uint1 = dw[t]
+                a_d: int32 = da[t]  # B4
+                d_d: W = dd[t]
+                if e_c == 1:
+                    pc[0] = mem[a_c]
+                if e_d == 1:
+                    pd[0] = mem[a_d]
+                if e_c == 1:
+                    if w_c == 1:
+                        mem[a_c] = d_c
+                if e_d == 1:
+                    if w_d == 1:
+                        mem[a_d] = d_d
+                qc[t] = pc[rl - 1]
+                qd[t] = pd[drl - 1]
+
+    return top
+
+
+def issue(n, w=64, inst="narrow"):
+    """No pipe: ``q[t]`` is the word read by the access issued at ``t`` (the
+    last read's word when ``t`` holds no read). ``RESP_SHIFT`` places it."""
+    ww, words, aw, rl, drl = _geom(inst)
+    W, A = UInt(w), UInt(aw)
+
+    @df.region()
+    def top(CE: uint1[n], CW: uint1[n], CA: A[n], CD: W[n],
+            DE: uint1[n], DW: uint1[n], DA: A[n], DD: W[n], QC: W[n], QD: W[n]):
+        @df.kernel(mapping=[1], args=[CE, CW, CA, CD, DE, DW, DA, DD, QC, QD])
+        def wa(ce: uint1[n], cw: uint1[n], ca: A[n], cd: W[n],
+               de: uint1[n], dw: uint1[n], da: A[n], dd: W[n], qc: W[n], qd: W[n]):
+            mem: W[words]
+            hc: W = 0
+            hd: W = 0
+            for t in range(n):
+                e_c: uint1 = ce[t]
+                w_c: uint1 = cw[t]
+                a_c: int32 = ca[t]  # B4
+                d_c: W = cd[t]
+                e_d: uint1 = de[t]
+                w_d: uint1 = dw[t]
+                a_d: int32 = da[t]  # B4
+                d_d: W = dd[t]
+                if e_c == 1:
+                    if w_c == 0:
+                        hc = mem[a_c]
+                if e_d == 1:
+                    if w_d == 0:
+                        hd = mem[a_d]
+                if e_c == 1:
+                    if w_c == 1:
+                        mem[a_c] = d_c
+                if e_d == 1:
+                    if w_d == 1:
+                        mem[a_d] = d_d
+                qc[t] = hc
+                qd[t] = hd
+
+    return top
+
+
+def _issue_shift(inst):
+    _, _, _, rl, drl = GEOM[inst]
+    return {"compute_rdata_o": rl - 1, "dma_rdata_o": drl - 1}
+
+
+# ``check.py``: variant -> (inst -> {resp port: k}); ``got[t]`` is compared
+# with the RTL's row ``t + k``.
+RESP_SHIFT = {"issue": _issue_shift}
+
+
+def annotated(n, w=64, inst="narrow"):
+    ww, words, aw, rl, drl = _geom(inst)
+    W, A = UInt(w), UInt(aw)
+
+    @df.region()
+    def top(CE: uint1[n], CW: uint1[n], CA: A[n], CD: W[n],
+            DE: uint1[n], DW: uint1[n], DA: A[n], DD: W[n], QC: W[n], QD: W[n]):
+        @df.kernel(mapping=[1], args=[CE, CW, CA, CD, DE, DW, DA, DD, QC, QD])
+        def wa(ce: uint1[n], cw: uint1[n], ca: A[n], cd: W[n],
+               de: uint1[n], dw: uint1[n], da: A[n], dd: W[n], qc: W[n], qd: W[n]):
+            mem: W[words] @ Memory(resource="URAM", storage_type="RAM_T2P", latency=3, depth=words)
+            pc: W[rl]
+            pd: W[drl]
+            for t in range(n):
+                for k in range(1, rl):  # negative-step range is refused (minor finding)
+                    pc[rl - k] = pc[rl - k - 1]
+                for j in range(1, drl):  # own variable: Catapult unrolls it by name
+                    pd[drl - j] = pd[drl - j - 1]
+                e_c: uint1 = ce[t]
+                w_c: uint1 = cw[t]
+                a_c: int32 = ca[t]  # B4
+                d_c: W = cd[t]
+                e_d: uint1 = de[t]
+                w_d: uint1 = dw[t]
+                a_d: int32 = da[t]  # B4
+                d_d: W = dd[t]
+                if e_c == 1:
+                    if w_c == 0:
+                        pc[0] = mem[a_c]
+                if e_d == 1:
+                    if w_d == 0:
+                        pd[0] = mem[a_d]
+                if e_c == 1:
+                    if w_c == 1:
+                        mem[a_c] = d_c
+                if e_d == 1:
+                    if w_d == 1:
+                        mem[a_d] = d_d
+                qc[t] = pc[rl - 1]
+                qd[t] = pd[drl - 1]
+
+    return top
+
+
+def _port_unit(n, w, inst):
+    """C9: a unit's trip count and widths freeze at ``@df.unit``, so the unit
+    is decorated inside a factory per (n, w, inst)."""
+    ww, words, aw, rl, drl = _geom(inst)
+    W, A = UInt(w), UInt(aw)
+
+    @df.unit()
+    def word_array(ce: Stream[uint1, 2], cw: Stream[uint1, 2], ca: Stream[UInt(aw), 2],
+                   cd: Stream[UInt(w), 2], de: Stream[uint1, 2], dw: Stream[uint1, 2],
+                   da: Stream[UInt(aw), 2], dd: Stream[UInt(w), 2],
+                   qc: Stream[UInt(w), 2], qd: Stream[UInt(w), 2]):
+        mem: W[words]
+        pc: W[rl]
+        pd: W[drl]
+        for t in range(n):
+            for k in range(1, rl):
+                pc[rl - k] = pc[rl - k - 1]
+            for j in range(1, drl):
+                pd[drl - j] = pd[drl - j - 1]
+            e_c: uint1 = ce.get()
+            w_c: uint1 = cw.get()
+            a_ca: UInt(aw) = ca.get()
+            a_c: int32 = a_ca  # B4; B5: not in one step
+            d_c: UInt(w) = cd.get()
+            e_d: uint1 = de.get()
+            w_d: uint1 = dw.get()
+            a_da: UInt(aw) = da.get()
+            a_d: int32 = a_da  # B4; B5
+            d_d: UInt(w) = dd.get()
+            if e_c == 1:
+                if w_c == 0:
+                    pc[0] = mem[a_c]
+            if e_d == 1:
+                if w_d == 0:
+                    pd[0] = mem[a_d]
+            if e_c == 1:
+                if w_c == 1:
+                    mem[a_c] = d_c
+            if e_d == 1:
+                if w_d == 1:
+                    mem[a_d] = d_d
+            qc.put(pc[rl - 1])
+            qd.put(pd[drl - 1])
+
+    return word_array
+
+
+def ported(n, w=64, inst="narrow"):
+    ww, words, aw, rl, drl = _geom(inst)
+    W, A = UInt(w), UInt(aw)
+    unit = _port_unit(n, w, inst)
+
+    @df.region()
+    def top(CE: uint1[n], CW: uint1[n], CA: A[n], CD: W[n],
+            DE: uint1[n], DW: uint1[n], DA: A[n], DD: W[n], QC: W[n], QD: W[n]):
+        s_ce: Stream[uint1, 2]
+        s_cw: Stream[uint1, 2]
+        s_ca: Stream[UInt(aw), 2]
+        s_cd: Stream[UInt(w), 2]
+        s_de: Stream[uint1, 2]
+        s_dw: Stream[uint1, 2]
+        s_da: Stream[UInt(aw), 2]
+        s_dd: Stream[UInt(w), 2]
+        s_qc: Stream[UInt(w), 2]
+        s_qd: Stream[UInt(w), 2]
+
+        @df.kernel(mapping=[1], args=[CE, CW, CA, CD, DE, DW, DA, DD])
+        def drive(ce: uint1[n], cw: uint1[n], ca: A[n], cd: W[n],
+                  de: uint1[n], dw: uint1[n], da: A[n], dd: W[n]):
+            for t in range(n):
+                s_ce.put(ce[t])
+                s_cw.put(cw[t])
+                s_ca.put(ca[t])
+                s_cd.put(cd[t])
+                s_de.put(de[t])
+                s_dw.put(dw[t])
+                s_da.put(da[t])
+                s_dd.put(dd[t])
+
+        unit(ce=s_ce, cw=s_cw, ca=s_ca, cd=s_cd, de=s_de, dw=s_dw, da=s_da, dd=s_dd,
+             qc=s_qc, qd=s_qd)
+
+        @df.kernel(mapping=[1], args=[QC, QD])
+        def sink(qc: W[n], qd: W[n]):
+            for t in range(n):
+                qc[t] = s_qc.get()
+                qd[t] = s_qd.get()
+
+    return top
+
+
+def _shared(n, w, inst, sync):
+    """``sync=False``: no link between the two port kernels; ``sync=True``: a
+    per-cycle barrier. (Two kernel bodies: a closure ``bool`` under ``if`` is
+    lowered as an ``i32`` constant and the verifier refuses the ``scf.if``.)"""
+    ww, words, aw, rl, drl = _geom(inst)
+    W, A = UInt(w), UInt(aw)
+
+    @df.region()
+    def top(CE: uint1[n], CW: uint1[n], CA: A[n], CD: W[n],
+            DE: uint1[n], DW: uint1[n], DA: A[n], DD: W[n], QC: W[n], QD: W[n]):
+        mem: W[words] @ Stateful = 0  # region scope: one memory, two port kernels
+
+        @df.kernel(mapping=[1], args=[CE, CW, CA, CD, QC])
+        def compute(ce: uint1[n], cw: uint1[n], ca: A[n], cd: W[n], qc: W[n]):
+            pc: W[rl]
+            for t in range(n):
+                for k in range(1, rl):
+                    pc[rl - k] = pc[rl - k - 1]
+                e_c: uint1 = ce[t]
+                w_c: uint1 = cw[t]
+                a_c: int32 = ca[t]  # B4
+                d_c: W = cd[t]
+                if e_c == 1:
+                    if w_c == 0:
+                        pc[0] = mem[a_c]
+                    else:
+                        mem[a_c] = d_c
+                qc[t] = pc[rl - 1]
+
+        @df.kernel(mapping=[1], args=[DE, DW, DA, DD, QD])
+        def dma(de: uint1[n], dw: uint1[n], da: A[n], dd: W[n], qd: W[n]):
+            pd: W[drl]
+            for t in range(n):
+                for j in range(1, drl):  # own variable: Catapult unrolls it by name
+                    pd[drl - j] = pd[drl - j - 1]
+                e_d: uint1 = de[t]
+                w_d: uint1 = dw[t]
+                a_d: int32 = da[t]  # B4
+                d_d: W = dd[t]
+                if e_d == 1:
+                    if w_d == 0:
+                        pd[0] = mem[a_d]
+                    else:
+                        mem[a_d] = d_d
+                qd[t] = pd[drl - 1]
+
+    @df.region()
+    def top_sync(CE: uint1[n], CW: uint1[n], CA: A[n], CD: W[n],
+                 DE: uint1[n], DW: uint1[n], DA: A[n], DD: W[n], QC: W[n], QD: W[n]):
+        mem: W[words] @ Stateful = 0
+        c2d: Stream[uint1, 2]  # compute -> dma: "cycle t done"
+        d2c: Stream[uint1, 2]  # dma -> compute
+
+        @df.kernel(mapping=[1], args=[CE, CW, CA, CD, QC])
+        def compute(ce: uint1[n], cw: uint1[n], ca: A[n], cd: W[n], qc: W[n]):
+            pc: W[rl]
+            for t in range(n):
+                for k in range(1, rl):
+                    pc[rl - k] = pc[rl - k - 1]
+                e_c: uint1 = ce[t]
+                w_c: uint1 = cw[t]
+                a_c: int32 = ca[t]  # B4
+                d_c: W = cd[t]
+                if e_c == 1:
+                    if w_c == 0:
+                        pc[0] = mem[a_c]
+                    else:
+                        mem[a_c] = d_c
+                qc[t] = pc[rl - 1]
+                c2d.put(1)
+                d2c.get()
+
+        @df.kernel(mapping=[1], args=[DE, DW, DA, DD, QD])
+        def dma(de: uint1[n], dw: uint1[n], da: A[n], dd: W[n], qd: W[n]):
+            pd: W[drl]
+            for t in range(n):
+                for j in range(1, drl):  # own variable: Catapult unrolls it by name
+                    pd[drl - j] = pd[drl - j - 1]
+                e_d: uint1 = de[t]
+                w_d: uint1 = dw[t]
+                a_d: int32 = da[t]  # B4
+                d_d: W = dd[t]
+                if e_d == 1:
+                    if w_d == 0:
+                        pd[0] = mem[a_d]
+                    else:
+                        mem[a_d] = d_d
+                qd[t] = pd[drl - 1]
+                d2c.put(1)
+                c2d.get()
+
+    return top_sync if sync else top
+
+
+def shared(n, w=64, inst="narrow"):
+    return _shared(n, w, inst, False)
+
+
+def shared_sync(n, w=64, inst="narrow"):
+    return _shared(n, w, inst, True)
+
+
+def wire(n, w=64, inst="narrow"):
+    """SystemC/Catapult port shape: the unit kernel ``wa`` has only ``Wire``
+    ports (``synth_top="wa_0"``); ``src``/``sink`` replay and record. Wires
+    are declared in ``CMD`` then ``RESP`` order (``cmp_trace`` maps by it)."""
+    ww, words, aw, rl, drl = _geom(inst)
+    W, A = UInt(w), UInt(aw)
+
+    @df.region()
+    def top(CE: uint1[n], CW: uint1[n], CA: A[n], CD: W[n],
+            DE: uint1[n], DW: uint1[n], DA: A[n], DD: W[n], QC: W[n], QD: W[n]):
+        w_ce: Wire[uint1]
+        w_cw: Wire[uint1]
+        w_ca: Wire[UInt(aw)]
+        w_cd: Wire[UInt(w)]
+        w_de: Wire[uint1]
+        w_dw: Wire[uint1]
+        w_da: Wire[UInt(aw)]
+        w_dd: Wire[UInt(w)]
+        w_qc: Wire[UInt(w)]
+        w_qd: Wire[UInt(w)]
+
+        @df.kernel(mapping=[1], args=[CE, CW, CA, CD, DE, DW, DA, DD])
+        def src(ce: uint1[n], cw: uint1[n], ca: A[n], cd: W[n],
+                de: uint1[n], dw: uint1[n], da: A[n], dd: W[n]):
+            for t in range(n):
+                w_ce.put(ce[t])
+                w_cw.put(cw[t])
+                w_ca.put(ca[t])
+                w_cd.put(cd[t])
+                w_de.put(de[t])
+                w_dw.put(dw[t])
+                w_da.put(da[t])
+                w_dd.put(dd[t])
+
+        @df.kernel(mapping=[1], args=[])
+        def wa():
+            mem: W[words]
+            pc: W[rl]
+            pd: W[drl]
+            for _ in range(n):
+                for k in range(1, rl):  # negative-step range is refused (minor finding)
+                    pc[rl - k] = pc[rl - k - 1]
+                for j in range(1, drl):  # own variable: Catapult unrolls it by name
+                    pd[drl - j] = pd[drl - j - 1]
+                e_c: uint1 = w_ce.get()
+                w_c: uint1 = w_cw.get()
+                a_ca: UInt(aw) = w_ca.get()
+                a_c: int32 = a_ca  # B4; B5
+                d_c: UInt(w) = w_cd.get()
+                e_d: uint1 = w_de.get()
+                w_d: uint1 = w_dw.get()
+                a_da: UInt(aw) = w_da.get()
+                a_d: int32 = a_da  # B4; B5
+                d_d: UInt(w) = w_dd.get()
+                # one access per port per cycle, as ONE if/else: Catapult then
+                # sees the read and the write of a port as exclusive and needs
+                # two RAM ports, not four. The order of the two ports is free:
+                # a same-word cross-port write is an undefined (masked) slot.
+                if e_c == 1:
+                    if w_c == 1:
+                        mem[a_c] = d_c
+                    else:
+                        pc[0] = mem[a_c]
+                if e_d == 1:
+                    if w_d == 1:
+                        mem[a_d] = d_d
+                    else:
+                        pd[0] = mem[a_d]
+                w_qc.put(pc[rl - 1])
+                w_qd.put(pd[drl - 1])
+
+        @df.kernel(mapping=[1], args=[QC, QD])
+        def sink(qc: W[n], qd: W[n]):
+            for t in range(n):
+                qc[t] = w_qc.get()
+                qd[t] = w_qd.get()
+
+    return top
+
+
+VARIANTS = {
+    "trace": (trace, _run_flat),
+    "trace_rw": (trace_rw, _run_flat),
+    "issue": (issue, _run_flat),
+    "ported": (ported, _run_flat),
+    "shared": (shared, _run_flat),
+    "shared_sync": (shared_sync, _run_flat),
+    "annotated": (annotated, _run_flat),
+    "wire": (wire, _run_flat),
+}

@@ -1,0 +1,75 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : wa_0
+Version: W-2024.09
+Date   : Fri Oct  2 14:22:57 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: v30[1] (input port clocked by ideal_clock)
+  Endpoint: wa_0_run_inst/clk_gate_mem_2_sva_reg/latch
+            (gating element for clock ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  wa_0               5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                                       Fanout     Trans      Incr       Path
+  ------------------------------------------------------------------------------------
+  clock ideal_clock (rise edge)                                     0.00       0.00
+  clock network delay (ideal)                                       0.00       0.00
+  input external delay                                              0.00       0.00 r
+  v30[1] (in)                                             0.01      0.01       0.01 r
+  v30[1] (net)                                  5                   0.00       0.01 r
+  U1411/A (INV_X1)                                        0.01      0.02       0.03 r
+  U1411/ZN (INV_X1)                                       0.01      0.02       0.05 f
+  n703 (net)                                    4                   0.00       0.05 f
+  U1449/A3 (NOR3_X1)                                      0.01      0.02       0.06 f
+  U1449/ZN (NOR3_X1)                                      0.13      0.16       0.22 r
+  n1367 (net)                                   8                   0.00       0.22 r
+  U1361/A (CLKBUF_X1)                                     0.13      0.01       0.24 r
+  U1361/Z (CLKBUF_X1)                                     0.11      0.16       0.40 r
+  n1307 (net)                                  20                   0.00       0.40 r
+  U1450/A1 (NAND2_X1)                                     0.11      0.03       0.43 r
+  U1450/ZN (NAND2_X1)                                     0.09      0.14       0.57 f
+  n1046 (net)                                  20                   0.00       0.57 f
+  U1451/A (CLKBUF_X1)                                     0.09      0.02       0.58 f
+  U1451/Z (CLKBUF_X1)                                     0.05      0.11       0.69 f
+  n1050 (net)                                  12                   0.00       0.69 f
+  U1452/A (CLKBUF_X1)                                     0.05      0.01       0.70 f
+  U1452/Z (CLKBUF_X1)                                     0.10      0.16       0.86 f
+  n1044 (net)                                  20                   0.00       0.86 f
+  U1453/A (OAI21_X1)                                      0.10      0.03       0.89 f
+  U1453/ZN (OAI21_X1)                                     0.03      0.05       0.94 r
+  wa_0_run_inst/N260 (net)                      1                   0.00       0.94 r
+  wa_0_run_inst/clk_gate_mem_2_sva_reg/EN (SNPS_CLOCK_GATE_HIGH_wa_0_run_4)
+                                                                    0.00       0.94 r
+  wa_0_run_inst/clk_gate_mem_2_sva_reg/EN (net)                     0.00       0.94 r
+  wa_0_run_inst/clk_gate_mem_2_sva_reg/latch/E (CLKGATETST_X1)
+                                                          0.03      0.01       0.95 r
+  data arrival time                                                            0.95
+
+  clock ideal_clock (rise edge)                                     3.33       3.33
+  clock network delay (ideal)                                       0.00       3.33
+  wa_0_run_inst/clk_gate_mem_2_sva_reg/latch/CK (CLKGATETST_X1)     0.00       3.33 r
+  clock gating setup time                                          -0.09       3.24
+  data required time                                                           3.24
+  ------------------------------------------------------------------------------------
+  data required time                                                           3.24
+  data arrival time                                                           -0.95
+  ------------------------------------------------------------------------------------
+  slack (MET)                                                                  2.30
+
+
+1
