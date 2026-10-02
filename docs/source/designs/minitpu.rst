@@ -688,3 +688,59 @@ Readings of another team's design that this page got wrong
   the corrected 168 and 155.
 * An earlier claim that ``B = 1..16`` is bit-identical **omitted the row-wise
   qualifier, and was wrong for attention**.
+
+The unit ladder: the differential harness
+-----------------------------------------
+
+README D-7 builds MiniTPU in Allo unit by unit; D-9 makes each unit a probe of
+the tools. The harness (``examples/minitpu/harness/``) is how a unit is judged.
+Its design choices, provisional until the owner reviews U1:
+
+**The RTL is the oracle.** Each MiniTPU ``.sv`` unit runs in Verilator through
+a generated C++ driver (``harness/rtl.py``), built once per unit and cached by
+the hash of its sources. Stimulus goes in and results come out as raw
+``uint64`` files, so a quarter of a million vectors cost one process. Three
+port shapes cover U1: ``comb`` (no clock), ``valid`` (``clk``, active-low
+reset, ``valid_i``/``valid_o``, one vector per cycle, latency *measured* per
+output) and ``bare`` (a clock and no valid, sampled at the declared depth).
+
+**References explain, they do not judge.** ``harness/ref.py`` states each
+unit's arithmetic in numpy *where it departs from IEEE*, each departure
+measured against the RTL. A difference between Allo and the RTL is then
+classified by rule (``EXPLAIN`` in the unit file), so a verdict line names its
+cause instead of only counting.
+
+**Every Allo backend is a column.** ``harness/check.py`` builds each Allo
+variant of a unit for each backend (the simulator; SystemC csim; later
+Catapult RTL, RTLGen, AMC), runs the same stimulus, and prints
+``UNIT-MATCH <unit> <variant> <backend> n/n latency=L`` or ``UNIT-DIFF`` with
+the classified differences. A build or run failure is reported as
+``UNIT-FAIL``, a finding, not a crash.
+
+**Two expressions per arithmetic unit.** ``native`` uses Allo's types
+(``bfloat16`` ``a + b``) and probes the type system's numerics in each
+backend; ``bits`` writes the RTL's own algorithm on integer fields and probes
+whether Allo can say what the hardware does.
+
+**Stimulus.** Float units get every class at its edges, crossed (44 bf16
+values, both signs: zeros, subnormals, normals at both ends, the rounding-tie
+scale, infinities and three NaN forms), pairs placed at rounding ties, and
+seeded random. Exhaustive sweeps stay on the RTL side, where MiniTPU's own
+``tb/`` already runs them (D-7's second check).
+
+**Latency** is declared in the unit file, from the RTL's parameters or
+``docs/isa_latency.json``, and checked against the RTL's measured value. Allo's
+simulator is untimed, so on the Allo side latency is checked only on RTL that
+Allo produced (Catapult today), on the Catapult track.
+
+``vpu_bf16_add`` as measured, 2026-10-02
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Over 251,936 vectors the RTL is IEEE round-to-nearest-even with subnormals,
+except that **every NaN result is the positive canonical** ``0x7FC0`` and
+**(+0) + (-0) is -0** (980 and 1 vectors). MiniTPU's own ``tb_bf16_add.cpp``
+skips every operand with an all-ones exponent, so it does not see the NaN rule.
+Allo's simulator (``native``) matches the RTL on the other 250,955 vectors, and
+differs on exactly those 981: it keeps the NaN sign and gives ``+0``, as IEEE
+does. Whether a unit model should state the RTL's NaN and zero rules, and how
+Allo would let it, is an open question for the U1 review.
