@@ -1,0 +1,24 @@
+composed_w32_3p33: consumer_0: latency 2 ii 1 scheduled connections io={'v17.Pop()': 0, 'v19.Push()': 0, 'v20.Pop()': 1, 'v18.Push()': 2}; producer_0: latency 1 ii 1 scheduled connections io={'v0.Pop()': 0, 'v1.Pop()': 0, 'v2.Pop()': 0, 'v3.Push()': 0, 'v4.Push()': 1}
+   LATENCY-COMPOSITE producer_0+consumer_0: kernel latencies [1, 2] (sum 3), ii [1, 1] (rate max 1), measured 3
+   csyn: area score ?; 
+composed_w32_2p0: consumer_0: latency 2 ii 1 scheduled connections io={'v17.Pop()': 0, 'v19.Push()': 0, 'v20.Pop()': 1, 'v18.Push()': 2}; producer_0: latency 1 ii 1 scheduled connections io={'v0.Pop()': 0, 'v1.Pop()': 0, 'v2.Pop()': 0, 'v3.Push()': 0, 'v4.Push()': 1}
+   LATENCY-COMPOSITE producer_0+consumer_0: kernel latencies [1, 2] (sum 3), ii [1, 1] (rate max 1), measured 3
+   csyn: area score ?; 
+composed_w64d16_3p33: consumer_0: latency 2 ii 1 scheduled connections io={'v17.Pop()': 0, 'v19.Push()': 0, 'v20.Pop()': 1, 'v18.Push()': 2}; producer_0: latency 1 ii 1 scheduled connections io={'v0.Pop()': 0, 'v1.Pop()': 0, 'v2.Pop()': 0, 'v3.Push()': 0, 'v4.Push()': 1}
+   LATENCY-COMPOSITE producer_0+consumer_0: kernel latencies [1, 2] (sum 3), ii [1, 1] (rate max 1), measured 3
+   csyn: area score ?; 
+composed_w257_3p33: consumer_0: latency 2 ii 1 scheduled connections io={'v17.Pop()': 0, 'v19.Push()': 0, 'v20.Pop()': 1, 'v18.Push()': 2}; producer_0: latency 1 ii 1 scheduled connections io={'v0.Pop()': 0, 'v1.Pop()': 0, 'v2.Pop()': 0, 'v3.Push()': 0, 'v4.Push()': 1}
+   LATENCY-COMPOSITE producer_0+consumer_0: kernel latencies [1, 2] (sum 3), ii [1, 1] (rate max 1), measured 3
+   csyn: area score ?; 
+composed_try_w32_3p33: consumer_0: latency 2 ii 1 scheduled connections io={'v22.Pop()': 0, 'v25.PopNB()': 1, 'v24.Push()': 2, 'v23.Push()': 2}; producer_0: latency 2 ii 1 scheduled connections io={'v0.Pop()': 0, 'v1.Pop()': 0, 'v2.Pop()': 0, 'v4.PushNB()': 1, 'v3.Push()': 2}
+   LATENCY-COMPOSITE producer_0+consumer_0: kernel latencies [2, 2] (sum 4), ii [1, 1] (rate max 1), measured 3
+   csyn: area score ?; 
+composed_w32_3p33_n40057: consumer_0: latency 2 ii 1 scheduled connections io={'v17.Pop()': 0, 'v19.Push()': 0, 'v20.Pop()': 1, 'v18.Push()': 2}; producer_0: latency 1 ii 1 scheduled connections io={'v0.Pop()': 0, 'v1.Pop()': 0, 'v2.Pop()': 0, 'v3.Push()': 0, 'v4.Push()': 1}
+   LATENCY-COMPOSITE producer_0+consumer_0: kernel latencies [1, 2] (sum 3), ii [1, 1] (rate max 1), measured 3
+   csyn: area score ?; 
+composed_w64d16_3p33_n40206: consumer_0: latency 2 ii 1 scheduled connections io={'v17.Pop()': 0, 'v19.Push()': 0, 'v20.Pop()': 1, 'v18.Push()': 2}; producer_0: latency 1 ii 1 scheduled connections io={'v0.Pop()': 0, 'v1.Pop()': 0, 'v2.Pop()': 0, 'v3.Push()': 0, 'v4.Push()': 1}
+   LATENCY-COMPOSITE producer_0+consumer_0: kernel latencies [1, 2] (sum 3), ii [1, 1] (rate max 1), measured 3
+   csyn: area score ?; 
+composed_w257_3p33_n10055: consumer_0: latency 2 ii 1 scheduled connections io={'v17.Pop()': 0, 'v19.Push()': 0, 'v20.Pop()': 1, 'v18.Push()': 2}; producer_0: latency 1 ii 1 scheduled connections io={'v0.Pop()': 0, 'v1.Pop()': 0, 'v2.Pop()': 0, 'v3.Push()': 0, 'v4.Push()': 1}
+   LATENCY-COMPOSITE producer_0+consumer_0: kernel latencies [1, 2] (sum 3), ii [1, 1] (rate max 1), measured 3
+   csyn: area score ?; 

@@ -1,0 +1,258 @@
+=== composed overflow
+HS-RTL vpu_fifo:w32d4 composed_w32_3p33 trace=overflow: 64 iterations, 68 cycles, HS cycles=68 (0.0s)
+  cycle | in fires (rst push pd pop) | out fires (pd e f) | values
+      0 | 1 1 1 1 | 0 1 1 | pop_data=0 empty=1 full=0
+      1 | 1 1 1 1 | 0 1 1 | pop_data=0 empty=1 full=0
+      2 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      3 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      4 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      5 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+      6 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+      7 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+      8 | 0 0 0 1 | 1 1 0 | pop_data=0 empty=0 full=0
+      9 | 0 0 0 1 | 1 1 0 | pop_data=0 empty=0 full=0
+     10 | 0 0 0 1 | 1 1 0 | pop_data=0 empty=0 full=0
+     11 | 0 0 0 1 | 1 1 0 | pop_data=1a6edfc7 empty=0 full=0
+     12 | 1 1 1 1 | 1 1 1 | pop_data=435b156 empty=0 full=0
+     13 | 1 1 1 1 | 1 1 1 | pop_data=130d60f5 empty=0 full=0
+     14 | 1 1 1 1 | 1 1 1 | pop_data=67409e7a empty=0 full=0
+     15 | 1 1 1 1 | 1 1 1 | pop_data=98695019 empty=0 full=0
+     16 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     17 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     18 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     19 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+    in  rst_ni       accepted 64/64; cycle - iteration: 0:8, 4:56
+    in  push_i       accepted 64/64; cycle - iteration: 0:8, 4:56
+    in  push_data_i  accepted 64/64; cycle - iteration: 0:8, 4:56
+    in  pop_i        accepted 64/64; cycle - iteration: 0:64
+    out pop_data_o   delivered 64/64; cycle - iteration: 2:64
+    out empty_o      delivered 64/64; cycle - iteration: 0:64
+    out full_o       delivered 64/64; cycle - iteration: 0:8, 4:56
+COMPOSED vpu_fifo:w32d4 composed_w32_3p33 catapult-rtl: pop_data 4/4 on pop cycles; empty 12/63 at s=-2 (10 at s=0); full 59/63 at s=+0 (59 at s=0)
+    push-accept -> pop-deliver cycles, pops one trace cycle after their push:  (5 push/pop pairs)
+=== composed underflow
+HS-RTL vpu_fifo:w32d4 composed_w32_3p33 trace=underflow: 64 iterations, 164 cycles, STALL cycles=164 accepted 64 64 64 5 delivered 3 5 64; HS cycles=164 (0.0s)
+  cycle | in fires (rst push pd pop) | out fires (pd e f) | values
+      0 | 1 1 1 1 | 0 1 1 | pop_data=0 empty=1 full=0
+      1 | 1 1 1 1 | 0 1 1 | pop_data=0 empty=1 full=0
+      2 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      3 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      4 | 1 1 1 0 | 0 0 1 | pop_data=0 empty=1 full=0
+      5 | 1 1 1 0 | 0 0 1 | pop_data=0 empty=1 full=0
+      6 | 1 1 1 0 | 0 0 1 | pop_data=0 empty=1 full=0
+      7 | 1 1 1 1 | 1 1 1 | pop_data=8b357e15 empty=0 full=0
+      8 | 1 1 1 0 | 0 0 1 | pop_data=8b357e15 empty=0 full=0
+      9 | 1 1 1 0 | 0 0 1 | pop_data=8b357e15 empty=0 full=0
+     10 | 1 1 1 0 | 0 0 1 | pop_data=8b357e15 empty=0 full=0
+     11 | 1 1 1 0 | 0 0 1 | pop_data=8b357e15 empty=0 full=0
+     12 | 1 1 1 0 | 0 0 1 | pop_data=8b357e15 empty=0 full=0
+     13 | 1 1 1 0 | 0 0 1 | pop_data=8b357e15 empty=0 full=0
+     14 | 1 1 1 0 | 0 0 1 | pop_data=8b357e15 empty=0 full=0
+     15 | 1 1 1 0 | 0 0 1 | pop_data=8b357e15 empty=0 full=0
+     16 | 1 1 1 0 | 0 0 1 | pop_data=8b357e15 empty=0 full=0
+     17 | 1 1 1 0 | 0 0 1 | pop_data=8b357e15 empty=0 full=0
+     18 | 1 1 1 0 | 0 0 1 | pop_data=8b357e15 empty=0 full=0
+     19 | 1 1 1 0 | 0 0 1 | pop_data=8b357e15 empty=0 full=0
+    in  rst_ni       accepted 64/64; cycle - iteration: 0:64
+    in  push_i       accepted 64/64; cycle - iteration: 0:64
+    in  push_data_i  accepted 64/64; cycle - iteration: 0:64
+    in  pop_i        accepted 5/64; cycle - iteration: 0:4, 3:1
+    out pop_data_o   delivered 3/64; cycle - iteration: 2:2, 5:1
+    out empty_o      delivered 5/64; cycle - iteration: 0:4, 3:1
+    out full_o       delivered 64/64; cycle - iteration: 0:64
+    (incomplete delivery: no value verdict; see STALL)
+    push-accept -> pop-deliver cycles, pops one trace cycle after their push:  (1 push/pop pairs)
+=== composed reset-mid-stream
+HS-RTL vpu_fifo:w32d4 composed_w32_3p33 trace=reset-mid-stream: 64 iterations, 66 cycles, HS cycles=66 (0.0s)
+  cycle | in fires (rst push pd pop) | out fires (pd e f) | values
+      0 | 1 1 1 1 | 0 1 1 | pop_data=0 empty=1 full=0
+      1 | 1 1 1 1 | 0 1 1 | pop_data=0 empty=1 full=0
+      2 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      3 | 1 1 1 1 | 1 1 1 | pop_data=8e21ba1d empty=0 full=0
+      4 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      5 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      6 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      7 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+      8 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+      9 | 1 1 1 1 | 1 1 1 | pop_data=761d3720 empty=0 full=0
+     10 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     11 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     12 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     13 | 1 1 1 1 | 1 1 1 | pop_data=7d280fc3 empty=0 full=0
+     14 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     15 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     16 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     17 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     18 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     19 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+    in  rst_ni       accepted 64/64; cycle - iteration: 0:64
+    in  push_i       accepted 64/64; cycle - iteration: 0:64
+    in  push_data_i  accepted 64/64; cycle - iteration: 0:64
+    in  pop_i        accepted 64/64; cycle - iteration: 0:64
+    out pop_data_o   delivered 64/64; cycle - iteration: 2:64
+    out empty_o      delivered 64/64; cycle - iteration: 0:64
+    out full_o       delivered 64/64; cycle - iteration: 0:64
+COMPOSED vpu_fifo:w32d4 composed_w32_3p33 catapult-rtl: pop_data 1/2 on pop cycles; empty 7/61 at s=+8 (3 at s=0); full 61/61 at s=+0 (61 at s=0)
+    e.g. reset-mid-stream cycle 11 pop_data: allo 7d280fc3 rtl ffffffff
+    push-accept -> pop-deliver cycles, pops one trace cycle after their push: 3:2 (2 push/pop pairs)
+=== composed push+pop-on-empty
+HS-RTL vpu_fifo:w32d4 composed_w32_3p33 trace=push+pop-on-empty: 64 iterations, 67 cycles, HS cycles=67 (0.0s)
+  cycle | in fires (rst push pd pop) | out fires (pd e f) | values
+      0 | 1 1 1 1 | 0 1 1 | pop_data=0 empty=1 full=0
+      1 | 1 1 1 1 | 0 1 1 | pop_data=0 empty=1 full=0
+      2 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      3 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      4 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      5 | 1 1 1 1 | 1 1 1 | pop_data=dd60f19 empty=0 full=0
+      6 | 1 1 1 0 | 0 0 1 | pop_data=dd60f19 empty=0 full=0
+      7 | 1 1 1 1 | 1 1 1 | pop_data=8437e0a3 empty=0 full=0
+      8 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      9 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+     10 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     11 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     12 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     13 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     14 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     15 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     16 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     17 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     18 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     19 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+    in  rst_ni       accepted 64/64; cycle - iteration: 0:64
+    in  push_i       accepted 64/64; cycle - iteration: 0:64
+    in  push_data_i  accepted 64/64; cycle - iteration: 0:64
+    in  pop_i        accepted 64/64; cycle - iteration: 0:6, 1:58
+    out pop_data_o   delivered 64/64; cycle - iteration: 2:4, 3:60
+    out empty_o      delivered 64/64; cycle - iteration: 0:6, 1:58
+    out full_o       delivered 64/64; cycle - iteration: 0:64
+COMPOSED vpu_fifo:w32d4 composed_w32_3p33 catapult-rtl: pop_data 1/1 on pop cycles; empty 59/63 at s=+0 (59 at s=0); full 63/63 at s=+0 (63 at s=0)
+    push-accept -> pop-deliver cycles, pops one trace cycle after their push: 3:1 (1 push/pop pairs)
+=== composed_try overflow
+HS-RTL vpu_fifo:w32d4 composed_try_w32_3p33 trace=overflow: 64 iterations, 66 cycles, HS cycles=66 (0.0s)
+  cycle | in fires (rst push pd pop) | out fires (pd e f) | values
+      0 | 1 1 1 1 | 0 0 0 | pop_data=0 empty=0 full=0
+      1 | 1 1 1 1 | 0 0 0 | pop_data=0 empty=0 full=0
+      2 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      3 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      4 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      5 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+      6 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+      7 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+      8 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=1
+      9 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=1
+     10 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=1
+     11 | 1 1 1 1 | 1 1 1 | pop_data=1a6edfc7 empty=0 full=1
+     12 | 1 1 1 1 | 1 1 1 | pop_data=435b156 empty=0 full=1
+     13 | 1 1 1 1 | 1 1 1 | pop_data=130d60f5 empty=0 full=0
+     14 | 1 1 1 1 | 1 1 1 | pop_data=67409e7a empty=0 full=0
+     15 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+     16 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+     17 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+     18 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+     19 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+    in  rst_ni       accepted 64/64; cycle - iteration: 0:64
+    in  push_i       accepted 64/64; cycle - iteration: 0:64
+    in  push_data_i  accepted 64/64; cycle - iteration: 0:64
+    in  pop_i        accepted 64/64; cycle - iteration: 0:64
+    out pop_data_o   delivered 64/64; cycle - iteration: 2:64
+    out empty_o      delivered 64/64; cycle - iteration: 2:64
+    out full_o       delivered 64/64; cycle - iteration: 2:64
+COMPOSED vpu_fifo:w32d4 composed_try_w32_3p33 catapult-rtl: pop_data 4/4 on pop cycles; empty 63/63 at s=+0 (63 at s=0); full 62/63 at s=+0 (62 at s=0)
+    push-accept -> pop-deliver cycles, pops one trace cycle after their push:  (5 push/pop pairs)
+=== composed_try underflow
+HS-RTL vpu_fifo:w32d4 composed_try_w32_3p33 trace=underflow: 64 iterations, 66 cycles, HS cycles=66 (0.0s)
+  cycle | in fires (rst push pd pop) | out fires (pd e f) | values
+      0 | 1 1 1 1 | 0 0 0 | pop_data=0 empty=0 full=0
+      1 | 1 1 1 1 | 0 0 0 | pop_data=0 empty=0 full=0
+      2 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      3 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      4 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      5 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      6 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      7 | 1 1 1 1 | 1 1 1 | pop_data=8b357e15 empty=0 full=0
+      8 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      9 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+     10 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+     11 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+     12 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+     13 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+     14 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+     15 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+     16 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+     17 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+     18 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+     19 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+    in  rst_ni       accepted 64/64; cycle - iteration: 0:64
+    in  push_i       accepted 64/64; cycle - iteration: 0:64
+    in  push_data_i  accepted 64/64; cycle - iteration: 0:64
+    in  pop_i        accepted 64/64; cycle - iteration: 0:64
+    out pop_data_o   delivered 64/64; cycle - iteration: 2:64
+    out empty_o      delivered 64/64; cycle - iteration: 2:64
+    out full_o       delivered 64/64; cycle - iteration: 2:64
+COMPOSED vpu_fifo:w32d4 composed_try_w32_3p33 catapult-rtl: pop_data 1/1 on pop cycles; empty 63/63 at s=+0 (63 at s=0); full 63/63 at s=+0 (63 at s=0)
+    push-accept -> pop-deliver cycles, pops one trace cycle after their push: 3:1 (1 push/pop pairs)
+=== composed_try reset-mid-stream
+HS-RTL vpu_fifo:w32d4 composed_try_w32_3p33 trace=reset-mid-stream: 64 iterations, 66 cycles, HS cycles=66 (0.0s)
+  cycle | in fires (rst push pd pop) | out fires (pd e f) | values
+      0 | 1 1 1 1 | 0 0 0 | pop_data=0 empty=0 full=0
+      1 | 1 1 1 1 | 0 0 0 | pop_data=0 empty=0 full=0
+      2 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      3 | 1 1 1 1 | 1 1 1 | pop_data=8e21ba1d empty=0 full=0
+      4 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      5 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      6 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      7 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+      8 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+      9 | 1 1 1 1 | 1 1 1 | pop_data=761d3720 empty=0 full=0
+     10 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     11 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     12 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     13 | 1 1 1 1 | 1 1 1 | pop_data=7d280fc3 empty=0 full=0
+     14 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     15 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     16 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     17 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     18 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     19 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+    in  rst_ni       accepted 64/64; cycle - iteration: 0:64
+    in  push_i       accepted 64/64; cycle - iteration: 0:64
+    in  push_data_i  accepted 64/64; cycle - iteration: 0:64
+    in  pop_i        accepted 64/64; cycle - iteration: 0:64
+    out pop_data_o   delivered 64/64; cycle - iteration: 2:64
+    out empty_o      delivered 64/64; cycle - iteration: 2:64
+    out full_o       delivered 64/64; cycle - iteration: 2:64
+COMPOSED vpu_fifo:w32d4 composed_try_w32_3p33 catapult-rtl: pop_data 1/2 on pop cycles; empty 6/61 at s=+0 (6 at s=0); full 61/61 at s=+0 (61 at s=0)
+    e.g. reset-mid-stream cycle 11 pop_data: allo 7d280fc3 rtl ffffffff
+    push-accept -> pop-deliver cycles, pops one trace cycle after their push: 3:2 (2 push/pop pairs)
+=== composed_try push+pop-on-empty
+HS-RTL vpu_fifo:w32d4 composed_try_w32_3p33 trace=push+pop-on-empty: 64 iterations, 66 cycles, HS cycles=66 (0.0s)
+  cycle | in fires (rst push pd pop) | out fires (pd e f) | values
+      0 | 1 1 1 1 | 0 0 0 | pop_data=0 empty=0 full=0
+      1 | 1 1 1 1 | 0 0 0 | pop_data=0 empty=0 full=0
+      2 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      3 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      4 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      5 | 1 1 1 1 | 1 1 1 | pop_data=dd60f19 empty=0 full=0
+      6 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=1 full=0
+      7 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+      8 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+      9 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     10 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     11 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     12 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     13 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     14 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     15 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     16 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     17 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     18 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+     19 | 1 1 1 1 | 1 1 1 | pop_data=0 empty=0 full=0
+    in  rst_ni       accepted 64/64; cycle - iteration: 0:64
+    in  push_i       accepted 64/64; cycle - iteration: 0:64
+    in  push_data_i  accepted 64/64; cycle - iteration: 0:64
+    in  pop_i        accepted 64/64; cycle - iteration: 0:64
+    out pop_data_o   delivered 64/64; cycle - iteration: 2:64
+    out empty_o      delivered 64/64; cycle - iteration: 2:64
+    out full_o       delivered 64/64; cycle - iteration: 2:64
+COMPOSED vpu_fifo:w32d4 composed_try_w32_3p33 catapult-rtl: pop_data 1/1 on pop cycles; empty 60/63 at s=+0 (60 at s=0); full 63/63 at s=+0 (63 at s=0)
+    push-accept -> pop-deliver cycles, pops one trace cycle after their push: 3:1 (1 push/pop pairs)

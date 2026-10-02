@@ -1,0 +1,19 @@
+RTL vpu_fifo:output: 40206 cycles in 6 traces (fill-full-passthrough-drain, wrap-half-full, random-legal-noreset-0, random-legal-noreset-1, tb_mxu_single_port lane 0, tb_mxu_single_port lane 1), 112194 defined slots, 13120 pops, 13120 pushes (7.9s)
+/work/shared/users/phd/sk3463/scratch/wt-u2fc/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui1[0m
+  warnings.warn(self.message, category=self.category)
+COMPOSED vpu_fifo:output composed simulator (build 0.3s, run 0.1s): pop_data 13120/13120 on pop cycles; empty 30310/40205 at s=-7 (30256 at s=0); full 26844/40205 at s=-4 (26790 at s=0)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[19:38:11] Compiling with g++ ...
+[19:38:16] Running simulation ...
+COMPOSED vpu_fifo:output composed systemc (build 0.2s, run 5.0s): pop_data 0/13120 on pop cycles; empty 39403/40205 at s=+0 (39403 at s=0); full 28881/40205 at s=-1 (28674 at s=0)
+    e.g. fill-full-passthrough-drain cycle 18 pop_data: allo 7fffffffffffffff rtl c9f71e7195b89619
+    e.g. fill-full-passthrough-drain cycle 19 pop_data: allo 7fffffffffffffff rtl 4e96a0c0313784e
+    e.g. fill-full-passthrough-drain cycle 20 pop_data: allo 7fffffffffffffff rtl d6f31449a82f6776
+EXIT 0
