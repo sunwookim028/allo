@@ -110,7 +110,7 @@ in what Allo can say.
     latency 0 is refused (N3). *[amend item 8's proposal: Catapult honours
     ``latency=`` on Connections ports and refuses it on Wire ports]*
 
-12. **MiniTPU findings for its owner** (D-7: changing MiniTPU is the owner's
+13. **MiniTPU findings for its owner** (D-7: changing MiniTPU is the owner's
     call). ``vpu_alu`` does not implement AND/OR/XOR (they return ``a``; the
     decoder never issues them; ``docs/UNITS.md`` lists them). From U2 Phase 0
     (``u2_phase0_2026-10-02.rst``): the assembler's output-FIFO rule counts
