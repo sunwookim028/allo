@@ -348,3 +348,7 @@ one design per bug (it skips without ``MGC_HOME`` and ``SYSTEMC_HOME``).
   round-to-nearest-even. The other 40 pairs then match numpy; bf16 <-> f16 fails,
   earlier, in the MLIR pipeline. Vitis and Catapult output is unchanged (a
   hook); the Catapult HLS flow keeps the old behaviour.
+- **A ``UInt(24)`` port could not be read back** (S5, same record): ``KeyError:
+  'ui24'``. The data-file reader knew only 8-, 16-, 32- and 64-bit integers. An
+  ``i<N>``/``ui<N>`` of any width up to 64 now reads into the smallest numpy
+  container (``ui24`` -> ``uint32``), as the simulator's argument path accepts it.
