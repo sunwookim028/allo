@@ -103,6 +103,47 @@ def get_global_vars(func):
     return all_globals
 
 
+def callee_global_vars(caller_vars, func, top_globals=None):
+    """The ``global_vars`` a called Python function is built with.
+
+    ``caller_vars`` is the caller's view (for a kernel, ``get_global_vars``
+    of the top function, which merges every reachable module's globals,
+    first name wins). A callee's free names must resolve where *it* was
+    written, as in Python: its own module's globals, then its closure, win
+    over anything the caller sees. Without this a function reused from
+    another module silently reads the caller's global of the same name.
+    The caller's view stays underneath only as a fallback for names the
+    callee's scope does not have (front-end entries such as ``df.p0``, and
+    an enclosing function's locals named in a nested function's
+    annotations, which leave no closure cell).
+
+    A function nested in the top function's own module (a helper defined
+    inside a test function) keeps the caller's view under its closure: that
+    view already holds the module's globals, and the enclosing function's
+    locals that ``_get_global_vars`` collects from the stack shadow them,
+    as they do in Python.
+    """
+    raw = inspect.unwrap(func)
+    scope = dict(caller_vars)
+    nested = "<locals>" in getattr(raw, "__qualname__", "")
+    if not (nested and raw.__globals__ is top_globals):
+        scope.update(raw.__globals__)
+    # A generic function's type parameters (``def f[T, N]``) are closure
+    # cells holding ``TypeVar``s; the instantiation binds them, so they are
+    # not overlaid here.
+    type_params = {t.__name__ for t in getattr(raw, "__type_params__", ())}
+    code = getattr(raw, "__code__", None)
+    if code is not None and raw.__closure__:
+        for name, cell in zip(code.co_freevars, raw.__closure__):
+            if name in type_params:
+                continue
+            try:
+                scope[name] = cell.cell_contents
+            except ValueError:  # an empty cell: not bound yet
+                pass
+    return scope
+
+
 def get_extra_type_hints(dtype: AlloType):
     assert isinstance(dtype, AlloType), f"Expect AlloType, got {dtype}"
     if isinstance(dtype, (Int, Fixed)):

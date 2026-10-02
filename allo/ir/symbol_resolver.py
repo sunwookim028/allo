@@ -119,18 +119,24 @@ class ASTResolver:
         if isinstance(node, ast.Slice):
             return tuple(
                 (
-                    ASTResolver.resolve_constant(node.lower, ctx),
-                    ASTResolver.resolve_constant(node.upper, ctx),
-                    ASTResolver.resolve_constant(node.step, ctx),
+                    ASTResolver.resolve_constant(node.lower, ctx, True),
+                    ASTResolver.resolve_constant(node.upper, ctx, True),
+                    ASTResolver.resolve_constant(node.step, ctx, True),
                 )
             )
         if isinstance(node, ast.Index):
-            return ASTResolver.resolve_constant(node.value, ctx)
+            return ASTResolver.resolve_constant(node.value, ctx, True)
         return None
 
     @staticmethod
-    def resolve_constant(node, ctx):
+    def resolve_constant(node, ctx, locals_shadow=False):
+        """Evaluate ``node`` as a compile-time constant in ``ctx.global_vars``,
+        or return None. With ``locals_shadow``, an expression that reads a
+        kernel parameter or local is not a constant, even when a global of the
+        same name exists: the local shadows it, as in Python."""
         if node is None:
+            return None
+        if locals_shadow and hasattr(ctx, "names_local") and ctx.names_local(node):
             return None
         try:
             # pylint: disable=eval-used
