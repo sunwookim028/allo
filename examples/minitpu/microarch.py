@@ -129,7 +129,20 @@ def build(prog, m_rows, dim=DIM, sub=SUB, vmem_words=VMEM_WORDS, target="simulat
     TW = bfloat16  # the architectural element type: BF16 everywhere
     TA = float32  # the 24-bit accumulator's carrier; rounded by round24()
 
-    @df.region()
+    # One Stateful has one kernel (README D-11); the regfile and VMEM are the
+    # model's "one memory, several ports", ordered by the request/response and
+    # retirement streams below (pc_req/pc_rsp, wp_req/wp_dat, wb_tok, st_tok).
+    # The premise is the author's, not checked -- as deadlock_free_because is.
+    @df.region(
+        shared_stateful={
+            "vregs": "port_c, write_port and alu touch vregs only to serve a "
+            "request (pc_req, wp_req, c_alu) the sequencer issued in program "
+            "order, and the sequencer waits on wb_tok/st_tok before a command "
+            "that depends on a write",
+            "vmem": "vmem_dma fills VMEM before fill_done and drains it only "
+            "after every vst retired (st_tok); vmem_compute starts at fill_done",
+        }
+    )
     def minitpu(
         prog_in: int32[max(n_cmd, 1), 4],
         dram_in: TW[vmem_words, sub, dim],

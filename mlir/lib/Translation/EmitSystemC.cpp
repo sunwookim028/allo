@@ -21,6 +21,7 @@
 #include "allo/Translation/Utils.h"
 #include "allo/Support/Utils.h" // getLayoutMap, isFullyPartitioned
 #include "llvm/ADT/SetVector.h"  // SmallSetVector: dedupe external IP headers
+#include "llvm/ADT/StringSet.h"  // statefulKernels: csim state persistence
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AffineExpr.h"
@@ -426,6 +427,15 @@ private:
   // per-element formatting, which is only reachable there inside a full `= {...}` brace
   // list -- a reset action needs the values one at a time.
   void emitDenseElementLiteral(Attribute element, Type type, bool isUnsigned);
+
+  // csim-only `@ Stateful` persistence across calls of the built module (README
+  // D-11): a kernel that owns stateful members gets __allo_state_save/_load/_resume
+  // (emitStatefulStateIO) and is recorded in statefulKernels; the top records its
+  // (instance, callee) pairs in kernelInsts so sc_main can save every stateful
+  // instance at exit.
+  void emitStatefulStateIO(llvm::ArrayRef<memref::GlobalOp> statefulGlobals);
+  llvm::StringSet<> statefulKernels;
+  SmallVector<std::pair<std::string, std::string>, 4> kernelInsts;
 
   // Loop-shape transform: the kernel's outermost `for t` becomes a free-running while(1)
   // under __SYNTHESIS__ so Catapult pipelines the body (see emitAffineFor).
@@ -1622,6 +1632,83 @@ void SystemCModuleEmitter::emitAffineStore(affine::AffineStoreOp op) {  // overr
 // fwd decl (defined near emitStreamEmpty): does func query empty()/full() on arg?
 static bool streamArgQueried(func::FuncOp func, unsigned argIdx, bool wantEmpty);
 
+// csim only: `@ Stateful` persists across calls of the built module (README D-11).
+// Each call of the module is one process (compile + run of this testbench), so
+// the state crosses calls through a file: sc_main saves every stateful instance's
+// members to allo_state_<instance>.data at exit, and the thread reloads them
+// right after its reset action when the runner (allo/backend/hls.py) sets
+// ALLO_STATE_RESUME -- which it does on every call after the first; `mod.reset()`
+// clears the files. Values cross exactly like the input/output data files
+// (tbIntKind): an ac_int of any width as decimal text (_wrwide/_rdwide), a
+// native unsigned as `unsigned long long`, a native signed as `long long`, a
+// float as its raw bits -- so a value round-trips bit-exact (a uint64 >= 2^63 or
+// an ac_int wider than 64 bits through `long long` would not; S7/S8).
+// Under __SYNTHESIS__ none of this exists: the RTL's contract is "between resets".
+void SystemCModuleEmitter::emitStatefulStateIO(
+    llvm::ArrayRef<memref::GlobalOp> statefulGlobals) {  // new (SystemC-only)
+  // `body` is called with the indexed lvalue (`name[_s0][_s1]`) and the element
+  // C type, inside one loop nest per global.
+  auto forEachElement = [&](llvm::function_ref<void(const std::string &,
+                                                    const std::string &, bool)>
+                                body) {
+    for (auto g : statefulGlobals) {
+      auto at = llvm::cast<ShapedType>(g.getType());
+      std::string ctype = std::string(getSCTypeName(at.getElementType()).str());
+      unsigned rank = at.getRank();
+      for (unsigned d = 0; d < rank; ++d) {
+        indent();
+        os << "for (int _s" << d << " = 0; _s" << d << " < " << at.getShape()[d]
+           << "; ++_s" << d << ") ";
+      }
+      std::string lv = g.getSymName().str();
+      for (unsigned d = 0; d < rank; ++d)
+        lv += "[_s" + std::to_string(d) + "]";
+      if (rank == 0)
+        indent();
+      body(lv, ctype, isFloatCType(ctype));
+    }
+  };
+  os << "#ifndef __SYNTHESIS__\n";
+  indent(); os << "// csim only: `@ Stateful` across calls of the built module (README D-11)\n";
+  indent(); os << "void __allo_state_save(std::ostream &_o) {\n";
+  addIndent();
+  forEachElement([&](const std::string &lv, const std::string &ctype, bool isF) {
+    char kind = tbIntKind(ctype);
+    if (isF)
+      os << "_o << _fbits(" << lv << ") << \"\\n\";\n";
+    else if (kind == 'a')
+      // One statement: it is the body of the brace-less `for` nest above.
+      os << "{ _wrwide(_o, " << lv << "); _o << \"\\n\"; }\n";
+    else
+      os << "_o << (" << (kind == 'u' ? "unsigned long long" : "long long")
+         << ")(" << lv << ") << \"\\n\";\n";
+  });
+  reduceIndent();
+  indent(); os << "}\n";
+  indent(); os << "void __allo_state_load(std::istream &_i) {\n";
+  addIndent();
+  forEachElement([&](const std::string &lv, const std::string &ctype, bool isF) {
+    if (isF)
+      os << "{ unsigned long long _v; _i >> _v; " << lv << " = _ffrombits< "
+         << ctype << " >(_v); }\n";
+    else if (tbIntKind(ctype) == 'a')
+      os << "_rdwide(_i, " << lv << ");\n";
+    else
+      os << "{ " << (tbIntKind(ctype) == 'u' ? "unsigned long long" : "long long")
+         << " _v; _i >> _v; " << lv << " = (" << ctype << ")_v; }\n";
+  });
+  reduceIndent();
+  indent(); os << "}\n";
+  indent(); os << "void __allo_state_resume() {\n";
+  addIndent();
+  indent(); os << "if (!std::getenv(\"ALLO_STATE_RESUME\")) return;\n";
+  indent(); os << "std::ifstream _f(std::string(\"allo_state_\") + basename() + \".data\");\n";
+  indent(); os << "if (_f) __allo_state_load(_f);\n";
+  reduceIndent();
+  indent(); os << "}\n";
+  os << "#endif\n";
+}
+
 void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (SystemC-only)
   auto name = func.getName();
   os << "SC_MODULE(" << name << ") {\n";
@@ -1867,6 +1954,10 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
       os << "[" << s << "]";
     os << ";  // @ Stateful\n";
   }
+  if (!statefulGlobals.empty()) {
+    statefulKernels.insert(func.getName());
+    emitStatefulStateIO(statefulGlobals);
+  }
 
   // Constructor: name the ports + register a clocked, reset-aware thread.
   indent(); os << "SC_HAS_PROCESS(" << name << ");\n";
@@ -2055,6 +2146,13 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
   }
   indent(); os << "done.write(false);  // completion flag low until the pass finishes\n";
   indent(); os << "wait();\n";
+  // After the reset action's wait(), so a reload cannot race the reset that
+  // re-initialises the members (the thread is out of reset once wait() returns).
+  if (!statefulGlobals.empty()) {
+    os << "#ifndef __SYNTHESIS__\n";
+    indent(); os << "__allo_state_resume();  // csim: continue from the previous call's state\n";
+    os << "#endif\n";
+  }
   // Baked-in constant arrays (e.g. `W: T[M,N] = np_W` weights) referenced by this
   // kernel: a memref.global holds the data and a GetGlobalOp aliases it, but the
   // SystemC path (unlike Vhls emitFunction) never emitted the global itself, so the
@@ -2905,9 +3003,12 @@ void SystemCModuleEmitter::emitTopModule(func::FuncOp func) {  // new (SystemC-o
   }
   // Submodule instance members: <callee> uN;
   SmallVector<std::string, 4> instNames;
+  kernelInsts.clear();
   for (auto it : llvm::enumerate(calls)) {
     std::string inst = "u" + std::to_string(it.index());
     instNames.push_back(inst);
+    if (!isIPCall(it.value(), parent))
+      kernelInsts.push_back({inst, std::string(it.value().getCallee())});
     indent();
     os << it.value().getCallee() << " " << inst << ";\n";
     // One signal per non-stream IP port. Every port must be bound or SystemC
@@ -3598,6 +3699,7 @@ void SystemCModuleEmitter::emitModule(ModuleOp module) {  // override (base emit
 typedef ac_ieee_float<binary16> half;
 #include <iostream>
 #include <fstream>
+#include <cstdlib>          // std::getenv: ALLO_STATE_RESUME (@ Stateful across calls)
 #include <iomanip>          // std::setprecision for lossless float tb output
 #include <algorithm>
 // --- float support helpers (half / ac_ieee_float<binary32> / double) ---
@@ -4409,6 +4511,18 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
           os << "    _f << _s << \"\\n\";\n";
         indent();
         os << "  } }\n";
+      }
+    // `@ Stateful` persistence (README D-11): save every stateful instance's
+    // members for the next call of the built module to resume from (the thread
+    // reloads them in __allo_state_resume when ALLO_STATE_RESUME is set). Done
+    // here, after the run is quiescent, not at the end of each thread's pass: a
+    // stream sink's sc_stop() can land before a producer's thread reaches the
+    // end of its body.
+    for (auto &ki : kernelInsts)
+      if (statefulKernels.count(ki.second)) {
+        indent();
+        os << "{ std::ofstream _f(\"allo_state_" << ki.first << ".data\"); t.dut."
+           << ki.first << ".__allo_state_save(_f); }\n";
       }
     indent(); os << "return 0;\n";
     reduceIndent();

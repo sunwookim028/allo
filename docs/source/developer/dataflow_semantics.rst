@@ -248,23 +248,54 @@ loop terminates when the condition is met (bounded by FIFO occupancy).
 4. Allo-Specific Notes
 ----------------------
 
-``@ stateful`` variables
+``@ Stateful`` variables
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   spad: float32[BURST_SIZE] @ stateful = 0.0
+   spad: float32[BURST_SIZE] @ Stateful = 0.0
 
-In the **Allo simulator**: The variable lives in a heap-allocated array that
-persists across repeated calls to ``df.build()(...)``. OpenMP threads share the
-process address space, so static state is naturally persistent.
+The contract (README D-11; record
+``dev/records/limitations/stateful_semantics_2026-10-02.rst``): a ``Stateful``
+keeps its value from one call of the built module to the next, and **one
+Stateful has one kernel**.
 
-In **HLS CSIM**: Lowered to a C++ ``static`` local variable inside the kernel
-function. Persists across sequential calls to the kernel.
+**Persistence.** In the **Allo simulator** the variable is a global of the
+JIT-compiled module, so it persists for the module's lifetime. In **SystemC
+csim** every call is one process (compile + run of the emitted testbench), so
+the state crosses calls through files: a kernel ``SC_MODULE`` that owns
+stateful members gets ``__allo_state_save`` / ``__allo_state_load`` /
+``__allo_state_resume`` (all under ``#ifndef __SYNTHESIS__``), ``sc_main``
+saves every instance's members to ``allo_state_<instance>.data`` at exit, and
+the thread reloads them right after its reset action's ``wait()`` -- so a
+reload can never race the reset -- when ``ALLO_STATE_RESUME`` is set, which the
+runner (``allo/backend/hls.py``) does on every call after the first. Integers
+cross as decimal ``long long`` and floats as their raw bits, like the data
+files, so values round-trip bit-exact. ``mod.reset()`` returns every Stateful
+to its declared initial value on both backends (what a hardware reset does;
+the simulator re-JITs the module). In **RTL** the contract is "between
+resets": a ``static`` local on Vitis, a reset-initialised member on
+SystemC/Catapult. *Not done:* SystemC **cosim** (SCVerify drives its own run)
+and the Vitis/Catapult csim host restart per call; the Allo-driven cosims
+re-instantiate the RTL (``u2_regfile_2026-10-02.rst``, M1), so verdicts there
+use single-call traces.
 
-In **HLS RTL** (synthesis): Lowered to a ``static`` local → register array
-(FF-based for small sizes ≤ ~32 elements, BRAM for larger). Persists between
-top-level invocations (kernel calls).
+**One kernel.** Two kernels that touch the same ``Stateful`` are refused at
+build, before any backend (``allo.dataflow.check_stateful_sharing``), with a
+message that names the Stateful and the kernels; a mapped kernel's PEs count
+as kernels. The simulator used to run them unordered and silently (M2); the
+HLS emitters refused on their own and still do. A kernel-local or
+``@df.unit``-instance Stateful gets one global per instance, so it can never
+trip the check. The one escape is the author's premise that streams already
+order every access -- a memory with several ports, modelled before the
+memory-port proposal lands::
+
+   @df.region(shared_stateful={"vregs": "every access serves a request the "
+                                        "sequencer issued in program order"})
+
+Nothing checks it, as nothing checks ``deadlock_free_because``: the simulator
+honours it, the HLS backends refuse the sharing regardless.
+``examples/minitpu/microarch.py`` is the one in-tree user.
 
 ``df.get_pid()`` with ``mapping=[N]``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -19,7 +19,7 @@ from ._mlir.ir import (
     MemRefType,
     Type,
 )
-from ._mlir.dialects import func as func_d, allo as allo_d
+from ._mlir.dialects import func as func_d, allo as allo_d, memref as memref_d
 from ._mlir.passmanager import PassManager as mlir_pass_manager
 from .customize import customize as _customize, Schedule
 from .utils import parse_kernel_name, construct_kernel_name
@@ -154,13 +154,9 @@ def move_stream_to_interface(
                 stream_signed += "u" if "unsigned" in op.attributes else "_"
                 for use in op.result.uses:
                     # get use's parent operation
-                    if isinstance(
-                        use.owner, _LINK_GET_OPS
-                    ):
+                    if isinstance(use.owner, _LINK_GET_OPS):
                         direction = "in"
-                    elif isinstance(
-                        use.owner, _LINK_PUT_OPS
-                    ):
+                    elif isinstance(use.owner, _LINK_PUT_OPS):
                         direction = "out"
                     elif isinstance(
                         use.owner, (allo_d.StreamEmptyOp, allo_d.StreamFullOp)
@@ -372,13 +368,9 @@ def move_stream_to_interface(
                 stream_types.append(op.result.type)
                 stream_signed += "u" if "unsigned" in op.attributes else "_"
                 for use in op.result.uses:
-                    if isinstance(
-                        use.owner, _LINK_GET_OPS
-                    ):
+                    if isinstance(use.owner, _LINK_GET_OPS):
                         direction = "in"
-                    elif isinstance(
-                        use.owner, _LINK_PUT_OPS
-                    ):
+                    elif isinstance(use.owner, _LINK_PUT_OPS):
                         direction = "out"
                     elif isinstance(
                         use.owner, (allo_d.StreamEmptyOp, allo_d.StreamFullOp)
@@ -544,10 +536,97 @@ def remove_unused_func_ops(s, func_names):
             func_op.erase()
 
 
-def _build_top(s, stream_info, enable_layout=False):
+def _walk_ops(op):
+    """Every operation nested anywhere under ``op`` (an ``Operation``)."""
+    for region in op.regions:
+        for block in region.blocks:
+            for inner in block.operations:
+                yield inner
+                yield from _walk_ops(inner.operation)
+
+
+def check_stateful_sharing(s, shared_stateful=None):
+    """One ``Stateful`` has one kernel (README D-11); refuse sharing at build.
+
+    Two kernels that touch the same ``@ Stateful`` global are concurrent
+    processes with no order between their accesses: the simulator ran them
+    unordered and silently (``u2_regfile_2026-10-02.rst``, M2), and no HLS
+    backend can express the sharing (each emitter refuses it on its own; those
+    refusals stay as a second line). The check runs here, before any backend,
+    so every target gives the same answer and the message can name the kernels.
+
+    ``shared_stateful`` is the author's premise that the accesses *are*
+    ordered -- by request/response or token streams, the ``shared_sync`` shape
+    of that record, which ``examples/minitpu/microarch.py`` relies on. It maps
+    each region-scope Stateful's name to the reason, and like
+    ``deadlock_free_because`` nothing checks it: the simulator honours the
+    premise, the HLS backends still refuse. A mapped kernel's PEs count as
+    separate kernels: a region-scope Stateful touched by ``mapping=[2]`` is
+    shared by ``k_0`` and ``k_1``. Kernel-local and unit-instance Statefuls
+    get one global per instance, so they can never trip this.
+    """
+    allowed = dict(shared_stateful or {})
+    globals_ = {
+        op.attributes["sym_name"].value: op
+        for op in s.module.body.operations
+        if isinstance(op, memref_d.GlobalOp)
+    }
+    # region-scope source name <- global symbol (kernel-local ones are per kernel)
+    source_name = {
+        gname: name for name, (gname, _) in getattr(s, "stateful_var_map", {}).items()
+    }
+    unknown = [
+        n for n in allowed if n not in source_name.values() and n not in globals_
+    ]
+    if unknown:
+        raise RuntimeError(
+            f"shared_stateful names {unknown}, which are not region-scope "
+            f"Stateful variables of `{s.top_func_name}` "
+            f"(it declares {sorted(source_name.values())})"
+        )
+    users = {}
+    for func in s.module.body.operations:
+        if not (isinstance(func, func_d.FuncOp) and "df.kernel" in func.attributes):
+            continue
+        kname = func.attributes["sym_name"].value
+        for op in _walk_ops(func.operation):
+            if op.operation.name != "memref.get_global":
+                continue
+            gname = op.attributes["name"].value
+            g = globals_.get(gname)
+            if (
+                g is None
+                or not gname.startswith("__stateful_")
+                or "constant" in g.attributes
+            ):
+                continue
+            kernels = users.setdefault(gname, [])
+            if kname not in kernels:
+                kernels.append(kname)
+    for gname, kernels in users.items():
+        if len(kernels) < 2:
+            continue
+        name = source_name.get(gname, gname)
+        if name in allowed or gname in allowed:
+            continue
+        raise RuntimeError(
+            f"Stateful `{name}` (`{gname}`) is used by {len(kernels)} kernels: "
+            f"{', '.join(kernels)}. One Stateful has one kernel (README D-11): "
+            "the kernels of a region run concurrently and nothing orders their "
+            "accesses, and no HLS backend can express the sharing. Give each "
+            "kernel its own `@ Stateful`, or pass the state between them over a "
+            "Stream. If streams already order every access, state that premise: "
+            f'`@df.region(shared_stateful={{"{name}": "<why>"}})` -- the '
+            "simulator then honours it; the HLS backends still refuse."
+        )
+
+
+def _build_top(s, stream_info, enable_layout=False, shared_stateful=None):
     """
     s: top-level schedule
     stream_info: {func_name: [(stream_names, direction)]}
+    shared_stateful: the region's ``shared_stateful`` premise (see
+        :func:`check_stateful_sharing`)
     """
     # remove unused kernel
     passes = ["canonicalize"]
@@ -560,6 +639,7 @@ def _build_top(s, stream_info, enable_layout=False):
         print(s.module)
         raise e
     remove_unused_func_ops(s, stream_info.keys())
+    check_stateful_sharing(s, shared_stateful)
 
     # create argument mapping
     funcs = get_all_df_kernels(s)
@@ -722,20 +802,19 @@ def unit(mapping=None):
     return actual_decorator
 
 
-def region(deadlock_free_because: str = None):
+def region(deadlock_free_because: str = None, shared_stateful: dict = None):
     """Mark the decorated function as a dataflow region.
 
     A region is a top-level dataflow function whose body declares
     streams, optional region-scope ``Stateful`` buffers, and a set of
     ``@kernel`` functions. All kernels inside the region run
-    concurrently on each invocation of the compiled module, and any
-    ``Stateful`` declared at region body scope is a single persistent
-    buffer shared by every kernel in the region (vs. ``Stateful``
-    declared at kernel body scope, which is private to that kernel).
-
-    Region-scope ``Stateful`` is the natural fit for accelerator
-    architectures with a decoder kernel and a compute kernel sharing
-    scratchpad/accumulator state (Gemmini-style).
+    concurrently on each invocation of the compiled module. A
+    ``Stateful`` keeps its value from one call of the built module to the
+    next, on every backend (README D-11), and **one Stateful has one
+    kernel**: a region-scope ``Stateful`` is a persistent buffer that may be
+    owned by exactly one kernel (a ``Stateful`` declared at kernel body scope
+    is private to that kernel by construction). Two kernels touching the same
+    one are refused at build, by :func:`check_stateful_sharing`.
 
     ``deadlock_free_because`` is the author's premise for why the feedback
     loops in a netlist of ``@df.unit`` instances drain. Nothing checks it, and
@@ -743,10 +822,20 @@ def region(deadlock_free_because: str = None):
     (``allo.netlist.UndeclaredPremise``): deadlock-freedom needs per-unit
     rates, which a netlist does not carry, so it is an obligation and not a
     rule. A region with no feedback needs no premise.
+
+    ``shared_stateful`` is the matching premise for a region-scope
+    ``Stateful`` that several kernels touch *in an order the streams between
+    them already fix* (request/response or token streams -- a memory with
+    several ports, modelled before the memory-port proposal lands). It maps
+    the Stateful's name to the reason, e.g. ``{"vregs": "every access
+    follows a pc_req/wp_req token the sequencer issues in program order"}``.
+    Nothing checks it either: the simulator honours it, and the HLS backends
+    refuse the sharing regardless.
     """
 
     def actual_decorator(func):
         check_region_wiring(func)
+        func.shared_stateful = shared_stateful
         # TODO: ideally this context information should be recorded in the builder
         global _current_region_context
         _current_region_context = {}
@@ -765,6 +854,7 @@ def region(deadlock_free_because: str = None):
             return hls_mod(*args, **kwargs)
 
         wrapper.mappings = func.mappings
+        wrapper.shared_stateful = shared_stateful
         return wrapper
 
     return actual_decorator
@@ -867,7 +957,9 @@ def customize(func, enable_tensor=False, opt_default=False):
     global_vars = get_global_vars(func)
     s = _customize(func, global_vars=global_vars, enable_tensor=enable_tensor)
     stream_info = move_stream_to_interface(s)
-    s = _build_top(s, stream_info)
+    s = _build_top(
+        s, stream_info, shared_stateful=getattr(func, "shared_stateful", None)
+    )
 
     if opt_default:
         df_primitive_default(s)
@@ -911,7 +1003,7 @@ def build(
         stream_info, stream_types_dict, extra_stream_info = move_stream_to_interface(
             s, with_stream_type=True, with_extra_info=True, unroll=False
         )
-        s = _build_top(s, stream_info, True)
+        s = _build_top(s, stream_info, True, getattr(func, "shared_stateful", None))
         aie_mod = AIE_MLIRModule(
             s.module,
             s.top_func_name,

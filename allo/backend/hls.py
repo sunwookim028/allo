@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # pylint: disable=consider-using-with, no-name-in-module, too-many-branches
 
+import glob
 import os
 import re
 import io
@@ -433,6 +434,9 @@ class HLSModule:
         self.platform = platform
         self.ext_libs = [] if ext_libs is None else ext_libs
         self.num_output_args = None  # Will be set from configs if provided
+        # Calls of this module so far: the systemc csim resumes `@ Stateful`
+        # from the previous call's state on every call after the first.
+        self._calls = 0
         user_configs = configs if configs is not None else {}
         # For Catapult (ASIC), start with ASIC-appropriate defaults instead of FPGA defaults.
         if platform in {"catapult", "systemc"}:
@@ -851,6 +855,37 @@ class HLSModule:
             return self.hls_code
         return f"HLSModule({self.top_func_name}, {self.mode}, {self.project})"
 
+    # `@ Stateful` persists across calls of the built module (README D-11). The
+    # systemc csim is one process per call, so the emitted testbench saves every
+    # kernel instance's stateful members to allo_state_<inst>.data at exit and
+    # reloads them when ALLO_STATE_RESUME is set (EmitSystemC.cpp,
+    # emitStatefulStateIO). The first call of a module starts from the declared
+    # initial values -- and clears whatever a previous build left in the project
+    # -- and every later call resumes. Not done for cosim (SCVerify drives its
+    # own run) nor for the vhls/catapult csim host (documented in
+    # docs/source/developer/dataflow_semantics.rst).
+    def _csim_state_env(self):
+        env = dict(os.environ)
+        env.pop("ALLO_STATE_RESUME", None)
+        if self._calls == 0:
+            self._clear_csim_state()
+        else:
+            env["ALLO_STATE_RESUME"] = "1"
+        return env
+
+    def _clear_csim_state(self):
+        for f in glob.glob(os.path.join(self.project, "allo_state_*.data")):
+            os.remove(f)
+
+    def reset(self):
+        """Return every ``@ Stateful`` to its declared initial value.
+
+        What a hardware reset does: the next call starts from the initial
+        values instead of resuming from the previous call's state.
+        """
+        self._calls = 0
+        self._clear_csim_state()
+
     def __call__(self, *args, shell=True):
         if self.platform == "vivado_hls":
             assert is_available("vivado_hls"), "vivado_hls is not available"
@@ -1188,16 +1223,20 @@ class HLSModule:
 
                 # Execution
                 cmd = f"cd {self.project}; ./sim"
+                env = self._csim_state_env() if self.platform == "systemc" else None
                 print(
                     f"[{time.strftime('%H:%M:%S', time.gmtime())}] Running simulation ..."
                 )
                 if shell:
-                    process = subprocess.Popen(cmd, shell=True)
+                    process = subprocess.Popen(cmd, shell=True, env=env)
                 else:
-                    process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+                    process = subprocess.Popen(
+                        cmd, shell=True, stdout=subprocess.PIPE, env=env
+                    )
                 process.wait()
                 if process.returncode != 0:
                     raise RuntimeError("Simulation failed.")
+                self._calls += 1
 
                 # Read outputs
                 if self.platform == "systemc":
