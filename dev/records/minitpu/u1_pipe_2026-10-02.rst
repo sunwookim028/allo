@@ -1,0 +1,508 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+################################################################
+U1 pipelined leaves: values, and what Allo can say about latency
+################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-02.** zhang-21, branch ``u1-pipe``
+   (from ``origin/u1-pilot`` at ``bb3bc24c``, which carries the SystemC
+   emitter fixes but **not** the unsigned-compare fix B1). MiniTPU at
+   ``b3ba0a4d4fb69d39091c55f5f00d1f237082a4f1``. Verilator 5.052
+   (conda-forge), Catapult Ultra Synthesis 2024.2/1130128 (library
+   ``nangate-45nm_beh``), SystemC 2.3.3 from Catapult, numpy 2.4.0.
+   Units: ``vpu_bf16_add_pipe`` (latency 2) and ``mxu_acc24_add_pipe``
+   (latency 3, ``vpu_pkg::MXU_ACC_ADD_LATENCY``). README D-7, D-9; the U1 row's
+   upgrade "declared pipeline latency on a unit".
+
+U1's check is "bit-exact **and at its declared latency**". The values half is
+settled below. The latency half is the subject of this record: Allo has no way
+to declare a unit's latency, its simulator is untimed, and SystemC csim's
+cycles are not the RTL's. What can be measured is the latency of RTL that
+Allo produced, and Catapult's own cycle constraint can pin it exactly -- but
+Allo cannot ask for it.
+
+Reproduce (``source examples/minitpu/harness/env-zhang21.sh``, from the
+worktree root, ``MINITPU_HARNESS_CACHE`` outside the MiniTPU clone;
+``R=dev/records/minitpu/u1_pipe_2026-10-02``)::
+
+   $ALLO_PYTHON -m examples.minitpu.harness.check bf16_add_pipe  --backend simulator --backend systemc   # ~25 s
+   $ALLO_PYTHON -m examples.minitpu.harness.check acc24_add_pipe --backend simulator --backend systemc   # ~40 s
+   $ALLO_PYTHON $R/scripts/csim_cycles.py acc24_add_pipe staged --n 2000      # csim cycle stamps
+   $ALLO_PYTHON $R/scripts/emit_csyn.py acc24_add_pipe bits <prj> \
+       --unroll leading_zeros19:offset --pipeline add_0:i --clock 5.0 \
+       --io 'v12.Push():v10.Pop()=3'                                            # ~47 s Catapult
+   $ALLO_PYTHON $R/scripts/cmp_rtl.py acc24_add_pipe <prj> [--ready-period 3] # ~8 s Verilator
+
+Outputs as run: ``u1_pipe_2026-10-02/check.txt`` (values),
+``csim_cycles.txt`` (csim stamps), ``rtl_cmp.txt`` (every Catapult RTL against
+MiniTPU's). Catapult projects are in scratch
+(``/work/shared/users/phd/sk3463/scratch/u1_pipe/cat/``), not kept.
+
+The Allo units
+==============
+
+* ``vpu_bf16_add_pipe`` computes ``vpu_bf16_add`` (MiniTPU proves the two
+  bit-identical over 2^32 pairs), so it reuses ``bf16_add.VARIANTS``:
+  ``native`` (``bfloat16`` ``a + b``) and ``bits`` (the line-for-line
+  transcription, with the B1 spare-bit workaround).
+* ``mxu_acc24_add_pipe`` gets three new variants in
+  ``units/acc24_add_pipe.py``. Allo has no acc24 type, so each carries acc24
+  as a bit pattern in ``uint32``:
+
+  - ``native`` -- **workaround**: widen by ``<< 8`` and bitcast to
+    ``float32``, add, round back to 15 fraction bits by add-half-plus-lsb
+    (``microarch.py``'s PE idiom). Rounds twice.
+  - ``bits`` -- ``mxu_acc24_add_pipe.sv`` (fabric profile) line for line, its
+    three stages in sequence in one kernel. Written in one pass and matched
+    first time; the B1 spare bits are on ``{exp,frac} >=``, ``lzc < max`` and
+    the exponent compares (``exp_s2`` held in 10 bits so 256 stays
+    positive); ``align_significand_jam``'s 19-arm ``case`` became a shift in a
+    40-bit word plus a jam mask (M5: no shift reaches the width).
+  - ``staged`` -- the same three stages as three kernels joined by
+    ``Stream[uint32, 2]``, each stream carrying exactly the RTL's stage
+    register bank (class 2 + sign 1 + magnitude 20 + exponent 9 = 32 bits).
+    This is the only way Allo can *write down* "three register stages".
+
+Values
+======
+
+Full stimulus: ``binary_bf16`` (251,936) and ``binary_acc24`` (352,116).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 20 50
+
+   * - unit / variant / backend
+     - result
+     - differences, classified
+   * - bf16 ``native`` simulator
+     - 250,955 / 251,936
+     - 980 NaN sign kept (RTL ``+0x7FC0``); 1 ``(+0)+(-0)`` (IEEE ``+0``, RTL ``-0``)
+   * - bf16 ``native`` SystemC csim
+     - 249,907 / 251,936
+     - 2,028 NaN encoding (``ac::bfloat16`` ``0x7FFF``/``0xFFFF``); 1 ``(+0)+(-0)``
+   * - bf16 ``bits`` simulator, csim
+     - **UNIT-MATCH** 251,936 both
+     - --
+   * - acc24 ``native`` simulator
+     - 350,021 / 352,116
+     - 1,981 NaN encoding kept; 1 ``(+0)+(-0)``; **113 double rounding**
+       (float32 add then acc24 round: one acc24 ulp; README divergence 5,
+       e.g. ``3f8000+378001``: Allo ``3f8000``, RTL ``3f8001``)
+   * - acc24 ``native`` SystemC csim
+     - 349,935 / 352,116
+     - **2,067 NaN results become zeros** (below); 1 ``(+0)+(-0)``; the same 113
+   * - acc24 ``bits``, ``staged``: simulator, csim
+     - **UNIT-MATCH** 352,116 all four
+     - --
+
+**The acc24 native program means two different things.** The simulator
+(LLVM ``float``) gives NaN ``0x7FC00000``, which the round step maps to
+``0x7FC000``. Catapult's ``ac_ieee_float<binary32>`` gives ``0x7FFFFFFF`` for
+every NaN (``-NaN``: ``0xFFFFFFFF``; probed with a 5-line C++ test), and the
+round step's ``+ 127 + lsb`` then carries the all-ones payload into the sign:
+``0x8000007F >> 8 = 0x800000`` -- **a NaN becomes minus zero** (``-0``, or ``+0``). Same
+Allo source, same stimulus: NaN in one backend, a number in the other. It is
+the workaround's fault (it assumes the NaN payload's low bits are zero), but
+the trigger is that Allo's ``float32`` has no NaN encoding of its own, so a
+bitcast observes each backend's.
+
+Latency: what is expressible, and where it is checked
+=====================================================
+
+"Latency L" here is MiniTPU's: rising edges from the one that captures an
+input to the one after which its result is visible, i.e. registers on the path
+(``harness/rtl.py``). For Catapult's Connections ports the harness counts from
+the edge that accepts the input handshake to the edge before the output's, the
+same count (a one-register unit reads 1).
+
+Nothing in Allo states a unit's latency. ``@df.kernel``/``@df.unit`` take no
+timing, ``s.pipeline`` takes an II and a Vitis ``style``, and the one
+``at=``-style latency in the tree (``allo/actions.py``) is a modelling
+declaration for the Action calendar, never handed to a backend. So the
+question became: of the constructs that *exist*, which one ends up meaning
+latency anywhere?
+
+The simulator: untimed, by construction
+---------------------------------------
+
+Each kernel is an OpenMP thread and a ``Stream`` a queue; there is no clock to
+read (the timed ``get_cycles()`` simulator was not merged, ``systemc.rst``).
+``bits`` and ``staged`` give identical results there, which is the point and
+the limit: the simulator proves the *function* of a staged unit and says
+nothing about its stages. A ``@ Stateful`` register chain does not help: in an
+untimed loop a register is an **iteration** delay, so a 3-deep chain would
+pair output *k* with input *k-3* and drop the last three results -- a different
+function, not a latency (``dataflow_semantics.rst``: Stateful persists across
+calls, it has no cycle).
+
+``harness/check.py`` used to print ``latency=<the RTL's declared value>`` on
+every Allo verdict line, which reads as if the Allo side had been held to it.
+It now prints ``latency=untimed`` (simulator) and ``latency=unchecked``
+(SystemC csim), with the RTL's value in parentheses.
+
+SystemC csim: the cycles are the handshakes'
+--------------------------------------------
+
+csim is clocked, so ``scripts/csim_cycles.py`` stamps the emitted testbench
+(a hand-patch to a generated file): each ``src_<port>`` thread records the
+cycle after every ``Push``, the ``snk`` thread after every ``Pop``
+(``csim_cycles.txt``, n = 2,000):
+
+.. list-table::
+   :header-rows: 1
+
+   * - Allo unit
+     - RTL latency
+     - csim out - in
+     - rate
+   * - bf16 ``bits``, one kernel
+     - 2
+     - 2
+     - 1.000
+   * - bf16 ``native``, one kernel
+     - 2
+     - 2
+     - 1.000
+   * - acc24 ``bits``, one kernel
+     - 3
+     - 2
+     - 1.000
+   * - acc24 ``bits`` + ``s.pipeline("add_0:i")``
+     - 3
+     - 2
+     - 1.000
+   * - acc24 ``staged`` (3 kernels, 2 ``Stream[.,2]``)
+     - 3
+     - 6
+     - 1.000
+   * - same, every stage pipelined
+     - 3
+     - 6
+     - 1.000
+
+Every one-kernel unit reads 2 whatever its arithmetic; each extra
+kernel-plus-FIFO hop adds 2; ``s.pipeline`` changes nothing. The emitted csim
+thread runs a whole loop body between two ``wait()``\ s (the synthesis split,
+``systemc.rst``), so its cycle count is a property of the handshakes and the
+FIFOs, never of the unit. **csim cannot check a declared latency**, and the
+bf16 row's agreement (2 = 2) is a coincidence.
+
+Catapult RTL: latency is the scheduler's choice, and can be pinned
+------------------------------------------------------------------
+
+``scripts/emit_csyn.py`` emits the region ``top`` (its array ports become
+Connections streams) and runs Catapult; ``scripts/cmp_rtl.py`` drives the RTL
+in Verilator (``stream`` shape) beside MiniTPU's (``valid`` shape) on the full
+stimulus. Every row below is **bit-exact against MiniTPU's RTL** (``bits``:
+251,936 / 352,116), except ``bf16 native`` (the 2,029 NaN/zero cases of the
+pilot). From ``rtl_cmp.txt``:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 10 18 16 16
+
+   * - Allo source + schedule
+     - clock
+     - latency (MiniTPU)
+     - cycles / vector
+     - Catapult score
+   * - acc24 ``bits`` + ``s.pipeline``
+     - 5.0
+     - **19** (3)
+     - **19.0**
+     - 3246.7
+   * - same
+     - 2.0
+     - **21** (3)
+     - **19.0**
+     - 3291.9
+   * - bf16 ``bits`` + ``s.pipeline``
+     - 5.0
+     - **2 or 18** (2)
+     - **1.42**
+     - 3810.4
+   * - bf16 ``bits`` + ``s.pipeline``
+     - 2.0
+     - refused (SCHD-30)
+     - --
+     - --
+   * - acc24 ``bits`` + unroll LZC + ``s.pipeline``
+     - 5.0
+     - **2** (3)
+     - 1.000
+     - 2738.9
+   * - same
+     - 2.0
+     - 3 (3)
+     - 1.000
+     - 2938.2
+   * - bf16 ``bits`` + unroll LZC + ``s.pipeline``
+     - 5.0
+     - 2 (2)
+     - 1.000
+     - 1925.8
+   * - same
+     - 2.0
+     - **3** (2)
+     - 1.000
+     - 2518.7
+   * - bf16 ``native`` + ``s.pipeline``
+     - 5.0
+     - **1** (2)
+     - 1.000
+     - 982.1
+   * - acc24 ``staged``, each stage pipelined
+     - 5.0
+     - **95** (3), rising from 23
+     - 19.0
+     - 2388.9 (3 kernels)
+   * - acc24 ``staged`` + unroll LZC
+     - 5.0
+     - **5** (3)
+     - 1.000
+     - 2035.0 (3 kernels)
+   * - acc24 unrolled, ``cycle set l_S_i_0_i -equal 3`` (hand-patch)
+     - 5.0
+     - 2 (3)
+     - 1.000
+     - 2721.1
+   * - bf16 unrolled, ``cycle set l_S_i_0_i -equal 2`` (hand-patch)
+     - 5.0
+     - **1** (2)
+     - 1.000
+     - 2150.9
+   * - acc24 unrolled, I/O constraint ``cycle set {v12.Push()} -from {v10.Pop()} -equal 3`` (hand-patch)
+     - 5.0
+     - **3** (3)
+     - 1.000
+     - 2848.8
+   * - same, ``-equal 1``
+     - 5.0
+     - 1
+     - 1.000
+     - 2757.8
+   * - same, ``-equal 6``
+     - 5.0
+     - 6
+     - 1.000
+     - 3231.9
+   * - same, ``-equal 3``
+     - 2.0
+     - 3
+     - 1.000
+     - 2938.2
+   * - bf16 unrolled, ``-from`` constraint ``-equal 2``
+     - 5.0
+     - **2** (2)
+     - 1.000
+     - 1934.9
+   * - same
+     - 2.0
+     - **refused** (SCHD-30: "could not schedule even with unlimited resources")
+     - --
+     - --
+   * - acc24 unrolled, ``cycle set l_S_i_0_i -equal 2``
+     - 2.0
+     - **refused** (SCHD-3: "Feedback path is too long ... with current pipeline and clock constraints")
+     - --
+     - --
+
+Under output backpressure (ready low one cycle in three) every II=1 design
+runs at the sink's 1.5 cycles/vector with nothing lost, and its measured
+latency grows (acc24 ``-equal 3``: 3-5): the handshake ports buffer, so a
+declared latency is a no-stall property.
+
+What the table says:
+
+1. **Unconstrained, the latency is the clock's, not the unit's.** The same
+   Allo source gives acc24 latency 2 at 5 ns and 3 at 2 ns; bf16 2 at 5 ns
+   and 3 at 2 ns; the ``native`` bf16 add gives 1 at 5 ns where ``bits``
+   gives 2. MiniTPU's own latencies are design decisions ("three stages meet
+   the 5 ns clock and match the published M-slot latency"), and Catapult at
+   5 ns makes the acc24 adder one stage *shorter* than MiniTPU's. Nothing in
+   the flow notices: ``cycle.rpt`` says latency ``-1`` for these processes
+   (Catapult-track F8), and Allo reads no report.
+2. **Catapult's cycle constraint pins it exactly.** ``cycle set
+   {<out>.Push()} -from {<in>.Pop()} -equal L`` (it becomes the op's
+   ``CSTEPS_FROM {{v10.Pop() == L}}`` directive) gave measured latency **L**
+   for every L tried -- 1, 3, 6 on acc24 at 5 ns, 3 at 2 ns, 2 on bf16 -- at
+   II=1, bit-exact; Catapult adds registers to lengthen (score 2739 -> 2849
+   -> 3232 for L = 2 -> 3 -> 6). Where L is too short for the clock it
+   **refuses** with a schedule failure. That is exactly the honour-or-refuse
+   behaviour D-1 asks of a backend. (The ``mod()`` call reports only "Failed
+   to synthesize"; the cause is in ``catapult.log``.)
+3. **The loop form of the constraint is not latency.** ``cycle set <loop>
+   -equal L`` fixes the c-steps of one iteration, which is not the port-to-
+   port count: acc24 at ``-equal 3`` measured 2, bf16 at ``-equal 2``
+   measured **1** (shorter than the unconstrained 2). A latency directive must
+   name the I/O operations, not the loop.
+4. **A staged Allo unit does not mean "L registers".** Three kernels joined
+   by streams synthesize to latency 5 at 5 ns (each kernel's handshake plus
+   each FIFO), not 3; with an unrolled LZC the rate is 1. The stage
+   boundaries are real in the RTL but their count is not the latency, in csim
+   (6) or in RTL (5).
+5. **"Pipelined with II=1" can be false at the ports.** With the
+   leading-zero loop left rolled (as written, like the ``.sv``'s ``for``),
+   Catapult reports ``Loop 'l_S_i_0_i' is pipelined with initiation interval
+   1`` and the RTL runs at **19 cycles/vector** (acc24), or at a
+   **data-dependent rate** for bf16 (1.42 on average: 6,592 vectors -- the
+   cancellations that take the normalize branch, where the rolled loop sits --
+   take 18 cycles, the rest 2). Allo had no way to know; ``s.unroll`` on the
+   nested function's loop (``leading_zeros19:offset``, not ``add_0:offset``,
+   which is refused) fixes it. The staged variant with the rolled loop shows
+   the backlog: latency climbs 23 -> 95 as the FIFOs fill. RTLGen hit the same
+   (II=48, its F4); AMC needed ``s.unroll`` too (its P1).
+
+Findings (D-9 classes)
+======================
+
+.. list-table::
+   :header-rows: 1
+   :widths: 6 18 76
+
+   * - #
+     - class
+     - finding
+   * - L1
+     - missing abstraction
+     - **A unit cannot declare its latency.** No Allo construct carries
+       "latency L, II 1" to any backend; ``s.pipeline`` carries II only. The
+       nearest things are a staged unit (L1-L4 above: means 6 in csim, 5 in
+       RTL) and ``@ Stateful`` chains (an iteration delay, not a latency).
+   * - L2
+     - semantic mismatch
+     - **The same Allo unit has a different latency per clock** (acc24: 2 at
+       5 ns, 3 at 2 ns; bf16 ``native`` 1 vs ``bits`` 2 at 5 ns), and no
+       report states it (``cycle.rpt`` latency ``-1``). The unit's latency is
+       a property of a Catapult run, not of the program.
+   * - L3
+     - semantic mismatch
+     - **SystemC csim cycles are the handshakes'**: 2 for any one-kernel unit,
+       +2 per kernel/FIFO hop, unchanged by ``s.pipeline``. csim cannot check
+       latency; the harness now says ``latency=unchecked`` rather than echo
+       the RTL's value.
+   * - L4
+     - missing abstraction (Allo) / match (Catapult)
+     - **Catapult can honour and refuse a latency exactly** (I/O cycle
+       constraint: measured = declared for L = 1, 2, 3, 6; schedule failure
+       when infeasible). Allo cannot emit it: done here by hand-patching
+       ``run.tcl``. The I/O op names (``v12.Push()``, ``v10.Pop()``) are the
+       emitter's own port names, so the emitter can produce them.
+   * - L5
+     - bug (report) / workaround
+     - **"Pipelined II=1" with a rolled inner loop**: Catapult's message is
+       true of the loop's issue and false at the ports (19 cyc/vector;
+       data-dependent 2/18 for bf16). Allo cannot see it. Workaround:
+       ``s.unroll("<nested fn>:<loop>")``; the handle naming (the nested
+       function's name, not the kernel's) is itself undocumented.
+   * - V1
+     - semantic mismatch
+     - **acc24 native: a NaN becomes a zero in SystemC** (2,067 vectors):
+       ``ac_ieee_float<binary32>`` NaN is ``0x7FFFFFFF``, the simulator's
+       ``0x7FC00000``; a bitcast exposes the difference and the rounding
+       workaround turns it into ``-0``/``+0``. Same class as the pilot's bf16
+       NaN finding, worse effect (a NaN stops being a NaN).
+   * - V2
+     - workaround
+     - **acc24 has no Allo type**: ``uint32`` bit patterns throughout; the
+       float path double-rounds on 113 / 352,116 vectors (README divergence
+       5, measured again). ``bits``/``staged`` are bit-exact.
+   * - V3
+     - bug (core, known)
+     - B1 again: every unsigned compare whose top bit can be set in
+       ``mxu_acc24_add_pipe`` needed a spare bit (5 sites). Not fixed on this
+       branch.
+   * - H1
+     - harness
+     - ``check.py`` printed the RTL's latency on Allo verdicts (fixed);
+       ``rtl.py``'s ``stream`` driver stalls on a non-flushing pipeline if fed
+       fewer vectors than the loop's trip count (drive the full stimulus).
+
+Proposal: a declared latency on a unit
+======================================
+
+Not implemented; for the owner's review. The measurements above are what it
+rests on.
+
+**What is declared.** A *timing contract* on a kernel (or a ``@df.unit``),
+next to its function::
+
+   @df.kernel(mapping=[1], args=[A, B, C], latency=3, ii=1)
+   def add(...): ...
+
+   # or, as a schedule primitive on the loop that streams the unit:
+   s.latency("add_0:i", 3, ii=1)
+
+meaning: *with every port ready, the outputs of iteration k leave exactly L
+edges after the last input of iteration k is accepted, and a new iteration
+starts every ii cycles* -- MiniTPU's count, measured under no stall, with
+latency at the kernel's own ports (not including region FIFOs). Exact, not a
+bound: a bound (Vitis ``latency max=``) cannot hold a cycle-locked consumer to
+it, and MiniTPU's PE skew (``row * MXU_PE_LATENCY``) is built on exact
+values. A unit may declare it once; the schedule form exists so an
+architecture can override it per instance.
+
+**How each backend honours or refuses it** (D-1: refuse, never drop):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 82
+
+   * - backend
+     - behaviour
+   * - Allo simulator
+     - Untimed; the contract is not part of the function. Accept, and record
+       ``latency: untimed`` in the build's manifest so a verdict cannot claim
+       it (as ``check.py`` now does). Refusing would make every timed unit
+       unsimulatable, and the simulator already ignores ``s.pipeline`` the
+       same way. *Not* emulated with an L-deep delay line: that is an
+       iteration shift (L1).
+   * - SystemC csim
+     - Two options, owner's call: (a) refuse to *report* a latency, as now;
+       (b) emit a csim-only ``AlloDelay<T, L>`` shift register (valid-tagged)
+       on each output port under ``#ifndef __SYNTHESIS__`` and subtract the
+       measured handshake offset (2, L3), so a cycle-locked consumer in csim
+       sees the declared timing. (b) models the contract; it does not check
+       the RTL. Recommended: (a) now, (b) when U3 composes cycle-locked units.
+   * - Catapult (via SystemC)
+     - Honour with what L4 measured: emit, after ``go architect``,
+       ``cycle set {<out>.Push()} -from {<in>.Pop()} -equal L`` for every
+       output/input pair of the kernel, plus ``PIPELINE_INIT_INTERVAL ii`` on
+       the loop (``s.pipeline``'s existing pragma). If Catapult's schedule
+       fails, the build fails with the SCHD message (Catapult already refuses;
+       Allo must surface the cause instead of "Failed to synthesize"). Then
+       **check**: the harness measures the RTL latency (``cmp_rtl.py``'s
+       stream stamps) and fails on any difference -- the directive is a
+       request, the RTL is the evidence. Needs the flush stall mode (Catapult
+       track F4) for finite streams, and an unrolled inner loop (L5); a
+       rolled loop inside the body should be refused when ``ii`` is declared,
+       since II=1 is then not true at the ports.
+   * - Vitis HLS
+     - ``#pragma HLS latency min=L max=L`` on the loop plus ``pipeline II``,
+       and read back the csynth report's iteration latency; refuse if it
+       differs. Its latency counts the loop body, not the ports (cf. L4's loop
+       form), so the mapping must be measured on Vitis cosim before it is
+       trusted. Untested here.
+   * - RTLGen, AMC
+     - No latency directive known in either. **Refuse** with a message naming
+       the unit, until they grow one; never emit and hope.
+   * - Combinational (L = 0)
+     - Refused by every backend today (pilot finding 4: no clockless unit).
+       Kept separate: L = 0 is a different port shape (``comb``), not a
+       latency value.
+
+**Where it is checked.** Only on RTL: the differential harness already
+measures latency from ``valid_o`` (MiniTPU) and from the stream stamps
+(Catapult). The verdict line becomes ``UNIT-MATCH ... latency=3/3`` (measured
+/ declared) for an RTL backend, and ``latency=untimed`` / ``unchecked`` for
+the simulator and csim -- so "bit-exact and at its declared latency" is a
+claim only an RTL column can make, and the matrix says which.
+
+**What it costs.** The declaration is one attribute; the Catapult emission is
+two TCL lines per port pair, with op names the emitter already owns. The
+work is in the refusals (RTLGen, AMC, a rolled inner loop, an infeasible L)
+and in reading Catapult's failure back into Allo.

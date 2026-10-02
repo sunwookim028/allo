@@ -27,6 +27,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 from examples.minitpu.harness import rtl, stimulus  # noqa: E402
 
 BACKENDS = ("simulator", "systemc")
+# What each backend can say about the unit's latency (values are checked here;
+# latency on the Allo side only on RTL Allo produced, the Catapult track).
+LATENCY_SEEN = {"simulator": "untimed", "systemc": "unchecked"}
 
 
 def build(unit_mod, variant, backend, n, project):
@@ -95,7 +98,11 @@ def main(argv=None):
                 continue
             k = int((got != want).sum())
             tag = "UNIT-MATCH" if k == 0 else "UNIT-DIFF "
-            print(f"{tag} {args.unit} {variant} {backend} {n - k}/{n} latency={u.RTL.latency} "
+            # The Allo side's latency is NOT measured here: the simulator is
+            # untimed, and SystemC csim's cycles are the handshakes', not the
+            # unit's (u1_pipe_2026-10-02.rst). Say so rather than echo the RTL's.
+            print(f"{tag} {args.unit} {variant} {backend} {n - k}/{n} "
+                  f"latency={LATENCY_SEEN[backend]} (rtl {u.RTL.latency}) "
                   f"(build {tb:.1f}s, run {time.time() - t - tb:.1f}s)", flush=True)
             if k:
                 bad_any = True

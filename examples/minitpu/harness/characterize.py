@@ -14,7 +14,7 @@ For each unit, on the unit's own stimulus:
   the unit's ``IEEE`` reference differ, grouped by the unit's
   ``DEVIATIONS`` rules. ``unexplained`` must be empty.
 
-Needs Verilator, not Allo.
+Needs Verilator; a unit file with Allo variants also imports Allo.
 """
 
 import argparse
