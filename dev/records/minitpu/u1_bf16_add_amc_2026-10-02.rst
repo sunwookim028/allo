@@ -21,7 +21,7 @@ U1 pilot ``vpu_bf16_add`` through AMC
         side), then run each script under ``scl enable gcc-toolset-13 --``.
         Point ``TMPDIR`` at a local disk: on NFS, the second ``AMCModule``
         call fails in ``shutil.rmtree(obj_dir)`` (``Directory not empty``,
-        because of ``.nfs`` files). ``results.txt`` holds the raw result lines.
+        because of ``.nfs`` files). ``u1_bf16_add_amc/RESULTS`` holds the raw result lines.
 
 Matrix cell (README D-9)
 ------------------------
