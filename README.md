@@ -180,8 +180,8 @@ The table says where each flow runs; the second column is this host (ace-01).
 | Allo dataflow simulator | yes | | functional only; one OS thread per kernel; no math dialect yet |
 | Vitis HLS csynth + cosim | yes | | every published cycle count; Vitis csim is not used (it hangs on misordered processes) |
 | SystemC emit | yes | | TinyTPU and EVA emit; schedule directives are dropped |
-| SystemC csim, functional stand-in (`scripts/systemc-csim-setup.sh`, pinned open-source libraries) | yes | | TinyTPU and EVA simulate correctly; not yet compared against Catapult's own csim; no synthesis, no cycles |
-| Catapult csim / csyn / cosim / PPA (the SystemC flow's real target) | no | zhang-21 | EVA verified in RTL cosim (choonsik1); a small design synthesized; `ppa_tinytpu` failed in `go analyze`; TinyTPU's SystemC never synthesized |
+| SystemC csim, functional stand-in (`scripts/systemc-csim-setup.sh`, pinned to Catapult 2024.2's library versions) | yes | | TinyTPU and EVA results identical to Catapult's own csim libraries (zhang-21, 2026-10-02); no synthesis, no cycles |
+| Catapult csim / csyn / cosim / PPA (the SystemC flow's real target) | no | zhang-21 | EVA verified in RTL cosim (choonsik1). **TinyTPU's SystemC synthesizes through `go extract`**, 0 errors, 332 s (2026-10-02): area score 320,032 (75% registers), slack -0.072 ns at 2.0 ns, and a 10.7M-cycle reset from array-clearing loops. Not yet simulated as RTL. `dev/records/catapult_handoff/zhang21_compare_2026-10-02/` |
 | Vivado (incl. Zynq UltraScale+) | yes | | not yet used |
 | Verilator 5.051 | yes | | not yet used |
 | Design Compiler + mflowgen (FreePDK45) | no | zhang-21 | TinyTPU and Gemmini area, measured |

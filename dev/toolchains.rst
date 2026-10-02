@@ -209,7 +209,11 @@ Catapult's 10.3.0. It is a functional pre-check and nothing more:
 
 - nothing in it synthesizes, schedules or produces RTL;
 
-Comparing it once against Catapult's own csim on zhang-21 is still to be done.
+On zhang-21 on 2026-10-02, Catapult's own csim libraries gave results identical
+to the stand-in's for TinyTPU and EVA
+(``dev/records/catapult_handoff/zhang21_compare_2026-10-02/``). There, csim must
+use Catapult's g++ 10.3.0, which ``module load catapult-2024`` puts first on
+``PATH``. The system g++ 8.5 fails to link (``GLIBCXX_3.4.26``).
 On 2026-10-01, TinyTPU (three ``stress_isa`` cases) and EVA
 (``cosim_eva_systemc.py``) gave the same results on it as on the unpinned
 probe.
