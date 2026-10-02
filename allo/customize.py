@@ -344,9 +344,14 @@ class Schedule:
         i32 = IntegerType.get_signless(32)
         ui32 = IntegerType.get_unsigned(32)
 
+        global_symbols = set()
         for buf in buffers_to_partition:
             buf_key = f"{buf.func}:{buf.name}"
             func, _, mlir_target = find_buffer(self.module, buf, self.func_args)
+            if isinstance(mlir_target, memref_d.GetGlobalOp):
+                # a `@ Stateful` array: the memref.global it reads must take
+                # the same layout as the get_global result the pass rewrites
+                global_symbols.add(mlir_target.name.value)
 
             # Record partition info
             if buf_key not in self.partitioned_arrays:
@@ -373,7 +378,9 @@ class Schedule:
             )
 
         # Update global memory references
-        self._update_global_types(buffers_to_partition, partition_type_int, dim, factor)
+        self._update_global_types(
+            buffers_to_partition, partition_type_int, dim, factor, global_symbols
+        )
 
     def _propagate_return_type_to_callers(
         self, func, mlir_target, partition_type, dim, factor
@@ -669,9 +676,11 @@ class Schedule:
                 callee_func.attributes["function_type"] = TypeAttr.get(new_func_type)
                 break
 
-    def _update_global_types(self, buffers, partition_type, dim, factor):
+    def _update_global_types(
+        self, buffers, partition_type, dim, factor, global_symbols=()
+    ):
         """Update global memory reference types."""
-        buffer_names = {buf.name for buf in buffers}
+        buffer_names = {buf.name for buf in buffers} | set(global_symbols)
 
         for op in self.module.body.operations:
             if isinstance(op, memref_d.GlobalOp):

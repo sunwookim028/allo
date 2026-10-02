@@ -132,8 +132,17 @@ def find_buffer(module, target, func_args):
             ):
                 return target_func, -1, op
 
-            # Check for GetGlobalOp
-            if isinstance(op, memref_d.GetGlobalOp) and op.name.value == target_name:
+            # Check for GetGlobalOp: a module-level global by its symbol, or a
+            # `@ Stateful` variable by the name the builder tagged it with
+            # (its symbol is `__stateful_<func>_<name>_<n>`)
+            if isinstance(op, memref_d.GetGlobalOp) and (
+                op.name.value == target_name
+                or (
+                    "stateful_name" in op.attributes
+                    and StringAttr(op.attributes["stateful_name"]).value
+                    == target_name
+                )
+            ):
                 return target_func, -1, op
 
             # Recursively search nested operations
@@ -157,12 +166,11 @@ def find_buffer(module, target, func_args):
                 result = search_operations_recursive(op.then_block.operations)
                 if result is not None:
                     return result
-                try:
+                # an `if` without an `else` has no else block (None)
+                if op.else_block is not None:
                     result = search_operations_recursive(op.else_block.operations)
                     if result is not None:
                         return result
-                except IndexError:
-                    pass
         return None
 
     # Find inner intermediate buffers recursively

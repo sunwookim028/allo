@@ -566,7 +566,11 @@ class ASTTransformer(ASTBuilder):
         cast_map = {
             # Index <-> UInt/Int
             (Int, Index): arith_d.IndexCastOp,
-            (UInt, Index): arith_d.IndexCastOp,
+            # A UInt index must be zero-extended: arith.index_cast sign-extends
+            # (uint8 200 -> index -56), index_castui does not. (Index, UInt)
+            # stays index_cast: a 64-bit index into a <= 64-bit UInt truncates
+            # identically either way.
+            (UInt, Index): arith_d.IndexCastUIOp,
             (Index, Int): arith_d.IndexCastOp,
             (Index, UInt): arith_d.IndexCastOp,
             # UInt/Int <-> Float
@@ -604,7 +608,7 @@ class ASTTransformer(ASTBuilder):
                 IntegerType.get_signless(32), op_result, ip=ctx.get_ip()
             )
             op_result = op.result
-            opcls = arith_d.IndexCastOp  # proceed to build cast to index
+            opcls = arith_d.IndexCastUIOp  # the ui32 above is unsigned
         elif isinstance(src_type, Index) and isinstance(res_type, Float):
             op = arith_d.IndexCastOp(
                 IntegerType.get_signless(32), op_result, ip=ctx.get_ip()
@@ -1064,14 +1068,21 @@ class ASTTransformer(ASTBuilder):
                 rhs,
                 (
                     allo_d.StreamConstructOp,
-                    allo_d.StreamGetOp,
                     allo_d.WireConstructOp,
-                    allo_d.WireGetOp,
                     allo_d.ChannelConstructOp,
-                    allo_d.ChannelGetOp,
                 ),
             ):
                 pass
+            elif isinstance(
+                rhs, (allo_d.StreamGetOp, allo_d.WireGetOp, allo_d.ChannelGetOp)
+            ):
+                # A scalar get yields the link's element type; `x: int32 =
+                # s.get()` on a Stream[UInt(5)] must widen it, or the store
+                # of an i5 into an i32 memref fails verification.
+                if len(value.shape) == 0 and len(target.shape) == 0:
+                    rhs = ASTTransformer.build_cast_op(
+                        ctx, rhs, value.dtype, target.dtype
+                    )
             else:
                 # dtype cast & broadcast
                 # for some OpView (e.g., linalg.transpose), op.result return a OpResultList
@@ -1984,6 +1995,11 @@ class ASTTransformer(ASTBuilder):
                 memref_type,
                 FlatSymbolRefAttr.get(global_name),
                 ip=ctx.get_ip(),
+            )
+            # the variable's name, so `s.partition("k:mem")` finds it (`name`
+            # is the symbol attribute of memref.get_global itself)
+            get_global_op.attributes["stateful_name"] = StringAttr.get(
+                node.target.id
             )
 
             # Store in context
