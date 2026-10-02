@@ -309,3 +309,9 @@ one design per bug (it skips without ``MGC_HOME`` and ``SYSTEMC_HOME``).
   tagged user at all, so both emitted as signed ``ac_int`` and could not bind to
   the unsigned read port. A function argument's sign is now read from the
   function's ``itypes``, as the HLS emitters do.
+- **A nested function returning ``UInt`` did not compile** (S2, same record).
+  The callee's signature took its result's sign from its ``otypes``
+  (``f(..., ac_int<5,false>*)``) but the call site declared the result buffer
+  from the signless call result (``ac_int<5,true>``), and the pointer did not
+  convert. The call site now reads the callee's ``otypes`` too. The fix is in
+  the shared ``VhlsModuleEmitter::emitCall``, so Vitis and Catapult C++ get it.
