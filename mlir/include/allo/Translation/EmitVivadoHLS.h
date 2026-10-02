@@ -87,6 +87,10 @@ protected:
 
   /// MLIR component and HLS C++ pragma emitters.
   void emitBlock(Block &block) override;
+  /// Hook consulted by emitBlock for every top-level op of a block: true skips
+  /// the op. The SystemC emitter uses it to split one kernel body between a
+  /// clocked thread and a combinational SC_METHOD (README D-13).
+  virtual bool skipOp(Operation *op) { return false; }
   void emitLoopDirectives(Operation *op) override;
   void emitArrayDirectives(Value memref) override;
   void emitFunctionDirectives(func::FuncOp func, ArrayRef<Value> portList) override;

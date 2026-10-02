@@ -358,6 +358,33 @@ private:
   void emitChannelPut(allo::ChannelPutOp op) override;
   void emitWireGet(allo::WireGetOp op) override;
   void emitWirePut(allo::WirePutOp op) override;
+
+  // README D-13: a kernel's declared combinational outputs (`Wire[T, comb]`).
+  // Each such port's cone becomes an SC_METHOD over SIGNAL storage; the clocked
+  // thread keeps the stores, the other ports and its wait(). The plan is built
+  // by planComb (which refuses what the method cannot be: a stream read, a store
+  // of the same iteration, anything clocked) and consumed by emitKernelModule and
+  // the load/store overrides through `combMode`.
+  struct CombPlan {
+    SmallVector<Value, 4> outPorts;         // comb sc_out args, in arg order
+    SmallVector<Operation *, 32> coneOps;   // every op the SC_METHOD emits, in program order
+    llvm::DenseSet<Operation *> coneSet;
+    llvm::DenseSet<Operation *> threadDead; // cone ops the thread no longer needs (the puts + DCE)
+    SmallVector<Value, 4> sensInputs;       // wire input args the cones read
+    SmallVector<Value, 4> storageAllocs;    // kernel-local arrays read by a cone -> sc_signal members
+    llvm::SmallVector<std::string, 4> storageGlobals; // @ Stateful globals read by a cone
+    Block *body = nullptr;                  // the iteration block the cones live in
+  };
+  CombPlan comb;
+  enum class CombMode { Normal, Thread, Method } combMode = CombMode::Normal;
+  bool planComb(func::FuncOp func);
+  bool isCombStorage(Value memref);
+  bool isCombStorageGlobal(memref::GlobalOp g);
+  bool skipOp(Operation *op) override;
+  void emitCombStorageLoad(Value result, bool isUnsigned, Value memref,
+                           llvm::function_ref<void()> emitIdx);
+  void emitCombStorageStore(Value memref, Value value,
+                            llvm::function_ref<void()> emitIdx);
   // Non-blocking: try_get/try_put -> Connections .PopNB()/.PushNB() (fire-on-valid).
   // empty()/full() read a synchronous sideband signal, NOT In::Empty()/Out::Full() (which
   // track the port handshake, not the FIFO's logical occupancy) -- see emitStreamEmpty.
@@ -1261,6 +1288,13 @@ void SystemCModuleEmitter::emitMemPortStore(Value memref, Value value,
 
 // memref.load: mem-port arg -> req/rsp; local %alloc array -> base emitter.
 void SystemCModuleEmitter::emitLoad(memref::LoadOp op) {  // override (base emitter)
+  if (isCombStorage(op.getMemRef())) {
+    auto mt = llvm::cast<MemRefType>(op.getMemRef().getType());
+    emitCombStorageLoad(op.getResult(), op->hasAttr("unsigned"), op.getMemRef(),
+                        [&]() { emitFlatIndexMemref(op.getIndices(), mt.getShape()); });
+    emitInfoAndNewLine(op);
+    return;
+  }
   if (char d = memPortArgDir(op.getMemRef()); d == 'i' || d == 'b') {
     auto mt = llvm::cast<MemRefType>(op.getMemRef().getType());
     emitMemPortLoad(op.getMemRef(), op.getResult(), op->hasAttr("unsigned"),
@@ -1273,6 +1307,13 @@ void SystemCModuleEmitter::emitLoad(memref::LoadOp op) {  // override (base emit
 
 // memref.store: mem-port arg -> req; local %alloc array -> base emitter.
 void SystemCModuleEmitter::emitStore(memref::StoreOp op) {  // override (base emitter)
+  if (isCombStorage(op.getMemRef())) {
+    auto mt = llvm::cast<MemRefType>(op.getMemRef().getType());
+    emitCombStorageStore(op.getMemRef(), op.getValueToStore(),
+                         [&]() { emitFlatIndexMemref(op.getIndices(), mt.getShape()); });
+    emitInfoAndNewLine(op);
+    return;
+  }
   if (char d = memPortArgDir(op.getMemRef()); d == 'o' || d == 'b') {
     auto mt = llvm::cast<MemRefType>(op.getMemRef().getType());
     emitMemPortStore(op.getMemRef(), op.getValueToStore(),
@@ -1495,6 +1536,12 @@ void SystemCModuleEmitter::emitSetSlice(allo::SetIntSliceOp op) {  // override (
 
 // Sequential-stream read:  <result> = <port>.Pop();   (index ignored — in order)
 void SystemCModuleEmitter::emitAffineLoad(affine::AffineLoadOp op) {  // override (base emitter)
+  if (isCombStorage(op.getMemRef())) {
+    emitCombStorageLoad(op.getResult(), op->hasAttr("unsigned"), op.getMemRef(),
+                        [&]() { emitFlatIndex(op); });
+    emitInfoAndNewLine(op);
+    return;
+  }
   // Random-access INPUT ('i') or read+write ('b') memory port: LOAD via the read pins.
   if (char d = memPortArgDir(op.getMemRef()); d == 'i' || d == 'b') {
     emitMemPortLoad(op.getMemRef(), op.getResult(), op->hasAttr("unsigned"),
@@ -1518,6 +1565,12 @@ void SystemCModuleEmitter::emitAffineLoad(affine::AffineLoadOp op) {  // overrid
 
 // Sequential-stream write:  <port>.Push(<value>);   (index ignored — in order)
 void SystemCModuleEmitter::emitAffineStore(affine::AffineStoreOp op) {  // override (base emitter)
+  if (isCombStorage(op.getMemRef())) {
+    emitCombStorageStore(op.getMemRef(), op.getValueToStore(),
+                         [&]() { emitFlatIndex(op); });
+    emitInfoAndNewLine(op);
+    return;
+  }
   // Random-access OUTPUT ('o') or read+write ('b') memory port: STORE via the write
   // pins (no response; the memory applies it).
   if (char d = memPortArgDir(op.getMemRef()); d == 'o' || d == 'b') {
@@ -1545,8 +1598,389 @@ void SystemCModuleEmitter::emitAffineStore(affine::AffineStoreOp op) {  // overr
 // fwd decl (defined near emitStreamEmpty): does func query empty()/full() on arg?
 static bool streamArgQueried(func::FuncOp func, unsigned argIdx, bool wantEmpty);
 
+//===----------------------------------------------------------------------===//
+// Declared combinational outputs (README D-13, `Wire[T, comb]`)
+//
+// Measured first by hand (dev/records/minitpu/u2_comb_read_2026-10-02.rst, form
+// e): Catapult builds a clockless read block from an SC_METHOD that is sensitive
+// to the kernel's wire inputs and to an array of sc_signal, beside the clocked
+// thread that writes that array. The shape has three parts, generalised here:
+//
+//  1. STORAGE a cone reads becomes `sc_signal<T> name[N]` (a module member),
+//     written in the reset action (Catapult CIN-233 refuses a signal the reset
+//     action does not set; CIN-197 refuses a plain member array feeding a
+//     combinational process). Loads become .read(), stores .write().
+//  2. ONE SC_METHOD per kernel (`comb`) holds every comb port's cone -- the
+//     put, and backwards from its value: wire_get of an input, loads of
+//     storage, loads of iteration temporaries (`a: int32 = ...`) together with
+//     the store that reaches them, and pure arithmetic. The thread drops the
+//     puts and whatever only they needed.
+//  3. THE RULE: the cone may read storage only before any store to it in the
+//     iteration (program order), and may contain no stream or channel op, no
+//     control flow, nothing defined outside the iteration (loop-carried or
+//     induction-variable state), no memory port. Anything else is refused,
+//     naming the port: a form that silently fell back to the thread would move
+//     the port's latency, which D-1 forbids.
+//
+// The storage reset is the recorded deviation of this backend (F3 of the
+// record, and of u2_comb_wire_impl_2026-10-02.rst): MiniTPU's register file is
+// never reset; Catapult will not synthesise unreset signal storage written by
+// a thread.
+//===----------------------------------------------------------------------===//
+
+bool SystemCModuleEmitter::isCombStorageGlobal(memref::GlobalOp g) {  // new (SystemC-only)
+  return llvm::is_contained(comb.storageGlobals, g.getSymName().str());
+}
+
+bool SystemCModuleEmitter::isCombStorage(Value memref) {  // new (SystemC-only)
+  if (comb.outPorts.empty())
+    return false;
+  if (llvm::is_contained(comb.storageAllocs, memref))
+    return true;
+  if (auto gg = memref.getDefiningOp<memref::GetGlobalOp>())
+    return llvm::is_contained(comb.storageGlobals, gg.getName().str());
+  return false;
+}
+
+bool SystemCModuleEmitter::skipOp(Operation *op) {  // override (base emitter)
+  switch (combMode) {
+  case CombMode::Normal:
+    return false;
+  case CombMode::Thread:
+    return comb.threadDead.count(op) > 0;
+  case CombMode::Method:
+    return comb.coneSet.count(op) == 0;
+  }
+  return false;
+}
+
+// <result> = <storage>[<flat index>].read();
+void SystemCModuleEmitter::emitCombStorageLoad(Value result, bool isUnsigned, Value memref,
+                                               llvm::function_ref<void()> emitIdx) {  // new (SystemC-only)
+  fixUnsignedType(result, isUnsigned);
+  indent();
+  emitValue(result);
+  os << " = " << getName(memref) << "[";
+  if (llvm::cast<MemRefType>(memref.getType()).getRank() == 0)
+    os << "0"; // a scalar: one-element signal array
+  else
+    emitIdx();
+  os << "].read();";
+}
+
+// <storage>[<flat index>].write(<value>);
+void SystemCModuleEmitter::emitCombStorageStore(Value memref, Value value,
+                                                llvm::function_ref<void()> emitIdx) {  // new (SystemC-only)
+  indent();
+  os << getName(memref) << "[";
+  if (llvm::cast<MemRefType>(memref.getType()).getRank() == 0)
+    os << "0";
+  else
+    emitIdx();
+  os << "].write(";
+  emitValue(value);
+  os << ");";
+}
+
+static Value combStoreTarget(Operation *o) {
+  if (auto st = llvm::dyn_cast<memref::StoreOp>(o))
+    return st.getMemRef();
+  if (auto st = llvm::dyn_cast<affine::AffineStoreOp>(o))
+    return st.getMemRef();
+  return Value();
+}
+static Value combLoadTarget(Operation *o) {
+  if (auto ld = llvm::dyn_cast<memref::LoadOp>(o))
+    return ld.getMemRef();
+  if (auto ld = llvm::dyn_cast<affine::AffineLoadOp>(o))
+    return ld.getMemRef();
+  return Value();
+}
+// The user-facing name of an array (its `name` attr or global symbol).
+static std::string combArrayName(Value m) {
+  if (auto *d = m.getDefiningOp()) {
+    if (auto n = d->getAttrOfType<StringAttr>("name"))
+      return n.getValue().str();
+    if (auto gg = llvm::dyn_cast<memref::GetGlobalOp>(d))
+      return gg.getName().str();
+  }
+  return "an array";
+}
+// The user-facing name of a wire/stream port: its construct's `name` at the
+// region, found through the call that binds it; else the argument position.
+static std::string combPortName(func::FuncOp func, Value v) {
+  auto ba = llvm::dyn_cast<BlockArgument>(v);
+  if (!ba)
+    return "a value";
+  auto mod = func->getParentOfType<ModuleOp>();
+  std::string found;
+  mod.walk([&](func::CallOp call) {
+    if (!found.empty() || call.getCallee() != func.getName() ||
+        ba.getArgNumber() >= call.getNumOperands())
+      return;
+    if (auto *d = call.getOperand(ba.getArgNumber()).getDefiningOp())
+      if (auto n = d->getAttrOfType<StringAttr>("name"))
+        found = n.getValue().str();
+  });
+  if (!found.empty())
+    return "`" + found + "`";
+  return "argument " + std::to_string(ba.getArgNumber());
+}
+
+// Build `comb` for this kernel. Returns false (after emitting the error, which
+// names the port) when a comb port's cone cannot be a combinational process.
+bool SystemCModuleEmitter::planComb(func::FuncOp func) {  // new (SystemC-only)
+  comb = CombPlan();
+  for (auto arg : llvm::enumerate(func.getArguments())) {
+    auto wt = llvm::dyn_cast<WireType>(arg.value().getType());
+    if (wt && wt.getComb() && streamDir(func, arg.index()) == 'o')
+      comb.outPorts.push_back(arg.value());
+  }
+  if (comb.outPorts.empty())
+    return true;
+  Block &entry = func.front();
+  // Is `b` the iteration block: the entry block, or the body of a kernel-level loop?
+  auto isIterationBlock = [&](Block *b) {
+    if (b == &entry)
+      return true;
+    auto fo = llvm::dyn_cast_or_null<affine::AffineForOp>(b->getParentOp());
+    return fo && fo->getBlock() == &entry;
+  };
+  // The first store to `m` before `pos` among the top-level ops of `b`, nested
+  // regions included; null if none.
+  auto storedBefore = [&](Value m, Operation *pos, Block *b) -> Operation * {
+    Operation *hit = nullptr;
+    for (auto &o : *b) {
+      if (&o == pos)
+        break;
+      o.walk([&](Operation *w) {
+        if (!hit && combStoreTarget(w) == m)
+          hit = w;
+      });
+      if (hit)
+        break;
+    }
+    return hit;
+  };
+  auto refuse = [&](Operation *at, const std::string &pn, const std::string &why) {
+    at->emitError("comb port ") << pn << " (" << func.getName() << "): " << why;
+    return false;
+  };
+
+  for (Value port : comb.outPorts) {
+    std::string pn = combPortName(func, port);
+    // Exactly one put, at the top level of the iteration block.
+    SmallVector<WirePutOp, 2> puts;
+    func.walk([&](WirePutOp p) {
+      if (p->getOperand(0) == port)
+        puts.push_back(p);
+    });
+    if (puts.size() != 1)
+      return refuse(func, pn, "a combinational output needs exactly one put per "
+                    "iteration, found " + std::to_string(puts.size()));
+    WirePutOp put = puts.front();
+    Block *b = put->getBlock();
+    if (!isIterationBlock(b))
+      return refuse(put, pn, "the put is under control flow (a condition or an inner "
+                    "loop); a combinational output must be driven unconditionally "
+                    "every iteration");
+    if (comb.body && comb.body != b)
+      return refuse(put, pn, "its put is in a different loop from another comb port's");
+    comb.body = b;
+    // Backward cone of the put's value.
+    SmallVector<Value, 16> work;
+    comb.coneSet.insert(put);
+    work.push_back(put->getOperand(1));
+    while (!work.empty()) {
+      Value v = work.pop_back_val();
+      if (auto ba = llvm::dyn_cast<BlockArgument>(v)) {
+        if (ba.getOwner() != &entry)
+          return refuse(put, pn, "its value depends on the loop induction variable, "
+                        "which is clocked state");
+        auto wt = llvm::dyn_cast<WireType>(ba.getType());
+        if (!wt || streamDir(func, ba.getArgNumber()) != 'i')
+          return refuse(put, pn, "its value reads " + combPortName(func, ba) +
+                        ", which is a stream, channel or memory port; a combinational "
+                        "output may read only Wire inputs and storage");
+        if (!llvm::is_contained(comb.sensInputs, ba))
+          comb.sensInputs.push_back(ba);
+        continue;
+      }
+      Operation *d = v.getDefiningOp();
+      if (llvm::isa<arith::ConstantOp>(d))
+        continue; // printed as a literal by getName; nothing to emit
+      if (comb.coneSet.count(d))
+        continue;
+      if (d->getBlock() != b)
+        return refuse(put, pn, "its value reads something computed outside the "
+                      "iteration (loop-carried or clocked state), which a combinational "
+                      "output cannot see");
+      if (llvm::isa<StreamGetOp, StreamTryGetOp, ChannelGetOp, ChannelTryGetOp,
+                    StreamPutOp, StreamTryPutOp, ChannelPutOp, ChannelTryPutOp>(d))
+        return refuse(put, pn, "its value reads a stream or channel; a combinational "
+                      "output may read only Wire inputs and storage");
+      if (d->getNumRegions() != 0)
+        return refuse(put, pn, "its value comes out of control flow (an if or a loop); "
+                      "the cone must be straight-line");
+      if (auto wg = llvm::dyn_cast<WireGetOp>(d)) {
+        comb.coneSet.insert(d);
+        work.push_back(wg->getOperand(0));
+        continue;
+      }
+      if (Value m = combLoadTarget(d)) {
+        if (llvm::isa<BlockArgument>(m))
+          return refuse(put, pn, "its value reads memory port " + combPortName(func, m) +
+                        "; a combinational output may read only Wire inputs and storage");
+        Operation *dm = m.getDefiningOp();
+        auto alloc = llvm::dyn_cast<memref::AllocOp>(dm);
+        auto gg = llvm::dyn_cast<memref::GetGlobalOp>(dm);
+        if (alloc && alloc->getBlock() == b) {
+          // An iteration temporary: the reaching store joins the cone.
+          if (llvm::cast<MemRefType>(m.getType()).getRank() != 0)
+            return refuse(put, pn, "its value reads " + combArrayName(m) + ", an array "
+                          "written inside the iteration; only scalar temporaries are "
+                          "followed through");
+          Operation *reaching = nullptr;
+          bool conditional = false;
+          for (auto &o : *b) {
+            if (&o == d)
+              break;
+            if (combStoreTarget(&o) == m)
+              reaching = &o;
+            else if (o.getNumRegions())
+              o.walk([&](Operation *w) {
+                if (combStoreTarget(w) == m)
+                  conditional = true;
+              });
+          }
+          if (conditional)
+            return refuse(put, pn, "its value reads temporary " + combArrayName(m) +
+                          ", which is written under a condition in the iteration");
+          if (!reaching)
+            return refuse(put, pn, "its value reads temporary " + combArrayName(m) +
+                          " before it is written in the iteration");
+          comb.coneSet.insert(d);
+          comb.coneSet.insert(reaching);
+          comb.coneSet.insert(alloc);
+          if (auto st = llvm::dyn_cast<memref::StoreOp>(reaching))
+            work.push_back(st.getValueToStore());
+          else
+            work.push_back(llvm::cast<affine::AffineStoreOp>(reaching).getValueToStore());
+          continue;
+        }
+        if (gg) {
+          auto g = gg->getParentOfType<ModuleOp>().lookupSymbol<memref::GlobalOp>(gg.getName());
+          if (!g || !isStatefulGlobal(g) || g->hasAttr("constant"))
+            return refuse(put, pn, "its value reads constant array " + combArrayName(m) +
+                          "; a comb cone reads Wire inputs, kernel-local storage and "
+                          "@ Stateful storage");
+        } else if (!alloc) {
+          return refuse(put, pn, "its value reads " + combArrayName(m) + " through a view; "
+                        "only a whole kernel-local or @ Stateful array can be comb storage");
+        }
+        // Storage: readable only before any store to it in the iteration.
+        if (storedBefore(m, d, b))
+          return refuse(put, pn, "its value reads " + combArrayName(m) + " after a store "
+                        "to it in the same iteration; a combinational output sees only "
+                        "the state loaded before the iteration's stores (README D-13). "
+                        "Read first, then store");
+        if (gg) {
+          if (!llvm::is_contained(comb.storageGlobals, gg.getName().str()))
+            comb.storageGlobals.push_back(gg.getName().str());
+        } else if (!llvm::is_contained(comb.storageAllocs, m)) {
+          comb.storageAllocs.push_back(m);
+        }
+        comb.coneSet.insert(d);
+        for (auto idx : d->getOperands())
+          if (idx != m)
+            work.push_back(idx);
+        continue;
+      }
+      if (combStoreTarget(d) || llvm::isa<memref::AllocOp, memref::GetGlobalOp>(d))
+        return refuse(put, pn, "its value depends on a memory operation the cone cannot "
+                      "follow");
+      // Pure computation (arith, casts, bit ops, affine.apply, select, ...).
+      comb.coneSet.insert(d);
+      for (auto o : d->getOperands())
+        work.push_back(o);
+    }
+  }
+  // The thread's own reads of comb storage must come before its stores as well:
+  // a signal written this iteration still reads the old value until the next
+  // delta, so a read-after-write body would silently see stale data.
+  {
+    bool bad = false;
+    Operation *badAt = nullptr;
+    Value badMem;
+    llvm::SmallPtrSet<Value, 4> written;
+    comb.body->walk<WalkOrder::PreOrder>([&](Operation *w) {
+      if (bad)
+        return;
+      if (Value m = combLoadTarget(w)) {
+        if (isCombStorage(m) && written.count(m)) {
+          bad = true, badAt = w, badMem = m;
+        }
+      } else if (Value m = combStoreTarget(w)) {
+        if (isCombStorage(m))
+          written.insert(m);
+      }
+    });
+    if (bad) {
+      badAt->emitError("comb storage ") << combArrayName(badMem) << " (" << func.getName()
+          << ") is read after a store to it in the same iteration; signal storage "
+             "returns the old value until the next cycle. Read first, then store";
+      return false;
+    }
+  }
+  // Program order of the cone.
+  for (auto &o : *comb.body)
+    if (comb.coneSet.count(&o))
+      comb.coneOps.push_back(&o);
+  // Thread-side dead code: the puts leave, then whatever only they consumed.
+  for (Operation *o : comb.coneOps)
+    if (llvm::isa<WirePutOp>(o))
+      comb.threadDead.insert(o);
+  auto allUsersDead = [&](Value v) {
+    for (auto *u : v.getUsers())
+      if (!comb.threadDead.count(u))
+        return false;
+    return true;
+  };
+  bool changed = true;
+  while (changed) {
+    changed = false;
+    for (auto it = comb.coneOps.rbegin(); it != comb.coneOps.rend(); ++it) {
+      Operation *o = *it;
+      if (comb.threadDead.count(o))
+        continue;
+      bool dead = true;
+      if (Value m = combStoreTarget(o)) {
+        // dead when no live load of the temporary remains
+        for (auto *u : m.getUsers())
+          if (combLoadTarget(u) == m && !comb.threadDead.count(u))
+            dead = false;
+      } else {
+        for (auto r : o->getResults())
+          if (!allUsersDead(r))
+            dead = false;
+      }
+      if (dead) {
+        comb.threadDead.insert(o);
+        changed = true;
+      }
+    }
+  }
+  return true;
+}
+
 void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (SystemC-only)
   auto name = func.getName();
+  // README D-13: classify the declared combinational outputs first; a refused
+  // cone stops emission here rather than producing a registered port.
+  if (!planComb(func)) {
+    state.encounteredError = true;
+    return;
+  }
   os << "SC_MODULE(" << name << ") {\n";
   addIndent();
 
@@ -1666,10 +2100,13 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
       // OUT wire is tracked separately in wireOutPorts.
       char d = streamDir(func, i);
       std::string pn = std::string(addName(v, /*isPtr=*/false).str());
-      if (d == 'o')
+      // A comb output (D-13) is driven by the SC_METHOD alone: a second driver in
+      // the thread's reset action would be a multiply-driven signal.
+      if (d == 'o' && !llvm::is_contained(comb.outPorts, v))
         wireOutPorts.push_back({pn, "0"});
       os << (d == 'o' ? "sc_out< " : "sc_in< ");
-      os << getStreamPayloadTypeName(wt.getBaseType(), linkPayloadUnsigned(v)) << " > " << pn << ";\n";
+      os << getStreamPayloadTypeName(wt.getBaseType(), linkPayloadUnsigned(v)) << " > " << pn;
+      os << ";" << (llvm::is_contained(comb.outPorts, v) ? "  // comb (D-13): driven by SC_METHOD comb" : "") << "\n";
     } else if (auto mt = llvm::dyn_cast<MemRefType>(v.getType())) {
       char d = argDir(func, i);
       if ((d == 'i' || d == 'o') && isSeqStreamable(v) && !forceMemPort(v)) {
@@ -1768,11 +2205,42 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
     auto at = llvm::cast<ShapedType>(g.getType());
     fixUnsignedType(g, g->hasAttr("unsigned"));
     indent();
+    if (isCombStorageGlobal(g)) {
+      // Read by a comb cone (D-13): signal storage, flattened, shared by the
+      // thread (writes) and the SC_METHOD (reads). Catapult CIN-197 refuses a
+      // plain member here.
+      int64_t total = 1;
+      for (auto &s : at.getShape())
+        total *= s;
+      os << "sc_signal< "
+         << getStreamPayloadTypeName(at.getElementType(), g->hasAttr("unsigned"))
+         << " > " << g.getSymName() << "[" << total << "];  // @ Stateful, comb storage\n";
+      continue;
+    }
     emitStatefulGlobalElementType(at.getElementType());
     os << " " << g.getSymName();
     for (auto &s : at.getShape())
       os << "[" << s << "]";
     os << ";  // @ Stateful\n";
+  }
+  // Kernel-local arrays read by a comb cone (D-13): the same signal storage,
+  // declared here instead of in the thread, zeroed in the reset action.
+  for (Value m : comb.storageAllocs) {
+    auto *alloc = m.getDefiningOp();
+    auto mt = llvm::cast<MemRefType>(m.getType());
+    std::string nm;
+    if (auto n = alloc->getAttrOfType<StringAttr>("name"))
+      nm = n.getValue().str();
+    Value mv = m;
+    fixUnsignedType(mv, alloc->hasAttr("unsigned"));
+    std::string sig = std::string(addName(mv, /*isPtr=*/false, nm).str());
+    int64_t total = 1;
+    for (auto s : mt.getShape())
+      total *= s;
+    indent();
+    os << "sc_signal< "
+       << getStreamPayloadTypeName(mt.getElementType(), alloc->hasAttr("unsigned"))
+       << " > " << sig << "[" << total << "];  // comb storage (D-13)\n";
   }
 
   // Constructor: name the ports + register a clocked, reset-aware thread.
@@ -1785,6 +2253,42 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
   indent(); os << "SC_THREAD(run);\n";
   indent(); os << "sensitive << clk.pos();\n";
   indent(); os << alloResetFn() << "(rst, false);\n";
+  if (!comb.outPorts.empty()) {
+    // The combinational process (D-13): sensitive to the Wire inputs its cones
+    // read and to every element of the storage they read.
+    reserveName("comb");
+    indent(); os << "SC_METHOD(comb);\n";
+    if (!comb.sensInputs.empty()) {
+      indent(); os << "sensitive";
+      for (Value in : comb.sensInputs)
+        os << " << " << getName(in);
+      os << ";\n";
+    }
+    auto sensArray = [&](const std::string &nm, int64_t total) {
+      indent();
+      os << "for (int _ci = 0; _ci < " << total << "; ++_ci) sensitive << " << nm
+         << "[_ci];\n";
+    };
+    for (Value m : comb.storageAllocs) {
+      int64_t total = 1;
+      for (auto s : llvm::cast<MemRefType>(m.getType()).getShape())
+        total *= s;
+      sensArray(std::string(getName(m).str()), total);
+    }
+    for (auto &g : statefulGlobals)
+      if (isCombStorageGlobal(g)) {
+        int64_t total = 1;
+        for (auto s : llvm::cast<ShapedType>(g.getType()).getShape())
+          total *= s;
+        sensArray(g.getSymName().str(), total);
+      }
+    // Read by the latency manifest (allo/backend/catapult.py): these ports are
+    // `comb`, not a latency number.
+    indent(); os << "// allo comb ports:";
+    for (Value p : comb.outPorts)
+      os << " " << getName(p);
+    os << "\n";
+  }
   reduceIndent();
   indent(); os << "}\n";
 
@@ -1916,7 +2420,24 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
     // so the attribute is a splat and one loop nest resets the whole array. Emitting an
     // assignment per element instead would put thousands of statements in the reset
     // action of any sizeable buffer.
-    if (dense.isSplat()) {
+    if (isCombStorageGlobal(g)) {
+      // Signal storage (D-13): flattened, written in the reset action (CIN-233).
+      int64_t total = 1;
+      for (auto &s : at.getShape())
+        total *= s;
+      if (!dense.isSplat()) {
+        g.emitError("comb storage `") << g.getSymName()
+            << "` needs a single (splat) initial value";
+        state.encounteredError = true;
+        return;
+      }
+      indent();
+      os << "for (int _sr = 0; _sr < " << total << "; ++_sr) " << g.getSymName()
+         << "[_sr].write(";
+      emitDenseElementLiteral(dense.getSplatValue<Attribute>(), at.getElementType(),
+                              g->hasAttr("unsigned"));
+      os << ");  // comb storage reset (Catapult CIN-233)\n";
+    } else if (dense.isSplat()) {
       unsigned rank = at.getRank();
       for (unsigned d = 0; d < rank; ++d) {
         indent();
@@ -1959,6 +2480,20 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
   // Raw sc_out wire ports must be driven in the reset action (Catapult CIN-233).
   for (auto &wp : wireOutPorts) {
     indent(); os << wp.first << ".write(" << wp.second << ");\n";
+  }
+  // Kernel-local comb storage (D-13) is zeroed here: Catapult requires every
+  // signal a thread writes to be set in the reset action (CIN-233). The
+  // recorded deviation: MiniTPU's register file is never reset.
+  for (Value m : comb.storageAllocs) {
+    auto mt = llvm::cast<MemRefType>(m.getType());
+    int64_t total = 1;
+    for (auto s : mt.getShape())
+      total *= s;
+    std::string tn = std::string(getStreamPayloadTypeName(
+        mt.getElementType(), m.getDefiningOp()->hasAttr("unsigned")).str());
+    indent();
+    os << "for (int _sr = 0; _sr < " << total << "; ++_sr) " << getName(m) << "[_sr].write("
+       << zeroOf(mt.getElementType(), tn) << ");  // comb storage reset (Catapult CIN-233)\n";
   }
   indent(); os << "done.write(false);  // completion flag low until the pass finishes\n";
   indent(); os << "wait();\n";
@@ -2012,7 +2547,9 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
   // (C[i]+=... re-accumulates every pass). Running once is correct for both, and
   // lets the tb read memory outputs after a real completion instead of guessing a
   // settle time. The idle `while(1) wait()` keeps the clocked thread alive.
+  combMode = comb.outPorts.empty() ? CombMode::Normal : CombMode::Thread;
   emitBlock(func.front()); // put/get now emit .Push()/.Pop()
+  combMode = CombMode::Normal;
   indent(); os << "done.write(true);  // RTL-observable completion (see the done port)\n";
   os << "#ifndef __SYNTHESIS__\n";
   indent(); os << "__allo_done++; // csim: this kernel finished its single pass\n";
@@ -2020,6 +2557,28 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
   indent(); os << "while (1) { wait(); }\n";
   reduceIndent();
   indent(); os << "}\n";
+
+  if (!comb.outPorts.empty()) {
+    // The combinational process (D-13): every comb port's cone, re-emitted from
+    // the Wire inputs and the storage signals. Values the thread also computes
+    // are declared again here (another function, another scope): their names
+    // are taken off the table for this emission and put back after.
+    auto savedNames = state.nameTable;
+    for (Operation *o : comb.coneOps)
+      for (auto r : o->getResults())
+        state.nameTable.erase(r);
+    indent(); os << "void comb() {  // combinational (D-13): same-cycle outputs";
+    for (Value p : comb.outPorts)
+      os << " " << getName(p);
+    os << "\n";
+    addIndent();
+    combMode = CombMode::Method;
+    emitBlock(*comb.body);
+    combMode = CombMode::Normal;
+    reduceIndent();
+    indent(); os << "}\n";
+    state.nameTable = savedNames;
+  }
 
   reduceIndent();
   os << "};\n\n";

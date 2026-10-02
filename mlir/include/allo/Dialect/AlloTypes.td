@@ -60,9 +60,16 @@ def StreamLike : TypeOrValueSemanticsContainer<Stream, "stream-like">;
 
 def Wire : Allo_Type<"Wire", [MemRefElementTypeInterface]> {
     let summary = "combinational wire";
+    let description = [{
+      `!allo.wire<T>` is a plain signal (sc_signal / sc_in / sc_out). The
+      `comb` flag (`!allo.wire<T, comb>`, README D-13) declares the port a
+      SAME-CYCLE output: the SystemC emitter drives it from a combinational
+      process (SC_METHOD) over signal storage instead of the kernel's clocked
+      thread, and a backend that cannot build that refuses the port.
+    }];
     let mnemonic = "wire";
-    let parameters = (ins AnyType:$baseType);
-    let assemblyFormat = "`<` $baseType `>`";
+    let parameters = (ins AnyType:$baseType, DefaultValuedParameter<"bool", "false">:$comb);
+    let hasCustomAssemblyFormat = 1;
 }
 
 def WireLike    : TypeOrValueSemanticsContainer<Wire,    "wire-like">;

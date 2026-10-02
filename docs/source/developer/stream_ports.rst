@@ -275,6 +275,13 @@ unit's interface is inspectable and checked without a region
 (``unit.__allo_unit__.ports``), and that its test harness is a three-line
 region rather than a copy of the architecture.
 
+**Ports are streams; a ``Wire`` port is not wired yet.** The netlist types every
+port as ``Stream`` (``allo/netlist.py`` ``as_stream``). ``Wire[T]`` and the
+declared combinational output ``Wire[T, comb]`` (README D-13,
+:ref:`systemc-comb`) evaluate in a signature since the ``comb`` work, but an
+instance binding one to a region link is still refused as a value argument; a
+comb output today is a ``@df.kernel`` driving a region-scope link.
+
 **Value parameters are still bound by name.** A unit's memref parameters are
 wired through the existing ``args=[...]`` path, which resolves region-scope
 names. The parameter name itself is now the unit's own -- the conflict

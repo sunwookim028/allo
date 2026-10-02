@@ -29,6 +29,7 @@ from .types import (
     Struct,
     Stream,
     Wire,
+    comb,
     Channel,
     Stateful,
     ConstExpr,
@@ -120,11 +121,23 @@ class TypeInferer(ASTVisitor):
                 shape = tuple()
                 return stream_dtype, shape, None
             if dtype is Wire:
-                # e.g., pipe: Wire[Ty]
-                base_type, base_shape, _ = TypeInferer.visit_type_hint(
-                    ctx, node.slice
-                )
-                wire_dtype = Wire(dtype=base_type, shape=base_shape)
+                # e.g., pipe: Wire[Ty] or, a declared same-cycle output
+                # (README D-13), pipe: Wire[Ty, comb]
+                is_comb = False
+                elt = node.slice
+                if isinstance(node.slice, ast.Tuple):
+                    assert (
+                        len(node.slice.elts) == 2
+                    ), "Wire expects `ele_type` and optionally `comb`"
+                    elt = node.slice.elts[0]
+                    flag = ASTResolver.resolve(node.slice.elts[1], ctx.global_vars)
+                    assert flag is comb, (
+                        f"Wire[T, {ast.unparse(node.slice.elts[1])}]: the only "
+                        "Wire modifier is `comb` (allo.ir.types.comb)"
+                    )
+                    is_comb = True
+                base_type, base_shape, _ = TypeInferer.visit_type_hint(ctx, elt)
+                wire_dtype = Wire(dtype=base_type, shape=base_shape, comb=is_comb)
                 return wire_dtype, tuple(), None
             if dtype is Channel:
                 # e.g., pipe: Channel[Ty, valid_ready]

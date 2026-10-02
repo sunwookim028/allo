@@ -1097,8 +1097,27 @@ def catapult_latency_manifest(sol_dir, log_path=None, declared=None):
     }
 
 
+def comb_ports_of(kernel_cpp):
+    """``{kernel module: [port, ...]}`` of the declared combinational outputs
+    (README D-13) in an emitted ``kernel.cpp``: the SystemC emitter writes
+    ``// allo comb ports: v24 v25`` inside every SC_MODULE that drives one
+    from an ``SC_METHOD``."""
+    out = {}
+    for m in re.finditer(r"SC_MODULE\((\w+)\) \{(.*?)\n\};", kernel_cpp, flags=re.S):
+        ports = re.search(r"// allo comb ports:((?: \w+)+)", m.group(2))
+        if ports:
+            out[m.group(1)] = ports.group(1).split()
+    return out
+
+
 def write_latency_manifest(project_path, top, declared=None):
-    """Write ``<project>/latency.json`` for a finished Catapult run; return it."""
+    """Write ``<project>/latency.json`` for a finished Catapult run; return it.
+
+    A port the emitter drives from an ``SC_METHOD`` (``Wire[T, comb]``, D-13)
+    is reported under ``ports`` as ``"comb"``: it has no latency number, and
+    ``0`` would be a number the harness could consume. The unit's ``latency``
+    stays the clocked thread's (the write path).
+    """
     import json
 
     rpt_dir = os.path.join(project_path, "build")
@@ -1108,6 +1127,15 @@ def write_latency_manifest(project_path, top, declared=None):
     man = catapult_latency_manifest(
         sol_dir, os.path.join(rpt_dir, "catapult.log"), declared=declared
     )
+    kernel_cpp = os.path.join(project_path, "kernel.cpp")
+    if os.path.exists(kernel_cpp):
+        with open(kernel_cpp, "r", encoding="utf-8", errors="replace") as f:
+            comb = comb_ports_of(f.read())
+        for kern, ports in comb.items():
+            u = man["units"].setdefault(
+                kern, {"process": f"/{kern}/run", "latency": None, "ii": None, "status": "unknown"}
+            )
+            u["ports"] = {p: "comb" for p in ports}
     with open(os.path.join(project_path, LATENCY_MANIFEST), "w", encoding="utf-8") as f:
         json.dump(man, f, indent=1, sort_keys=True)
     return man

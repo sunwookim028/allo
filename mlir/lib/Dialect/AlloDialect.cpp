@@ -69,6 +69,30 @@ void StructType::print(mlir::AsmPrinter &p) const {
   p << '>';
 }
 
+// `!allo.wire<T>` or `!allo.wire<T, comb>` (README D-13: the comb flag is
+// declared, never inferred, so it is part of the type the emitter reads).
+void WireType::print(mlir::AsmPrinter &p) const {
+  p << "<" << getBaseType();
+  if (getComb())
+    p << ", comb";
+  p << ">";
+}
+
+Type WireType::parse(AsmParser &parser) {
+  Type baseType;
+  if (parser.parseLess() || parser.parseType(baseType))
+    return Type();
+  bool comb = false;
+  if (succeeded(parser.parseOptionalComma())) {
+    if (parser.parseKeyword("comb"))
+      return Type();
+    comb = true;
+  }
+  if (parser.parseGreater())
+    return Type();
+  return get(parser.getContext(), baseType, comb);
+}
+
 Type StructType::parse(AsmParser &parser) {
   if (parser.parseLess())
     return Type();

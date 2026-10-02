@@ -113,15 +113,19 @@ void mlir::python::populateAlloIRTypes(nb::module_ &m) {
    mlir_type_subclass(m, "WireType", alloMlirTypeIsAWireType)
         .def_classmethod(
             "get",
-            [](nb::object cls, MlirType &baseType, MlirContext ctx) {
-              return cls(alloMlirWireTypeGet(ctx, baseType));
+            [](nb::object cls, MlirType &baseType, bool comb, MlirContext ctx) {
+              return cls(alloMlirWireTypeGet(ctx, baseType, comb));
             },
             "Get an instance of WireType in given context.", nb::arg("cls"),
-            nb::arg("base_type"), nb::arg("context") = nb::none())
+            nb::arg("base_type"), nb::arg("comb") = false,
+            nb::arg("context") = nb::none())
         .def_property_readonly(
             "base_type",
             [](MlirType type) { return alloMlirWireTypeGetBaseType(type); },
-            "Returns the base type of the wire object");
+            "Returns the base type of the wire object")
+        .def_property_readonly(
+            "comb", [](MlirType type) { return alloMlirWireTypeGetComb(type); },
+            "True for a declared same-cycle (combinational) output, README D-13");
 
     mlir_type_subclass(m, "ChannelType", alloMlirTypeIsAChannelType)
         .def_classmethod(

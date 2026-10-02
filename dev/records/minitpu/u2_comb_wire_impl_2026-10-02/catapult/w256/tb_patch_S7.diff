@@ -1,0 +1,12 @@
+806c806
+<     { std::ofstream _f("output0.data"); for (int f = 0; f < 64; ++f) _f << (long long)(ch_v69.Pop()) << "\n"; }
+---
+>     { std::ofstream _f("output0.data"); for (int f = 0; f < 64; ++f) _f << (ch_v69.Pop()).to_int64() << "\n"; }
+812c812
+<     { std::ofstream _f("output1.data"); for (int f = 0; f < 64; ++f) _f << (long long)(ch_v70.Pop()) << "\n"; }
+---
+>     { std::ofstream _f("output1.data"); for (int f = 0; f < 64; ++f) _f << (ch_v70.Pop()).to_int64() << "\n"; }
+818c818
+<     { std::ofstream _f("output2.data"); for (int f = 0; f < 64; ++f) _f << (long long)(ch_v71.Pop()) << "\n"; }
+---
+>     { std::ofstream _f("output2.data"); for (int f = 0; f < 64; ++f) _f << (ch_v71.Pop()).to_int64() << "\n"; }

@@ -1996,7 +1996,7 @@ class ASTTransformer(ASTBuilder):
         # TODO: guard, declaration has no rhs
         if isinstance(dtype, (Wire, Channel)):
             if isinstance(dtype, Wire):
-                link_type = allo_d.WireType.get(dtype.build())
+                link_type = allo_d.WireType.get(dtype.build(), dtype.comb)
                 construct = allo_d.WireConstructOp
             else:
                 link_type = allo_d.ChannelType.get(dtype.build(), dtype.protocol)
