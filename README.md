@@ -105,8 +105,8 @@ entry it supersedes.
 
 **D-3 (2026-10-01). Repository layout, approved for M0.**
 - `examples/minitpu/` is the home of the TPU unit library (the template). It is
-  built there in M1. TinyTPU's `examples/tinytpu/ip/` stays in place, frozen
-  (D-4), and is retired at M2, when the TinyTPU instance imports from the
+  built there from U1. TinyTPU's `examples/tinytpu/ip/` stays in place, frozen
+  (D-4), and is retired by the TinyTPU-instance track, when the instance imports from the
   template.
 - SystemC gets a front door, `allo/backend/systemc.py`.
 - New agent-harness code goes in a root-level `agents/`. The existing CHIA
@@ -122,7 +122,7 @@ entry it supersedes.
 **D-4 (2026-10-01). TinyTPU becomes an instance; today's TinyTPU is frozen.**
 - The current TinyTPU stays as the regression reference: published cycles,
   ASIC area, the Gemmini comparison, and the stress and mutation gates.
-- It is retired only when the template instance reproduces it (milestone M2).
+- It is retired only when the template instance reproduces it (the TinyTPU-instance track).
 - `examples/minitpu/` is rewritten as the template. Its `reference.py`
   (arithmetic) and `program.py` (schedule rules) carry over.
 
@@ -131,25 +131,43 @@ not a commitment. Harness work goes into the method-agnostic core first.
 
 **D-6 (2026-10-01). Settle before building.**
 - No design work until M0 is on `main`.
-- M1 starts only after the expressiveness probes (P) have been reviewed.
+- *Amended by D-7:* the expressiveness probes (P) are replaced by the unit
+  ladder.
+
+**D-7 (2026-10-02). Build and validate MiniTPU unit by unit.**
+- A single-shot port of the full core is not attempted. The milestones climb
+  MiniTPU's own separability order (`docs/UNITS.md` §2): arithmetic leaves,
+  storage with ports, datapath composites, control, then the core. The real
+  units replace the synthetic probes of P.
+- **Validated** means bit-exact against the RTL unit, and equal to the unit's
+  declared latency, both by a differential harness that drives the Allo unit
+  and the Verilator-wrapped `.sv` module with the same stimulus. MiniTPU's own
+  `tb/` is a second check. Cycle-by-cycle agreement is checked only once a unit
+  has Catapult RTL (the Catapult track).
+- MiniTPU is the same owner's design, pinned at `b3ba0a4d`. Changing it (e.g.
+  adding interlocks) is an owner's decision, recorded here when made.
 
 
 ## Milestones
 
 Each milestone passes on **one acceptance check** and names the tools it uses
-as-is, fixes, integrates, and upgrades. Status is recorded here. The milestones
-after M0 are reviewed again once M0 is done.
+as-is, fixes, integrates, and upgrades. Status is recorded here.
+
+**Status:** M0 done (2026-10-02, on `main`). Next: U1.
 
 | | milestone, and its pass check | uses as-is | fixes | integrates | upgrades |
 | --- | --- | --- | --- | --- | --- |
 | **M0** | **Settled.** Layout as in D-3, stale docs fixed. *Check:* a clean checkout passes `reproduce.sh --no-cosim`, the SystemC emit tests and `pytest tests/act` | Allo core, TinyTPU gates | stale docs | choonsik1's unmerged commits (simulator math lowering, RISC-V-as-IP, EVA) | the layout of D-3; `AGENTS.md` |
-| **P** | **Expressiveness probes.** Small designs with MiniTPU's hard shapes: several state machines over **addressed memories** (VREG, VMEM), shared and contended ports, a two-ported memory, fixed-latency delay lines, a double-buffered commit, a VLIW bundle issued to several slots at once, and a stall interlock. *Check:* a matrix showing each shape expressed, refused, or wrong in the Allo simulator and in SystemC csim | Allo simulator, SystemC emitter, the pinned csim stand-in | whatever the probes expose | Catapult on zhang-21: compare its csim with the stand-in once, and a first `go analyze` of TinyTPU's SystemC | — |
-| M1 | **MiniTPU compute core as a composed template**, bit-exact against MiniTPU's RTL on programs from MiniTPU's own assembler. *Check:* `RTL-MATCH n/n` on the Allo simulator and on SystemC csim | Allo simulator, SystemC emitter, Verilator 5.051, MiniTPU's `asm.py` and testbench (read-only) | csim's dependence on a `catapult` binary; csim's output arrays starting at zero; the composition limits found by P | a reference harness that runs MiniTPU program images on its Verilator RTL | `compose` gains optional modules and swappable engines; interlocks; bf16/acc24 through csim; the simulator scaled to about 280 kernels |
-| M2 | **TinyTPU as an instance of the template.** *Check:* `stress_isa` passes on the instance, and its cosim cycles are reported against the frozen reference | Vitis cosim; the stress, mutate and `gen_isa` gates | — | — | ISA spec and `gen_isa` generalised to instances; Actions on the template |
-| M3 | **Template → RTL, matched and measured.** *Check:* MiniTPU core RTL bit-exact in Verilator, plus a QoR table against MiniTPU's ZCU104 build | Catapult (zhang-21), Verilator, Vivado 2023.2 (this host) | SystemC refuses or translates `s.dependence`, partitions and pipelining instead of dropping them; memory-port ready pins; `Wire` in RTL | `Wire` combinational mode (`c7402f9f`); a runbook for zhang-21 | bf16 through Catapult synthesis |
-| M4 | **The compiler onto MiniTPU.** *Check:* `make mlp TARGET=minitpu` bit-exact against PyTorch | ACT core, torch tracing | ACT's TinyTPU-shaped assumptions | MiniTPU's assembler as the emission back end | a VLIW machine model; bf16 workloads |
-| M5 | **The open HLS stack.** *Check:* M3's check, through RTLGen + AMC | Verilator | — | Kai's RTLGen (reconciling `allov2` with this core); AMC | lowering composed regions to AMC |
-| M6 | **The full MiniTPU stack.** *Check:* MiniTPU's own board checks on an Allo bitstream, and/or a physical-design report | Vivado, the ASIC flat flow (zhang-21) | the ASIC-manifest path, never run end to end | DMA and host path; board access; the open-source ASIC flow (needs Docker access) | the full VLIW core |
+| **U1** | **Arithmetic leaves:** `vpu_bf16_add`/`_pipe`, `vpu_bf16_mul`, `mxu_bf16_mul_acc24`, `mxu_acc24_add_pipe`, `vpu_alu`. *Check:* each bit-exact and at its declared latency against the RTL unit | Allo simulator, SystemC csim stand-in, Verilator 5.051, MiniTPU at `b3ba0a4d` | — | — | **the differential unit harness** (new, reused by every unit); bf16/acc24 numerics; declared pipeline latency on a unit |
+| **U2** | **Storage with ports:** `vpu_regfile` (3 async reads, 1 sync write), `vpu_word_array` (2 read/write ports), `vpu_fifo`, the output FIFO. *Check:* as U1, plus the port conflicts MiniTPU's assembler refuses | as U1 | SystemC gives two clients of one memory a replica each | — | `compose` declares memory ports; addressed memory shared by several state machines |
+| **U3** | **Datapath composites:** `xlu_reduction_tree`, `sfu`, `xlu_transpose`, `mxu_pe` → `mxu_systolic_array` → `mxu`. *Check:* as U1; the MXU against its push/commit/pop contract | as U1 | — | — | `compose` optional modules and swappable engines (MAC plug-in, matrix engine) |
+| **U4** | **Control:** sequencer pieces (loop control, scalar address generation, address resolve, fetch/decode), DMA address generation, DMA. *Check:* against `tb_bundle_*` and `docs/isa_latency.json` | as U1 | — | — | the `vpu_ctrl_t` contract as a declared interface; the interlock decision |
+| **U5** | **Compute core** (VPU + MXU + sequencer) on MiniTPU's own assembled programs. *Check:* `RTL-MATCH n/n`, Allo simulator and SystemC csim against the RTL | as U1; MiniTPU's `asm.py` | — | — | the simulator scaled to about 280 kernels |
+| *track* | **Catapult, per unit:** each landed unit through SystemC → Catapult on zhang-21. *Check:* RTL cycle-equal to MiniTPU's unit in Verilator, with area and timing reported | Catapult 2024.2, Xcelium (zhang-21), Verilator | SystemC refuses or translates `s.dependence`, partitions and pipelining instead of dropping them; memory-port ready pins; `Wire` in RTL | `Wire` combinational mode (`c7402f9f`) | bf16 through Catapult synthesis |
+| *track* | **TinyTPU as an instance** (after U3). *Check:* `stress_isa` on the instance; cycles against the frozen reference | Vitis cosim; the stress, mutate and `gen_isa` gates | — | — | ISA spec and `gen_isa` generalised to instances; an int8 MAC plug-in and an accumulator module |
+| M1 | **The compiler onto MiniTPU** (after U5). *Check:* `make mlp TARGET=minitpu` bit-exact against PyTorch | ACT core, torch tracing | ACT's TinyTPU-shaped assumptions | MiniTPU's assembler as the emission back end | a VLIW machine model; bf16 workloads |
+| M2 | **The open HLS stack.** *Check:* the Catapult track's check, through RTLGen + AMC | Verilator | — | Kai's RTLGen (reconciling `allov2` with this core); AMC | lowering composed regions to AMC |
+| M3 | **The full MiniTPU stack.** *Check:* MiniTPU's own board checks on an Allo bitstream, and/or a physical-design report | Vivado, the ASIC flat flow (zhang-21) | the ASIC-manifest path, never run end to end | DMA and host path; board access; the open-source ASIC flow (needs Docker access) | the full VLIW core |
 
 
 ## Status
