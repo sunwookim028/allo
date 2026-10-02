@@ -55,9 +55,20 @@ zhang-21; MiniTPU at ``b3ba0a4d``; harness on branch ``u1-pilot``.
        ``UInt`` gets a signed result buffer
      - Fixes on branch ``systemc-u1-fixes``. The existing bf16 test only
        checked emission, so the compile error was never seen.
-   * - Catapult csyn / RTL
-     - in progress (branch ``u1-catapult``)
-     -
+   * - Catapult csyn / RTL, ``native``
+     - **finding, semantic mismatch** after two emitter bugs worked around:
+       RTL 249,907/251,936 vs MiniTPU (249,908 vs IEEE; ties and subnormals
+       exact); the rest are NaN encodings (Catapult ``0x7fff``/``0xffff``)
+       and ``(+0)+(-0)`` (+0). II=1 latency 2 with ``s.pipeline``; 3 cy/vector
+       without. Same-flow DC (FreePDK45, 3.33 ns, output-registered, wire
+       ports): Catapult **813.4** vs MiniTPU **883.9** um^2. Bugs: include
+       order (CRD-135 ``Marshall``), Wire-only kernel lacks ``wait()``
+       (CIN-123). Missing abstractions: a combinational unit (closest is
+       ``Wire`` ports, still clocked); pipeline stall/flush mode (default
+       leaves the last element stuck; ``style=`` refused for SystemC)
+     - ``u1_bf16_add_catapult_2026-10-02/README.md`` (nine findings). Emitter
+       bugs passed to ``systemc-u1-fixes``. Catapult's own area score ranks
+       the variants differently from DC.
    * - RTLGen, ``native``
      - **finding, semantic mismatch + missing abstraction**: 249,995/251,936
        match. The others are NaN encodings (RTLGen keeps sign and payload)
