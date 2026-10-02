@@ -941,6 +941,19 @@ def build(
 
     if target == "simulator":
         s = customize(func)
+        # Wire and Channel are SystemC-flow links (docs/source/backends/systemc.rst);
+        # the simulator has no lowering for them and failed inside the
+        # ExecutionEngine with an opaque "missing LLVMTranslationDialectInterface".
+        # A `comb` port (README D-13) is a Wire, so it is refused here too: the
+        # simulator is untimed and could only run it as an ordinary value.
+        mod_str = str(s.module)
+        for kind in ("!allo.wire", "!allo.channel"):
+            if kind in mod_str:
+                raise NotImplementedError(
+                    f"{kind} links are only supported by the SystemC backend "
+                    '(target="systemc"); the simulator has no wire/channel '
+                    "semantics. Use Stream links on the simulator."
+                )
         return LLVMOMPModule(s.module, s.top_func_name)
     # FPGA backend (vitis_hls, vivado_hls, tapa, ihls)
     s = customize(func, enable_tensor=enable_tensor)

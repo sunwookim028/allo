@@ -102,12 +102,16 @@ bool alloMlirTypeIsAWireType(MlirType type) {
   return llvm::isa<allo::WireType>(unwrap(type));
 }
 
-MlirType alloMlirWireTypeGet(MlirContext ctx, MlirType baseType) {
-  return wrap(allo::WireType::get(unwrap(ctx), unwrap(baseType)));
+MlirType alloMlirWireTypeGet(MlirContext ctx, MlirType baseType, bool comb) {
+  return wrap(allo::WireType::get(unwrap(ctx), unwrap(baseType), comb));
 }
 
 MlirType alloMlirWireTypeGetBaseType(MlirType type) {
   return wrap(llvm::dyn_cast<allo::WireType>(unwrap(type)).getBaseType());
+}
+
+bool alloMlirWireTypeGetComb(MlirType type) {
+  return llvm::dyn_cast<allo::WireType>(unwrap(type)).getComb();
 }
 
 // Channel

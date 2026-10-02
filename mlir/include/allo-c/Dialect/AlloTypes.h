@@ -48,8 +48,9 @@ MLIR_CAPI_EXPORTED unsigned alloMlirStreamTypeGetDepth(MlirType type);
 
 MLIR_CAPI_EXPORTED bool alloMlirTypeIsAWireType(MlirType type);
 MLIR_CAPI_EXPORTED MlirType alloMlirWireTypeGet(MlirContext ctx,
-                                                MlirType baseType);
+                                                MlirType baseType, bool comb);
 MLIR_CAPI_EXPORTED MlirType alloMlirWireTypeGetBaseType(MlirType type);
+MLIR_CAPI_EXPORTED bool alloMlirWireTypeGetComb(MlirType type);
 
 
 MLIR_CAPI_EXPORTED bool alloMlirTypeIsAChannelType(MlirType type);

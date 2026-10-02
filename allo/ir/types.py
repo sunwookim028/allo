@@ -372,18 +372,55 @@ valid_only = ChannelProtocol.valid_only
 valid_ready = ChannelProtocol.valid_ready
 
 
+class _CombMarker:
+    """``comb`` in ``Wire[T, comb]``: the port is a declared same-cycle output
+    (README D-13). A marker, not a type: it only ever appears as the second
+    item of a ``Wire[...]`` subscript or as ``Wire(..., comb=True)``."""
+
+    def __repr__(self):
+        return "comb"
+
+
+comb = _CombMarker()
+
+
 class Wire(AlloType):
     """
     A combinational wire: an unbuffered, zero-latency point-to-point link
     between two dataflow kernels -- no handshake, no backpressure.
     (For a buffered FIFO use `Stream`; for a handshake link use `Channel`.)
+
+    ``Wire[T, comb]`` (or ``Wire(T, (), comb=True)``) declares the wire a
+    **combinational output** of the kernel that drives it: its value is a
+    function of that kernel's ``Wire`` inputs and of storage read before any
+    store of the iteration, with no register on the path. The SystemC emitter
+    builds it as an ``SC_METHOD`` over signal storage; every other backend
+    refuses it. Declared, never inferred (README D-13): an inferred form would
+    change a port's latency silently when its cone changed shape.
     """
 
-    def __init__(self, dtype, shape):
+    def __class_getitem__(cls, item):
+        """``Wire[dtype]`` / ``Wire[dtype, comb]`` as a value, so it can
+        annotate a ``@df.unit`` port (a parameter annotation is evaluated; a
+        body annotation is read off the AST by ``infer.py``)."""
+        dtype, flag = item if isinstance(item, tuple) else (item, None)
+        if flag is not None and flag is not comb:
+            raise TypeError(
+                f"Wire[T, {flag!r}]: the only Wire modifier is `comb` "
+                "(allo.ir.types.comb)"
+            )
+        shape = tuple()
+        if isinstance(dtype, TypeAnnotation):
+            dtype, shape = dtype.dtype, tuple(dtype.shape)
+        return cls(dtype=dtype, shape=shape, comb=flag is comb)
+
+    def __init__(self, dtype, shape, comb=False):
         assert isinstance(dtype, AlloType), f"dtype must be an AlloType, got {dtype}"
         self.dtype = dtype
         self.shape = shape  # element shape (() for a scalar wire)
-        super().__init__(0, 0, f"wire<{dtype}>")
+        # (`bool` is UInt(1) in this module, so no bool() call here)
+        self.comb = True if comb else False  # declared same-cycle output (D-13)
+        super().__init__(0, 0, f"wire<{dtype}{', comb' if self.comb else ''}>")
 
     def build(self):
         if len(self.shape) > 0:
@@ -392,7 +429,7 @@ class Wire(AlloType):
 
     def __repr__(self):
         shape = ", ".join(str(s) for s in self.shape)
-        return f"Wire({self.dtype}[{shape}])"
+        return f"Wire({self.dtype}[{shape}]{', comb' if self.comb else ''})"
 
     # No-op stubs (resolved at IR-build time). A wire never blocks, so there
     # are no try_*/empty/full variants.
