@@ -379,6 +379,41 @@ def _run_group_timeout(cmd, timeout, what, **kwargs):
     return subprocess.CompletedProcess(cmd, proc.returncode, out, err)
 
 
+_SELF_FIFO_PORT = re.compile(r"Connections::Out< (?P<T>[^;]*) > (?P<name>\w+)_enq;")
+
+
+def refuse_self_fifo_for_synthesis(hls_code):
+    """A stream put and got by ONE kernel (a self-FIFO) is emitted as a
+    MatchLib AlloFifo wired as a self-loop with ``_enq``/``_deq`` Connections
+    ports and a synchronous occupancy counter. csim runs it bit-exactly, but
+    Catapult cannot schedule it in any loop that puts and gets conditionally:
+    ``could not schedule partition '/top/fifo_0/run' even with unlimited
+    resources`` (SCHD-30; with and without pipelining, with and without the
+    reset drain -- the chained feedback through the counter and the deq Pop).
+    The build failed late, in csynth, instead of being refused (MiniTPU U2
+    FIFO record, C1). Refuse at emission for every mode that synthesizes."""
+    found = []
+    module = None
+    for line in hls_code.splitlines():
+        if line.startswith("SC_MODULE("):
+            module = line[len("SC_MODULE("):].split(")")[0]
+        m = _SELF_FIFO_PORT.search(line)
+        if m:
+            found.append((module, m.group("name")))
+    if not found:
+        return
+    what = ", ".join(f"stream '{s}' in kernel '{k}'" for k, s in found)
+    raise RuntimeError(
+        f"SystemC synthesis: {what} is a self-FIFO (one kernel both puts and "
+        "gets it). Its lowering (an AlloFifo self-loop with a synchronous "
+        "occupancy counter) cannot be scheduled by Catapult: SCHD-30 \"could not "
+        "schedule partition ... even with unlimited resources\", pipelined or "
+        "not. csim (mode='csim') runs it; for synthesis keep the FIFO as an "
+        "in-kernel ring (an array with head/tail pointers) or move its two "
+        "ends into two kernels."
+    )
+
+
 class HLSModule:
     def __init__(
         self,
@@ -493,6 +528,8 @@ class HLSModule:
 
         buf.seek(0)
         self.hls_code = buf.read()
+        if platform == "systemc" and mode is not None and mode != "csim":
+            refuse_self_fifo_for_synthesis(self.hls_code)
         if project is not None:
             assert mode is not None, "mode must be specified when project is specified"
             os.makedirs(project, exist_ok=True)
