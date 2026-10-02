@@ -77,6 +77,21 @@ static SmallString<32> getSCTypeName(Type valType) {
 // so recover it here from the defining construct or any user. (Without this every
 // UInt payload emits as ac_int<W,true> -> signed, breaking csim of UInt designs.)
 static bool linkPayloadUnsigned(Value linkVal) {
+  // A function argument (a kernel's port, a region's boundary array) has no
+  // defining op, and its users need not be tagged: stores carry no `unsigned`
+  // attr, and a region's arguments are only passed on to calls. Its sign is in
+  // the function's `itypes` string, as the HLS emitters read it. Without this
+  // a UInt kernel's write port and every UInt top-level port emitted signed,
+  // so In<ac_int<16,false>> was bound to In<ac_int<16,true>> and g++ failed.
+  if (auto barg = llvm::dyn_cast<BlockArgument>(linkVal))
+    if (auto f = llvm::dyn_cast_or_null<func::FuncOp>(
+            barg.getOwner()->getParentOp()))
+      if (barg.getOwner() == &f.getBody().front())
+        if (auto it = f->getAttrOfType<StringAttr>("itypes")) {
+          StringRef s = it.getValue();
+          if (barg.getArgNumber() < s.size() && s[barg.getArgNumber()] == 'u')
+            return true;
+        }
   if (Operation *def = linkVal.getDefiningOp())
     if (def->hasAttr("unsigned"))
       return true;
