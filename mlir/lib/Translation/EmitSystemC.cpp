@@ -19,6 +19,7 @@
 #include "allo/Translation/EmitVivadoHLS.h" // reuse the Vhls emitter base
 #include "allo/Translation/EmitCatapultHLS.h" // reuse Catapult's ac_int type map
 #include "allo/Translation/Utils.h"
+#include "allo/Support/Utils.h" // getLayoutMap, isFullyPartitioned
 #include "llvm/ADT/SetVector.h"  // SmallSetVector: dedupe external IP headers
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -1788,6 +1789,22 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
   for (auto &g : statefulGlobals) {
     auto at = llvm::cast<ShapedType>(g.getType());
     fixUnsignedType(g, g->hasAttr("unsigned"));
+    // `s.partition(.., Complete)` on the Stateful: registers, spelled for
+    // Catapult as hls_resource [Register] before the member (the pragma
+    // emitArrayDirectivesPreheader writes for a partitioned local array).
+    if (auto mt = llvm::dyn_cast<MemRefType>(g.getType()))
+      if (allo::getLayoutMap(mt)) {
+        bool full = true;
+        for (int64_t dim = 0; dim < mt.getRank(); ++dim)
+          if (!allo::isFullyPartitioned(mt, dim))
+            full = false;
+        if (full) {
+          indent();
+          os << "#pragma hls_resource " << g.getSymName().str()
+             << "_rsc variables=\"" << g.getSymName().str()
+             << "\" map_to_module=\"[Register]\"\n";
+        }
+      }
     indent();
     emitStatefulGlobalElementType(at.getElementType());
     os << " " << g.getSymName();

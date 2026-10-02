@@ -22,11 +22,32 @@ namespace allo {
 
 void removeStrideMap(func::FuncOp &func) {
   SmallVector<Operation *, 8> allocOps;
+  SmallVector<memref::GetGlobalOp, 4> getGlobalOps;
   func.walk([&](Operation *op) {
     if (auto alloc = dyn_cast<memref::AllocOp>(op)) {
       allocOps.push_back(alloc);
+    } else if (auto gg = dyn_cast<memref::GetGlobalOp>(op)) {
+      getGlobalOps.push_back(gg);
     }
   });
+
+  // A partitioned global (`x: T[N] @ Stateful` under s.partition) carries the
+  // layout on the memref.global and on every get_global of it; a partition is
+  // a hardware directive with no meaning on the LLVM path, so strip both (the
+  // memory space stays: it may carry a `Memory(...)` annotation).
+  for (auto gg : getGlobalOps) {
+    auto memRefType = llvm::cast<MemRefType>(gg.getType());
+    if (memRefType.getLayout().getAffineMap().isIdentity() ||
+        memRefType.getLayout().getAffineMap().isEmpty())
+      continue;
+    auto newMemRefType =
+        MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
+                        AffineMap(), memRefType.getMemorySpace());
+    gg.getResult().setType(newMemRefType);
+    if (auto mod = gg->getParentOfType<ModuleOp>())
+      if (auto g = mod.lookupSymbol<memref::GlobalOp>(gg.getName()))
+        g.setTypeAttr(TypeAttr::get(newMemRefType));
+  }
 
   for (auto op : allocOps) {
     auto allocOp = dyn_cast<memref::AllocOp>(op);

@@ -1996,6 +1996,11 @@ class ASTTransformer(ASTBuilder):
                 FlatSymbolRefAttr.get(global_name),
                 ip=ctx.get_ip(),
             )
+            # the variable's name, so `s.partition("k:mem")` finds it (`name`
+            # is the symbol attribute of memref.get_global itself)
+            get_global_op.attributes["stateful_name"] = StringAttr.get(
+                node.target.id
+            )
 
             # Store in context
             ctx.buffers[node.target.id] = get_global_op
