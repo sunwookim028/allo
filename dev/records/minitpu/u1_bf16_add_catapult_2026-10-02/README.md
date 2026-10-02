@@ -268,7 +268,7 @@ $ALLO_PYTHON $R/emit_var.py wire 16 $S/wire_ii1_n16_3p33.prj --pipeline --clock=
 PATCH_ARGS=--wire-wait $S/run_csyn.sh $S/wire_ii1_n16_3p33.prj
 export MINITPU_HARNESS_CACHE=$S/hcache
 $ALLO_PYTHON $R/cmp_rtl.py $S/native_ii1_n251936.prj/build/Catapult/top.v1 --top top
-$ALLO_PYTHON $R/cmp_rtl.py $S/wire_ii1_n16_3p33.prj/build/Catapult/add_0.v1 --shape bare --latency 0 --warmup 1
+$ALLO_PYTHON $R/cmp_rtl.py $S/wire_ii1_n16_3p33.prj/build/Catapult/add_0.v1 --shape bare --latency 1 --warmup 1
 $R/dc/run_dc.sh cat_wire_ii1_3p33 add_0 clk 3.33 $S/wire_ii1_n16_3p33.prj/build/Catapult/add_0.v1/concat_rtl.v
 $R/dc/run_dc.sh minitpu_oreg_3p33 mtpu_add_oreg clk 3.33 \
     /work/shared/users/phd/sk3463/minitpu/src/core/vpu/vpu_bf16_add.sv $R/dc/mtpu_add_oreg.sv

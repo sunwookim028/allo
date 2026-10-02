@@ -66,14 +66,15 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     u = importlib.import_module(f"examples.minitpu.units.{args.unit}")
-    stim = stimulus.binary_bf16()
+    # a unit may bring its own stimulus (acc24 operands, ALU op codes)
+    stim = u.stimulus() if hasattr(u, "stimulus") else stimulus.binary_bf16()
     if args.n:
         stim = stim[: args.n]
     n = len(stim)
 
     t = time.time()
     want, cyc = rtl.run(u.RTL, stim.astype(np.uint64))
-    want = want[:, 0].astype(np.uint16)
+    want = want[:, 0].astype(np.uint16 if u.RTL.outputs[0][1] <= 16 else np.uint32)
     lat = sorted(set(cyc.tolist()))
     print(f"RTL {u.RTL.top}: {n} vectors, latency {lat} (declared {u.RTL.latency}), {time.time() - t:.1f}s", flush=True)
     if lat != [u.RTL.latency]:
