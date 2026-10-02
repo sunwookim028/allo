@@ -1,0 +1,7 @@
+RTL vpu_regfile:w16: 60261 cycles in 9 traces, 180780 defined slots, RTL vs reference on defined: 180780/180780 (0.2s)
+UNIT-DIFF  vpu_regfile:w16 trace_raw systemc 1266/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.2s, run 5.9s)
+    differing defined slots by trace: wr-offsets-port-a=107, wr-offsets-port-b=168, wr-offsets-port-c=171, reset-keeps=42, random-0=59624, random-1=59645, random-2=59721, tb_vpu_alu_regfile=36
+    e.g. wr-offsets-port-a cycle 65 rdata_a_o: allo 0 rtl ff75
+    e.g. wr-offsets-port-a cycle 66 rdata_a_o: allo 0 rtl ff75
+    e.g. wr-offsets-port-a cycle 67 rdata_a_o: allo 0 rtl ff75
+    e.g. wr-offsets-port-a cycle 68 rdata_a_o: allo 0 rtl ff75

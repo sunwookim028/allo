@@ -1,0 +1,25 @@
+EXPORTED trace_part N=8192 in 0.2s
+COSIM trace_part N=8192 chunks=1 cycles(first 2)=[CosimResult(cycles=8193, latency_ns=27310.0, waveform=None, result=None)] 8.2s
+EXPORTED stateful_part N=8192 in 0.2s
+                                                        Traceback (most recent call last):
+                                                        IndexError: index 2917 is out of bounds for axis 0 with size 2917
+Traceback (most recent call last):
+AssertionError: cosim testbench failed (see /work/shared/users/phd/sk3463/scratch/rtlgen/tmp/allo_cosim_ndgrqmym/sim.log)
+EXPORTED stateful N=4096 in 0.3s
+COSIM stateful N=4096 chunks=1 cycles(first 2)=[CosimResult(cycles=12289, latency_ns=40963.333333333336, waveform=None, result=None)] 9.3s
+EXPORTED stateful_part N=8192 in 0.3s
+COSIM stateful_part N=8192 chunks=8 cycles(first 2)=[CosimResult(cycles=8193, latency_ns=27310.0, waveform=None, result=None), CosimResult(cycles=8193, latency_ns=27310.0, waveform=None, result=None)] 36.0s
+EXPORTED trace_part N=60261 in 0.3s
+                                                        Traceback (most recent call last):
+                                                        AssertionError: cosim timed out after 40000 cycles
+Traceback (most recent call last):
+AssertionError: cosim testbench failed (see /work/shared/users/phd/sk3463/scratch/rtlgen/tmp/allo_cosim_vmh7o3wh/sim.log)
+EXPORTED trace N=60261 in 0.2s
+                                                        Traceback (most recent call last):
+                                                        AssertionError: cosim timed out after 40000 cycles
+Traceback (most recent call last):
+AssertionError: cosim testbench failed (see /work/shared/users/phd/sk3463/scratch/rtlgen/tmp/allo_cosim_akxot66a/sim.log)
+EXPORTED trace_part N=60261 in 0.3s
+COSIM trace_part N=60261 chunks=1 cycles(first 2)=[CosimResult(cycles=60262, latency_ns=200873.33333333334, waveform=None, result=None)] 20.0s
+EXPORTED trace N=60261 in 0.2s
+COSIM trace N=60261 chunks=1 cycles(first 2)=[CosimResult(cycles=180784, latency_ns=602613.3333333334, waveform=None, result=None)] 52.2s

@@ -1,0 +1,4 @@
+# scripts/wire_csim_offset.py (first 3000 cycles): matches of got[t + k] against MiniTPU want[t] on defined slots
+OFFSET rdata_a_o defined 2999 {-4: 352, -3: 386, -2: 401, -1: 450, 0: 492, 1: 535, 2: 539, 3: 585, 4: 2995} first got [0, 0, 0, 0, 0, 10089] want [33215, 10089, 10089, 10089, 10089, 10089]
+OFFSET rdata_b_o defined 2999 {-4: 407, -3: 419, -2: 467, -1: 469, 0: 526, 1: 541, 2: 577, 3: 2996, 4: 577} first got [0, 0, 0, 0, 10089, 10089] want [33215, 10089, 10089, 10089, 10089, 10089]
+OFFSET rdata_c_o defined 2999 {-4: 393, -3: 410, -2: 469, -1: 490, 0: 515, 1: 566, 2: 596, 3: 2996, 4: 595} first got [0, 0, 0, 0, 10089, 10089] want [33215, 10089, 10089, 10089, 10089, 10089]

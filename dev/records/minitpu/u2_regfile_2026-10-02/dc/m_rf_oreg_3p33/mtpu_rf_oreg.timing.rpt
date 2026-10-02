@@ -1,0 +1,71 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : mtpu_rf_oreg
+Version: W-2024.09
+Date   : Fri Oct  2 13:36:37 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: ra[0] (input port clocked by ideal_clock)
+  Endpoint: qa_reg[15] (rising edge-triggered flip-flop clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  mtpu_rf_oreg       5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                                       Fanout     Trans      Incr       Path
+  ------------------------------------------------------------------------------------
+  clock ideal_clock (rise edge)                                     0.00       0.00
+  clock network delay (ideal)                                       0.00       0.00
+  input external delay                                              0.00       0.00 r
+  ra[0] (in)                                              0.01      0.01       0.01 r
+  ra[0] (net)                                   3                   0.00       0.01 r
+  u/raddr_a_i[0] (vpu_regfile_00000010)                             0.00       0.01 r
+  u/raddr_a_i[0] (net)                                              0.00       0.01 r
+  u/U822/A (INV_X1)                                       0.01      0.02       0.02 r
+  u/U822/ZN (INV_X1)                                      0.01      0.01       0.03 f
+  u/n753 (net)                                  2                   0.00       0.03 f
+  u/U829/A2 (NAND2_X1)                                    0.01      0.01       0.05 f
+  u/U829/ZN (NAND2_X1)                                    0.08      0.08       0.13 r
+  u/n754 (net)                                  8                   0.00       0.13 r
+  u/U12/A2 (NOR2_X2)                                      0.08      0.04       0.17 r
+  u/U12/ZN (NOR2_X2)                                      0.03      0.05       0.22 f
+  u/n1084 (net)                                16                   0.00       0.22 f
+  u/U832/B2 (AOI22_X1)                                    0.03      0.02       0.25 f
+  u/U832/ZN (AOI22_X1)                                    0.03      0.06       0.30 r
+  u/n756 (net)                                  1                   0.00       0.30 r
+  u/U834/A3 (NAND4_X1)                                    0.03      0.01       0.31 r
+  u/U834/ZN (NAND4_X1)                                    0.02      0.03       0.35 f
+  u/n773 (net)                                  1                   0.00       0.35 f
+  u/U841/A3 (OR4_X1)                                      0.02      0.01       0.35 f
+  u/U841/ZN (OR4_X1)                                      0.02      0.11       0.47 f
+  u/rdata_a_o[15] (net)                         1                   0.00       0.47 f
+  u/rdata_a_o[15] (vpu_regfile_00000010)                            0.00       0.47 f
+  da[15] (net)                                                      0.00       0.47 f
+  qa_reg[15]/D (DFF_X1)                                   0.02      0.01       0.47 f
+  data arrival time                                                            0.47
+
+  clock ideal_clock (rise edge)                                     3.33       3.33
+  clock network delay (ideal)                                       0.00       3.33
+  qa_reg[15]/CK (DFF_X1)                                            0.00       3.33 r
+  library setup time                                               -0.04       3.29
+  data required time                                                           3.29
+  ------------------------------------------------------------------------------------
+  data required time                                                           3.29
+  data arrival time                                                           -0.47
+  ------------------------------------------------------------------------------------
+  slack (MET)                                                                  2.81
+
+
+1

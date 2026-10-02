@@ -1,0 +1,3 @@
+  ``Stream``\ s, one token per port per cycle (lockstep), between a driver
+RTL vpu_regfile:w16: 60261 cycles in 9 traces, 180780 defined slots, RTL vs reference on defined: 180780/180780 (0.2s)
+UNIT-MATCH vpu_regfile:w16 trace systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.3s, run 5.9s)

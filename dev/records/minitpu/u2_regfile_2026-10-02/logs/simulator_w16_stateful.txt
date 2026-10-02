@@ -1,0 +1,2 @@
+RTL vpu_regfile:w16: 60261 cycles in 9 traces, 180780 defined slots, RTL vs reference on defined: 180780/180780 (0.2s)
+UNIT-MATCH vpu_regfile:w16 stateful simulator 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=order-only (build 0.2s, run 0.2s)

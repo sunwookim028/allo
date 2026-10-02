@@ -1,0 +1,7 @@
+RTL vpu_regfile:w16: 60261 cycles in 9 traces, 180780 defined slots, RTL vs reference on defined: 180780/180780 (0.2s)
+UNIT-DIFF  vpu_regfile:w16 stateful systemc 170093/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.2s, run 301.9s)
+    differing defined slots by trace: random-0=3572, random-1=3685, random-2=3430
+    e.g. random-0 cycle 1037 rdata_a_o: allo 0 rtl d02
+    e.g. random-0 cycle 1041 rdata_a_o: allo 0 rtl d229
+    e.g. random-0 cycle 1048 rdata_a_o: allo 0 rtl b1b2
+    e.g. random-0 cycle 1052 rdata_a_o: allo 0 rtl d1e4

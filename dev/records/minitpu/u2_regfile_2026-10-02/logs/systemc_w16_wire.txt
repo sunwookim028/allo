@@ -1,0 +1,7 @@
+RTL vpu_regfile:w16: 60261 cycles in 9 traces, 180780 defined slots, RTL vs reference on defined: 180780/180780 (0.3s)
+UNIT-DIFF  vpu_regfile:w16 wire systemc 21217/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.5s, run 5.9s)
+    differing defined slots by trace: fill-readback=103, wr-offsets-port-a=25, wr-offsets-port-b=23, wr-offsets-port-c=23, reset-keeps=26, random-0=53068, random-1=53191, random-2=53080, tb_vpu_alu_regfile=24
+    e.g. fill-readback cycle 1 rdata_a_o: allo 0 rtl 2769
+    e.g. fill-readback cycle 2 rdata_a_o: allo 0 rtl 2769
+    e.g. fill-readback cycle 3 rdata_a_o: allo 0 rtl 2769
+    e.g. fill-readback cycle 4 rdata_a_o: allo 0 rtl 2769

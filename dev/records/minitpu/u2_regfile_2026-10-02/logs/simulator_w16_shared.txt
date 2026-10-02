@@ -1,0 +1,7 @@
+RTL vpu_regfile:w16: 60261 cycles in 9 traces, 180780 defined slots, RTL vs reference on defined: 180780/180780 (0.2s)
+UNIT-DIFF  vpu_regfile:w16 shared simulator 8502/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=order-only (build 0.6s, run 0.2s)
+    differing defined slots by trace: fill-readback=177, wr-offsets-port-a=171, wr-offsets-port-b=170, wr-offsets-port-c=169, reset-keeps=42, random-0=57339, random-1=56941, random-2=57233, tb_vpu_alu_regfile=36
+    e.g. fill-readback cycle 1 rdata_a_o: allo 0 rtl 2769
+    e.g. fill-readback cycle 2 rdata_a_o: allo 0 rtl 2769
+    e.g. fill-readback cycle 3 rdata_a_o: allo 0 rtl 2769
+    e.g. fill-readback cycle 4 rdata_a_o: allo 0 rtl 2769

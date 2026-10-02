@@ -1,0 +1,4 @@
+MATCH amc/got_llvm_none_60261: 180780/180780 defined over the first 60261 cycles (3 masked)
+MATCH amc/got_amc_none_60261: 180780/180780 defined over the first 60261 cycles (3 masked)
+MATCH amc/got_amc_pipeline_256: 765/765 defined over the first 256 cycles (3 masked)
+MATCH amc/got_amc_pipeline_60261: 180780/180780 defined over the first 60261 cycles (3 masked)
