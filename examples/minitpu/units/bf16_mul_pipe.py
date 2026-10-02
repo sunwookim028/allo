@@ -46,6 +46,97 @@ PROBE = ((0x3F80, 0x3F80), (0x4000, 0x3F80))
 stimulus = bf16_mul.stimulus
 
 
+def mul_bits(a_i: uint16, b_i: uint16) -> uint16:
+    """``vpu_bf16_mul_pipe`` (the form ``vpu_alu`` instantiates), one pair.
+
+    Its 9-bit unsigned compares are held in 10 bits: Allo lowers unsigned
+    ``>=``/``<=`` to a signed ``cmpi`` (B1), and 9-bit sums reach 510.
+    """
+    sign: uint1 = a_i[15] ^ b_i[15]
+    exp_a: UInt(8) = a_i[7:15]
+    exp_b: UInt(8) = b_i[7:15]
+    frac_a: UInt(7) = a_i[0:7]
+    frac_b: UInt(7) = b_i[0:7]
+    # {1'b1, frac} * {1'b1, frac} at 16 bits: operands widened first, since
+    # an expression's width is sized from its operands (M4).
+    mant_a: UInt(16) = 0
+    mant_a[0:7] = frac_a
+    mant_a[7] = 1
+    mant_b: UInt(16) = 0
+    mant_b[0:7] = frac_b
+    mant_b[7] = 1
+    product: UInt(16) = mant_a * mant_b
+
+    ea: UInt(10) = exp_a
+    eb: UInt(10) = exp_b
+    exp_sum: UInt(10) = ea + eb
+    exp_bias: UInt(10) = 0
+    frac: UInt(7) = 0
+    guard: uint1 = 0
+    sticky: uint1 = 0
+    if product[15]:
+        exp_bias = 126
+        frac = product[8:15]
+        guard = product[7]
+        sticky = product[0:7] != 0
+    else:
+        exp_bias = 127
+        frac = product[7:14]
+        guard = product[6]
+        sticky = product[0:6] != 0
+    exp_s: UInt(9) = exp_sum[0:9] - exp_bias[0:9]
+    round_up: uint1 = guard & (sticky | frac[0])
+    frac8: UInt(8) = frac
+    rounded: UInt(8) = frac8 + round_up
+    frac_final: UInt(7) = 0 if rounded[7] else rounded[0:7]
+    exp_final: UInt(9) = exp_s + rounded[7]
+    exp_final10: UInt(10) = exp_final
+    bias_inf: UInt(10) = exp_bias + 255
+
+    result: uint16 = 0
+    if (
+        (exp_a == 0xFF and frac_a != 0)
+        or (exp_b == 0xFF and frac_b != 0)
+        or (exp_a == 0xFF and exp_b == 0 and frac_b == 0)
+        or (exp_b == 0xFF and exp_a == 0 and frac_a == 0)
+    ):
+        result = 0x7FC0
+    elif exp_a == 0xFF or exp_b == 0xFF:
+        result[15] = sign
+        result[7:15] = 0xFF
+    elif exp_a == 0 or exp_b == 0:
+        result[15] = sign
+    elif exp_sum >= bias_inf:
+        result[15] = sign
+        result[7:15] = 0xFF
+    elif exp_sum <= exp_bias:
+        result[15] = sign
+    elif exp_final10 >= 255:
+        result[15] = sign
+        result[7:15] = 0xFF
+    else:
+        result[15] = sign
+        result[7:15] = exp_final[0:8]
+        result[0:7] = frac_final
+    return result
+
+def fn(n):
+    """The unit as one reusable function, ``mul_bits``, called per pair.
+
+    ``vpu_alu`` imports the same function, so the pipe and the ALU check one
+    implementation against two RTL units.
+    """
+
+    @df.region()
+    def top(A: uint16[n], B: uint16[n], C: uint16[n]):
+        @df.kernel(mapping=[1], args=[A, B, C])
+        def mul(a: uint16[n], b: uint16[n], c: uint16[n]):
+            for i in range(n):
+                c[i] = mul_bits(a[i], b[i])
+
+    return top
+
+
 def bits_pipe(n):
     # vpu_bf16_mul_pipe's two always blocks, flattened into one iteration.
     @df.region()
@@ -224,6 +315,7 @@ VARIANTS = {
     "bits": bf16_mul.VARIANTS["bits"],
     "bits_pipe": (bits_pipe, bf16_mul.run_bits),
     "stages": (stages, bf16_mul.run_bits),
+    "fn": (fn, bf16_mul.run_bits),
 }
 DEVIATIONS = bf16_mul.DEVIATIONS
 EXPLAIN = bf16_mul.EXPLAIN
