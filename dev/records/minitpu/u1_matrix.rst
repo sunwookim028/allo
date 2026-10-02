@@ -89,6 +89,27 @@ pilot, ``u2_regfile_2026-10-02.rst``):
   regfile's Catapult cell. F5 (``s.partition`` on a ``Stateful`` crashes)
   goes with the ``core-uint-index`` batch.
 
+**Owner's decisions, 2026-10-02, checkpoint 6** (after ``vpu_word_array`` and
+the FIFOs, ``u2_word_array_2026-10-02.rst``, ``u2_fifo_2026-10-02.rst``):
+
+- FIFOs: for the **standalone** verdicts the explicit ring is the unit (the
+  self-FIFO Catapult cannot schedule, C1, is a harness artefact: one kernel
+  both pushes and pops). For the **composed** MXU at U3, a two-kernel
+  ``Stream`` through Catapult is measured against ``vpu_fifo`` before the
+  form is chosen, with the reset (pointer-only vs drained) and the illegal-
+  program (drop vs stall) differences recorded either way. Branch
+  ``u2-fifo-composed``.
+- ``Stream.peek()``: decided by whether the MXU controller holds the head
+  word across cycles before popping (then peek is demanded) or pops in the
+  cycle it consumes (then ``try_get`` suffices). Checked on the RTL first.
+- Registered-read storage: **pipe-as-data is the reference form** (the
+  shift registers written out, as MiniTPU's RTL writes them; it gave exactly
+  3/2/1 on every RTL backend); ``issue`` + ``latency=L`` is the form that
+  *asks* a backend for a contract; D-12 lowers a port's declared read
+  latency to exactly that pipe.
+- Filed: AMC #126 (comment: A1, a failed schedule returns a design);
+  MiniTPU #22 (F6, the VMEM sim model is not DC-synthesizable).
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
