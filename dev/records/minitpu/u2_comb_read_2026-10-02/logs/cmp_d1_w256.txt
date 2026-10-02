@@ -1,0 +1,1 @@
+RTL-TRACE vpu_regfile:w256 d1_w256: defined 45744/45744 at measured read latency L=0 (MiniTPU 0); 3 masked; first-3000 hits by L {0: 8997, 1: 8335, 2: 1606, 3: 1549, 4: 1380, 5: 1301, 6: 1212, 7: 1147}; 15249 cycles; 0.3s

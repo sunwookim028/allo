@@ -54,6 +54,9 @@ Catapult RTL a cycle is whatever the schedule makes of an iteration, which
     port shape of MiniTPU's module. SystemC only. Synthesized with
     ``s.partition("rf_0:mem")`` (complete) -- without it Catapult maps ``mem``
     to a 1R1W RAM and fails SCHD-30 at II=1.
+``wire_stateful`` (comb-read form b)
+    ``wire`` with ``mem @ Stateful`` (a module member in the emitted SystemC).
+    Probe only: ``dev/records/minitpu/u2_comb_read_2026-10-02.rst``.
 ``trace_raw``
     ``trace`` as first written (no workarounds); evidence only.
 
@@ -577,6 +580,65 @@ def wire(n, w=16):
     return top
 
 
+def wire_stateful(n, w=16):
+    """Comb-read form (b): ``wire`` with ``mem @ Stateful`` (a module member in
+    the emitted SystemC, zeroed in the reset action) instead of a kernel-local
+    array. ``dev/records/minitpu/u2_comb_read_2026-10-02.rst``."""
+    W = UInt(w)
+
+    @df.region()
+    def top(RA: A5[n], RB: A5[n], RC: A5[n], WA: A5[n], WD: W[n], WE: uint1[n],
+            QA: W[n], QB: W[n], QC: W[n]):
+        w_ra: Wire[UInt(5)]
+        w_rb: Wire[UInt(5)]
+        w_rc: Wire[UInt(5)]
+        w_wa: Wire[UInt(5)]
+        w_wd: Wire[UInt(w)]
+        w_we: Wire[uint1]
+        w_qa: Wire[UInt(w)]
+        w_qb: Wire[UInt(w)]
+        w_qc: Wire[UInt(w)]
+
+        @df.kernel(mapping=[1], args=[RA, RB, RC, WA, WD, WE])
+        def src(ra: A5[n], rb: A5[n], rc: A5[n], wa: A5[n], wd: W[n], we: uint1[n]):
+            for t in range(n):
+                w_ra.put(ra[t])
+                w_rb.put(rb[t])
+                w_rc.put(rc[t])
+                w_wa.put(wa[t])
+                w_wd.put(wd[t])
+                w_we.put(we[t])
+
+        @df.kernel(mapping=[1], args=[])
+        def rf():
+            mem: W[32] @ Stateful = 0
+            for _ in range(n):
+                a5: UInt(5) = w_ra.get()
+                a: int32 = a5  # B4 workaround; B5: not in one step
+                b5: UInt(5) = w_rb.get()
+                b: int32 = b5  # B4 workaround; B5: not in one step
+                c5: UInt(5) = w_rc.get()
+                c: int32 = c5  # B4 workaround; B5: not in one step
+                x5: UInt(5) = w_wa.get()
+                x: int32 = x5  # B4 workaround; B5: not in one step
+                d: UInt(w) = w_wd.get()
+                e: uint1 = w_we.get()
+                w_qa.put(mem[a])
+                w_qb.put(mem[b])
+                w_qc.put(mem[c])
+                if e:
+                    mem[x] = d
+
+        @df.kernel(mapping=[1], args=[QA, QB, QC])
+        def sink(qa: W[n], qb: W[n], qc: W[n]):
+            for t in range(n):
+                qa[t] = w_qa.get()
+                qb[t] = w_qb.get()
+                qc[t] = w_qc.get()
+
+    return top
+
+
 VARIANTS = {
     "trace": (trace, _run_flat),
     "trace_raw": (trace_raw, _run_flat),
@@ -586,4 +648,5 @@ VARIANTS = {
     "shared_sync": (shared_sync, _run_flat),
     "annotated": (annotated, _run_flat),
     "wire": (wire, _run_flat),
+    "wire_stateful": (wire_stateful, _run_flat),
 }

@@ -1,0 +1,23 @@
+Traceback (most recent call last):
+  File "/work/shared/users/phd/sk3463/scratch/wt-u2cr/dev/records/minitpu/u2_comb_read_2026-10-02/scripts/emit_csyn.py", line 81, in <module>
+    s.partition(f"{fn}:{var}", partition_type=Partition.Complete, dim=1)
+  File "/work/shared/users/phd/sk3463/scratch/wt-u2cr/allo/customize.py", line 95, in wrapper
+    res = fn(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^
+  File "/work/shared/users/phd/sk3463/scratch/wt-u2cr/allo/customize.py", line 341, in partition
+    buffers_to_partition = self._collect_partition_targets(target)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/work/shared/users/phd/sk3463/scratch/wt-u2cr/allo/customize.py", line 437, in _collect_partition_targets
+    _, _, mlir_target = find_buffer(self.module, buf, self.func_args)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/work/shared/users/phd/sk3463/scratch/wt-u2cr/allo/ir/transform.py", line 169, in find_buffer
+    result = search_operations_recursive(target_func.entry_block.operations)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/work/shared/users/phd/sk3463/scratch/wt-u2cr/allo/ir/transform.py", line 141, in search_operations_recursive
+    result = search_operations_recursive(op.body.operations)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/work/shared/users/phd/sk3463/scratch/wt-u2cr/allo/ir/transform.py", line 161, in search_operations_recursive
+    result = search_operations_recursive(op.else_block.operations)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'operations'
+B_EXIT 1
