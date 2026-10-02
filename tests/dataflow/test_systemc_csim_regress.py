@@ -278,3 +278,40 @@ def test_float_ports_pass_the_synthesis_front_end(T):
     with tempfile.TemporaryDirectory() as tmp:
         _synthesis_syntax_check(code, tmp)
 
+
+def _wire_only(N):
+    @df.region()
+    def top(A: int32[N], B: int32[N]):
+        wa: Wire[int32]
+        wb: Wire[int32]
+
+        @df.kernel(mapping=[1], args=[A])
+        def src(a: int32[N]):
+            for i in range(N):
+                wa.put(a[i])
+
+        @df.kernel(mapping=[1], args=[])
+        def inc():
+            for _ in range(N):
+                wb.put(wa.get() + 1)
+
+        @df.kernel(mapping=[1], args=[B])
+        def sink(b: int32[N]):
+            for i in range(N):
+                b[i] = wb.get()
+
+    return top
+
+
+def test_wire_only_kernel_waits_under_synthesis():
+    """C2: a steady-state kernel whose links are all Wires has no handshake to
+    end a cycle, so its synthesized ``while (1)`` needs its own wait(): Catapult
+    refused it with CIN-123. Emission only (no toolchain needed); the
+    `go compile` was checked by hand (docs/source/backends/systemc.rst)."""
+    code = df.build(_wire_only(16), target="systemc").hls_code
+    body = code[code.index("SC_MODULE(inc_0)"):]
+    body = body[: body.index("\n};")]
+    loop = body[body.index("while (1) {  // steady-state loop"):]
+    # the per-iteration wait() is NOT inside an `#ifndef __SYNTHESIS__` guard
+    i = loop.index("wait();  // no handshake in the body")
+    assert "#ifndef __SYNTHESIS__" not in loop[:i].splitlines()[-1]

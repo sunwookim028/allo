@@ -1056,11 +1056,27 @@ void SystemCModuleEmitter::emitAffineFor(affine::AffineForOp op) {  // override 
   emitBlock(*op.getBody());
   // csim only: an SC_THREAD does not yield on its own, so a body issuing non-blocking
   // stream ops needs a per-iteration wait() or peer threads never run. Under synthesis
-  // the PushNB/PopNB handshake supplies the cycle boundary.
-  os << "#ifndef __SYNTHESIS__\n";
+  // the PushNB/PopNB handshake supplies the cycle boundary -- but only where there is
+  // one. A body whose links are all `Wire`s (plain sc_signal read/write) has no
+  // stream or channel op (valid_only channel helpers wait() themselves), so the
+  // synthesized `while (1)` had no wait() and Catapult refused it (CIN-123 "Loop
+  // 'while' in thread 'run' must have a wait"). Such a body gets its wait() under
+  // synthesis too.
+  bool hasHandshake = false;
+  op.walk([&](Operation *o) {
+    if (isa<allo::StreamPutOp, allo::StreamGetOp, allo::StreamTryPutOp,
+            allo::StreamTryGetOp, allo::ChannelPutOp, allo::ChannelGetOp,
+            allo::ChannelTryPutOp, allo::ChannelTryGetOp>(o))
+      hasHandshake = true;
+  });
+  if (hasHandshake)
+    os << "#ifndef __SYNTHESIS__\n";
   indent();
-  os << "wait();\n";
-  os << "#endif\n";
+  os << "wait();" << (hasHandshake ? "" : "  // no handshake in the body: the cycle "
+                                          "boundary, in csim and synthesis")
+     << "\n";
+  if (hasHandshake)
+    os << "#endif\n";
   reduceIndent();
   indent();
   os << "}\n";
