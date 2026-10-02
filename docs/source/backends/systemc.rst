@@ -336,3 +336,19 @@ one design per bug (it skips without ``MGC_HOME`` and ``SYSTEMC_HOME``).
   stream or channel op now gets its ``wait()`` under synthesis too (valid_only
   channel helpers already wait). Checked by hand: the ``bf16_add`` Wire variant
   passes ``go analyze`` and ``go compile`` unpatched.
+- **Float casts did not compile, or truncated** (S4, the MiniTPU multiplier
+  units, ``dev/records/minitpu/u1_mul_2026-10-02.rst``). The shared emitter wrote
+  every cast as ``D v = x;``. ac floats have only explicit constructors, so g++
+  rejected 24 of the 42 float/int pairs among bf16, f16, f32, f64, i8, i32 and
+  ui16 (bf16 -> f32 first). Of the pairs that compiled, int -> bf16 truncated
+  (``ac::bfloat16``'s constructors hard-code ``AC_TRN_ZERO``), where arith rounds
+  to nearest even. The SystemC emitter now writes each such cast through header
+  helpers (``_fstd``, ``_fto``, ``_ito``; float -> int through
+  ``convert_to_ac_int``, toward zero), converting via ``ac_std_float`` with one
+  round-to-nearest-even. The other 40 pairs then match numpy; bf16 <-> f16 fails,
+  earlier, in the MLIR pipeline. Vitis and Catapult output is unchanged (a
+  hook); the Catapult HLS flow keeps the old behaviour.
+- **A ``UInt(24)`` port could not be read back** (S5, same record): ``KeyError:
+  'ui24'``. The data-file reader knew only 8-, 16-, 32- and 64-bit integers. An
+  ``i<N>``/``ui<N>`` of any width up to 64 now reads into the smallest numpy
+  container (``ui24`` -> ``uint32``), as the simulator's argument path accepts it.
