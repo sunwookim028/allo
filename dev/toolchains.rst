@@ -274,8 +274,10 @@ A row marked **unpinned** is an open defect.
      - 2023.2, by install path
      - this page
    * - Verilator
-     - 5.051, ``devel rev vUNKNOWN-built20260904-2286359``
-     - this page
+     - 5.052, conda-forge build ``py312pl5321h9d6c286_0`` (the ladder's pin).
+       ace-01's ``~/.local/bin/verilator`` is an older build, development commit
+       ``228635918ed0`` ("5.051")
+     - ``scripts/verilator-setup.sh``
    * - PyTorch (ACT tutorial)
      - ``torch==2.14.0`` CPU
      - ``docs/source/designs/tinytpu_tutorial.rst``

@@ -164,6 +164,18 @@ not a commitment. Harness work goes into the method-agnostic core first.
   adding interlocks) is an owner's decision, recorded here when made.
 
 
+**D-8 (2026-10-02). The ladder runs on zhang-21.**
+- The unit ladder (U1-U5) and the Catapult track both run on zhang-21, which has
+  Catapult, Xcelium and Vivado (with the ZCU104 part). ace-01 stays usable as a
+  second host, through the csim stand-in.
+- zhang-21 needs two installs, both pinned (`dev/toolchains.rst`):
+  - Verilator 5.052, one exact conda-forge build, installed by
+    `scripts/verilator-setup.sh` into its own prefix. MiniTPU's README names
+    5.051; at its pinned commit its 14-testbench unit suite passes on 5.052
+    (ace-01, 2026-10-02).
+  - `torch==2.14.0` CPU, for the ACT flow.
+- MiniTPU is cloned there by its owner, at the pinned commit.
+
 ## Milestones
 
 Each milestone passes on **one acceptance check** and names the tools it uses
