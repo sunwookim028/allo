@@ -110,6 +110,25 @@ the FIFOs, ``u2_word_array_2026-10-02.rst``, ``u2_fifo_2026-10-02.rst``):
 - Filed: AMC #126 (comment: A1, a failed schedule returns a design);
   MiniTPU #22 (F6, the VMEM sim model is not DC-synthesizable).
 
+**Owner's decisions, 2026-10-02, checkpoint 7:**
+
+- D-11 implementation (``core-stateful`` ``89222da8``, held for review): the
+  old whole-core model's genuine sharing of ``vregs``/``vmem`` across kernels
+  is kept alive by an explicit, **unchecked, simulator-only premise**
+  ``@df.region(shared_stateful={...})``, mirroring ``deadlock_free_because``;
+  HLS backends still refuse. **Transitional**: retired when D-12's ported
+  memories replace ``microarch.py`` (D-4).
+- D-13 implemented (``backend-comb-wire`` ``548ffe3f``, merged here): the
+  ``comb`` regfile is bit-exact at read latency 0 / write-visible 1 on
+  Catapult with no design patch, w16 and w256; DC area equals the hand
+  patch. F3: an **unreset** storage form exists after all (the write as a
+  clock-edge method, no reset action, ``-RESET_CLEARS_ALL_REGS no``): 0
+  reset flops, bit-exact, DC **4,021.9 um^2 vs MiniTPU 4,021.7** -- parity.
+  Not yet emitted (the kernel's writer is its thread); proposed as an
+  explicit marker, owner's call below. Gap: ``@df.unit`` ports are
+  Stream-typed in the netlist, so a ``Wire[T, comb]`` *unit* port is still
+  refused; the marker lives on region-scope links until U3.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
