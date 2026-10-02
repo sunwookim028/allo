@@ -1,0 +1,71 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : mtpu_fifo_257x4
+Version: W-2024.09
+Date   : Fri Oct  2 14:24:35 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: u/rd_ptr_q_reg[0]
+              (rising edge-triggered flip-flop clocked by ideal_clock)
+  Endpoint: pop_data_o[37]
+            (output port clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  mtpu_fifo_257x4    5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                        Fanout     Trans      Incr       Path
+  ---------------------------------------------------------------------
+  clock ideal_clock (rise edge)                      0.00       0.00
+  clock network delay (ideal)                        0.00       0.00
+  u/rd_ptr_q_reg[0]/CK (DFF_X1)            0.00      0.00       0.00 r
+  u/rd_ptr_q_reg[0]/Q (DFF_X1)             0.01      0.08       0.08 f
+  u/rd_ptr_q[0] (net)            2                   0.00       0.08 f
+  U3/A1 (NOR2_X1)                          0.01      0.01       0.10 f
+  U3/ZN (NOR2_X1)                          0.13      0.15       0.25 r
+  n274 (net)                    13                   0.00       0.25 r
+  U4/A (CLKBUF_X1)                         0.13      0.01       0.26 r
+  U4/Z (CLKBUF_X1)                         0.10      0.16       0.42 r
+  n349 (net)                    20                   0.00       0.42 r
+  U52/A (CLKBUF_X1)                        0.10      0.02       0.43 r
+  U52/Z (CLKBUF_X1)                        0.10      0.15       0.59 r
+  n407 (net)                    20                   0.00       0.59 r
+  U162/A (CLKBUF_X1)                       0.10      0.02       0.61 r
+  U162/Z (CLKBUF_X1)                       0.10      0.16       0.76 r
+  n541 (net)                    20                   0.00       0.76 r
+  U187/A (CLKBUF_X1)                       0.10      0.02       0.78 r
+  U187/Z (CLKBUF_X1)                       0.10      0.16       0.94 r
+  n586 (net)                    20                   0.00       0.94 r
+  U188/B1 (AOI22_X1)                       0.10      0.03       0.97 r
+  U188/ZN (AOI22_X1)                       0.03      0.04       1.00 f
+  n94 (net)                      1                   0.00       1.00 f
+  U189/A2 (NAND2_X1)                       0.03      0.01       1.01 f
+  U189/ZN (NAND2_X1)                       0.02      0.04       1.06 r
+  pop_data_o[37] (net)           1                   0.00       1.06 r
+  pop_data_o[37] (out)                     0.02      0.05       1.10 r
+  data arrival time                                             1.10
+
+  clock ideal_clock (rise edge)                      3.33       3.33
+  clock network delay (ideal)                        0.00       3.33
+  output external delay                              0.00       3.33
+  data required time                                            3.33
+  ---------------------------------------------------------------------
+  data required time                                            3.33
+  data arrival time                                            -1.10
+  ---------------------------------------------------------------------
+  slack (MET)                                                   2.23
+
+
+1

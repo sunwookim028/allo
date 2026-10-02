@@ -1,0 +1,82 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : fifo_0
+Version: W-2024.09
+Date   : Fri Oct  2 14:32:01 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: fifo_0_run_inst/while_v26_sva_reg
+              (rising edge-triggered flip-flop clocked by ideal_clock)
+  Endpoint: fifo_0_run_inst/v16_reg[20]
+            (rising edge-triggered flip-flop clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  fifo_0             5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                                       Fanout     Trans      Incr       Path
+  ------------------------------------------------------------------------------------
+  clock ideal_clock (rise edge)                                     0.00       0.00
+  clock network delay (ideal)                                       0.00       0.00
+  fifo_0_run_inst/while_v26_sva_reg/CK (DFFR_X1)          0.00      0.00       0.00 r
+  fifo_0_run_inst/while_v26_sva_reg/QN (DFFR_X1)          0.02      0.08       0.08 f
+  n268 (net)                                    4                   0.00       0.08 f
+  U293/A (AOI21_X1)                                       0.02      0.02       0.09 f
+  U293/ZN (AOI21_X1)                                      0.03      0.06       0.15 r
+  n259 (net)                                    2                   0.00       0.15 r
+  U294/A (INV_X1)                                         0.03      0.01       0.16 r
+  U294/ZN (INV_X1)                                        0.01      0.02       0.18 f
+  n263 (net)                                    3                   0.00       0.18 f
+  U295/A2 (NOR2_X1)                                       0.01      0.01       0.20 f
+  U295/ZN (NOR2_X1)                                       0.04      0.05       0.25 r
+  n167 (net)                                    3                   0.00       0.25 r
+  U296/A (INV_X1)                                         0.04      0.02       0.27 r
+  U296/ZN (INV_X1)                                        0.01      0.02       0.29 f
+  n168 (net)                                    3                   0.00       0.29 f
+  U345/A3 (NOR3_X1)                                       0.01      0.01       0.30 f
+  U345/ZN (NOR3_X1)                                       0.12      0.16       0.46 r
+  n234 (net)                                    7                   0.00       0.46 r
+  U346/A (CLKBUF_X1)                                      0.12      0.01       0.47 r
+  U346/Z (CLKBUF_X1)                                      0.09      0.14       0.61 r
+  n248 (net)                                   15                   0.00       0.61 r
+  U347/A (CLKBUF_X1)                                      0.09      0.01       0.63 r
+  U347/Z (CLKBUF_X1)                                      0.07      0.12       0.74 r
+  n194 (net)                                   12                   0.00       0.74 r
+  U433/S (MUX2_X1)                                        0.07      0.02       0.77 r
+  U433/Z (MUX2_X1)                                        0.01      0.07       0.84 f
+  fifo_0_run_inst/mem_0_sva_dfm_1_mx1[20] (net)
+                                                2                   0.00       0.84 f
+  U435/B2 (AOI22_X1)                                      0.01      0.01       0.85 f
+  U435/ZN (AOI22_X1)                                      0.03      0.05       0.90 r
+  n195 (net)                                    1                   0.00       0.90 r
+  U436/A2 (NAND2_X1)                                      0.03      0.01       0.91 r
+  U436/ZN (NAND2_X1)                                      0.01      0.02       0.93 f
+  n141 (net)                                    1                   0.00       0.93 f
+  fifo_0_run_inst/v16_reg[20]/D (DFFR_X1)                 0.01      0.01       0.93 f
+  data arrival time                                                            0.93
+
+  clock ideal_clock (rise edge)                                     3.33       3.33
+  clock network delay (ideal)                                       0.00       3.33
+  fifo_0_run_inst/v16_reg[20]/CK (DFFR_X1)                          0.00       3.33 r
+  library setup time                                               -0.04       3.29
+  data required time                                                           3.29
+  ------------------------------------------------------------------------------------
+  data required time                                                           3.29
+  data arrival time                                                           -0.93
+  ------------------------------------------------------------------------------------
+  slack (MET)                                                                  2.35
+
+
+1

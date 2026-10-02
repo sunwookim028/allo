@@ -1,0 +1,81 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : mtpu_fifo_32x4
+Version: W-2024.09
+Date   : Fri Oct  2 14:19:44 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: u/count_q_reg[0]
+              (rising edge-triggered flip-flop clocked by ideal_clock)
+  Endpoint: u/count_q_reg[2]
+            (rising edge-triggered flip-flop clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  mtpu_fifo_32x4     5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                        Fanout     Trans      Incr       Path
+  ---------------------------------------------------------------------
+  clock ideal_clock (rise edge)                      0.00       0.00
+  clock network delay (ideal)                        0.00       0.00
+  u/count_q_reg[0]/CK (DFF_X1)             0.00      0.00       0.00 r
+  u/count_q_reg[0]/Q (DFF_X1)              0.02      0.10       0.10 f
+  u/count_q[0] (net)             7                   0.00       0.10 f
+  U144/A2 (NOR3_X1)                        0.02      0.02       0.11 f
+  U144/ZN (NOR3_X1)                        0.08      0.11       0.22 r
+  full_o (net)                   2                   0.00       0.22 r
+  U149/A (INV_X1)                          0.08      0.01       0.24 r
+  U149/ZN (INV_X1)                         0.02      0.01       0.25 f
+  n104 (net)                     1                   0.00       0.25 f
+  U150/B2 (OAI21_X1)                       0.02      0.01       0.26 f
+  U150/ZN (OAI21_X1)                       0.05      0.07       0.33 r
+  n197 (net)                     4                   0.00       0.33 r
+  U151/A2 (NOR2_X1)                        0.05      0.02       0.34 r
+  U151/ZN (NOR2_X1)                        0.02      0.02       0.37 f
+  n106 (net)                     3                   0.00       0.37 f
+  U153/A (INV_X1)                          0.02      0.01       0.38 f
+  U153/ZN (INV_X1)                         0.02      0.03       0.41 r
+  n184 (net)                     3                   0.00       0.41 r
+  U154/B1 (AOI22_X1)                       0.02      0.02       0.43 r
+  U154/ZN (AOI22_X1)                       0.02      0.03       0.45 f
+  n187 (net)                     2                   0.00       0.45 f
+  U155/A (AOI221_X1)                       0.02      0.01       0.47 f
+  U155/ZN (AOI221_X1)                      0.04      0.08       0.54 r
+  n105 (net)                     1                   0.00       0.54 r
+  U156/A (INV_X1)                          0.04      0.01       0.55 r
+  U156/ZN (INV_X1)                         0.01      0.01       0.56 f
+  n108 (net)                     1                   0.00       0.56 f
+  U159/A (MUX2_X1)                         0.01      0.01       0.57 f
+  U159/Z (MUX2_X1)                         0.01      0.06       0.63 f
+  u/N43 (net)                    1                   0.00       0.63 f
+  U15/A1 (AND2_X1)                         0.01      0.01       0.63 f
+  U15/ZN (AND2_X1)                         0.01      0.03       0.66 f
+  n15 (net)                      1                   0.00       0.66 f
+  u/count_q_reg[2]/D (DFF_X1)              0.01      0.01       0.67 f
+  data arrival time                                             0.67
+
+  clock ideal_clock (rise edge)                      2.00       2.00
+  clock network delay (ideal)                        0.00       2.00
+  u/count_q_reg[2]/CK (DFF_X1)                       0.00       2.00 r
+  library setup time                                -0.04       1.96
+  data required time                                            1.96
+  ---------------------------------------------------------------------
+  data required time                                            1.96
+  data arrival time                                            -0.67
+  ---------------------------------------------------------------------
+  slack (MET)                                                   1.29
+
+
+1

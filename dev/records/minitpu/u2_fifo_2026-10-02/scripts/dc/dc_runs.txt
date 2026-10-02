@@ -1,0 +1,15 @@
+# $M = MiniTPU src/core, $R = this dir, $S = scratch/u2ff/cat (Catapult projects)
+m_fifo32x4_3p33       mtpu_fifo_32x4        clk_i 3.33 $M/vpu/vpu_fifo.sv $R/mtpu_fifo_32x4.sv
+m_fifo32x4_oreg_3p33  mtpu_fifo_32x4_oreg   clk   3.33 $M/vpu/vpu_fifo.sv $R/mtpu_fifo_oreg.sv $R/mtpu_fifo_32x4.sv
+m_fifo32x4_2p0        mtpu_fifo_32x4        clk_i 2.0  $M/vpu/vpu_fifo.sv $R/mtpu_fifo_32x4.sv
+m_fifo32x4_oreg_2p0   mtpu_fifo_32x4_oreg   clk   2.0  $M/vpu/vpu_fifo.sv $R/mtpu_fifo_oreg.sv $R/mtpu_fifo_32x4.sv
+m_fifo64x16_3p33      mtpu_fifo_64x16       clk_i 3.33 $M/vpu/vpu_fifo.sv $R/mtpu_fifo_64x16.sv
+m_fifo64x16_oreg_3p33 mtpu_fifo_64x16_oreg  clk   3.33 $M/vpu/vpu_fifo.sv $R/mtpu_fifo_oreg.sv $R/mtpu_fifo_64x16.sv
+m_fifo257x4_3p33      mtpu_fifo_257x4       clk_i 3.33 $M/vpu/vpu_fifo.sv $R/mtpu_fifo_257x4.sv
+m_fifo257x4_oreg_3p33 mtpu_fifo_257x4_oreg  clk   3.33 $M/vpu/vpu_fifo.sv $R/mtpu_fifo_oreg.sv $R/mtpu_fifo_257x4.sv
+c_w_fifo32x4_part_3p33    fifo_0 clk 3.33 $S/wire_part_w32_3p33.prj/build/Catapult/fifo_0.v1/concat_rtl.v
+c_w_fifo32x4_3p33         fifo_0 clk 3.33 $S/wire_w32_3p33.prj/build/Catapult/fifo_0.v1/concat_rtl.v
+c_w_fifo32x4_part_2p0     fifo_0 clk 2.0  $S/wire_part_w32_2p0.prj/build/Catapult/fifo_0.v1/concat_rtl.v
+c_w_fifo64x16_part_3p33   fifo_0 clk 3.33 $S/wire_part_w64d16_3p33.prj/build/Catapult/fifo_0.v1/concat_rtl.v
+c_w_fifo257x4_part_3p33   fifo_0 clk 3.33 $S/wire_part_w257_3p33.prj/build/Catapult/fifo_0.v1/concat_rtl.v
+c_w_fifo32x4_np_part_3p33 fifo_0 clk 3.33 $S/wire_np_part_w32_3p33.prj/build/Catapult/fifo_0.v1/concat_rtl.v

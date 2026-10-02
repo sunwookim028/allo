@@ -1,0 +1,3 @@
+RTL vpu_fifo:w32d4: 400 cycles in 7 traces, 1158 defined slots, RTL vs reference on defined: 1158/1158 (0.0s)
+loc("-":2:3): error: cannot be converted to LLVM IR: missing `LLVMTranslationDialectInterface` registration for dialect for op: func.func
+UNIT-FAIL  vpu_fifo wire simulator: RuntimeError: Failure while creating the ExecutionEngine.

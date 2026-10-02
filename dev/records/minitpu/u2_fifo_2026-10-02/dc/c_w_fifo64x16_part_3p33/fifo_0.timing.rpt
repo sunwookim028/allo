@@ -1,0 +1,213 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : fifo_0
+Version: W-2024.09
+Date   : Fri Oct  2 14:26:42 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: fifo_0_run_inst/while_v20_while_v20_nor_mdf_sva_reg
+              (rising edge-triggered flip-flop clocked by ideal_clock)
+  Endpoint: fifo_0_run_inst/v17_reg
+            (rising edge-triggered flip-flop clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  fifo_0             5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                                       Fanout     Trans      Incr       Path
+  ------------------------------------------------------------------------------------
+  clock ideal_clock (rise edge)                                     0.00       0.00
+  clock network delay (ideal)                                       0.00       0.00
+  fifo_0_run_inst/while_v20_while_v20_nor_mdf_sva_reg/CK (DFFS_X1)
+                                                          0.00      0.00       0.00 r
+  fifo_0_run_inst/while_v20_while_v20_nor_mdf_sva_reg/Q (DFFS_X1)
+                                                          0.01      0.09       0.09 r
+  fifo_0_run_inst/while_v20_while_v20_nor_mdf_sva (net)
+                                                1                   0.00       0.09 r
+  fifo_0_run_inst/U64/B2 (AOI21_X1)                       0.01      0.01       0.10 r
+  fifo_0_run_inst/U64/ZN (AOI21_X1)                       0.02      0.03       0.13 f
+  fifo_0_run_inst/n6 (net)                      4                   0.00       0.13 f
+  fifo_0_run_inst/U11/A (INV_X1)                          0.02      0.02       0.14 f
+  fifo_0_run_inst/U11/ZN (INV_X1)                         0.03      0.04       0.18 r
+  fifo_0_run_inst/n952 (net)                    5                   0.00       0.18 r
+  fifo_0_run_inst/U12/A (INV_X2)                          0.03      0.03       0.22 r
+  fifo_0_run_inst/U12/ZN (INV_X2)                         0.03      0.05       0.27 f
+  fifo_0_run_inst/n929 (net)                   20                   0.00       0.27 f
+  fifo_0_run_inst/U70/A1 (NAND2_X1)                       0.03      0.03       0.29 f
+  fifo_0_run_inst/U70/ZN (NAND2_X1)                       0.01      0.02       0.32 r
+  fifo_0_run_inst/n8 (net)                      1                   0.00       0.32 r
+  fifo_0_run_inst/U72/A2 (NAND3_X1)                       0.01      0.01       0.33 r
+  fifo_0_run_inst/U72/ZN (NAND3_X1)                       0.02      0.04       0.36 f
+  fifo_0_run_inst/n66 (net)                     3                   0.00       0.36 f
+  fifo_0_run_inst/U73/A1 (NAND2_X1)                       0.02      0.01       0.38 f
+  fifo_0_run_inst/U73/ZN (NAND2_X1)                       0.02      0.02       0.40 r
+  fifo_0_run_inst/n12 (net)                     1                   0.00       0.40 r
+  fifo_0_run_inst/U76/A1 (NAND3_X1)                       0.02      0.01       0.41 r
+  fifo_0_run_inst/U76/ZN (NAND3_X1)                       0.01      0.02       0.44 f
+  fifo_0_run_inst/n67 (net)                     1                   0.00       0.44 f
+  fifo_0_run_inst/U161/CI (FA_X1)                         0.01      0.02       0.46 f
+  fifo_0_run_inst/U161/CO (FA_X1)                         0.01      0.07       0.53 f
+  fifo_0_run_inst/n68 (net)                     1                   0.00       0.53 f
+  fifo_0_run_inst/U163/CI (FA_X1)                         0.01      0.02       0.55 f
+  fifo_0_run_inst/U163/CO (FA_X1)                         0.02      0.08       0.63 f
+  fifo_0_run_inst/n98 (net)                     3                   0.00       0.63 f
+  fifo_0_run_inst/U77/A1 (NAND2_X1)                       0.02      0.01       0.64 f
+  fifo_0_run_inst/U77/ZN (NAND2_X1)                       0.02      0.02       0.66 r
+  fifo_0_run_inst/n15 (net)                     1                   0.00       0.66 r
+  fifo_0_run_inst/U80/A1 (NAND3_X1)                       0.02      0.01       0.67 r
+  fifo_0_run_inst/U80/ZN (NAND3_X1)                       0.01      0.02       0.70 f
+  fifo_0_run_inst/n69 (net)                     1                   0.00       0.70 f
+  fifo_0_run_inst/U165/CI (FA_X1)                         0.01      0.02       0.72 f
+  fifo_0_run_inst/U165/CO (FA_X1)                         0.02      0.08       0.80 f
+  fifo_0_run_inst/n17 (net)                     3                   0.00       0.80 f
+  fifo_0_run_inst/U85/A1 (NAND2_X1)                       0.02      0.01       0.81 f
+  fifo_0_run_inst/U85/ZN (NAND2_X1)                       0.01      0.02       0.83 r
+  fifo_0_run_inst/n19 (net)                     1                   0.00       0.83 r
+  fifo_0_run_inst/U87/A2 (NAND3_X1)                       0.01      0.01       0.84 r
+  fifo_0_run_inst/U87/ZN (NAND3_X1)                       0.01      0.02       0.87 f
+  fifo_0_run_inst/n21 (net)                     1                   0.00       0.87 f
+  fifo_0_run_inst/U89/CI (FA_X1)                          0.01      0.02       0.89 f
+  fifo_0_run_inst/U89/CO (FA_X1)                          0.01      0.07       0.96 f
+  fifo_0_run_inst/n22 (net)                     1                   0.00       0.96 f
+  fifo_0_run_inst/U91/CI (FA_X1)                          0.01      0.02       0.98 f
+  fifo_0_run_inst/U91/CO (FA_X1)                          0.02      0.08       1.06 f
+  fifo_0_run_inst/n24 (net)                     3                   0.00       1.06 f
+  fifo_0_run_inst/U95/A1 (NAND2_X1)                       0.02      0.01       1.07 f
+  fifo_0_run_inst/U95/ZN (NAND2_X1)                       0.02      0.02       1.09 r
+  fifo_0_run_inst/n27 (net)                     1                   0.00       1.09 r
+  fifo_0_run_inst/U98/A1 (NAND3_X1)                       0.02      0.01       1.10 r
+  fifo_0_run_inst/U98/ZN (NAND3_X1)                       0.02      0.04       1.14 f
+  fifo_0_run_inst/n32 (net)                     3                   0.00       1.14 f
+  fifo_0_run_inst/U107/A1 (NAND2_X1)                      0.02      0.01       1.15 f
+  fifo_0_run_inst/U107/ZN (NAND2_X1)                      0.02      0.02       1.17 r
+  fifo_0_run_inst/n36 (net)                     1                   0.00       1.17 r
+  fifo_0_run_inst/U110/A1 (NAND3_X1)                      0.02      0.01       1.19 r
+  fifo_0_run_inst/U110/ZN (NAND3_X1)                      0.01      0.02       1.21 f
+  fifo_0_run_inst/n37 (net)                     1                   0.00       1.21 f
+  fifo_0_run_inst/U112/CI (FA_X1)                         0.01      0.02       1.23 f
+  fifo_0_run_inst/U112/CO (FA_X1)                         0.02      0.08       1.31 f
+  fifo_0_run_inst/n39 (net)                     3                   0.00       1.31 f
+  fifo_0_run_inst/U117/A1 (NAND2_X1)                      0.02      0.01       1.32 f
+  fifo_0_run_inst/U117/ZN (NAND2_X1)                      0.01      0.02       1.34 r
+  fifo_0_run_inst/n41 (net)                     1                   0.00       1.34 r
+  fifo_0_run_inst/U119/A2 (NAND3_X1)                      0.01      0.01       1.36 r
+  fifo_0_run_inst/U119/ZN (NAND3_X1)                      0.01      0.02       1.38 f
+  fifo_0_run_inst/n43 (net)                     1                   0.00       1.38 f
+  fifo_0_run_inst/U122/CI (FA_X1)                         0.01      0.02       1.40 f
+  fifo_0_run_inst/U122/CO (FA_X1)                         0.02      0.08       1.48 f
+  fifo_0_run_inst/n74 (net)                     3                   0.00       1.48 f
+  fifo_0_run_inst/U123/A1 (NAND2_X1)                      0.02      0.01       1.49 f
+  fifo_0_run_inst/U123/ZN (NAND2_X1)                      0.02      0.02       1.51 r
+  fifo_0_run_inst/n46 (net)                     1                   0.00       1.51 r
+  fifo_0_run_inst/U126/A1 (NAND3_X1)                      0.02      0.01       1.53 r
+  fifo_0_run_inst/U126/ZN (NAND3_X1)                      0.02      0.04       1.56 f
+  fifo_0_run_inst/n76 (net)                     3                   0.00       1.56 f
+  fifo_0_run_inst/U127/A1 (NAND2_X1)                      0.02      0.01       1.58 f
+  fifo_0_run_inst/U127/ZN (NAND2_X1)                      0.02      0.02       1.60 r
+  fifo_0_run_inst/n49 (net)                     1                   0.00       1.60 r
+  fifo_0_run_inst/U130/A1 (NAND3_X1)                      0.02      0.01       1.61 r
+  fifo_0_run_inst/U130/ZN (NAND3_X1)                      0.02      0.04       1.64 f
+  fifo_0_run_inst/n78 (net)                     3                   0.00       1.64 f
+  fifo_0_run_inst/U131/A1 (NAND2_X1)                      0.02      0.01       1.66 f
+  fifo_0_run_inst/U131/ZN (NAND2_X1)                      0.02      0.02       1.68 r
+  fifo_0_run_inst/n52 (net)                     1                   0.00       1.68 r
+  fifo_0_run_inst/U134/A1 (NAND3_X1)                      0.02      0.01       1.69 r
+  fifo_0_run_inst/U134/ZN (NAND3_X1)                      0.01      0.02       1.72 f
+  fifo_0_run_inst/n79 (net)                     1                   0.00       1.72 f
+  fifo_0_run_inst/U178/CI (FA_X1)                         0.01      0.02       1.73 f
+  fifo_0_run_inst/U178/CO (FA_X1)                         0.01      0.07       1.81 f
+  fifo_0_run_inst/n80 (net)                     1                   0.00       1.81 f
+  fifo_0_run_inst/U180/CI (FA_X1)                         0.01      0.02       1.82 f
+  fifo_0_run_inst/U180/CO (FA_X1)                         0.01      0.07       1.90 f
+  fifo_0_run_inst/n81 (net)                     1                   0.00       1.90 f
+  fifo_0_run_inst/U182/CI (FA_X1)                         0.01      0.02       1.91 f
+  fifo_0_run_inst/U182/CO (FA_X1)                         0.01      0.07       1.99 f
+  fifo_0_run_inst/n82 (net)                     1                   0.00       1.99 f
+  fifo_0_run_inst/U184/CI (FA_X1)                         0.01      0.02       2.01 f
+  fifo_0_run_inst/U184/CO (FA_X1)                         0.01      0.07       2.08 f
+  fifo_0_run_inst/n83 (net)                     1                   0.00       2.08 f
+  fifo_0_run_inst/U186/CI (FA_X1)                         0.01      0.02       2.10 f
+  fifo_0_run_inst/U186/CO (FA_X1)                         0.02      0.08       2.18 f
+  fifo_0_run_inst/n85 (net)                     3                   0.00       2.18 f
+  fifo_0_run_inst/U135/A1 (NAND2_X1)                      0.02      0.01       2.19 f
+  fifo_0_run_inst/U135/ZN (NAND2_X1)                      0.02      0.02       2.21 r
+  fifo_0_run_inst/n55 (net)                     1                   0.00       2.21 r
+  fifo_0_run_inst/U138/A1 (NAND3_X1)                      0.02      0.01       2.22 r
+  fifo_0_run_inst/U138/ZN (NAND3_X1)                      0.01      0.02       2.25 f
+  fifo_0_run_inst/n86 (net)                     1                   0.00       2.25 f
+  fifo_0_run_inst/U191/CI (FA_X1)                         0.01      0.02       2.27 f
+  fifo_0_run_inst/U191/CO (FA_X1)                         0.02      0.08       2.35 f
+  fifo_0_run_inst/n88 (net)                     3                   0.00       2.35 f
+  fifo_0_run_inst/U139/A1 (NAND2_X1)                      0.02      0.01       2.36 f
+  fifo_0_run_inst/U139/ZN (NAND2_X1)                      0.02      0.02       2.38 r
+  fifo_0_run_inst/n58 (net)                     1                   0.00       2.38 r
+  fifo_0_run_inst/U142/A1 (NAND3_X1)                      0.02      0.01       2.39 r
+  fifo_0_run_inst/U142/ZN (NAND3_X1)                      0.01      0.02       2.42 f
+  fifo_0_run_inst/n89 (net)                     1                   0.00       2.42 f
+  fifo_0_run_inst/U195/CI (FA_X1)                         0.01      0.02       2.44 f
+  fifo_0_run_inst/U195/CO (FA_X1)                         0.01      0.07       2.51 f
+  fifo_0_run_inst/n90 (net)                     1                   0.00       2.51 f
+  fifo_0_run_inst/U196/CI (FA_X1)                         0.01      0.02       2.53 f
+  fifo_0_run_inst/U196/CO (FA_X1)                         0.01      0.07       2.60 f
+  fifo_0_run_inst/n91 (net)                     1                   0.00       2.60 f
+  fifo_0_run_inst/U197/CI (FA_X1)                         0.01      0.02       2.62 f
+  fifo_0_run_inst/U197/CO (FA_X1)                         0.01      0.07       2.69 f
+  fifo_0_run_inst/n92 (net)                     1                   0.00       2.69 f
+  fifo_0_run_inst/U198/CI (FA_X1)                         0.01      0.02       2.71 f
+  fifo_0_run_inst/U198/CO (FA_X1)                         0.02      0.08       2.79 f
+  fifo_0_run_inst/n94 (net)                     3                   0.00       2.79 f
+  fifo_0_run_inst/U144/A2 (NAND2_X1)                      0.02      0.01       2.80 f
+  fifo_0_run_inst/U144/ZN (NAND2_X1)                      0.01      0.02       2.83 r
+  fifo_0_run_inst/n60 (net)                     1                   0.00       2.83 r
+  fifo_0_run_inst/U146/A2 (NAND3_X1)                      0.01      0.01       2.84 r
+  fifo_0_run_inst/U146/ZN (NAND3_X1)                      0.02      0.04       2.87 f
+  fifo_0_run_inst/n923 (net)                    3                   0.00       2.87 f
+  fifo_0_run_inst/U147/B (XNOR2_X1)                       0.02      0.02       2.89 f
+  fifo_0_run_inst/U147/ZN (XNOR2_X1)                      0.01      0.05       2.94 f
+  fifo_0_run_inst/n887 (net)                    2                   0.00       2.94 f
+  fifo_0_run_inst/U2099/A1 (NOR4_X1)                      0.01      0.01       2.95 f
+  fifo_0_run_inst/U2099/ZN (NOR4_X1)                      0.04      0.05       3.00 r
+  fifo_0_run_inst/n898 (net)                    1                   0.00       3.00 r
+  fifo_0_run_inst/U2102/A1 (NAND3_X1)                     0.04      0.01       3.02 r
+  fifo_0_run_inst/U2102/ZN (NAND3_X1)                     0.02      0.03       3.04 f
+  fifo_0_run_inst/n920 (net)                    1                   0.00       3.04 f
+  fifo_0_run_inst/U2108/A3 (NOR4_X1)                      0.02      0.01       3.05 f
+  fifo_0_run_inst/U2108/ZN (NOR4_X1)                      0.04      0.08       3.13 r
+  fifo_0_run_inst/n930 (net)                    1                   0.00       3.13 r
+  fifo_0_run_inst/U2115/A1 (NAND2_X1)                     0.04      0.01       3.15 r
+  fifo_0_run_inst/U2115/ZN (NAND2_X1)                     0.02      0.03       3.17 f
+  fifo_0_run_inst/n932 (net)                    2                   0.00       3.17 f
+  fifo_0_run_inst/U2118/B2 (OAI21_X1)                     0.02      0.01       3.18 f
+  fifo_0_run_inst/U2118/ZN (OAI21_X1)                     0.02      0.04       3.22 r
+  fifo_0_run_inst/n739 (net)                    2                   0.00       3.22 r
+  fifo_0_run_inst/U2119/A1 (OR2_X1)                       0.02      0.01       3.23 r
+  fifo_0_run_inst/U2119/ZN (OR2_X1)                       0.01      0.03       3.26 r
+  fifo_0_run_inst/N94 (net)                     1                   0.00       3.26 r
+  fifo_0_run_inst/v17_reg/D (DFFR_X1)                     0.01      0.01       3.27 r
+  data arrival time                                                            3.27
+
+  clock ideal_clock (rise edge)                                     3.33       3.33
+  clock network delay (ideal)                                       0.00       3.33
+  fifo_0_run_inst/v17_reg/CK (DFFR_X1)                              0.00       3.33 r
+  library setup time                                               -0.03       3.30
+  data required time                                                           3.30
+  ------------------------------------------------------------------------------------
+  data required time                                                           3.30
+  data arrival time                                                           -3.27
+  ------------------------------------------------------------------------------------
+  slack (MET)                                                                  0.03
+
+
+1

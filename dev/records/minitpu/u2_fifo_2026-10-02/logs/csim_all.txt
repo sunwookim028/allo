@@ -1,0 +1,81 @@
+== systemc w32d4 trace exit 0
+RTL vpu_fifo:w32d4: 80092 cycles in 10 traces, 213166 defined slots, RTL vs reference on defined: 213166/213166 (0.3s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+UNIT-MATCH vpu_fifo:w32d4 trace systemc 213166/213166 defined (27110 masked: empty=27105, pre-reset=3, uninit=2; allo==rtl on 27106) cycle=per-iteration, time unchecked (build 0.3s, run 6.6s)
+== systemc w32d4 ported exit 0
+RTL vpu_fifo:w32d4: 80092 cycles in 10 traces, 213166 defined slots, RTL vs reference on defined: 213166/213166 (0.3s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+UNIT-MATCH vpu_fifo:w32d4 ported systemc 213166/213166 defined (27110 masked: empty=27105, pre-reset=3, uninit=2; allo==rtl on 27106) cycle=per-iteration, time unchecked (build 0.5s, run 6.8s)
+== systemc w32d4 stream exit 0
+RTL vpu_fifo:w32d4: 80092 cycles in 10 traces, 213166 defined slots, RTL vs reference on defined: 213166/213166 (0.3s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+UNIT-MATCH vpu_fifo:w32d4 stream systemc 213166/213166 defined (27110 masked: empty=27105, pre-reset=3, uninit=2; allo==rtl on 1608) cycle=per-iteration, time unchecked (build 0.2s, run 6.3s)
+== systemc w32d4 stream_raw exit 1
+RTL vpu_fifo:w32d4: 80092 cycles in 10 traces, 213166 defined slots, RTL vs reference on defined: 213166/213166 (0.3s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+UNIT-DIFF  vpu_fifo:w32d4 stream_raw systemc 156760/213166 defined (27110 masked: empty=27105, pre-reset=3, uninit=2; allo==rtl on 1214) cycle=per-iteration, time unchecked (build 0.3s, run 6.2s)
+    differing defined slots by trace: fill-full-passthrough-drain=5, wrap-half-full=1, push+pop-on-empty=6, overflow=12, reset-mid-stream=3, random-legal-0=8228, random-legal-1=7864, random-any-0=20899, random-any-1=19387, underflow=1
+    e.g. fill-full-passthrough-drain cycle 3 pop_data_o: allo 0 rtl 59609c83
+    e.g. fill-full-passthrough-drain cycle 4 pop_data_o: allo 0 rtl 59609c83
+== systemc w32d4 wire exit 1
+RTL vpu_fifo:w32d4: 80092 cycles in 10 traces, 213166 defined slots, RTL vs reference on defined: 213166/213166 (0.3s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+UNIT-DIFF  vpu_fifo:w32d4 wire systemc 150379/213166 defined (27110 masked: empty=27105, pre-reset=3, uninit=2; allo==rtl on 9828) cycle=per-iteration, time unchecked (build 0.5s, run 6.4s)
+    differing defined slots by trace: fill-full-passthrough-drain=30, wrap-half-full=17, push+pop-on-empty=9, overflow=20, underflow=4, reset-mid-stream=13, random-legal-0=17386, random-legal-1=17228, random-any-0=14534, random-any-1=13546
+    e.g. fill-full-passthrough-drain cycle 3 pop_data_o: allo 0 rtl 59609c83
+    e.g. fill-full-passthrough-drain cycle 4 pop_data_o: allo 0 rtl 59609c83
+== systemc output trace exit 1
+RTL vpu_fifo:output: 80240 cycles in 12 traces, 219756 defined slots, RTL vs reference on defined: 219756/219756 (0.3s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+UNIT-DIFF  vpu_fifo:output trace systemc 160478/219756 defined (20964 masked: empty=20959, pre-reset=3, uninit=2; allo==rtl on 1) cycle=per-iteration, time unchecked (build 0.2s, run 5.7s)
+    differing defined slots by trace: fill-full-passthrough-drain=39, wrap-half-full=55, push+pop-on-empty=4, overflow=35, underflow=1, reset-mid-stream=5, random-legal-0=15511, random-legal-1=15827, random-any-0=13694, random-any-1=14102, tb_mxu_single_port lane 0=3, tb_mxu_single_port lane 1=2
+    e.g. fill-full-passthrough-drain cycle 3 pop_data_o: allo 7fffffffffffffff rtl c9f71e7195b89619
+    e.g. fill-full-passthrough-drain cycle 4 pop_data_o: allo 7fffffffffffffff rtl c9f71e7195b89619
+== systemc output ported exit 1
+RTL vpu_fifo:output: 80240 cycles in 12 traces, 219756 defined slots, RTL vs reference on defined: 219756/219756 (0.3s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+UNIT-DIFF  vpu_fifo:output ported systemc 160478/219756 defined (20964 masked: empty=20959, pre-reset=3, uninit=2; allo==rtl on 1) cycle=per-iteration, time unchecked (build 0.5s, run 6.4s)
+    differing defined slots by trace: fill-full-passthrough-drain=39, wrap-half-full=55, push+pop-on-empty=4, overflow=35, underflow=1, reset-mid-stream=5, random-legal-0=15511, random-legal-1=15827, random-any-0=13694, random-any-1=14102, tb_mxu_single_port lane 0=3, tb_mxu_single_port lane 1=2
+    e.g. fill-full-passthrough-drain cycle 3 pop_data_o: allo 7fffffffffffffff rtl c9f71e7195b89619
+    e.g. fill-full-passthrough-drain cycle 4 pop_data_o: allo 7fffffffffffffff rtl c9f71e7195b89619
+== systemc output stream exit 1
+RTL vpu_fifo:output: 80240 cycles in 12 traces, 219756 defined slots, RTL vs reference on defined: 219756/219756 (0.3s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+UNIT-DIFF  vpu_fifo:output stream systemc 160478/219756 defined (20964 masked: empty=20959, pre-reset=3, uninit=2; allo==rtl on 1) cycle=per-iteration, time unchecked (build 0.3s, run 5.6s)
+    differing defined slots by trace: fill-full-passthrough-drain=39, wrap-half-full=55, push+pop-on-empty=4, overflow=35, underflow=1, reset-mid-stream=5, random-legal-0=15511, random-legal-1=15827, random-any-0=13694, random-any-1=14102, tb_mxu_single_port lane 0=3, tb_mxu_single_port lane 1=2
+    e.g. fill-full-passthrough-drain cycle 3 pop_data_o: allo 7fffffffffffffff rtl c9f71e7195b89619
+    e.g. fill-full-passthrough-drain cycle 4 pop_data_o: allo 7fffffffffffffff rtl c9f71e7195b89619
+== systemc output stream_raw exit 1
+RTL vpu_fifo:output: 80240 cycles in 12 traces, 219756 defined slots, RTL vs reference on defined: 219756/219756 (0.3s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+UNIT-DIFF  vpu_fifo:output stream_raw systemc 147460/219756 defined (20964 masked: empty=20959, pre-reset=3, uninit=2; allo==rtl on 772) cycle=per-iteration, time unchecked (build 0.2s, run 5.9s)
+    differing defined slots by trace: fill-full-passthrough-drain=39, wrap-half-full=55, push+pop-on-empty=7, overflow=40, underflow=2, reset-mid-stream=5, random-legal-0=15110, random-legal-1=15345, random-any-0=20875, random-any-1=20812, tb_mxu_single_port lane 0=4, tb_mxu_single_port lane 1=2
+    e.g. fill-full-passthrough-drain cycle 3 pop_data_o: allo 0 rtl c9f71e7195b89619
+    e.g. fill-full-passthrough-drain cycle 4 pop_data_o: allo 0 rtl c9f71e7195b89619
+== systemc output wire exit 1
+RTL vpu_fifo:output: 80240 cycles in 12 traces, 219756 defined slots, RTL vs reference on defined: 219756/219756 (0.3s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+UNIT-DIFF  vpu_fifo:output wire systemc 146159/219756 defined (20964 masked: empty=20959, pre-reset=3, uninit=2; allo==rtl on 2) cycle=per-iteration, time unchecked (build 0.5s, run 5.8s)
+    differing defined slots by trace: fill-full-passthrough-drain=54, wrap-half-full=59, push+pop-on-empty=9, overflow=47, underflow=4, reset-mid-stream=13, random-legal-0=19767, random-legal-1=19692, random-any-0=16600, random-any-1=17334, tb_mxu_single_port lane 0=11, tb_mxu_single_port lane 1=7
+    e.g. fill-full-passthrough-drain cycle 3 pop_data_o: allo 0 rtl c9f71e7195b89619
+    e.g. fill-full-passthrough-drain cycle 4 pop_data_o: allo 0 rtl c9f71e7195b89619

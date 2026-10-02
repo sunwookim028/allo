@@ -1,0 +1,11 @@
+B7 simulator try_put result used: empty() after each put = [0, 0, 0, 0] (expected [0, 0, 0, 0])
+B7 simulator try_put result UNUSED: empty() after each put = [1, 1, 1, 1] (expected [0, 0, 0, 0])
+B7 systemc try_put result used: empty() after each put = [0, 0, 0, 0] (expected [0, 0, 0, 0])
+B7 systemc try_put result UNUSED: empty() after each put = [0, 0, 0, 0] (expected [0, 0, 0, 0])
+S8 simulator: in ['0x1', '0x7fffffffffffffff', '0x8000000000000000', '0x3'] out ['0x1', '0x7fffffffffffffff', '0x8000000000000000', '0x3'] (expected equal)
+S8 systemc: in ['0x1', '0x7fffffffffffffff', '0x8000000000000000', '0x3'] out ['0x1', '0x7fffffffffffffff', '0x7fffffffffffffff', '0x7fffffffffffffff'] (expected equal)
+S9 simulator: full() after try_put #1..6 into Stream[int32, 4] = [0, 0, 0, 1, 1, 1] (expected [0, 0, 0, 1, 1, 1])
+S9 systemc: full() after try_put #1..6 into Stream[int32, 4] = [0, 0, 0, 1, 0, 0] (expected [0, 0, 0, 1, 1, 1])
+M3 FAILED: MLIRError: Failure while executing pass pipeline:
+M3 simulator: empty() after push+pop on empty = [0, 0] (Stream keeps the word: 0; the RTL loses it: 1)
+M3 systemc: empty() after push+pop on empty = [0, 0] (Stream keeps the word: 0; the RTL loses it: 1)

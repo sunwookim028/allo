@@ -1,0 +1,79 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : mtpu_fifo_64x16
+Version: W-2024.09
+Date   : Fri Oct  2 14:21:58 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: u/rd_ptr_q_reg[0]
+              (rising edge-triggered flip-flop clocked by ideal_clock)
+  Endpoint: pop_data_o[25]
+            (output port clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  mtpu_fifo_64x16    5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                                       Fanout     Trans      Incr       Path
+  ------------------------------------------------------------------------------------
+  clock ideal_clock (rise edge)                                     0.00       0.00
+  clock network delay (ideal)                                       0.00       0.00
+  u/rd_ptr_q_reg[0]/CK (DFF_X1)                           0.00      0.00       0.00 r
+  u/rd_ptr_q_reg[0]/QN (DFF_X1)                           0.03      0.09       0.09 f
+  u/n714 (net)                                  8                   0.00       0.09 f
+  u/U29/A3 (NOR3_X1)                                      0.03      0.02       0.11 f
+  u/U29/ZN (NOR3_X1)                                      0.06      0.09       0.20 r
+  u/n762 (net)                                  3                   0.00       0.20 r
+  u/U33/A (INV_X1)                                        0.06      0.02       0.22 r
+  u/U33/ZN (INV_X1)                                       0.01      0.01       0.23 f
+  u/n15 (net)                                   1                   0.00       0.23 f
+  u/U34/A2 (NOR2_X1)                                      0.01      0.01       0.24 f
+  u/U34/ZN (NOR2_X1)                                      0.12      0.15       0.39 r
+  u/n507 (net)                                 12                   0.00       0.39 r
+  u/U150/A (CLKBUF_X1)                                    0.12      0.01       0.40 r
+  u/U150/Z (CLKBUF_X1)                                    0.11      0.16       0.56 r
+  u/n521 (net)                                 20                   0.00       0.56 r
+  u/U213/A (CLKBUF_X1)                                    0.11      0.02       0.58 r
+  u/U213/Z (CLKBUF_X1)                                    0.11      0.16       0.74 r
+  u/n536 (net)                                 20                   0.00       0.74 r
+  u/U631/A (CLKBUF_X1)                                    0.11      0.02       0.76 r
+  u/U631/Z (CLKBUF_X1)                                    0.08      0.13       0.89 r
+  u/n706 (net)                                 15                   0.00       0.89 r
+  u/U764/A1 (AOI22_X1)                                    0.08      0.03       0.92 r
+  u/U764/ZN (AOI22_X1)                                    0.04      0.02       0.94 f
+  u/n674 (net)                                  1                   0.00       0.94 f
+  u/U765/A4 (NAND4_X1)                                    0.04      0.01       0.95 f
+  u/U765/ZN (NAND4_X1)                                    0.02      0.03       0.99 r
+  u/n683 (net)                                  1                   0.00       0.99 r
+  u/U771/A1 (OR2_X1)                                      0.02      0.01       0.99 r
+  u/U771/ZN (OR2_X1)                                      0.02      0.04       1.03 r
+  u/pop_data_o[25] (net)                        1                   0.00       1.03 r
+  u/pop_data_o[25] (vpu_fifo_WIDTH64_DEPTH16)                       0.00       1.03 r
+  pop_data_o[25] (net)                                              0.00       1.03 r
+  pop_data_o[25] (out)                                    0.02      0.05       1.08 r
+  data arrival time                                                            1.08
+
+  clock ideal_clock (rise edge)                                     3.33       3.33
+  clock network delay (ideal)                                       0.00       3.33
+  output external delay                                             0.00       3.33
+  data required time                                                           3.33
+  ------------------------------------------------------------------------------------
+  data required time                                                           3.33
+  data arrival time                                                           -1.08
+  ------------------------------------------------------------------------------------
+  slack (MET)                                                                  2.25
+
+
+1

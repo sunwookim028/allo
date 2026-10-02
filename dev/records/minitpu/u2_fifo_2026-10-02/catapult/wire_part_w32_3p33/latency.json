@@ -1,0 +1,18 @@
+{
+ "clock_period_ns": 3.33,
+ "definition": "latency: rising edges from the input-accepting edge to the edge after which the output is visible, no stall; ii: cycles between iterations of the I/O loop",
+ "solution": "/work/shared/users/phd/sk3463/scratch/u2ff/cat/wire_part_w32_3p33.prj/build/Catapult/fifo_0.v1",
+ "tool": "catapult",
+ "units": {
+  "fifo_0": {
+   "declared": 1,
+   "ii": 1,
+   "latency": 2,
+   "loop": "while",
+   "loop_c_steps": 1,
+   "port_style": "wire",
+   "process": "/fifo_0/run",
+   "status": "scheduled"
+  }
+ }
+}

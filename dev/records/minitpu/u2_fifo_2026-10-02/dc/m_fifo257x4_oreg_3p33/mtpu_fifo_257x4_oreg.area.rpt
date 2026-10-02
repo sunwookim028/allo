@@ -1,0 +1,31 @@
+ 
+****************************************
+Report : area
+Design : mtpu_fifo_257x4_oreg
+Version: W-2024.09
+Date   : Fri Oct  2 14:25:56 2026
+****************************************
+
+Information: Updating design information... (UID-85)
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                          540
+Number of nets:                          2456
+Number of cells:                         2174
+Number of combinational cells:            869
+Number of sequential cells:              1299
+Number of macros/black boxes:               0
+Number of buf/inv:                         59
+Number of references:                      21
+
+Combinational area:                974.890015
+Buf/Inv area:                       45.219999
+Noncombinational area:            5871.417788
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                  6846.307803
+Total area:                 undefined
+1

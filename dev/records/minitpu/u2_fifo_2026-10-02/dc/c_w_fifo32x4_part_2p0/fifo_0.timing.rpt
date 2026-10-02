@@ -1,0 +1,186 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : fifo_0
+Version: W-2024.09
+Date   : Fri Oct  2 14:26:34 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: fifo_0_run_inst/while_v20_while_v20_nor_mdf_sva_reg
+              (rising edge-triggered flip-flop clocked by ideal_clock)
+  Endpoint: fifo_0_run_inst/v17_reg
+            (rising edge-triggered flip-flop clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  fifo_0             5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                                       Fanout     Trans      Incr       Path
+  ------------------------------------------------------------------------------------
+  clock ideal_clock (rise edge)                                     0.00       0.00
+  clock network delay (ideal)                                       0.00       0.00
+  fifo_0_run_inst/while_v20_while_v20_nor_mdf_sva_reg/CK (DFFS_X1)
+                                                          0.00      0.00       0.00 r
+  fifo_0_run_inst/while_v20_while_v20_nor_mdf_sva_reg/Q (DFFS_X1)
+                                                          0.01      0.08       0.08 f
+  fifo_0_run_inst/while_v20_while_v20_nor_mdf_sva (net)
+                                                1                   0.00       0.08 f
+  U367/A1 (NAND2_X1)                                      0.01      0.01       0.09 f
+  U367/ZN (NAND2_X1)                                      0.01      0.01       0.11 r
+  n156 (net)                                    1                   0.00       0.11 r
+  U368/A1 (AND2_X2)                                       0.01      0.01       0.12 r
+  U368/ZN (AND2_X2)                                       0.03      0.05       0.17 r
+  n158 (net)                                   10                   0.00       0.17 r
+  U375/A (INV_X1)                                         0.03      0.02       0.19 r
+  U375/ZN (INV_X1)                                        0.01      0.01       0.21 f
+  n159 (net)                                    2                   0.00       0.21 f
+  U370/B2 (OAI21_X1)                                      0.01      0.01       0.22 f
+  U370/ZN (OAI21_X1)                                      0.03      0.05       0.27 r
+  n205 (net)                                    2                   0.00       0.27 r
+  U374/B1 (AOI21_X1)                                      0.03      0.01       0.28 r
+  U374/ZN (AOI21_X1)                                      0.02      0.03       0.31 f
+  n164 (net)                                    2                   0.00       0.31 f
+  U381/B1 (OAI21_X1)                                      0.02      0.01       0.32 f
+  U381/ZN (OAI21_X1)                                      0.02      0.04       0.36 r
+  n320 (net)                                    2                   0.00       0.36 r
+  U385/B1 (AOI21_X1)                                      0.02      0.01       0.37 r
+  U385/ZN (AOI21_X1)                                      0.01      0.02       0.39 f
+  n325 (net)                                    2                   0.00       0.39 f
+  U388/B1 (OAI21_X1)                                      0.01      0.01       0.41 f
+  U388/ZN (OAI21_X1)                                      0.03      0.04       0.44 r
+  n336 (net)                                    2                   0.00       0.44 r
+  U392/B1 (AOI21_X1)                                      0.03      0.01       0.46 r
+  U392/ZN (AOI21_X1)                                      0.01      0.02       0.48 f
+  n330 (net)                                    2                   0.00       0.48 f
+  U395/B1 (OAI21_X1)                                      0.01      0.01       0.49 f
+  U395/ZN (OAI21_X1)                                      0.03      0.04       0.53 r
+  n299 (net)                                    2                   0.00       0.53 r
+  U399/B1 (AOI21_X1)                                      0.03      0.01       0.54 r
+  U399/ZN (AOI21_X1)                                      0.01      0.02       0.56 f
+  n304 (net)                                    2                   0.00       0.56 f
+  U402/B1 (OAI21_X1)                                      0.01      0.01       0.57 f
+  U402/ZN (OAI21_X1)                                      0.03      0.04       0.62 r
+  n316 (net)                                    2                   0.00       0.62 r
+  U406/B1 (AOI21_X1)                                      0.03      0.01       0.63 r
+  U406/ZN (AOI21_X1)                                      0.01      0.02       0.65 f
+  n310 (net)                                    2                   0.00       0.65 f
+  U409/B1 (OAI21_X1)                                      0.01      0.01       0.67 f
+  U409/ZN (OAI21_X1)                                      0.02      0.04       0.70 r
+  n275 (net)                                    2                   0.00       0.70 r
+  U413/B1 (AOI21_X1)                                      0.02      0.01       0.72 r
+  U413/ZN (AOI21_X1)                                      0.01      0.02       0.74 f
+  n280 (net)                                    2                   0.00       0.74 f
+  U416/B1 (OAI21_X1)                                      0.01      0.01       0.75 f
+  U416/ZN (OAI21_X1)                                      0.03      0.04       0.79 r
+  n292 (net)                                    2                   0.00       0.79 r
+  U420/B1 (AOI21_X1)                                      0.03      0.01       0.80 r
+  U420/ZN (AOI21_X1)                                      0.01      0.02       0.82 f
+  n286 (net)                                    2                   0.00       0.82 f
+  U423/B1 (OAI21_X1)                                      0.01      0.01       0.83 f
+  U423/ZN (OAI21_X1)                                      0.03      0.04       0.87 r
+  n228 (net)                                    2                   0.00       0.87 r
+  U427/B1 (AOI21_X1)                                      0.03      0.01       0.89 r
+  U427/ZN (AOI21_X1)                                      0.01      0.02       0.91 f
+  n233 (net)                                    2                   0.00       0.91 f
+  U430/B1 (OAI21_X1)                                      0.01      0.01       0.92 f
+  U430/ZN (OAI21_X1)                                      0.03      0.04       0.96 r
+  n239 (net)                                    2                   0.00       0.96 r
+  U434/B1 (AOI21_X1)                                      0.03      0.01       0.97 r
+  U434/ZN (AOI21_X1)                                      0.01      0.02       0.99 f
+  n244 (net)                                    2                   0.00       0.99 f
+  U437/B1 (OAI21_X1)                                      0.01      0.01       1.00 f
+  U437/ZN (OAI21_X1)                                      0.03      0.04       1.04 r
+  n250 (net)                                    2                   0.00       1.04 r
+  U441/B1 (AOI21_X1)                                      0.03      0.01       1.06 r
+  U441/ZN (AOI21_X1)                                      0.01      0.02       1.08 f
+  n255 (net)                                    2                   0.00       1.08 f
+  U444/B1 (OAI21_X1)                                      0.01      0.01       1.09 f
+  U444/ZN (OAI21_X1)                                      0.03      0.04       1.13 r
+  n261 (net)                                    2                   0.00       1.13 r
+  U446/A1 (NAND2_X1)                                      0.03      0.01       1.14 r
+  U446/ZN (NAND2_X1)                                      0.01      0.01       1.15 f
+  n175 (net)                                    1                   0.00       1.15 f
+  U448/A1 (AND2_X1)                                       0.01      0.01       1.16 f
+  U448/ZN (AND2_X1)                                       0.01      0.03       1.19 f
+  n213 (net)                                    2                   0.00       1.19 f
+  U449/B1 (OAI21_X1)                                      0.01      0.01       1.21 f
+  U449/ZN (OAI21_X1)                                      0.03      0.03       1.24 r
+  n266 (net)                                    2                   0.00       1.24 r
+  U453/B1 (AOI21_X1)                                      0.03      0.01       1.25 r
+  U453/ZN (AOI21_X1)                                      0.01      0.02       1.27 f
+  n216 (net)                                    2                   0.00       1.27 f
+  U454/A1 (OR2_X1)                                        0.01      0.01       1.28 f
+  U454/ZN (OR2_X1)                                        0.01      0.04       1.33 f
+  n180 (net)                                    1                   0.00       1.33 f
+  U322/A1 (AND2_X1)                                       0.01      0.01       1.33 f
+  U322/ZN (AND2_X1)                                       0.01      0.03       1.37 f
+  n220 (net)                                    2                   0.00       1.37 f
+  U455/B2 (OAI21_X1)                                      0.01      0.01       1.38 f
+  U455/ZN (OAI21_X1)                                      0.03      0.04       1.42 r
+  n222 (net)                                    2                   0.00       1.42 r
+  U456/A1 (NAND2_X1)                                      0.03      0.01       1.43 r
+  U456/ZN (NAND2_X1)                                      0.01      0.01       1.45 f
+  n184 (net)                                    1                   0.00       1.45 f
+  U319/A1 (AND2_X1)                                       0.01      0.01       1.46 f
+  U319/ZN (AND2_X1)                                       0.01      0.03       1.49 f
+  n196 (net)                                    2                   0.00       1.49 f
+  U457/B2 (OAI21_X1)                                      0.01      0.01       1.50 f
+  U457/ZN (OAI21_X1)                                      0.03      0.05       1.55 r
+  n200 (net)                                    2                   0.00       1.55 r
+  U458/A1 (NAND2_X1)                                      0.03      0.01       1.56 r
+  U458/ZN (NAND2_X1)                                      0.01      0.02       1.58 f
+  n188 (net)                                    1                   0.00       1.58 f
+  U459/A1 (NAND2_X1)                                      0.01      0.01       1.59 f
+  U459/ZN (NAND2_X1)                                      0.02      0.02       1.61 r
+  n202 (net)                                    2                   0.00       1.61 r
+  U460/A1 (NAND2_X1)                                      0.02      0.01       1.63 r
+  U460/ZN (NAND2_X1)                                      0.01      0.01       1.64 f
+  n191 (net)                                    1                   0.00       1.64 f
+  U361/A1 (AND2_X1)                                       0.01      0.01       1.65 f
+  U361/ZN (AND2_X1)                                       0.01      0.03       1.68 f
+  n195 (net)                                    2                   0.00       1.68 f
+  U314/B2 (OAI21_X1)                                      0.01      0.01       1.69 f
+  U314/ZN (OAI21_X1)                                      0.02      0.04       1.73 r
+  n193 (net)                                    1                   0.00       1.73 r
+  U462/B (XNOR2_X1)                                       0.02      0.02       1.75 r
+  U462/ZN (XNOR2_X1)                                      0.03      0.05       1.79 r
+  n385 (net)                                    2                   0.00       1.79 r
+  U463/A (INV_X1)                                         0.03      0.01       1.81 r
+  U463/ZN (INV_X1)                                        0.01      0.01       1.82 f
+  n349 (net)                                    1                   0.00       1.82 f
+  U559/A1 (NAND4_X1)                                      0.01      0.01       1.83 f
+  U559/ZN (NAND4_X1)                                      0.02      0.02       1.85 r
+  n351 (net)                                    2                   0.00       1.85 r
+  U560/B2 (OAI21_X1)                                      0.02      0.01       1.87 r
+  U560/ZN (OAI21_X1)                                      0.02      0.02       1.89 f
+  n391 (net)                                    2                   0.00       1.89 f
+  U620/A2 (OR2_X1)                                        0.02      0.01       1.90 f
+  U620/ZN (OR2_X1)                                        0.01      0.05       1.95 f
+  fifo_0_run_inst/N26 (net)                     1                   0.00       1.95 f
+  fifo_0_run_inst/v17_reg/D (DFFR_X1)                     0.01      0.01       1.96 f
+  data arrival time                                                            1.96
+
+  clock ideal_clock (rise edge)                                     2.00       2.00
+  clock network delay (ideal)                                       0.00       2.00
+  fifo_0_run_inst/v17_reg/CK (DFFR_X1)                              0.00       2.00 r
+  library setup time                                               -0.04       1.96
+  data required time                                                           1.96
+  ------------------------------------------------------------------------------------
+  data required time                                                           1.96
+  data arrival time                                                           -1.96
+  ------------------------------------------------------------------------------------
+  slack (MET)                                                                  0.00
+
+
+1

@@ -22,13 +22,64 @@ no pop on empty without a push) and also never push and pop together on an
 empty FIFO, which no assertion catches but which loses the pushed word.
 Illegal traces do all three; overflow on ``output`` is H7's "the RTL drops".
 
-No Allo variant yet (U2 plan, checkpoint 1).
+Allo variants (``dev/records/minitpu/u2_fifo_2026-10-02.rst``). Every variant
+is driven by the SAME per-cycle command trace as the RTL (one array per input
+port, ``rst_ni`` included, one element per cycle) and returns one array per
+output port. Data is ``UInt(W)``, the flags ``uint1``. "Cycle ``t``" is
+iteration ``t`` of the unit's loop (see ``vpu_regfile.py``). ``make(n, w)``
+takes the width because ``check.py`` does; the depth is ``DEPTH_OF[w]``.
+
+``trace`` (plan F2, "bits")
+    One kernel, the ``.sv`` transcribed: a kernel-local ring ``mem: W[d]``,
+    ``rd``/``wr`` pointers and a count, all ``int32``; the outputs of cycle
+    ``t`` are the state it starts in (pre-edge sample); then the RTL's update
+    rules, illegal commands included, so it is bit-exact on illegal traces too.
+``ported`` (R3 shape)
+    A ``@df.unit`` with ``trace``'s body; four command and three response
+    ``Stream`` ports in lockstep, between a driver and a sink kernel.
+``wire`` (the Catapult port shape)
+    ``trace``'s body in a kernel whose ports are all ``Wire``
+    (``synth_top="fifo_0"``); ``src``/``sink`` replay and record.
+``stream`` (plan F1: the Allo FIFO primitive)
+    The FIFO is a ``Stream[W, d - 1]`` owned by one kernel (a self-FIFO:
+    both ends in the same kernel) behind a **head register**: the first-word-
+    fall-through adapter the port needs, because a ``Stream`` has no peek
+    (``pop_data`` must be visible without a pop). ``empty`` is "no head",
+    ``full`` is "head and ``fifo.full()``"; capacity ``d``. A pop refills the
+    head from the stream, a push lands in the head when it is free, else
+    ``put``. A reset drains the stream (a ``Stream`` has no pointer reset).
+    One RTL quirk needs a special case: push and pop together on an empty FIFO
+    loses the word in the RTL (H12); a Stream cannot lose it, so the variant
+    drops it by hand (marked H12 in the body).
+``stream_raw`` (F1 as the plan words it)
+    ``Stream[W, d]`` alone, no head register: ``pop_data`` is the word a pop
+    returns on the cycle of the pop and 0 otherwise, the flags are the
+    stream's own. The pass-through on full is the program order "pop, then
+    push"; a push on full is dropped by a ``full()`` guard (``try_put``
+    would be, but B7 drops an unused ``try_put`` on the simulator and S9
+    drifts its counter in csim). A probe of capacity and flag timing; it
+    cannot match the head-visible slots (``scripts/flags_only.py``).
+
+Workarounds every variant carries (``u2_regfile_2026-10-02.rst``): B4 (pointers
+are ``int32``, never an unsigned index); S6 (every port read unconditional,
+only the state update under ``if``); B5 (stream ``get`` into the port type
+first, then widen).
 """
+
+import numpy as np
+
+import allo.dataflow as df
+from allo.ir.types import Stream, UInt, Wire, int32, uint1
 
 from examples.minitpu.harness import ref, rtl
 from examples.minitpu.harness.traces import Trace, rng_for, word
 
-GEOM = {"w32d4": (32, 4), "input": (257, 4), "output": (64, 16)}
+GEOM = {"w32d4": (32, 4), "input": (257, 4), "output": (64, 16),
+        "d16w48": (48, 16)}  # probe: the output FIFO's depth at a width csim reads back (S8)
+WIDTH = {k: v[0] for k, v in GEOM.items()}
+DEPTH_OF = {v[0]: v[1] for v in GEOM.values()}  # make(n, w): the depth from the width
+CMD = ("rst_ni", "push_i", "push_data_i", "pop_i")
+RESP = ("pop_data_o", "empty_o", "full_o")
 
 
 def _unit(inst):
@@ -47,7 +98,6 @@ def _unit(inst):
 INSTANCES = {k: _unit(k) for k in GEOM}
 DEFAULT = "w32d4"
 RTL = INSTANCES[DEFAULT]
-VARIANTS = {}
 LATENCY_SOURCE = "vpu_fifo.sv:31-33 (flags and pop_data combinational from registered state)"
 
 
@@ -143,7 +193,7 @@ def directed(inst):
 
 
 def traces(inst):
-    n = 20000 if inst != "input" else 5000
+    n = 20000 if inst not in ("input", "d16w48") else 5000
     tr = directed(inst)
     tr += [(f"random-legal-{s}", random_trace(inst, n, s, True), True) for s in range(2)]
     tr += [(f"random-any-{s}", random_trace(inst, n, s, False), False) for s in range(2)]
@@ -213,3 +263,550 @@ def _unit_input_dim2():
 
 INSTANCES["input_dim2"] = _unit_input_dim2()  # seed-only: the tb's DIM = 2 input FIFO
 GEOM["input_dim2"] = (33, 4)
+WIDTH["input_dim2"] = 33
+DEPTH_OF[33] = 4
+
+
+# ---------------------------------------------------------------------------
+# Allo variants. ``make(n, w)`` returns a region over per-port arrays of n
+# cycles (depth ``DEPTH_OF[w]``); each runner takes the built module and a
+# command trace (``CMD`` columns as integer lists) and returns
+# ``{resp port: array of ints}``.
+# ---------------------------------------------------------------------------
+
+
+def _np(w):
+    return np.uint8 if w <= 8 else np.uint16 if w <= 16 else np.uint32 if w <= 32 else np.uint64
+
+
+def _args(cmd, n, w):
+    """The trace as the region's input arrays, plus zeroed outputs. A width
+    above 64 has no numpy dtype (B6/H8): refused here rather than corrupting
+    the simulator's heap."""
+    if w > 64:
+        raise ValueError(f"B6: no numpy dtype carries a {w}-bit element")
+    ins = [np.asarray(cmd["rst_ni"][:n], dtype=np.uint8),
+           np.asarray(cmd["push_i"][:n], dtype=np.uint8),
+           np.asarray([int(x) for x in cmd["push_data_i"][:n]], dtype=_np(w)),
+           np.asarray(cmd["pop_i"][:n], dtype=np.uint8)]
+    outs = [np.zeros(n, dtype=_np(w)), np.zeros(n, dtype=np.uint8), np.zeros(n, dtype=np.uint8)]
+    return ins, outs
+
+
+def _run_flat(mod, cmd, n, w):
+    ins, outs = _args(cmd, n, w)
+    mod(*ins, *outs)
+    return {p: o for p, o in zip(RESP, outs)}
+
+
+def trace(n, w=32):
+    W = UInt(w)
+    d = DEPTH_OF[w]
+
+    @df.region()
+    def top(RST: uint1[n], PUSH: uint1[n], PD: W[n], POP: uint1[n],
+            QD: W[n], QE: uint1[n], QF: uint1[n]):
+        @df.kernel(mapping=[1], args=[RST, PUSH, PD, POP, QD, QE, QF])
+        def fifo(rst: uint1[n], push: uint1[n], pd: W[n], pop: uint1[n],
+                 qd: W[n], qe: uint1[n], qf: uint1[n]):
+            mem: W[d]
+            rd: int32 = 0
+            wr: int32 = 0
+            cnt: int32 = 0
+            for t in range(n):
+                empty: int32 = 0
+                full: int32 = 0
+                if cnt == 0:
+                    empty = 1
+                if cnt == d:
+                    full = 1
+                qd[t] = mem[rd]  # first word falls through: visible without a pop
+                qe[t] = empty
+                qf[t] = full
+                r: uint1 = rst[t]  # S6 workaround: every port read unconditional
+                p: uint1 = push[t]
+                x: W = pd[t]
+                q: uint1 = pop[t]
+                if r == 0:  # reset clears the pointers and the count, not mem
+                    rd = 0
+                    wr = 0
+                    cnt = 0
+                else:
+                    do_push: int32 = 0
+                    do_pop: int32 = 0
+                    if p == 1:
+                        if full == 0:
+                            do_push = 1
+                        elif q == 1:  # pass-through on full
+                            do_push = 1
+                    if q == 1:
+                        if empty == 0:
+                            do_pop = 1
+                        elif p == 1:  # H12: both pointers move, the word is lost
+                            do_pop = 1
+                    if do_push == 1:
+                        mem[wr] = x
+                        if wr == d - 1:
+                            wr = 0
+                        else:
+                            wr = wr + 1
+                    if do_pop == 1:
+                        if rd == d - 1:
+                            rd = 0
+                        else:
+                            rd = rd + 1
+                    cnt = cnt + do_push - do_pop
+
+    return top
+
+
+def _port_unit(n, w):
+    """C9: sizes freeze at ``@df.unit``, so a factory per (n, w)."""
+    W = UInt(w)
+    d = DEPTH_OF[w]
+
+    @df.unit()
+    def fifo(rst: Stream[uint1, 2], push: Stream[uint1, 2], pd: Stream[UInt(w), 2],
+             pop: Stream[uint1, 2], qd: Stream[UInt(w), 2], qe: Stream[uint1, 2],
+             qf: Stream[uint1, 2]):
+        mem: W[d]
+        rd: int32 = 0
+        wr: int32 = 0
+        cnt: int32 = 0
+        for t in range(n):
+            empty: int32 = 0
+            full: int32 = 0
+            if cnt == 0:
+                empty = 1
+            if cnt == d:
+                full = 1
+            r: uint1 = rst.get()
+            p: uint1 = push.get()
+            x: UInt(w) = pd.get()
+            q: uint1 = pop.get()
+            qd.put(mem[rd])
+            qe.put(empty)
+            qf.put(full)
+            if r == 0:
+                rd = 0
+                wr = 0
+                cnt = 0
+            else:
+                do_push: int32 = 0
+                do_pop: int32 = 0
+                if p == 1:
+                    if full == 0:
+                        do_push = 1
+                    elif q == 1:
+                        do_push = 1
+                if q == 1:
+                    if empty == 0:
+                        do_pop = 1
+                    elif p == 1:
+                        do_pop = 1
+                if do_push == 1:
+                    mem[wr] = x
+                    if wr == d - 1:
+                        wr = 0
+                    else:
+                        wr = wr + 1
+                if do_pop == 1:
+                    if rd == d - 1:
+                        rd = 0
+                    else:
+                        rd = rd + 1
+                cnt = cnt + do_push - do_pop
+
+    return fifo
+
+
+def ported(n, w=32):
+    W = UInt(w)
+    unit = _port_unit(n, w)
+
+    @df.region()
+    def top(RST: uint1[n], PUSH: uint1[n], PD: W[n], POP: uint1[n],
+            QD: W[n], QE: uint1[n], QF: uint1[n]):
+        s_rst: Stream[uint1, 2]
+        s_push: Stream[uint1, 2]
+        s_pd: Stream[UInt(w), 2]
+        s_pop: Stream[uint1, 2]
+        s_qd: Stream[UInt(w), 2]
+        s_qe: Stream[uint1, 2]
+        s_qf: Stream[uint1, 2]
+
+        @df.kernel(mapping=[1], args=[RST, PUSH, PD, POP])
+        def drive(rst: uint1[n], push: uint1[n], pd: W[n], pop: uint1[n]):
+            for t in range(n):
+                s_rst.put(rst[t])
+                s_push.put(push[t])
+                s_pd.put(pd[t])
+                s_pop.put(pop[t])
+
+        unit(rst=s_rst, push=s_push, pd=s_pd, pop=s_pop, qd=s_qd, qe=s_qe, qf=s_qf)
+
+        @df.kernel(mapping=[1], args=[QD, QE, QF])
+        def sink(qd: W[n], qe: uint1[n], qf: uint1[n]):
+            for t in range(n):
+                qd[t] = s_qd.get()
+                qe[t] = s_qe.get()
+                qf[t] = s_qf.get()
+
+    return top
+
+
+def wire(n, w=32):
+    """SystemC/Catapult port shape: ``fifo`` has only ``Wire`` ports
+    (``synth_top="fifo_0"``); ``src``/``sink`` replay and record."""
+    W = UInt(w)
+    d = DEPTH_OF[w]
+
+    @df.region()
+    def top(RST: uint1[n], PUSH: uint1[n], PD: W[n], POP: uint1[n],
+            QD: W[n], QE: uint1[n], QF: uint1[n]):
+        w_rst: Wire[uint1]
+        w_push: Wire[uint1]
+        w_pd: Wire[UInt(w)]
+        w_pop: Wire[uint1]
+        w_qd: Wire[UInt(w)]
+        w_qe: Wire[uint1]
+        w_qf: Wire[uint1]
+
+        @df.kernel(mapping=[1], args=[RST, PUSH, PD, POP])
+        def src(rst: uint1[n], push: uint1[n], pd: W[n], pop: uint1[n]):
+            for t in range(n):
+                w_rst.put(rst[t])
+                w_push.put(push[t])
+                w_pd.put(pd[t])
+                w_pop.put(pop[t])
+
+        @df.kernel(mapping=[1], args=[])
+        def fifo():
+            mem: W[d]
+            rd: int32 = 0
+            wr: int32 = 0
+            cnt: int32 = 0
+            for _ in range(n):
+                empty: int32 = 0
+                full: int32 = 0
+                if cnt == 0:
+                    empty = 1
+                if cnt == d:
+                    full = 1
+                r: uint1 = w_rst.get()
+                p: uint1 = w_push.get()
+                x: UInt(w) = w_pd.get()
+                q: uint1 = w_pop.get()
+                w_qd.put(mem[rd])
+                w_qe.put(empty)
+                w_qf.put(full)
+                if r == 0:
+                    rd = 0
+                    wr = 0
+                    cnt = 0
+                else:
+                    do_push: int32 = 0
+                    do_pop: int32 = 0
+                    if p == 1:
+                        if full == 0:
+                            do_push = 1
+                        elif q == 1:
+                            do_push = 1
+                    if q == 1:
+                        if empty == 0:
+                            do_pop = 1
+                        elif p == 1:
+                            do_pop = 1
+                    if do_push == 1:
+                        mem[wr] = x
+                        if wr == d - 1:
+                            wr = 0
+                        else:
+                            wr = wr + 1
+                    if do_pop == 1:
+                        if rd == d - 1:
+                            rd = 0
+                        else:
+                            rd = rd + 1
+                    cnt = cnt + do_push - do_pop
+
+        @df.kernel(mapping=[1], args=[QD, QE, QF])
+        def sink(qd: W[n], qe: uint1[n], qf: uint1[n]):
+            for t in range(n):
+                qd[t] = w_qd.get()
+                qe[t] = w_qe.get()
+                qf[t] = w_qf.get()
+
+    return top
+
+
+def stream(n, w=32):
+    """The Allo FIFO primitive behind a head register (first-word-fall-through
+    adapter): ``Stream[W, d - 1]`` + head = capacity ``d``."""
+    W = UInt(w)
+    d = DEPTH_OF[w]
+    k = d - 1
+
+    @df.region()
+    def top(RST: uint1[n], PUSH: uint1[n], PD: W[n], POP: uint1[n],
+            QD: W[n], QE: uint1[n], QF: uint1[n]):
+        q_fifo: Stream[UInt(w), k]  # a self-FIFO: one kernel owns both ends
+
+        @df.kernel(mapping=[1], args=[RST, PUSH, PD, POP, QD, QE, QF])
+        def fifo(rst: uint1[n], push: uint1[n], pd: W[n], pop: uint1[n],
+                 qd: W[n], qe: uint1[n], qf: uint1[n]):
+            head: W = 0
+            hv: int32 = 0  # head valid
+            for t in range(n):
+                empty: int32 = 0
+                full: int32 = 0
+                if hv == 0:
+                    empty = 1
+                sf: uint1 = q_fifo.full()
+                if hv == 1:
+                    if sf == 1:
+                        full = 1
+                qd[t] = head
+                qe[t] = empty
+                qf[t] = full
+                r: uint1 = rst[t]
+                p: uint1 = push[t]
+                x: W = pd[t]
+                q: uint1 = pop[t]
+                if r == 0:  # no pointer reset on a Stream: drain it
+                    se: uint1 = q_fifo.empty()
+                    while se == 0:
+                        junk: UInt(w) = q_fifo.get()
+                        se = q_fifo.empty()
+                    hv = 0
+                else:
+                    do_push: int32 = 0
+                    do_pop: int32 = 0
+                    if p == 1:
+                        if full == 0:
+                            do_push = 1
+                        elif q == 1:
+                            do_push = 1
+                    if q == 1:
+                        if empty == 0:
+                            do_pop = 1
+                        elif p == 1:  # H12: the RTL loses the word; a Stream cannot
+                            do_push = 0
+                    if do_pop == 1:  # pop first: pass-through on full needs the slot
+                        se2: uint1 = q_fifo.empty()
+                        if se2 == 0:
+                            head = q_fifo.get()
+                        else:
+                            hv = 0
+                    if do_push == 1:
+                        if hv == 0:
+                            head = x
+                            hv = 1
+                        else:
+                            q_fifo.put(x)
+
+    return top
+
+
+def stream_raw(n, w=32):
+    """``Stream[W, d]`` alone (plan F1 as worded): no head register, so
+    ``pop_data`` is defined only on the cycle of a pop (0 otherwise)."""
+    W = UInt(w)
+    d = DEPTH_OF[w]
+
+    @df.region()
+    def top(RST: uint1[n], PUSH: uint1[n], PD: W[n], POP: uint1[n],
+            QD: W[n], QE: uint1[n], QF: uint1[n]):
+        q_fifo: Stream[UInt(w), d]
+
+        @df.kernel(mapping=[1], args=[RST, PUSH, PD, POP, QD, QE, QF])
+        def fifo(rst: uint1[n], push: uint1[n], pd: W[n], pop: uint1[n],
+                 qd: W[n], qe: uint1[n], qf: uint1[n]):
+            for t in range(n):
+                e: uint1 = q_fifo.empty()
+                f: uint1 = q_fifo.full()
+                qe[t] = e
+                qf[t] = f
+                r: uint1 = rst[t]
+                p: uint1 = push[t]
+                x: W = pd[t]
+                q: uint1 = pop[t]
+                out: W = 0
+                if r == 0:
+                    se: uint1 = q_fifo.empty()
+                    while se == 0:
+                        junk: UInt(w) = q_fifo.get()
+                        se = q_fifo.empty()
+                else:
+                    if q == 1:  # pop, then push: pass-through on full
+                        if e == 0:
+                            out = q_fifo.get()
+                    if p == 1:  # a refused push is dropped, as the RTL's; put under
+                        f2: uint1 = q_fifo.full()  # a guard, not try_put (B7, S9)
+                        if f2 == 0:
+                            q_fifo.put(x)
+                qd[t] = out
+
+    return top
+
+
+def stream_nodrain(n, w=32):
+    """Catapult probe only: ``stream`` without the reset drain loop (a reset
+    just drops the head), to tell whether Catapult's SCHD-30 on ``stream`` is
+    the ``while`` drain or the self-FIFO itself. Wrong after a reset with
+    words inside: not a verdict variant."""
+    W = UInt(w)
+    d = DEPTH_OF[w]
+    k = d - 1
+
+    @df.region()
+    def top(RST: uint1[n], PUSH: uint1[n], PD: W[n], POP: uint1[n],
+            QD: W[n], QE: uint1[n], QF: uint1[n]):
+        q_fifo: Stream[UInt(w), k]
+
+        @df.kernel(mapping=[1], args=[RST, PUSH, PD, POP, QD, QE, QF])
+        def fifo(rst: uint1[n], push: uint1[n], pd: W[n], pop: uint1[n],
+                 qd: W[n], qe: uint1[n], qf: uint1[n]):
+            head: W = 0
+            hv: int32 = 0
+            for t in range(n):
+                empty: int32 = 0
+                full: int32 = 0
+                if hv == 0:
+                    empty = 1
+                sf: uint1 = q_fifo.full()
+                if hv == 1:
+                    if sf == 1:
+                        full = 1
+                qd[t] = head
+                qe[t] = empty
+                qf[t] = full
+                r: uint1 = rst[t]
+                p: uint1 = push[t]
+                x: W = pd[t]
+                q: uint1 = pop[t]
+                if r == 0:
+                    hv = 0
+                else:
+                    do_push: int32 = 0
+                    do_pop: int32 = 0
+                    if p == 1:
+                        if full == 0:
+                            do_push = 1
+                        elif q == 1:
+                            do_push = 1
+                    if q == 1:
+                        if empty == 0:
+                            do_pop = 1
+                        elif p == 1:
+                            do_push = 0
+                    if do_pop == 1:
+                        se2: uint1 = q_fifo.empty()
+                        if se2 == 0:
+                            head = q_fifo.get()
+                        else:
+                            hv = 0
+                    if do_push == 1:
+                        if hv == 0:
+                            head = x
+                            hv = 1
+                        else:
+                            q_fifo.put(x)
+
+    return top
+
+
+def wire_np(n, w=32):
+    """Catapult probe only: ``wire`` with the RTL's pointer widths
+    (``UInt(log2 d)`` pointers, ``UInt(log2(d + 1))`` count) instead of the
+    ``int32`` the B4 workaround forces on the simulator path, to price that
+    workaround in area. Not run on the simulator (B4)."""
+    import math
+
+    W = UInt(w)
+    d = DEPTH_OF[w]
+    P = UInt(int(math.log2(d)))
+    C = UInt(int(math.log2(d)) + 1)
+
+    @df.region()
+    def top(RST: uint1[n], PUSH: uint1[n], PD: W[n], POP: uint1[n],
+            QD: W[n], QE: uint1[n], QF: uint1[n]):
+        w_rst: Wire[uint1]
+        w_push: Wire[uint1]
+        w_pd: Wire[UInt(w)]
+        w_pop: Wire[uint1]
+        w_qd: Wire[UInt(w)]
+        w_qe: Wire[uint1]
+        w_qf: Wire[uint1]
+
+        @df.kernel(mapping=[1], args=[RST, PUSH, PD, POP])
+        def src(rst: uint1[n], push: uint1[n], pd: W[n], pop: uint1[n]):
+            for t in range(n):
+                w_rst.put(rst[t])
+                w_push.put(push[t])
+                w_pd.put(pd[t])
+                w_pop.put(pop[t])
+
+        @df.kernel(mapping=[1], args=[])
+        def fifo():
+            mem: W[d]
+            rd: P = 0
+            wr: P = 0
+            cnt: C = 0
+            for _ in range(n):
+                empty: uint1 = 0
+                full: uint1 = 0
+                if cnt == 0:
+                    empty = 1
+                if cnt == d:
+                    full = 1
+                r: uint1 = w_rst.get()
+                p: uint1 = w_push.get()
+                x: UInt(w) = w_pd.get()
+                q: uint1 = w_pop.get()
+                w_qd.put(mem[rd])
+                w_qe.put(empty)
+                w_qf.put(full)
+                if r == 0:
+                    rd = 0
+                    wr = 0
+                    cnt = 0
+                else:
+                    do_push: uint1 = 0
+                    do_pop: uint1 = 0
+                    if p == 1:
+                        if full == 0:
+                            do_push = 1
+                        elif q == 1:
+                            do_push = 1
+                    if q == 1:
+                        if empty == 0:
+                            do_pop = 1
+                        elif p == 1:
+                            do_pop = 1
+                    if do_push == 1:
+                        mem[wr] = x
+                        wr = wr + 1  # wraps at the pointer width, as the RTL
+                    if do_pop == 1:
+                        rd = rd + 1
+                    cnt = cnt + do_push - do_pop
+
+        @df.kernel(mapping=[1], args=[QD, QE, QF])
+        def sink(qd: W[n], qe: uint1[n], qf: uint1[n]):
+            for t in range(n):
+                qd[t] = w_qd.get()
+                qe[t] = w_qe.get()
+                qf[t] = w_qf.get()
+
+    return top
+
+
+VARIANTS = {
+    "trace": (trace, _run_flat),
+    "ported": (ported, _run_flat),
+    "wire": (wire, _run_flat),
+    "stream": (stream, _run_flat),
+    "stream_raw": (stream_raw, _run_flat),
+    "stream_nodrain": (stream_nodrain, _run_flat),
+    "wire_np": (wire_np, _run_flat),
+}
