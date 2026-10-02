@@ -34,6 +34,31 @@ Three port shapes cover U1:
     wrapper stamps each input's accept cycle (the last port's) and each
     output's cycle, so latency and throughput are both measured;
     ``last_stats`` holds the totals of the latest run.
+``trace``
+    ``clk`` and every other input, reset included, a *command trace*: one
+    row of every input port per cycle, which is how a stateful unit (a
+    register file, a RAM, a FIFO) is a function -- from a command trace to a
+    *response trace*, one row of every output port per cycle (U2).
+    ``run_trace()`` drives it. Cycle ``t`` is: drive row ``t`` with the clock
+    low, ``eval()``, sample the ``"pre"`` outputs, rising edge ``t + 1``,
+    sample the ``"post"`` outputs. An output's sampling is the optional third
+    element of its spec, ``(port, width, "pre" | "post")``, default ``"pre"``:
+    ``"pre"`` for an asynchronous read and for flags (the value the cycle's
+    consumer sees, so a read and a write of one address in one cycle return
+    the old value), ``"post"`` for a registered read. So a port of latency
+    ``L`` edges shows a cycle-``t`` command in row ``t + L`` if ``"pre"`` and
+    in row ``t + L - 1`` if ``"post"``; ``probe_trace()`` measures it.
+    Ports may be any width: a port is ``ceil(width / 64)`` little-endian
+    ``uint64`` words in the raw files, unpacked from and into Verilator's
+    ``VlWide`` (32-bit words) for ports wider than 64 bits.
+    The model is built with ``--x-initial unique`` and every run takes a
+    seed (``+verilator+seed``, random reset), so state the RTL never
+    initialises -- a RAM entry not yet written, a FIFO before reset --
+    differs between seeds: the harness masks those slots rather than trust
+    zeros, and ``characterize`` checks that every slot it calls defined is
+    seed-invariant. With ``assertions=True`` the model is built with
+    ``--assert`` and an unlimited error count; ``last_asserts`` gets
+    ``(cycle, message)`` for every assertion that fired.
 
 Latency counts rising edges: an input driven before edge 1 is captured by it,
 and a unit of latency ``L`` shows the result after edge ``L`` -- the number of
@@ -94,6 +119,8 @@ class RtlUnit:
     rdy: str = "_rdy"
     dat: str = "_dat"
     out_ready_period: int = 0  # stream: 0 = output always ready
+    params: dict = field(default_factory=dict)  # top-level parameters (-G)
+    assertions: bool = False  # trace: build with --assert, record firings
 
     def key(self, home):
         h = hashlib.sha256(repr(self).encode())
@@ -109,6 +136,8 @@ WRAPPER_VERSION = "2"
 
 def _wrapper(u):
     """The C++ driver for one unit."""
+    if u.shape == "trace":
+        return _trace_driver(u)
     ni, no = len(u.inputs), len(u.outputs)
     set_in = "\n".join(
         f"    dut.{p} = (decltype(dut.{p}))in[k * {ni} + {i}];"
@@ -260,6 +289,200 @@ def _stream_body(u):
               (unsigned long long)first_out, (unsigned long long)n);"""
 
 
+def nwords(width):
+    """``uint64`` words that hold a ``width``-bit port."""
+    return (width + 63) // 64
+
+
+def out_spec(port):
+    """``(name, width, sample)`` of an output spec; ``sample`` defaults to pre."""
+    return (port[0], port[1], port[2] if len(port) > 2 else "pre")
+
+
+def pack(values, width):
+    """Integers (a list of Python ints, or an integer array) ->
+    ``uint64[n, nwords(width)]``, masked to ``width`` bits."""
+    nw = nwords(width)
+    # a list of Python ints stays exact (numpy would make a mix of big and
+    # small ints float64); an integer ndarray takes the fast path
+    arr = values if isinstance(values, np.ndarray) else np.array(values, dtype=object)
+    assert arr.dtype == object or np.issubdtype(arr.dtype, np.integer), arr.dtype
+    if arr.dtype != object and nw == 1:
+        m = np.uint64((1 << width) - 1) if width < 64 else np.uint64(2**64 - 1)
+        return (arr.astype(np.uint64) & m).reshape(-1, 1)
+    out = np.zeros((len(values), nw), dtype=np.uint64)
+    m = (1 << width) - 1
+    for i, v in enumerate(values):
+        v = int(v) & m
+        for j in range(nw):
+            out[i, j] = (v >> (64 * j)) & 0xFFFFFFFFFFFFFFFF
+    return out
+
+
+def unpack(words):
+    """``uint64[n, nw]`` -> list of Python ints (any width)."""
+    words = np.asarray(words, dtype=np.uint64).reshape(len(words), -1)
+    return [sum(int(w) << (64 * j) for j, w in enumerate(row)) for row in words]
+
+
+_TRACE_HELPERS = """
+template <typename T> static inline void setp(T& p, const uint64_t* w) { p = (T)w[0]; }
+template <std::size_t N> static inline void setp(VlWide<N>& p, const uint64_t* w) {
+  for (std::size_t i = 0; i < N; ++i) p.m_storage[i] = (EData)(w[i / 2] >> (32 * (i % 2)));
+}
+template <typename T> static inline void getp(const T& p, uint64_t* w) { w[0] = (uint64_t)p; }
+template <std::size_t N> static inline void getp(const VlWide<N>& p, uint64_t* w) {
+  for (std::size_t i = 0; i < N; i += 2)
+    w[i / 2] = (uint64_t)p.m_storage[i] | (i + 1 < N ? (uint64_t)p.m_storage[i + 1] << 32 : 0);
+}
+"""
+
+
+def _trace_driver(u):
+    """C++ driver for the ``trace`` shape (module docstring)."""
+    win = sum(nwords(w) for _, w in u.inputs)
+    wout = sum(nwords(out_spec(p)[1]) for p in u.outputs)
+    set_in, zero_in, off = [], [], 0
+    for p, w in u.inputs:
+        set_in.append(f"    setp(dut.{p}, &in[t * {win} + {off}]);")
+        zero_in.append(f"  setp(dut.{p}, zeros);")
+        off += nwords(w)
+    pre, post, off = [], [], 0
+    for spec in u.outputs:
+        p, w, smp = out_spec(spec)
+        assert smp in ("pre", "post"), spec
+        (pre if smp == "pre" else post).append(f"    getp(dut.{p}, &out[t * {wout} + {off}]);")
+        off += nwords(w)
+    ports = {p for p, _ in u.inputs}
+    own_rst = u.rst_n in ports
+    do_rst = bool(u.reset) and not own_rst
+    idle = "{ ctx->time(0); dut.%s = 0; dut.eval(); dut.%s = 1; dut.eval(); }" % (u.clk, u.clk)
+    nl = "\n"
+    return f"""// generated by examples/minitpu/harness/rtl.py (trace shape)
+#include "V{u.top}.h"
+#include "verilated.h"
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <vector>
+{_TRACE_HELPERS}
+int main(int argc, char** argv) {{
+  VerilatedContext* ctx = Verilated::threadContextp();
+  ctx->commandArgs(argc, argv);
+  ctx->randReset(2);  // with --x-initial unique: uninitialised state is random
+  ctx->randSeed(std::atoi(argv[3]));
+  ctx->errorLimit(1 << 30);  // an assertion is recorded, not fatal
+  FILE* fi = std::fopen(argv[1], "rb");
+  std::fseek(fi, 0, SEEK_END);
+  const uint64_t n = std::ftell(fi) / 8 / {win};
+  std::fseek(fi, 0, SEEK_SET);
+  std::vector<uint64_t> in(n * {win}), out(n * {wout}, 0);
+  static const uint64_t zeros[64] = {{0}};
+  if (std::fread(in.data(), 8, n * {win}, fi) != n * {win}) return 2;
+  std::fclose(fi);
+  V{u.top} dut;
+  dut.{u.clk} = 0;
+{nl.join(zero_in)}
+  {f"dut.{u.rst_n} = 0;" if do_rst else ""}
+  for (int r = 0; r < {4 if do_rst else 0}; ++r) {idle}
+  {f"dut.{u.rst_n} = 1;" if do_rst else ""}
+  for (int w = 0; w < {u.warmup}; ++w) {idle}
+  for (uint64_t t = 0; t < n; ++t) {{
+    ctx->time(t + 1);  // assertion messages carry cycle t + 1
+    dut.{u.clk} = 0;
+{nl.join(set_in)}
+    dut.eval();
+{nl.join(pre)}
+    dut.{u.clk} = 1;
+    dut.eval();
+{nl.join(post)}
+  }}
+  FILE* fo = std::fopen(argv[2], "wb");
+  std::fwrite(out.data(), 8, out.size(), fo);
+  std::fclose(fo);
+  return 0;
+}}
+"""
+
+
+def run_trace(u, cmd, seed=1):
+    """Run command trace ``cmd`` through a ``trace``-shape unit.
+
+    ``cmd`` maps every input port to its per-cycle values: a 1-D array or list
+    of ints, or ``uint64[n, nwords]`` already packed. Returns
+    ``{output: uint64[n, nwords]}`` in the row convention of the module
+    docstring (``unpack`` turns a column into Python ints). ``seed`` seeds the
+    random initial state. ``last_asserts`` gets the assertions that fired.
+    """
+    assert u.shape == "trace"
+    cols = []
+    for p, w in u.inputs:
+        v = cmd[p]
+        if isinstance(v, np.ndarray) and v.ndim == 2:
+            assert v.dtype == np.uint64 and v.shape[1] == nwords(w), (p, v.shape)
+            cols.append(v)
+        else:
+            cols.append(pack(v if isinstance(v, np.ndarray) else list(v), w))
+    n = len(cols[0])
+    assert all(len(c) == n for c in cols), "command columns differ in length"
+    stim = np.ascontiguousarray(np.concatenate(cols, axis=1), dtype=np.uint64)
+    exe = build(u)
+    d = os.path.dirname(exe)
+    tag = f"{os.getpid()}.{seed}"
+    fi, fo = os.path.join(d, f"in.{tag}"), os.path.join(d, f"out.{tag}")
+    stim.tofile(fi)
+    try:
+        r = subprocess.run([exe, fi, fo, str(seed)], capture_output=True, text=True)
+        if r.returncode != 0:
+            raise RuntimeError(f"{u.top} trace driver exited {r.returncode}: {r.stderr[-2000:]}")
+        wout = sum(nwords(out_spec(p)[1]) for p in u.outputs)
+        raw = np.fromfile(fo, dtype=np.uint64).reshape(n, wout)
+    finally:
+        for p in (fi, fo):
+            if os.path.exists(p):
+                os.remove(p)
+    res, off = {}, 0
+    for spec in u.outputs:
+        p, w, _ = out_spec(spec)
+        k = nwords(w)
+        col = raw[:, off : off + k].copy()
+        if w % 64:
+            col[:, -1] &= np.uint64((1 << (w % 64)) - 1)
+        res[p] = col
+        off += k
+    last_asserts.clear()
+    for line in (r.stdout + r.stderr).splitlines():
+        if "Assertion failed" in line or "%Error" in line:
+            cyc = None
+            if line.startswith("["):
+                try:
+                    cyc = int(line[1 : line.index("]")].split()[0]) - 1
+                except ValueError:
+                    pass
+            last_asserts.append((cyc, line.strip()))
+    return res
+
+
+def probe_trace(u, cmd, port, event, seed=1):
+    """Measure a ``trace`` port's latency, in edges, without a reference.
+
+    ``cmd`` is a trace whose ``port`` holds one value up to cycle ``event``
+    and moves only because of the command issued in cycle ``event`` (a read
+    of a newly different word, a write to the word being read, a push). The
+    latency is the number of edges from that command's capture to the first
+    row where ``port`` leaves its value of row ``event - 1``: rows count from
+    the edge for ``"pre"`` ports and after it for ``"post"`` ports.
+    """
+    res = run_trace(u, cmd, seed)[port]
+    _, _, smp = out_spec(next(o for o in u.outputs if o[0] == port))
+    moved = np.flatnonzero((res[event:] != res[event - 1]).any(axis=1))
+    assert len(moved), f"{port} never moved after cycle {event}"
+    return int(moved[0]) + (1 if smp == "post" else 0)
+
+
+last_asserts = []  # trace shape: [(cycle, message)] of the latest run_trace()
+
+
 def build(u, cache=None):
     """Build the unit's driver once; return the binary's path."""
     home = minitpu_home()
@@ -278,6 +501,9 @@ def build(u, cache=None):
     cmd = (
         [verilator, "--cc", "--exe", "--build", "-Wno-fatal", "-O3"]
         + [f"+define+{d_}" for d_ in u.defines]
+        + [f"-G{k}={v}" for k, v in u.params.items()]
+        + (["--x-initial", "unique"] if u.shape == "trace" else [])
+        + (["--assert"] if u.assertions else [])
         + ["--top-module", u.top, "--Mdir", d, "-j", "8"]
         + [os.path.join(home, s) for s in u.sources]
         + [os.path.join(d, "driver.cpp"), "-CFLAGS", "-std=c++17 -O2"]

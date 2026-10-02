@@ -1,0 +1,45 @@
+RTL mxu_bf16_mul_acc24: 6019104 vectors, latency [0] (declared 0), 1.0s
+UNIT-DIFF  mul_acc24 native simulator 4668187/6019104 latency=untimed (rtl 0) (build 0.2s, run 0.1s)
+
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+         24  Inf x 0: allo NaN from the float32 multiply, rtl +0x7fc000  e.g. 0000+7f80: allo ffc000 rtl 7fc000, 0000+ff80: allo ffc000 rtl 7fc000, 7f80+0000: allo ffc000 rtl 7fc000
+     676774  NaN operand: allo keeps its sign/payload, rtl +0x7fc000  e.g. 0000+7f81: allo 7fc100 rtl 7fc000, 0000+7fff: allo 7fff00 rtl 7fc000, 0000+ffc0: allo ffc000 rtl 7fc000
+      70862  subnormal operand flushed: rtl signed 0, IEEE an acc24 subnormal  e.g. 0001+3f80: allo 0100 rtl 0000, 0001+3f81: allo 0102 rtl 0000, 0001+3fff: allo 01fe rtl 0000
+     514840  subnormal operand flushed: rtl signed 0, IEEE a normal product  e.g. 0001+7f00: allo 3c8000 rtl 0000, 0001+7f7e: allo 3cfe00 rtl 0000, 0001+7f7f: allo 3cff00 rtl 0000
+      88417  product < 2^-126 flushed: rtl signed 0, IEEE an acc24 subnormal  e.g. 0080+3b80: allo 0080 rtl 0000, 0080+3c00: allo 0100 rtl 0000, 0080+bb80: allo 800080 rtl 800000
+[07:46:40] Compiling with g++ ...
+[07:46:44] Running simulation ...
+UNIT-DIFF  mul_acc24 native systemc 4941087/6019104 latency=unchecked (rtl 0) (build 0.2s, run 35.6s)
+         12  Inf x 0: allo NaN from the float32 multiply, rtl +0x7fc000  e.g. 0000+ff80: allo ffc000 rtl 7fc000, 7f80+8000: allo ffc000 rtl 7fc000, 8000+7f80: allo ffc000 rtl 7fc000
+     403886  NaN operand: allo keeps its sign/payload, rtl +0x7fc000  e.g. 0000+ffc0: allo ffc000 rtl 7fc000, 0000+ff81: allo ffc000 rtl 7fc000, 0000+ffff: allo ffc000 rtl 7fc000
+      70862  subnormal operand flushed: rtl signed 0, IEEE an acc24 subnormal  e.g. 0001+3f80: allo 0100 rtl 0000, 0001+3f81: allo 0102 rtl 0000, 0001+3fff: allo 01fe rtl 0000
+     514840  subnormal operand flushed: rtl signed 0, IEEE a normal product  e.g. 0001+7f00: allo 3c8000 rtl 0000, 0001+7f7e: allo 3cfe00 rtl 0000, 0001+7f7f: allo 3cff00 rtl 0000
+      88417  product < 2^-126 flushed: rtl signed 0, IEEE an acc24 subnormal  e.g. 0080+3b80: allo 0080 rtl 0000, 0080+3c00: allo 0100 rtl 0000, 0080+bb80: allo 800080 rtl 800000
+UNIT-DIFF  mul_acc24 native_bitext simulator 4668187/6019104 latency=untimed (rtl 0) (build 0.2s, run 0.1s)
+
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+         24  Inf x 0: allo NaN from the float32 multiply, rtl +0x7fc000  e.g. 0000+7f80: allo ffc000 rtl 7fc000, 0000+ff80: allo ffc000 rtl 7fc000, 7f80+0000: allo ffc000 rtl 7fc000
+     676774  NaN operand: allo keeps its sign/payload, rtl +0x7fc000  e.g. 0000+7f81: allo 7fc100 rtl 7fc000, 0000+7fff: allo 7fff00 rtl 7fc000, 0000+ffc0: allo ffc000 rtl 7fc000
+      70862  subnormal operand flushed: rtl signed 0, IEEE an acc24 subnormal  e.g. 0001+3f80: allo 0100 rtl 0000, 0001+3f81: allo 0102 rtl 0000, 0001+3fff: allo 01fe rtl 0000
+     514840  subnormal operand flushed: rtl signed 0, IEEE a normal product  e.g. 0001+7f00: allo 3c8000 rtl 0000, 0001+7f7e: allo 3cfe00 rtl 0000, 0001+7f7f: allo 3cff00 rtl 0000
+      88417  product < 2^-126 flushed: rtl signed 0, IEEE an acc24 subnormal  e.g. 0080+3b80: allo 0080 rtl 0000, 0080+3c00: allo 0100 rtl 0000, 0080+bb80: allo 800080 rtl 800000
+[07:47:22] Compiling with g++ ...
+[07:47:27] Running simulation ...
+UNIT-DIFF  mul_acc24 native_bitext systemc 4941087/6019104 latency=unchecked (rtl 0) (build 0.2s, run 36.1s)
+         12  Inf x 0: allo NaN from the float32 multiply, rtl +0x7fc000  e.g. 0000+ff80: allo ffc000 rtl 7fc000, 7f80+8000: allo ffc000 rtl 7fc000, 8000+7f80: allo ffc000 rtl 7fc000
+     403886  NaN operand: allo keeps its sign/payload, rtl +0x7fc000  e.g. 0000+ffc0: allo ffc000 rtl 7fc000, 0000+ff81: allo ffc000 rtl 7fc000, 0000+ffff: allo ffc000 rtl 7fc000
+      70862  subnormal operand flushed: rtl signed 0, IEEE an acc24 subnormal  e.g. 0001+3f80: allo 0100 rtl 0000, 0001+3f81: allo 0102 rtl 0000, 0001+3fff: allo 01fe rtl 0000
+     514840  subnormal operand flushed: rtl signed 0, IEEE a normal product  e.g. 0001+7f00: allo 3c8000 rtl 0000, 0001+7f7e: allo 3cfe00 rtl 0000, 0001+7f7f: allo 3cff00 rtl 0000
+      88417  product < 2^-126 flushed: rtl signed 0, IEEE an acc24 subnormal  e.g. 0080+3b80: allo 0080 rtl 0000, 0080+3c00: allo 0100 rtl 0000, 0080+bb80: allo 800080 rtl 800000
+UNIT-MATCH mul_acc24 bits simulator 6019104/6019104 latency=untimed (rtl 0) (build 0.3s, run 0.9s)
+
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[07:48:03] Compiling with g++ ...
+[07:48:07] Running simulation ...
+UNIT-MATCH mul_acc24 bits systemc 6019104/6019104 latency=unchecked (rtl 0) (build 0.2s, run 32.6s)

@@ -1,0 +1,288 @@
+PASS test_trace
+== vpu_regfile:w16: vpu_regfile (trace) params={} defines=[]
+   ok  fill-readback                legal       64 cyc  defined 189/189 masked 3  seed-diff 0  asserts 0
+   ok  wr-offsets-port-a            legal       57 cyc  defined 168/168 masked 3  seed-diff 0  asserts 0
+   ok  wr-offsets-port-b            legal       57 cyc  defined 168/168 masked 3  seed-diff 0  asserts 0
+   ok  wr-offsets-port-c            legal       57 cyc  defined 168/168 masked 3  seed-diff 0  asserts 0
+   ok  reset-keeps                  legal       14 cyc  defined 39/39 masked 3  seed-diff 0  asserts 0
+   ok  random-0                     legal    20000 cyc  defined 59829/59829 masked 171  seed-diff 0  asserts 0
+   ok  random-1                     legal    20000 cyc  defined 59869/59869 masked 131  seed-diff 0  asserts 0
+   ok  random-2                     legal    20000 cyc  defined 59842/59842 masked 158  seed-diff 0  asserts 0
+   ok  tb_vpu_alu_regfile           legal       12 cyc  defined 27/27 masked 9  seed-diff 0  asserts 0 TB-REPLAY 27/27
+   undefined-slot census (slots, guess matched, moved with seed):
+      rdata_a_o          uninit                178  guess        0  seed-moved      178
+      rdata_b_o          uninit                143  guess        0  seed-moved      143
+      rdata_c_o          uninit                163  guess        0  seed-moved      163
+   LATENCY-OK   read a: declared 0, step probe 0
+   LATENCY-OK   write -> read a: declared 1, step probe 1
+   LATENCY-OK   read b: declared 0, step probe 0
+   LATENCY-OK   write -> read b: declared 1, step probe 1
+   LATENCY-OK   read c: declared 0, step probe 0
+   LATENCY-OK   write -> read c: declared 1, step probe 1
+   REF-MATCH vpu_regfile:w16 (1.0s)
+== vpu_regfile:w256: vpu_regfile (trace) params={'WIDTH': 256} defines=[]
+   ok  fill-readback                legal       64 cyc  defined 189/189 masked 3  seed-diff 0  asserts 0
+   ok  wr-offsets-port-a            legal       57 cyc  defined 168/168 masked 3  seed-diff 0  asserts 0
+   ok  wr-offsets-port-b            legal       57 cyc  defined 168/168 masked 3  seed-diff 0  asserts 0
+   ok  wr-offsets-port-c            legal       57 cyc  defined 168/168 masked 3  seed-diff 0  asserts 0
+   ok  reset-keeps                  legal       14 cyc  defined 39/39 masked 3  seed-diff 0  asserts 0
+   ok  random-0                     legal     5000 cyc  defined 14816/14816 masked 184  seed-diff 0  asserts 0
+   ok  random-1                     legal     5000 cyc  defined 14855/14855 masked 145  seed-diff 0  asserts 0
+   ok  random-2                     legal     5000 cyc  defined 14792/14792 masked 208  seed-diff 0  asserts 0
+   undefined-slot census (slots, guess matched, moved with seed):
+      rdata_a_o          uninit                185  guess        0  seed-moved      185
+      rdata_b_o          uninit                182  guess        0  seed-moved      182
+      rdata_c_o          uninit                185  guess        0  seed-moved      185
+   LATENCY-OK   read a: declared 0, step probe 0
+   LATENCY-OK   write -> read a: declared 1, step probe 1
+   LATENCY-OK   read b: declared 0, step probe 0
+   LATENCY-OK   write -> read b: declared 1, step probe 1
+   LATENCY-OK   read c: declared 0, step probe 0
+   LATENCY-OK   write -> read c: declared 1, step probe 1
+   REF-MATCH vpu_regfile:w256 (0.5s)
+== vpu_word_array:narrow: vpu_word_array (trace) params={} defines=['MINITPU_NUM_LANES=1', 'MINITPU_VMEM_ENTRIES_PER_LANE=16']
+   ok  wr-offsets-compute->compute  legal      138 cyc  defined 12/12 masked 264  seed-diff 0  asserts 0
+   ok  wr-offsets-compute->dma      legal       75 cyc  defined 9/9 masked 141  seed-diff 0  asserts 0
+   ok  wr-same-cycle-compute->dma   illegal     30 cyc  defined 0/0 masked 60  seed-diff 0  asserts 0  rw collision=3
+   ok  wr-offsets-dma->compute      legal      117 cyc  defined 12/12 masked 222  seed-diff 0  asserts 0
+   ok  wr-same-cycle-dma->compute   illegal     36 cyc  defined 0/0 masked 72  seed-diff 0  asserts 0  rw collision=3
+   ok  wr-offsets-dma->dma          legal       93 cyc  defined 9/9 masked 177  seed-diff 0  asserts 0
+   ok  rdw-same-port                legal       39 cyc  defined 6/6 masked 72  seed-diff 0  asserts 0
+   ok  both-read-one-word           legal       21 cyc  defined 6/6 masked 36  seed-diff 0  asserts 0
+   ok  ww-collision                 illegal     39 cyc  defined 3/3 masked 75  seed-diff 0  asserts 0  ww collision=3
+   ok  idle-gaps                    legal       21 cyc  defined 6/6 masked 36  seed-diff 0  asserts 0
+   ok  random-legal-0               legal    20000 cyc  defined 17887/17887 masked 22113  seed-diff 0  asserts 0
+   ok  random-legal-1               legal    20000 cyc  defined 17955/17955 masked 22045  seed-diff 0  asserts 0
+   ok  random-any-0                 illegal  20000 cyc  defined 15893/15893 masked 24107  seed-diff 0  asserts 0  rw collision=1391, ww collision=472
+   ok  random-any-1                 illegal  20000 cyc  defined 15872/15872 masked 24128  seed-diff 0  asserts 0  rw collision=1296, ww collision=443
+   undefined-slot census (slots, guess matched, moved with seed):
+      compute_rdata_o    collision            1358  guess     1358  seed-moved        0
+      compute_rdata_o    no read             20433  guess    20233  seed-moved      200
+      compute_rdata_o    uninit                 29  guess        0  seed-moved       29
+      compute_rdata_o    write cycle         24340  guess    24307  seed-moved       33
+      compute_rdata_o    ww collision          699  guess      699  seed-moved        0
+      dma_rdata_o        collision            1335  guess     1335  seed-moved        0
+      dma_rdata_o        no read             20677  guess    20432  seed-moved      245
+      dma_rdata_o        uninit                 23  guess        0  seed-moved       23
+      dma_rdata_o        write cycle         24001  guess    23969  seed-moved       32
+      dma_rdata_o        ww collision          653  guess      653  seed-moved        0
+   events: rw collision=2693, ww collision=918
+   LATENCY-OK   read compute: declared 3, step probe 3
+   LATENCY-OK   read dma: declared 2, step probe 2
+   LATENCY-OK   write compute -> read compute (visibility): declared 1, step probe 1
+   LATENCY-OK   write compute -> read dma (visibility): declared 1, step probe 1
+   LATENCY-OK   write dma -> read compute (visibility): declared 1, step probe 1
+   LATENCY-OK   write dma -> read dma (visibility): declared 1, step probe 1
+   REF-MATCH vpu_word_array:narrow (1.5s)
+== vpu_word_array:narrow_rl2: vpu_word_array (trace) params={'READ_LATENCY': 2} defines=['MINITPU_NUM_LANES=1', 'MINITPU_VMEM_ENTRIES_PER_LANE=16']
+   ok  wr-offsets-compute->compute  legal       93 cyc  defined 9/9 masked 177  seed-diff 0  asserts 0
+   ok  wr-offsets-compute->dma      legal       75 cyc  defined 9/9 masked 141  seed-diff 0  asserts 0
+   ok  wr-same-cycle-compute->dma   illegal     30 cyc  defined 0/0 masked 60  seed-diff 0  asserts 0  rw collision=3
+   ok  wr-offsets-dma->compute      legal       75 cyc  defined 9/9 masked 141  seed-diff 0  asserts 0
+   ok  wr-same-cycle-dma->compute   illegal     30 cyc  defined 0/0 masked 60  seed-diff 0  asserts 0  rw collision=3
+   ok  wr-offsets-dma->dma          legal       93 cyc  defined 9/9 masked 177  seed-diff 0  asserts 0
+   ok  rdw-same-port                legal       36 cyc  defined 6/6 masked 66  seed-diff 0  asserts 0
+   ok  both-read-one-word           legal       18 cyc  defined 6/6 masked 30  seed-diff 0  asserts 0
+   ok  ww-collision                 illegal     39 cyc  defined 3/3 masked 75  seed-diff 0  asserts 0  ww collision=3
+   ok  idle-gaps                    legal       21 cyc  defined 6/6 masked 36  seed-diff 0  asserts 0
+   ok  random-legal-0               legal    20000 cyc  defined 18209/18209 masked 21791  seed-diff 0  asserts 0
+   ok  random-legal-1               legal    20000 cyc  defined 17920/17920 masked 22080  seed-diff 0  asserts 0
+   ok  random-any-0                 illegal  20000 cyc  defined 16025/16025 masked 23975  seed-diff 0  asserts 0  rw collision=1264, ww collision=436
+   ok  random-any-1                 illegal  20000 cyc  defined 16051/16051 masked 23949  seed-diff 0  asserts 0  rw collision=1316, ww collision=421
+   undefined-slot census (slots, guess matched, moved with seed):
+      compute_rdata_o    collision            1300  guess     1300  seed-moved        0
+      compute_rdata_o    no read             20547  guess    20365  seed-moved      182
+      compute_rdata_o    uninit                 31  guess        0  seed-moved       31
+      compute_rdata_o    write cycle         23803  guess    23770  seed-moved       33
+      compute_rdata_o    ww collision          630  guess      630  seed-moved        0
+      dma_rdata_o        collision            1286  guess     1286  seed-moved        0
+      dma_rdata_o        no read             20530  guess    20336  seed-moved      194
+      dma_rdata_o        uninit                 19  guess        0  seed-moved       19
+      dma_rdata_o        write cycle         24016  guess    23983  seed-moved       33
+      dma_rdata_o        ww collision          596  guess      596  seed-moved        0
+   events: rw collision=2586, ww collision=860
+   LATENCY-OK   read compute: declared 2, step probe 2
+   LATENCY-OK   read dma: declared 2, step probe 2
+   LATENCY-OK   write compute -> read compute (visibility): declared 1, step probe 1
+   LATENCY-OK   write compute -> read dma (visibility): declared 1, step probe 1
+   LATENCY-OK   write dma -> read compute (visibility): declared 1, step probe 1
+   LATENCY-OK   write dma -> read dma (visibility): declared 1, step probe 1
+   REF-MATCH vpu_word_array:narrow_rl2 (1.5s)
+== vpu_word_array:full: vpu_word_array (trace) params={} defines=[]
+   ok  wr-offsets-compute->compute  legal      138 cyc  defined 12/12 masked 264  seed-diff 0  asserts 0
+   ok  wr-offsets-compute->dma      legal       75 cyc  defined 9/9 masked 141  seed-diff 0  asserts 0
+   ok  wr-same-cycle-compute->dma   illegal     30 cyc  defined 0/0 masked 60  seed-diff 0  asserts 0  rw collision=3
+   ok  wr-offsets-dma->compute      legal      117 cyc  defined 12/12 masked 222  seed-diff 0  asserts 0
+   ok  wr-same-cycle-dma->compute   illegal     36 cyc  defined 0/0 masked 72  seed-diff 0  asserts 0  rw collision=3
+   ok  wr-offsets-dma->dma          legal       93 cyc  defined 9/9 masked 177  seed-diff 0  asserts 0
+   ok  rdw-same-port                legal       39 cyc  defined 6/6 masked 72  seed-diff 0  asserts 0
+   ok  both-read-one-word           legal       21 cyc  defined 6/6 masked 36  seed-diff 0  asserts 0
+   ok  ww-collision                 illegal     39 cyc  defined 3/3 masked 75  seed-diff 0  asserts 0  ww collision=3
+   ok  idle-gaps                    legal       21 cyc  defined 6/6 masked 36  seed-diff 0  asserts 0
+   ok  random-legal-0               legal     3000 cyc  defined 2045/2045 masked 3955  seed-diff 0  asserts 0
+   ok  random-legal-1               legal     3000 cyc  defined 2087/2087 masked 3913  seed-diff 0  asserts 0
+   ok  random-any-0                 illegal   3000 cyc  defined 1810/1810 masked 4190  seed-diff 0  asserts 0  rw collision=154, ww collision=57
+   ok  random-any-1                 illegal   3000 cyc  defined 1871/1871 masked 4129  seed-diff 0  asserts 0  rw collision=171, ww collision=44
+   ok  tb_vpu_word_array@RL3        legal       81 cyc  defined 5/5 masked 157  seed-diff 0  asserts 0
+   undefined-slot census (slots, guess matched, moved with seed):
+      compute_rdata_o    collision             167  guess      167  seed-moved        0
+      compute_rdata_o    no read              3575  guess     2680  seed-moved      895
+      compute_rdata_o    uninit               1279  guess        0  seed-moved     1279
+      compute_rdata_o    write cycle          3680  guess     2762  seed-moved      918
+      compute_rdata_o    ww collision           75  guess       75  seed-moved        0
+      dma_rdata_o        collision             164  guess      164  seed-moved        0
+      dma_rdata_o        no read              3531  guess     2565  seed-moved      966
+      dma_rdata_o        uninit               1319  guess        0  seed-moved     1319
+      dma_rdata_o        write cycle          3634  guess     2798  seed-moved      836
+      dma_rdata_o        ww collision           75  guess       75  seed-moved        0
+   events: rw collision=331, ww collision=104
+   LATENCY-OK   read compute: declared 3, step probe 3
+   LATENCY-OK   read dma: declared 2, step probe 2
+   LATENCY-OK   write compute -> read compute (visibility): declared 1, step probe 1
+   LATENCY-OK   write compute -> read dma (visibility): declared 1, step probe 1
+   LATENCY-OK   write dma -> read compute (visibility): declared 1, step probe 1
+   LATENCY-OK   write dma -> read dma (visibility): declared 1, step probe 1
+   REF-MATCH vpu_word_array:full (0.9s)
+== vpu_word_array:full_rl2: vpu_word_array (trace) params={'READ_LATENCY': 2} defines=[]
+   ok  wr-offsets-compute->compute  legal       93 cyc  defined 9/9 masked 177  seed-diff 0  asserts 0
+   ok  wr-offsets-compute->dma      legal       75 cyc  defined 9/9 masked 141  seed-diff 0  asserts 0
+   ok  wr-same-cycle-compute->dma   illegal     30 cyc  defined 0/0 masked 60  seed-diff 0  asserts 0  rw collision=3
+   ok  wr-offsets-dma->compute      legal       75 cyc  defined 9/9 masked 141  seed-diff 0  asserts 0
+   ok  wr-same-cycle-dma->compute   illegal     30 cyc  defined 0/0 masked 60  seed-diff 0  asserts 0  rw collision=3
+   ok  wr-offsets-dma->dma          legal       93 cyc  defined 9/9 masked 177  seed-diff 0  asserts 0
+   ok  rdw-same-port                legal       36 cyc  defined 6/6 masked 66  seed-diff 0  asserts 0
+   ok  both-read-one-word           legal       18 cyc  defined 6/6 masked 30  seed-diff 0  asserts 0
+   ok  ww-collision                 illegal     39 cyc  defined 3/3 masked 75  seed-diff 0  asserts 0  ww collision=3
+   ok  idle-gaps                    legal       21 cyc  defined 6/6 masked 36  seed-diff 0  asserts 0
+   ok  random-legal-0               legal     3000 cyc  defined 2042/2042 masked 3958  seed-diff 0  asserts 0
+   ok  random-legal-1               legal     3000 cyc  defined 1991/1991 masked 4009  seed-diff 0  asserts 0
+   ok  random-any-0                 illegal   3000 cyc  defined 1924/1924 masked 4076  seed-diff 0  asserts 0  rw collision=159, ww collision=53
+   ok  random-any-1                 illegal   3000 cyc  defined 1791/1791 masked 4209  seed-diff 0  asserts 0  rw collision=151, ww collision=62
+   ok  tb_vpu_word_array            legal       81 cyc  defined 5/5 masked 157  seed-diff 0  asserts 0 TB-REPLAY 5/5
+   undefined-slot census (slots, guess matched, moved with seed):
+      compute_rdata_o    collision             156  guess      156  seed-moved        0
+      compute_rdata_o    no read              3527  guess     2601  seed-moved      926
+      compute_rdata_o    uninit               1268  guess        0  seed-moved     1268
+      compute_rdata_o    write cycle          3702  guess     2819  seed-moved      883
+      compute_rdata_o    ww collision           78  guess       78  seed-moved        0
+      dma_rdata_o        collision             159  guess      158  seed-moved        1
+      dma_rdata_o        no read              3478  guess     2545  seed-moved      933
+      dma_rdata_o        uninit               1262  guess        0  seed-moved     1262
+      dma_rdata_o        write cycle          3644  guess     2776  seed-moved      868
+      dma_rdata_o        ww collision           98  guess       98  seed-moved        0
+   events: rw collision=316, ww collision=118
+   LATENCY-OK   read compute: declared 2, step probe 2
+   LATENCY-OK   read dma: declared 2, step probe 2
+   LATENCY-OK   write compute -> read compute (visibility): declared 1, step probe 1
+   LATENCY-OK   write compute -> read dma (visibility): declared 1, step probe 1
+   LATENCY-OK   write dma -> read compute (visibility): declared 1, step probe 1
+   LATENCY-OK   write dma -> read dma (visibility): declared 1, step probe 1
+   REF-MATCH vpu_word_array:full_rl2 (0.9s)
+== vpu_fifo:w32d4: vpu_fifo (trace) params={} defines=[]
+   ok  fill-full-passthrough-drain  legal       24 cyc  defined 61/61 masked 11  seed-diff 0  asserts 0  push+pop on full (pass-through)=3
+   ok  wrap-half-full               legal       16 cyc  defined 43/43 masked 5  seed-diff 0  asserts 0
+   ok  push+pop-on-empty            illegal     10 cyc  defined 21/21 masked 9  seed-diff 0  asserts 0  push+pop on empty (word lost)=1
+   ok  overflow                     illegal     14 cyc  defined 36/36 masked 6  seed-diff 0  asserts 4  overflow (push dropped)=3, underflow (pop ignored)=1
+   ok  underflow                    illegal      7 cyc  defined 13/13 masked 8  seed-diff 0  asserts 3  underflow (pop ignored)=3
+   ok  reset-mid-stream             legal       13 cyc  defined 24/24 masked 15  seed-diff 0  asserts 0
+   ok  random-legal-0               legal    20002 cyc  defined 54397/54397 masked 5609  seed-diff 0  asserts 0  push+pop on full (pass-through)=1286
+   ok  random-legal-1               legal    20002 cyc  defined 54019/54019 masked 5987  seed-diff 0  asserts 0  push+pop on full (pass-through)=1291
+   ok  random-any-0                 illegal  20002 cyc  defined 52743/52743 masked 7263  seed-diff 0  asserts 7914  overflow (push dropped)=4057, push+pop on empty (word lost)=1371, push+pop on full (pass-through)=1266, underflow (pop ignored)=3857
+   ok  random-any-1                 illegal  20002 cyc  defined 51781/51781 masked 8225  seed-diff 0  asserts 8410  overflow (push dropped)=3633, push+pop on empty (word lost)=1413, push+pop on full (pass-through)=1118, underflow (pop ignored)=4777
+   undefined-slot census (slots, guess matched, moved with seed):
+      empty_o            pre-reset              12  guess        0  seed-moved        0
+      full_o             pre-reset              12  guess       12  seed-moved        0
+      pop_data_o         empty               27073  guess    27073  seed-moved        0
+      pop_data_o         pre-reset              12  guess        0  seed-moved       11
+      pop_data_o         uninit                 29  guess        0  seed-moved       29
+   events: overflow (push dropped)=7693, push+pop on empty (word lost)=2785, push+pop on full (pass-through)=4964, underflow (pop ignored)=8638
+   assertion x7693: %Error: vpu_fifo.sv:39: Assertion failed in TOP.vpu_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x8638: %Error: vpu_fifo.sv:41: Assertion failed in TOP.vpu_fifo: vpu_fifo underflow: illegal/undefined schedule
+   LATENCY-OK   push -> empty_o: declared 1, step probe 1
+   LATENCY-OK   push -> pop_data_o (fall-through): declared 1, step probe 1
+   LATENCY-OK   last push -> full_o: declared 1, step probe 1
+   LATENCY-OK   pop -> pop_data_o: declared 1, step probe 1
+   REF-MATCH vpu_fifo:w32d4 (1.0s)
+== vpu_fifo:input: vpu_fifo (trace) params={'WIDTH': 257, 'DEPTH': 4} defines=[]
+   ok  fill-full-passthrough-drain  legal       24 cyc  defined 61/61 masked 11  seed-diff 0  asserts 0  push+pop on full (pass-through)=3
+   ok  wrap-half-full               legal       16 cyc  defined 43/43 masked 5  seed-diff 0  asserts 0
+   ok  push+pop-on-empty            illegal     10 cyc  defined 21/21 masked 9  seed-diff 0  asserts 0  push+pop on empty (word lost)=1
+   ok  overflow                     illegal     14 cyc  defined 36/36 masked 6  seed-diff 0  asserts 4  overflow (push dropped)=3, underflow (pop ignored)=1
+   ok  underflow                    illegal      7 cyc  defined 13/13 masked 8  seed-diff 0  asserts 3  underflow (pop ignored)=3
+   ok  reset-mid-stream             legal       13 cyc  defined 24/24 masked 15  seed-diff 0  asserts 0
+   ok  random-legal-0               legal     5002 cyc  defined 13569/13569 masked 1437  seed-diff 0  asserts 0  push+pop on full (pass-through)=363
+   ok  random-legal-1               legal     5002 cyc  defined 13722/13722 masked 1284  seed-diff 0  asserts 0  push+pop on full (pass-through)=306
+   ok  random-any-0                 illegal   5002 cyc  defined 12914/12914 masked 2092  seed-diff 0  asserts 1883  overflow (push dropped)=761, push+pop on empty (word lost)=397, push+pop on full (pass-through)=265, underflow (pop ignored)=1122
+   ok  random-any-1                 illegal   5002 cyc  defined 13431/13431 masked 1575  seed-diff 0  asserts 2151  overflow (push dropped)=1253, push+pop on empty (word lost)=274, push+pop on full (pass-through)=416, underflow (pop ignored)=898
+   undefined-slot census (slots, guess matched, moved with seed):
+      empty_o            pre-reset              12  guess        0  seed-moved        0
+      full_o             pre-reset              12  guess       12  seed-moved        0
+      pop_data_o         empty                6351  guess     6351  seed-moved        0
+      pop_data_o         pre-reset              12  guess        0  seed-moved       11
+      pop_data_o         uninit                 55  guess        0  seed-moved       55
+   events: overflow (push dropped)=2017, push+pop on empty (word lost)=672, push+pop on full (pass-through)=1353, underflow (pop ignored)=2024
+   assertion x2017: %Error: vpu_fifo.sv:39: Assertion failed in TOP.vpu_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x2024: %Error: vpu_fifo.sv:41: Assertion failed in TOP.vpu_fifo: vpu_fifo underflow: illegal/undefined schedule
+   LATENCY-OK   push -> empty_o: declared 1, step probe 1
+   LATENCY-OK   push -> pop_data_o (fall-through): declared 1, step probe 1
+   LATENCY-OK   last push -> full_o: declared 1, step probe 1
+   LATENCY-OK   pop -> pop_data_o: declared 1, step probe 1
+   REF-MATCH vpu_fifo:input (0.6s)
+== vpu_fifo:output: vpu_fifo (trace) params={'WIDTH': 64, 'DEPTH': 16} defines=[]
+   ok  fill-full-passthrough-drain  legal       48 cyc  defined 133/133 masked 11  seed-diff 0  asserts 0  push+pop on full (pass-through)=3
+   ok  wrap-half-full               legal       58 cyc  defined 169/169 masked 5  seed-diff 0  asserts 0
+   ok  push+pop-on-empty            illegal     10 cyc  defined 21/21 masked 9  seed-diff 0  asserts 0  push+pop on empty (word lost)=1
+   ok  overflow                     illegal     38 cyc  defined 108/108 masked 6  seed-diff 0  asserts 4  overflow (push dropped)=3, underflow (pop ignored)=1
+   ok  underflow                    illegal      7 cyc  defined 13/13 masked 8  seed-diff 0  asserts 3  underflow (pop ignored)=3
+   ok  reset-mid-stream             legal       13 cyc  defined 24/24 masked 15  seed-diff 0  asserts 0
+   ok  random-legal-0               legal    20002 cyc  defined 55513/55513 masked 4493  seed-diff 0  asserts 0  push+pop on full (pass-through)=942
+   ok  random-legal-1               legal    20002 cyc  defined 55828/55828 masked 4178  seed-diff 0  asserts 0  push+pop on full (pass-through)=1026
+   ok  random-any-0                 illegal  20002 cyc  defined 53695/53695 masked 6311  seed-diff 0  asserts 7074  overflow (push dropped)=3426, push+pop on empty (word lost)=1130, push+pop on full (pass-through)=934, underflow (pop ignored)=3648
+   ok  random-any-1                 illegal  20002 cyc  defined 54103/54103 masked 5903  seed-diff 0  asserts 6348  overflow (push dropped)=3059, push+pop on empty (word lost)=1064, push+pop on full (pass-through)=860, underflow (pop ignored)=3289
+   ok  tb_mxu_single_port lane 0    legal       29 cyc  defined 58/58 masked 29  seed-diff 0  asserts 0 TB-REPLAY 58/58
+   ok  tb_mxu_single_port lane 1    legal       29 cyc  defined 57/57 masked 30  seed-diff 0  asserts 0 TB-REPLAY 57/57
+   undefined-slot census (slots, guess matched, moved with seed):
+      empty_o            pre-reset              14  guess        0  seed-moved        0
+      full_o             pre-reset              14  guess       14  seed-moved        0
+      pop_data_o         empty               20789  guess    20789  seed-moved        0
+      pop_data_o         pre-reset              14  guess        0  seed-moved       14
+      pop_data_o         uninit                167  guess        0  seed-moved      167
+   events: overflow (push dropped)=6488, push+pop on empty (word lost)=2195, push+pop on full (pass-through)=3765, underflow (pop ignored)=6941
+   assertion x6488: %Error: vpu_fifo.sv:39: Assertion failed in TOP.vpu_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x6941: %Error: vpu_fifo.sv:41: Assertion failed in TOP.vpu_fifo: vpu_fifo underflow: illegal/undefined schedule
+   LATENCY-OK   push -> empty_o: declared 1, step probe 1
+   LATENCY-OK   push -> pop_data_o (fall-through): declared 1, step probe 1
+   LATENCY-OK   last push -> full_o: declared 1, step probe 1
+   LATENCY-OK   pop -> pop_data_o: declared 1, step probe 1
+   REF-MATCH vpu_fifo:output (1.0s)
+== vpu_fifo:input_dim2: vpu_fifo (trace) params={'WIDTH': 33, 'DEPTH': 4} defines=[]
+   ok  fill-full-passthrough-drain  legal       24 cyc  defined 61/61 masked 11  seed-diff 0  asserts 0  push+pop on full (pass-through)=3
+   ok  wrap-half-full               legal       16 cyc  defined 43/43 masked 5  seed-diff 0  asserts 0
+   ok  push+pop-on-empty            illegal     10 cyc  defined 21/21 masked 9  seed-diff 0  asserts 0  push+pop on empty (word lost)=1
+   ok  overflow                     illegal     14 cyc  defined 36/36 masked 6  seed-diff 0  asserts 4  overflow (push dropped)=3, underflow (pop ignored)=1
+   ok  underflow                    illegal      7 cyc  defined 13/13 masked 8  seed-diff 0  asserts 3  underflow (pop ignored)=3
+   ok  reset-mid-stream             legal       13 cyc  defined 24/24 masked 15  seed-diff 0  asserts 0
+   ok  random-legal-0               legal    20002 cyc  defined 54628/54628 masked 5378  seed-diff 0  asserts 0  push+pop on full (pass-through)=1309
+   ok  random-legal-1               legal    20002 cyc  defined 53795/53795 masked 6211  seed-diff 0  asserts 0  push+pop on full (pass-through)=1296
+   ok  random-any-0                 illegal  20002 cyc  defined 52535/52535 masked 7471  seed-diff 0  asserts 8428  overflow (push dropped)=4275, push+pop on empty (word lost)=1312, push+pop on full (pass-through)=1297, underflow (pop ignored)=4153
+   ok  random-any-1                 illegal  20002 cyc  defined 52367/52367 masked 7639  seed-diff 0  asserts 8253  overflow (push dropped)=3957, push+pop on empty (word lost)=1332, push+pop on full (pass-through)=1212, underflow (pop ignored)=4296
+   ok  tb_mxu_single_port input FIFO (DIM=2: 33 b) legal       29 cyc  defined 62/62 masked 25  seed-diff 0  asserts 0 TB-REPLAY 62/62
+   undefined-slot census (slots, guess matched, moved with seed):
+      empty_o            pre-reset              13  guess        0  seed-moved        0
+      full_o             pre-reset              13  guess       13  seed-moved        0
+      pop_data_o         empty               26676  guess    26676  seed-moved        0
+      pop_data_o         pre-reset              13  guess        1  seed-moved       12
+      pop_data_o         uninit                 63  guess        0  seed-moved       63
+   events: overflow (push dropped)=8235, push+pop on empty (word lost)=2645, push+pop on full (pass-through)=5117, underflow (pop ignored)=8453
+   assertion x8235: %Error: vpu_fifo.sv:39: Assertion failed in TOP.vpu_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x8453: %Error: vpu_fifo.sv:41: Assertion failed in TOP.vpu_fifo: vpu_fifo underflow: illegal/undefined schedule
+   LATENCY-OK   push -> empty_o: declared 1, step probe 1
+   LATENCY-OK   push -> pop_data_o (fall-through): declared 1, step probe 1
+   LATENCY-OK   last push -> full_o: declared 1, step probe 1
+   LATENCY-OK   pop -> pop_data_o: declared 1, step probe 1
+   REF-MATCH vpu_fifo:input_dim2 (1.0s)
+
+real	0m13.565s
+user	0m9.443s
+sys	0m3.303s
+EXIT 0

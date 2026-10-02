@@ -24,6 +24,12 @@ in what Allo can say.
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
+   *Checked together, 2026-10-02:* ``u1-pilot`` with both
+   ``core-uint-compare`` and ``core-scoping`` merged (branch
+   ``u1-with-core-fixes``, ``fd076a86``) gives verdicts identical to
+   ``u1-pilot``'s on every unit, variant and backend, and the 66 regression
+   tests of all three fix branches pass together
+   (``u1_integration_2026-10-02/``).
 2. **Merge the SystemC emitter fixes** (``systemc-u1-fixes``, eight bugs,
    each with a compile-and-run regression test)? EVA bit-exact; TinyTPU
    SystemC csim unchanged; TinyTPU's Vitis and Catapult emission is

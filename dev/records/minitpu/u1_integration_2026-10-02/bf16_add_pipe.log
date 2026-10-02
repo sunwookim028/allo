@@ -1,0 +1,21 @@
+RTL vpu_bf16_add_pipe: 251936 vectors, latency [2] (declared 2), 0.1s
+UNIT-DIFF  bf16_add_pipe native simulator 250955/251936 latency=untimed (rtl 2) (build 0.2s, run 0.0s)
+
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+          1  (+0)+(-0): allo +0 (IEEE), rtl -0  e.g. 0000+8000: allo 0000 rtl 8000
+        980  NaN sign: allo keeps it, rtl always +0x7fc0  e.g. 0000+ffc0: allo ffc0 rtl 7fc0, 0000+ff81: allo ffc0 rtl 7fc0, 0000+ffff: allo ffc0 rtl 7fc0
+[07:35:18] Compiling with g++ ...
+[07:35:22] Running simulation ...
+UNIT-DIFF  bf16_add_pipe native systemc 249907/251936 latency=unchecked (rtl 2) (build 0.1s, run 5.4s)
+       2028  NaN payload: ac_std_float all-ones 0x7fff/0xffff, rtl +0x7fc0  e.g. 0000+7fc0: allo 7fff rtl 7fc0, 0000+7f81: allo 7fff rtl 7fc0, 0000+7fff: allo 7fff rtl 7fc0
+          1  (+0)+(-0): allo +0 (IEEE), rtl -0  e.g. 0000+8000: allo 0000 rtl 8000
+UNIT-MATCH bf16_add_pipe bits simulator 251936/251936 latency=untimed (rtl 2) (build 0.5s, run 0.1s)
+
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[07:35:24] Compiling with g++ ...
+[07:35:28] Running simulation ...
+UNIT-MATCH bf16_add_pipe bits systemc 251936/251936 latency=unchecked (rtl 2) (build 0.4s, run 5.5s)

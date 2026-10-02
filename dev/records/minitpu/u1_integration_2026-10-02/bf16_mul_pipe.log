@@ -1,0 +1,53 @@
+RTL vpu_bf16_mul_pipe: 6019104 vectors, latency [2] (declared 2), 1.3s
+UNIT-DIFF  bf16_mul_pipe native simulator 5011918/6019104 latency=untimed (rtl 2) (build 0.2s, run 0.1s)
+
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+         24  Inf x 0: allo -0x7fc0, rtl +0x7fc0  e.g. 0000+7f80: allo ffc0 rtl 7fc0, 0000+ff80: allo ffc0 rtl 7fc0, 7f80+0000: allo ffc0 rtl 7fc0
+     403846  NaN operand: allo -0x7fc0, rtl +0x7fc0  e.g. 0000+ffc0: allo ffc0 rtl 7fc0, 0000+ff81: allo ffc0 rtl 7fc0, 0000+ffff: allo ffc0 rtl 7fc0
+      36401  subnormal operand flushed: rtl signed 0, IEEE a subnormal product  e.g. 0001+3f80: allo 0001 rtl 0000, 0001+3f81: allo 0001 rtl 0000, 0001+3fff: allo 0002 rtl 0000
+     514904  subnormal operand flushed: rtl signed 0, IEEE a normal product  e.g. 0001+7f00: allo 3c80 rtl 0000, 0001+7f7e: allo 3cfe rtl 0000, 0001+7f7f: allo 3cff rtl 0000
+      51958  product < 2^-126 flushed: rtl signed 0, IEEE a subnormal  e.g. 0080+3c00: allo 0001 rtl 0000, 0080+bc00: allo 8001 rtl 8000, 0081+3b80: allo 0001 rtl 0000
+         53  product < 2^-126 flushed: rtl signed 0, IEEE rounds up to 2^-126  e.g. a0b7+1f33: allo 8080 rtl 8000, a63a+99b0: allo 0080 rtl 0000, af31+90b9: allo 0080 rtl 0000
+[07:36:55] Compiling with g++ ...
+[07:36:59] Running simulation ...
+UNIT-DIFF  bf16_mul_pipe native systemc 5011890/6019104 latency=unchecked (rtl 2) (build 0.2s, run 31.8s)
+         12  Inf x 0: allo -0x7fc0, rtl +0x7fc0  e.g. 0000+ff80: allo ffc0 rtl 7fc0, 7f80+8000: allo ffc0 rtl 7fc0, 8000+7f80: allo ffc0 rtl 7fc0
+     403886  NaN operand: allo -0x7fc0, rtl +0x7fc0  e.g. 0000+ffc0: allo ffc0 rtl 7fc0, 0000+ff81: allo ffc0 rtl 7fc0, 0000+ffff: allo ffc0 rtl 7fc0
+      36401  subnormal operand flushed: rtl signed 0, IEEE a subnormal product  e.g. 0001+3f80: allo 0001 rtl 0000, 0001+3f81: allo 0001 rtl 0000, 0001+3fff: allo 0002 rtl 0000
+     514904  subnormal operand flushed: rtl signed 0, IEEE a normal product  e.g. 0001+7f00: allo 3c80 rtl 0000, 0001+7f7e: allo 3cfe rtl 0000, 0001+7f7f: allo 3cff rtl 0000
+      51958  product < 2^-126 flushed: rtl signed 0, IEEE a subnormal  e.g. 0080+3c00: allo 0001 rtl 0000, 0080+bc00: allo 8001 rtl 8000, 0081+3b80: allo 0001 rtl 0000
+         53  product < 2^-126 flushed: rtl signed 0, IEEE rounds up to 2^-126  e.g. a0b7+1f33: allo 8080 rtl 8000, a63a+99b0: allo 0080 rtl 0000, af31+90b9: allo 0080 rtl 0000
+UNIT-MATCH bf16_mul_pipe bits simulator 6019104/6019104 latency=untimed (rtl 2) (build 0.3s, run 0.1s)
+
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[07:37:30] Compiling with g++ ...
+[07:37:34] Running simulation ...
+UNIT-MATCH bf16_mul_pipe bits systemc 6019104/6019104 latency=unchecked (rtl 2) (build 0.2s, run 28.9s)
+UNIT-MATCH bf16_mul_pipe bits_pipe simulator 6019104/6019104 latency=untimed (rtl 2) (build 0.3s, run 0.0s)
+
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[07:38:00] Compiling with g++ ...
+[07:38:04] Running simulation ...
+UNIT-MATCH bf16_mul_pipe bits_pipe systemc 6019104/6019104 latency=unchecked (rtl 2) (build 0.2s, run 30.2s)
+UNIT-MATCH bf16_mul_pipe stages simulator 6019104/6019104 latency=untimed (rtl 2) (build 0.5s, run 313.2s)
+
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[07:43:44] Compiling with g++ ...
+[07:43:49] Running simulation ...
+UNIT-MATCH bf16_mul_pipe stages systemc 6019104/6019104 latency=unchecked (rtl 2) (build 0.3s, run 135.3s)
+UNIT-MATCH bf16_mul_pipe fn simulator 6019104/6019104 latency=untimed (rtl 2) (build 0.3s, run 0.1s)
+
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[07:46:00] Compiling with g++ ...
+[07:46:04] Running simulation ...
+UNIT-MATCH bf16_mul_pipe fn systemc 6019104/6019104 latency=unchecked (rtl 2) (build 0.2s, run 29.4s)

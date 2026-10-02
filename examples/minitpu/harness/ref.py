@@ -337,3 +337,201 @@ def exp_field(x, frac=7):
 
 def is_zero(x, frac=7):
     return int(x) & ((1 << (8 + frac)) - 1) == 0
+
+
+# ---------------------------------------------------------------------------
+# U2: storage units, as trace references.
+#
+# A storage unit is a function from a command trace to a response trace
+# (``rtl.py``, the ``trace`` shape). Each reference below takes the command
+# trace as ``{port: uint64[n, nwords]}`` and returns ``(resp, reason)``:
+# ``resp[port]`` is ``uint64[n, nwords]`` in ``rtl.py``'s row convention and
+# ``reason[port]`` is a ``str[n]`` that is ``""`` on a *defined* slot and
+# otherwise names why the slot is undefined. A masked slot still carries the
+# reference's best guess of what MiniTPU's simulation model returns there, so
+# ``characterize`` can say how often the guess holds -- but only defined slots
+# are held to the RTL. A third result, ``events``, counts the illegal or
+# quirky commands the trace issued, by kind.
+
+UNINIT = "uninit"  # a read of state never written (no reset clears it)
+
+
+def _col(cmd, p):
+    return np.asarray(cmd[p], dtype=np.uint64).reshape(len(cmd[p]), -1)
+
+
+def _bit(cmd, p):
+    return _col(cmd, p)[:, 0].astype(bool)
+
+
+def _addr(cmd, p):
+    return _col(cmd, p)[:, 0].astype(np.int64)
+
+
+def vpu_regfile_trace(cmd, width, depth=32):
+    """``vpu_regfile.sv``: three asynchronous reads, one synchronous write.
+
+    Row ``t`` of ``rdata_{a,b,c}_o`` (sampled before edge ``t + 1``) is the
+    entry as it was before cycle ``t``'s write: a read and a write of one
+    VREG in one cycle return the **old** value, and a write is seen from the
+    next cycle (write visibility 1). ``rst_ni`` does nothing. A read of a VREG
+    never written is ``uninit``: the memory has no reset.
+    """
+    n = len(cmd["we_i"])
+    nw = (width + 63) // 64
+    mem = np.zeros((depth, nw), dtype=np.uint64)
+    written = np.zeros(depth, dtype=bool)
+    we, wa, wd = _bit(cmd, "we_i"), _addr(cmd, "waddr_i"), _col(cmd, "wdata_i")
+    ra = {x: _addr(cmd, f"raddr_{x}_i") for x in "abc"}
+    resp = {f"rdata_{x}_o": np.zeros((n, nw), dtype=np.uint64) for x in "abc"}
+    reason = {f"rdata_{x}_o": np.full(n, "", dtype=object) for x in "abc"}
+    for t in range(n):
+        for x in "abc":
+            a = ra[x][t]
+            resp[f"rdata_{x}_o"][t] = mem[a]
+            if not written[a]:
+                reason[f"rdata_{x}_o"][t] = UNINIT
+        if we[t]:
+            mem[wa[t]] = wd[t]
+            written[wa[t]] = True
+    return resp, reason, {}
+
+
+def vpu_word_array_trace(cmd, nw, read_latency=3, dma_read_latency=2, ww_winner="dma"):
+    """``vpu_word_array.sv``'s simulation model (the ``ifndef SYNTHESIS`` branch).
+
+    Two symmetric ports, ``compute`` and ``dma``. A port with ``en`` reads the
+    word as it was before the cycle (NBA), so a read-during-write on one port
+    returns the **old** word; the read enters a pipe of the port's latency
+    (3 / 2) and leaves it on ``*_rdata_o`` in row ``t + L - 1`` (sampled after
+    edge ``t + 1``, so latency ``L`` edges). Writes are seen from the next
+    cycle (visibility 1), from either port. Undefined slots:
+
+    * ``no read``: the read issued ``L`` cycles earlier had ``en`` low. The
+      model's pipe then holds its last read (the guess), and XPM's
+      ``no_change`` port holds its output too, but nothing promises it;
+    * ``write cycle``: that read had ``we`` high. The model returns the old
+      word (the guess); XPM ``WRITE_MODE no_change`` holds the previous output
+      instead, so the board differs from the model here;
+    * ``collision``: that read touched the word the other port wrote in the
+      same cycle (``vpu_vmem_simd.sv``'s assertion; undefined on the board);
+    * ``ww collision``: a read of a word both ports wrote in one cycle, until
+      it is written again. The model's two ``always_ff`` blocks both write it;
+      ``ww_winner`` is the guess of which lands;
+    * ``uninit``: a read of a word never written.
+    """
+    n = len(cmd["compute_en_i"])
+    ports = {"compute": read_latency, "dma": dma_read_latency}
+    en = {p: _bit(cmd, f"{p}_en_i") for p in ports}
+    we = {p: _bit(cmd, f"{p}_we_i") & en[p] for p in ports}
+    ad = {p: _addr(cmd, f"{p}_addr_i") for p in ports}
+    wd = {p: _col(cmd, f"{p}_wdata_i") for p in ports}
+    mem, state = {}, {}  # word -> data, word -> "" | reason
+    zero = np.zeros(nw, dtype=np.uint64)
+    pipe = {p: [(zero, "no read")] * L for p, L in ports.items()}
+    resp = {f"{p}_rdata_o": np.zeros((n, nw), dtype=np.uint64) for p in ports}
+    reason = {f"{p}_rdata_o": np.full(n, "", dtype=object) for p in ports}
+    events = {}
+    for t in range(n):
+        coll = (en["compute"][t] and en["dma"][t] and ad["compute"][t] == ad["dma"][t]
+                and (we["compute"][t] or we["dma"][t]))
+        if coll:
+            k = "ww collision" if we["compute"][t] and we["dma"][t] else "rw collision"
+            events[k] = events.get(k, 0) + 1
+        for p, L in ports.items():
+            o = "dma" if p == "compute" else "compute"
+            if en[p][t]:
+                a = ad[p][t]
+                v = mem.get(a, zero)
+                why = state.get(a, UNINIT)
+                if we[p][t]:
+                    why = "write cycle"
+                elif coll and we[o][t]:
+                    why = "collision"
+                head = (v, why)
+            else:
+                head = (pipe[p][0][0], "no read")
+            pipe[p] = [head] + pipe[p][:-1]
+            resp[f"{p}_rdata_o"][t], reason[f"{p}_rdata_o"][t] = pipe[p][L - 1]
+        if coll and we["compute"][t] and we["dma"][t]:
+            a = ad["dma"][t]
+            mem[a] = wd[ww_winner][t]
+            state[a] = "ww collision"
+        else:
+            for p in ports:
+                if we[p][t]:
+                    mem[ad[p][t]] = wd[p][t]
+                    state[ad[p][t]] = ""
+    return resp, reason, events
+
+
+def vpu_fifo_trace(cmd, width, depth):
+    """``vpu_fifo.sv``: a ring of ``depth`` entries with a reset count.
+
+    Row ``t`` (sampled before edge ``t + 1``) shows the state cycle ``t``
+    starts in: ``empty_o``/``full_o`` from the count, ``pop_data_o =
+    mem[rd_ptr]`` (first-word-fall-through, asynchronous). The update is the
+    RTL's, illegal commands included, so the flags are defined on every trace
+    after the first reset:
+
+    * a push is taken if not full, or full with a pop (pass-through);
+    * a pop is taken if not empty, or empty with a push: the pointers both
+      move, the count stays 0 and **the pushed word is lost** -- the reader
+      gets stale ``mem[rd_ptr]`` and no assertion fires (``events``:
+      ``push+pop on empty``);
+    * a push on full without a pop is dropped (``overflow``, asserted in
+      simulation only); a pop on empty without a push does nothing
+      (``underflow``, asserted).
+
+    Undefined slots: everything before the first reset (``pre-reset``), and
+    ``pop_data_o`` while empty (``empty``; the guess is the stale entry,
+    ``uninit`` if that entry was never written). ``rst_ni`` low clears the
+    pointers and the count at the edge, not ``mem``.
+    """
+    n = len(cmd["push_i"])
+    nw = (width + 63) // 64
+    rst = ~_bit(cmd, "rst_ni")
+    push, pop, pd = _bit(cmd, "push_i"), _bit(cmd, "pop_i"), _col(cmd, "push_data_i")
+    mem = np.zeros((depth, nw), dtype=np.uint64)
+    written = np.zeros(depth, dtype=bool)
+    known, count, rd, wr = False, 0, 0, 0
+    resp = {p: np.zeros((n, nw if p == "pop_data_o" else 1), dtype=np.uint64)
+            for p in ("pop_data_o", "empty_o", "full_o")}
+    reason = {p: np.full(n, "", dtype=object) for p in resp}
+    events = {}
+
+    def ev(k):
+        events[k] = events.get(k, 0) + 1
+
+    for t in range(n):
+        empty, full = count == 0, count == depth
+        resp["empty_o"][t, 0], resp["full_o"][t, 0] = empty, full
+        resp["pop_data_o"][t] = mem[rd]
+        if not known:
+            for p in resp:
+                reason[p][t] = "pre-reset"
+        elif empty:
+            reason["pop_data_o"][t] = "empty" if written[rd] else UNINIT
+        if rst[t]:
+            known, count, rd, wr = True, 0, 0, 0
+            continue
+        if not known:
+            continue
+        do_push = push[t] and (not full or pop[t])
+        do_pop = pop[t] and (not empty or push[t])
+        if push[t] and full and not pop[t]:
+            ev("overflow (push dropped)")
+        if pop[t] and empty and not push[t]:
+            ev("underflow (pop ignored)")
+        if push[t] and pop[t] and empty:
+            ev("push+pop on empty (word lost)")
+        if push[t] and pop[t] and full:
+            ev("push+pop on full (pass-through)")
+        if do_push:
+            mem[wr] = pd[t]
+            written[wr] = True
+            wr = (wr + 1) % depth
+        if do_pop:
+            rd = (rd + 1) % depth
+        count += int(do_push) - int(do_pop)
+    return resp, reason, events

@@ -1,0 +1,63 @@
+u1-pilot 1d49f23f Merge remote-tracking branch 'origin/systemc-u1-fixes' into u1-pilot
+== bf16_add exit=1 16s
+RTL vpu_bf16_add: 251936 vectors, latency [0] (declared 0), 0.1s
+UNIT-DIFF  bf16_add native simulator 250955/251936 latency=untimed (rtl 0) (build 0.2s, run 0.0s)
+UNIT-DIFF  bf16_add native systemc 249907/251936 latency=unchecked (rtl 0) (build 0.2s, run 5.3s)
+UNIT-MATCH bf16_add bits simulator 251936/251936 latency=untimed (rtl 0) (build 0.5s, run 0.1s)
+UNIT-MATCH bf16_add bits systemc 251936/251936 latency=unchecked (rtl 0) (build 0.4s, run 5.6s)
+== bf16_add_pipe exit=1 16s
+RTL vpu_bf16_add_pipe: 251936 vectors, latency [2] (declared 2), 0.1s
+UNIT-DIFF  bf16_add_pipe native simulator 250955/251936 latency=untimed (rtl 2) (build 0.2s, run 0.0s)
+UNIT-DIFF  bf16_add_pipe native systemc 249907/251936 latency=unchecked (rtl 2) (build 0.1s, run 5.4s)
+UNIT-MATCH bf16_add_pipe bits simulator 251936/251936 latency=untimed (rtl 2) (build 0.5s, run 0.1s)
+UNIT-MATCH bf16_add_pipe bits systemc 251936/251936 latency=unchecked (rtl 2) (build 0.4s, run 5.5s)
+== bf16_mul exit=1 74s
+RTL vpu_bf16_mul: 6019104 vectors, latency [0] (declared 0), 1.0s
+UNIT-DIFF  bf16_mul native simulator 5011918/6019104 latency=untimed (rtl 0) (build 0.2s, run 0.1s)
+UNIT-DIFF  bf16_mul native systemc 5011890/6019104 latency=unchecked (rtl 0) (build 0.2s, run 32.2s)
+UNIT-MATCH bf16_mul bits simulator 6019104/6019104 latency=untimed (rtl 0) (build 0.3s, run 0.0s)
+UNIT-MATCH bf16_mul bits systemc 6019104/6019104 latency=unchecked (rtl 0) (build 0.2s, run 29.4s)
+== bf16_mul_pipe exit=1 583s
+RTL vpu_bf16_mul_pipe: 6019104 vectors, latency [2] (declared 2), 1.3s
+UNIT-DIFF  bf16_mul_pipe native simulator 5011918/6019104 latency=untimed (rtl 2) (build 0.2s, run 0.1s)
+UNIT-DIFF  bf16_mul_pipe native systemc 5011890/6019104 latency=unchecked (rtl 2) (build 0.2s, run 31.8s)
+UNIT-MATCH bf16_mul_pipe bits simulator 6019104/6019104 latency=untimed (rtl 2) (build 0.3s, run 0.1s)
+UNIT-MATCH bf16_mul_pipe bits systemc 6019104/6019104 latency=unchecked (rtl 2) (build 0.2s, run 28.9s)
+UNIT-MATCH bf16_mul_pipe bits_pipe simulator 6019104/6019104 latency=untimed (rtl 2) (build 0.3s, run 0.0s)
+UNIT-MATCH bf16_mul_pipe bits_pipe systemc 6019104/6019104 latency=unchecked (rtl 2) (build 0.2s, run 30.2s)
+UNIT-MATCH bf16_mul_pipe stages simulator 6019104/6019104 latency=untimed (rtl 2) (build 0.5s, run 313.2s)
+UNIT-MATCH bf16_mul_pipe stages systemc 6019104/6019104 latency=unchecked (rtl 2) (build 0.3s, run 135.3s)
+UNIT-MATCH bf16_mul_pipe fn simulator 6019104/6019104 latency=untimed (rtl 2) (build 0.3s, run 0.1s)
+UNIT-MATCH bf16_mul_pipe fn systemc 6019104/6019104 latency=unchecked (rtl 2) (build 0.2s, run 29.4s)
+== mul_acc24 exit=1 127s
+RTL mxu_bf16_mul_acc24: 6019104 vectors, latency [0] (declared 0), 1.0s
+UNIT-DIFF  mul_acc24 native simulator 4668187/6019104 latency=untimed (rtl 0) (build 0.2s, run 0.1s)
+UNIT-DIFF  mul_acc24 native systemc 4941087/6019104 latency=unchecked (rtl 0) (build 0.2s, run 35.6s)
+UNIT-DIFF  mul_acc24 native_bitext simulator 4668187/6019104 latency=untimed (rtl 0) (build 0.2s, run 0.1s)
+UNIT-DIFF  mul_acc24 native_bitext systemc 4941087/6019104 latency=unchecked (rtl 0) (build 0.2s, run 36.1s)
+UNIT-MATCH mul_acc24 bits simulator 6019104/6019104 latency=untimed (rtl 0) (build 0.3s, run 0.9s)
+UNIT-MATCH mul_acc24 bits systemc 6019104/6019104 latency=unchecked (rtl 0) (build 0.2s, run 32.6s)
+== acc24_add_pipe exit=1 40s
+RTL mxu_acc24_add_pipe: 352116 vectors, latency [3] (declared 3), 0.1s
+UNIT-DIFF  acc24_add_pipe native simulator 350021/352116 latency=untimed (rtl 3) (build 0.2s, run 0.1s)
+UNIT-DIFF  acc24_add_pipe native systemc 349935/352116 latency=unchecked (rtl 3) (build 0.2s, run 6.1s)
+UNIT-MATCH acc24_add_pipe bits simulator 352116/352116 latency=untimed (rtl 3) (build 0.6s, run 0.1s)
+UNIT-MATCH acc24_add_pipe bits systemc 352116/352116 latency=unchecked (rtl 3) (build 0.4s, run 7.3s)
+UNIT-MATCH acc24_add_pipe staged simulator 352116/352116 latency=untimed (rtl 3) (build 0.8s, run 10.2s)
+UNIT-MATCH acc24_add_pipe staged systemc 352116/352116 latency=unchecked (rtl 3) (build 0.6s, run 8.9s)
+== alu exit=1 562s
+RTL vpu_alu: 5079552 vectors, latency [3] (declared 3), 1.6s
+UNIT-DIFF  alu native simulator 5051836/5079552 latency=untimed (rtl 3) (build 0.2s, run 0.1s)
+UNIT-DIFF  alu native systemc 5064720/5079552 latency=unchecked (rtl 3) (build 0.2s, run 27.0s)
+UNIT-MATCH alu bits simulator 5079552/5079552 latency=untimed (rtl 3) (build 0.7s, run 0.7s)
+UNIT-MATCH alu bits systemc 5079552/5079552 latency=unchecked (rtl 3) (build 0.5s, run 42.9s)
+UNIT-MATCH alu bits_dispatch simulator 5079552/5079552 latency=untimed (rtl 3) (build 0.7s, run 0.1s)
+UNIT-MATCH alu bits_dispatch systemc 5079552/5079552 latency=unchecked (rtl 3) (build 0.5s, run 24.2s)
+UNIT-DIFF  alu engines_native simulator 5069695/5079552 latency=untimed (rtl 3) (build 0.3s, run 0.2s)
+UNIT-DIFF  alu engines_native systemc 5067236/5079552 latency=unchecked (rtl 3) (build 0.2s, run 39.9s)
+UNIT-DIFF  alu add_bits_mul_native simulator 5072213/5079552 latency=untimed (rtl 3) (build 0.6s, run 0.6s)
+UNIT-DIFF  alu add_bits_mul_native systemc 5072282/5079552 latency=unchecked (rtl 3) (build 0.5s, run 42.6s)
+UNIT-MATCH alu netlist simulator 5079552/5079552 latency=untimed (rtl 3) (build 1.1s, run 97.8s)
+UNIT-MATCH alu netlist systemc 5079552/5079552 latency=unchecked (rtl 3) (build 0.8s, run 87.3s)
+UNIT-DIFF  alu netlist_native simulator 5069696/5079552 latency=untimed (rtl 3) (build 0.7s, run 99.8s)
+UNIT-DIFF  alu netlist_native systemc 5067236/5079552 latency=unchecked (rtl 3) (build 0.5s, run 85.5s)
