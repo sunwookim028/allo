@@ -204,3 +204,38 @@ def test_uint_ports_compile_and_run():
     c = np.zeros(N, dtype=np.uint16)
     _csim(_uint_copy(N), a, c)
     np.testing.assert_array_equal(c, a)
+
+
+def _uint_helper(N):
+    @df.region()
+    def top(A: uint16[N], C: uint16[N]):
+        @df.kernel(mapping=[1], args=[A, C])
+        def k(a: uint16[N], c: uint16[N]):
+            def lzc(value: UInt(16)) -> UInt(5):
+                lz: UInt(5) = 16
+                found: UInt(1) = 0
+                for offset in range(16):
+                    if not found and value[15 - offset]:
+                        lz = offset
+                        found = 1
+                return lz
+
+            for i in range(N):
+                c[i] = lzc(a[i])
+
+    return top
+
+
+@needs_csim
+def test_uint_helper_result_compiles_and_runs():
+    """S2: a nested function returning UInt.
+
+    The callee was emitted as ``f(..., ac_int<5,false>*)`` and the call site's
+    result buffer as ``ac_int<5,true>``, which g++ rejects. The call site now
+    takes the result's sign from the callee's ``otypes``.
+    """
+    a = np.array([0, 1, 0x8000, 0xFFFF, 0x00F0, 0x0100, 0x4000, 0x0003], dtype=np.uint16)
+    c = np.zeros(len(a), dtype=np.uint16)
+    _csim(_uint_helper(len(a)), a, c)
+    want = [16 - int(x).bit_length() for x in a]
+    assert c.tolist() == want
