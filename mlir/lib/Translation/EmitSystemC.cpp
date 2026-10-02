@@ -28,6 +28,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Tools/mlir-translate/Translation.h"
 #include "llvm/Support/raw_ostream.h"
+#include <cstdlib> // std::atoi (wideIntWidth)
 
 using namespace mlir;
 using namespace allo;
@@ -131,6 +132,19 @@ static SmallString<32> getStreamPayloadTypeName(Type valType, bool isUnsigned) {
 static bool isFloatCType(const std::string &t) {
   return t == "half" || t == "double" || t == "ac::bfloat16" ||
          t.find("ieee_float") != std::string::npos;
+}
+
+// The width of an integer element type the tb cannot move through `long long`
+// (`ap_int<W>`/`ap_uint<W>`/`ac_int<W,..>` with W > 64, see getSCTypeName), else 0.
+static int wideIntWidth(const std::string &t) {
+  size_t lt = t.find('<');
+  if (lt == std::string::npos)
+    return 0;
+  std::string head = t.substr(0, lt);
+  if (head != "ap_int" && head != "ap_uint" && head != "ac_int")
+    return 0;
+  int w = std::atoi(t.c_str() + lt + 1);
+  return w > 64 ? w : 0;
 }
 
 // A Channel's PROTOCOL picks genuinely different hardware, not a cosmetic label:
@@ -3554,6 +3568,28 @@ template <>
 inline ac_ieee_float<binary32> _ffrombits<ac_ieee_float<binary32> >(unsigned long long b) {
   ac_ieee_float<binary32> v; v.set_data(ac_int<32, true>((long long)b)); return v;
 }
+// Integers WIDER than 64 bits in the testbench's data files: decimal text of
+// any length, read and written by digit arithmetic on the ac_int itself (the
+// same text the Python side writes and parses for every width). `long long`
+// cannot carry them, and a plain ac_int has no conversion to it under
+// __SYNTHESIS__ (Catapult CRD-413), so a 256-bit port used to need a
+// hand-patched testbench. Every step is an explicit T(...) so the csim shim
+// (an ac_int subclass) and the bare ac_int alias both construct from the
+// wider intermediate.
+template <class T> inline void _rdwide(std::istream &f, T &v) {
+  std::string s; f >> s; v = T(0);
+  size_t i = 0; bool neg = false;
+  if (i < s.size() && (s[i] == '-' || s[i] == '+')) { neg = (s[i] == '-'); ++i; }
+  for (; i < s.size(); ++i) v = T(v * 10 + (int)(s[i] - '0'));
+  if (neg) v = T(-v);
+}
+template <class T> inline void _wrwide(std::ostream &f, const T &v) {
+  T u = v; bool neg = (u < 0); if (neg) u = T(-u);
+  std::string s;
+  do { s.insert(s.begin(), (char)('0' + (u % 10).to_int())); u = T(u / 10); } while (u != 0);
+  if (neg) s.insert(s.begin(), '-');
+  f << s;
+}
 // Float conversions (casts). ac floats have explicit constructors only, and
 // ac::bfloat16's hard-code round-toward-zero; arith casts round to nearest
 // even. So convert through ac_std_float, whose conversions are AC_RND_CONV:
@@ -4112,8 +4148,14 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         std::string rt = isF ? "unsigned long long" : "long long";
         std::string conv = isF ? "_ffrombits< " + a.ctype + " >(_v)"
                                : "(" + a.ctype + ")_v";
+        std::string rd = "_f >> _v;";
+        if (wideIntWidth(a.ctype)) { // > 64 bits: no long long (see _rdwide)
+          rt = a.ctype;
+          conv = "_v";
+          rd = "_rdwide(_f, _v);";
+        }
         os << "{ std::ifstream _f(\"input" << a.fileIdx << ".data\"); " << rt
-           << " _v; for (int f = 0; f < " << a.total << "; ++f) { _f >> _v; ch_"
+           << " _v; for (int f = 0; f < " << a.total << "; ++f) { " << rd << " ch_"
            << a.member << ".Push(" << conv << "); } }\n";
         reduceIndent();
         indent(); os << "}\n";
@@ -4132,6 +4174,11 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
              << ".data\"); for (int f = 0; f < " << a.total
              << "; ++f) _f << _fbits(ch_" << a.member
              << ".Pop()) << \"\\n\"; }\n";
+        else if (wideIntWidth(a.ctype)) // > 64 bits: no long long (see _wrwide)
+          os << "{ std::ofstream _f(\"output" << a.fileIdx
+             << ".data\"); for (int f = 0; f < " << a.total << "; ++f) { "
+             << a.ctype << " _v = ch_" << a.member
+             << ".Pop(); _wrwide(_f, _v); _f << \"\\n\"; } }\n";
         else
           os << "{ std::ofstream _f(\"output" << a.fileIdx
              << ".data\"); for (int f = 0; f < " << a.total
@@ -4174,10 +4221,16 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         std::string rt = isF ? "unsigned long long" : "long long";
         std::string conv = isF ? "_ffrombits< " + mi.ctype + " >(_v)"
                                : "(" + mi.ctype + ")_v";
+        std::string rd = "_f >> _v;";
+        if (wideIntWidth(mi.ctype)) { // > 64 bits: no long long (see _rdwide)
+          rt = mi.ctype;
+          conv = "_v";
+          rd = "_rdwide(_f, _v);";
+        }
         // Exposed memories live in the tb; replicated ones are still inside the DUT.
         std::string owner = mi.exposed ? "t." : "t.dut.";
         os << "{ std::ifstream _f(\"input" << mi.inIdx << ".data\"); " << rt
-           << " _v; for (int f = 0; f < " << mi.total << "; ++f) { _f >> _v; "
+           << " _v; for (int f = 0; f < " << mi.total << "; ++f) { " << rd << " "
            << owner << mi.chan << "_mem.mem[f] = " << conv << "; } }\n";
       }
     indent(); os << "t.rst = 0; sc_start(1, SC_NS);\n";
@@ -4232,8 +4285,12 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         // +0 (all-zero bits) elsewhere, so OR-ing their bits merges them exactly
         // (a float sum would turn -0 into +0 and could not carry NaN bits).
         bool isFloat = isFloatCType(m.ctype);
+        bool isWide = wideIntWidth(m.ctype) > 0; // > 64 bits: no long long
         indent();
-        os << (isFloat ? "    unsigned long long _s = 0;\n" : "    long long _s = 0;\n");
+        if (isWide)
+          os << "    " << m.ctype << " _s = 0;\n";
+        else
+          os << (isFloat ? "    unsigned long long _s = 0;\n" : "    long long _s = 0;\n");
         for (auto &mi : memInsts)
           if (mi.dir != 'i' && mi.outIdx == m.outIdx) {
             // Exposed memories live in the tb; replicated ones inside the DUT.
@@ -4241,12 +4298,18 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
             indent();
             if (isFloat)
               os << "    _s |= _fbits(" << owner << mi.chan << "_mem.mem[f]);\n";
+            else if (isWide)
+              os << "    _s = " << m.ctype << "(_s + " << owner << mi.chan
+                 << "_mem.mem[f]);\n";
             else
               os << "    _s += (long long) " << owner << mi.chan
                  << "_mem.mem[f];\n";
           }
         indent();
-        os << "    _f << _s << \"\\n\";\n";
+        if (isWide)
+          os << "    _wrwide(_f, _s); _f << \"\\n\";\n";
+        else
+          os << "    _f << _s << \"\\n\";\n";
         indent();
         os << "  } }\n";
       }
