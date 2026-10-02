@@ -1,0 +1,10 @@
+# run_dc.sh <name> <top> <clk> <period> <srcs...>; $M = MiniTPU src/core, $R = this dir, $S = scratch/u2wa/cat
+m_wa_narrow_3p33 mtpu_wa_narrow clk_i 3.33 $R/mtpu_wa_narrow.sv $M/vpu/vpu_pkg.sv $R/vpu_word_array_sim.sv
+m_wa_narrow_2p0 mtpu_wa_narrow clk_i 2.0 $R/mtpu_wa_narrow.sv $M/vpu/vpu_pkg.sv $R/vpu_word_array_sim.sv
+c_w_wa_3p33 wa_0 clk 3.33 $S/wire_n64_3p33.prj/build/Catapult/wa_0.v1/concat_rtl.v
+c_w_wa_part_3p33 wa_0 clk 3.33 $S/wire_part_n64_3p33.prj/build/Catapult/wa_0.v1/concat_rtl.v
+c_w_wa_unr_3p33 wa_0 clk 3.33 $S/wire_unr_n64_3p33.prj/build/Catapult/wa_0.v1/concat_rtl.v
+c_w_wa_unr_part_3p33 wa_0 clk 3.33 $S/wire_unr_part_n64_3p33.prj/build/Catapult/wa_0.v1/concat_rtl.v
+c_w_wa_unr_2p0 wa_0 clk 2.0 $S/wire_unr_n64_2p0.prj/build/Catapult/wa_0.v1/concat_rtl.v
+c_w_wa2_unr_3p33 wa_0 clk 3.33 $S/wire2_unr_n64_3p33.prj/build/Catapult/wa_0.v1/concat_rtl.v
+c_w_wa2_unr_2p0 wa_0 clk 2.0 $S/wire2_unr_n64_2p0.prj/build/Catapult/wa_0.v1/concat_rtl.v

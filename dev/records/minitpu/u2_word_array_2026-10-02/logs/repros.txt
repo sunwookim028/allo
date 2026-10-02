@@ -1,0 +1,48 @@
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[18:30:50] Compiling with g++ ...
+[18:30:55] Running simulation ...
+REPRO s8_csim_u64_parse: BUG: in ['0x1', '0x7fffffffffffffff', '0x8000000000000005', '0x7'] simulator ['0x1', '0x7fffffffffffffff', '0x8000000000000005', '0x7'] csim ['0x1', '0x7fffffffffffffff', '0x7fffffffffffffff', '0x7fffffffffffffff']
+REPRO negative_step_range: refused: MLIRError: Unable to parse module assembly:
+error: "-":5:38: custom op 'affine.for' expected step to be representable as a positive
+Error: failed to run MLIR lower pipeline, printing module...
+#map = affine_map<(d0) -> (d0)>
+#map1 = affine_map<() -> (0)>
+#map2 = affine_map<() -> (4)>
+"builtin.module"() ({
+  "func.func"() <{function_type = (memref<4xi32>, memref<4xi32>) -> (), sym_name = "k_0"}> ({
+  ^bb0(%arg2: memref<4xi32>, %arg3: memref<4xi32>):
+    %0 = "arith.constant"() <{value = 1 : i33}> : () -> i33
+    %1 = "arith.constant"() <{value = 1 : i32}> : () -> i32
+    "affine.for"() <{lowerBoundMap = #map1, operandSegmentSizes = array<i32: 0, 0, 0>, step = 1 : index, upperBoundMap = #map2}> ({
+    ^bb0(%arg4: index):
+      %2 = "affine.load"(%arg2, %arg4) <{map = #map}> {from = "a"} : (memref<4xi32>, index) -> i32
+      "affine.store"(%2, %arg3, %arg4) <{map = #map}> {to = "b"} : (i32, memref<4xi32>, index) -> ()
+      "scf.if"(%1) ({
+        %3 = "affine.load"(%arg2, %arg4) <{map = #map}> {from = "a"} : (memref<4xi32>, index) -> i32
+        %4 = "arith.extsi"(%3) : (i32) -> i33
+        %5 = "arith.addi"(%4, %0) <{overflowFlags = #arith.overflow<none>}> : (i33, i33) -> i33
+        %6 = "arith.trunci"(%5) <{overflowFlags = #arith.overflow<none>}> : (i33) -> i32
+        "affine.store"(%6, %arg3, %arg4) <{map = #map}> {to = "b"} : (i32, memref<4xi32>, index) -> ()
+        "scf.yield"() : () -> ()
+      }, {
+      }) : (i32) -> ()
+      "affine.yield"() : () -> ()
+    }) {loop_name = "t", op_name = "S_t_0"} : () -> ()
+    "func.return"() : () -> ()
+  }) {df.kernel, itypes = "ss", otypes = "", stypes = "__"} : () -> ()
+  "func.func"() <{function_type = (memref<4xi32>, memref<4xi32>) -> (), sym_name = "top"}> ({
+  ^bb0(%arg0: memref<4xi32>, %arg1: memref<4xi32>):
+    "func.return"() : () -> ()
+  }) {itypes = "ss", otypes = ""} : () -> ()
+}) : () -> ()
+
+REPRO closure_bool_if: refused: MLIRError: Failure while executing pass pipeline:
+error: unknown: 'scf.if' op operand #0 must be 1-bit signless integer, but got 'i32'
+ note: unknown: see current operatio
+REPRO rolled_shift_loop_emission: unroll=False: hls_unroll pragmas in emission = 0; unroll=True: hls_unroll pragmas in emission = 1

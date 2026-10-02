@@ -1,0 +1,23 @@
+MATCH amc:got_amc_none_trace_256: 22/22 defined over the first 256 cycles (490 masked)
+MATCH amc:got_amc_none_trace_80609: 67717/67717 defined over the first 80609 cycles (93501 masked)
+DIFF  amc:got_amc_part_trace_256: 1/22 defined over the first 256 cycles (490 masked)
+    e.g. qc cycle 8: got 0 rtl 628711b7b00a747a
+    e.g. qc cycle 23: got 628711b7b00a747a rtl 0
+    e.g. qd cycle 144: got 0 rtl 16ec40a38e7adeef
+    e.g. qd cycle 151: got 16ec40a38e7adeef rtl 9fd593844e8d2deb
+DIFF  amc:got_amc_pipeline_trace_256: 0/22 defined over the first 256 cycles (490 masked)
+    e.g. qc cycle 8: got 0 rtl 628711b7b00a747a
+    e.g. qc cycle 23: got 628711b7b00a747a rtl 0
+    e.g. qd cycle 144: got 0 rtl 16ec40a38e7adeef
+    e.g. qd cycle 151: got 16ec40a38e7adeef rtl 9fd593844e8d2deb
+DIFF  amc:got_amc_pipeline_trace_80609: 12425/67717 defined over the first 80609 cycles (93501 masked)
+    e.g. qc cycle 8: got 0 rtl 628711b7b00a747a
+    e.g. qc cycle 23: got 628711b7b00a747a rtl 0
+    e.g. qd cycle 144: got 0 rtl 16ec40a38e7adeef
+    e.g. qd cycle 151: got 16ec40a38e7adeef rtl 9fd593844e8d2deb
+DIFF  amc:got_amc_pipeline_trace_rw_256: 0/22 defined over the first 256 cycles (490 masked)
+    e.g. qc cycle 8: got 0 rtl 628711b7b00a747a
+    e.g. qc cycle 23: got 3a1c30ffc591a188 rtl 0
+    e.g. qd cycle 144: got 0 rtl 16ec40a38e7adeef
+    e.g. qd cycle 151: got 16ec40a38e7adeef rtl 9fd593844e8d2deb
+MATCH amc:got_llvm_none_trace_256: 22/22 defined over the first 256 cycles (490 masked)

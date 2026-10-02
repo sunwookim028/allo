@@ -1,0 +1,17 @@
+RTL-TRACE vpu_word_array:narrow wire_n64_3p33: defined 19502/67717 at measured read latency compute L=4 (MiniTPU 3) 9694/33775, dma L=3 (MiniTPU 2) 9808/33942; 93501 masked; 80609 cycles; 1.1s
+    first-3000 hits by L, compute_rdata_o: {0: 61, 1: 60, 2: 74, 3: 299, 4: 320, 5: 244, 6: 243, 7: 196, 8: 199, 9: 175}
+    first-3000 hits by L, dma_rdata_o: {0: 67, 1: 82, 2: 331, 3: 359, 4: 261, 5: 256, 6: 203, 7: 199, 8: 167, 9: 161}
+    e.g. wr-offsets-compute->compute cycle 8 compute_rdata_o: catapult 0 minitpu 628711b7b00a747a
+    e.g. wr-offsets-compute->compute cycle 42 compute_rdata_o: catapult d8d4221ae8975c9c minitpu 100000000000
+    e.g. wr-offsets-compute->compute cycle 69 compute_rdata_o: catapult 4069ac3c51b715ec minitpu 1000000000
+    e.g. wr-offsets-compute->dma cycle 144 dma_rdata_o: catapult 0 minitpu 16ec40a38e7adeef
+    e.g. wr-offsets-compute->dma cycle 151 dma_rdata_o: catapult 55e8b70e63affeca minitpu 9fd593844e8d2deb
+    e.g. wr-offsets-compute->dma cycle 169 dma_rdata_o: catapult 89095f81910a1ae0 minitpu 994b082580888640
+    PROBE read compute: declared 3; MiniTPU 3; Catapult never moved (v32 never moved after cycle 20)
+    PROBE read dma: declared 2; MiniTPU 2; Catapult never moved (v33 never moved after cycle 20)
+    PROBE write compute -> read compute (visibility): declared 1; MiniTPU 1; Catapult never moved (v32 never moved after cycle 19)
+    PROBE write compute -> read dma (visibility): declared 1; MiniTPU 1; Catapult never moved (v33 never moved after cycle 19)
+    PROBE write dma -> read compute (visibility): declared 1; MiniTPU 1; Catapult never moved (v32 never moved after cycle 19)
+    PROBE write dma -> read dma (visibility): declared 1; MiniTPU 1; Catapult never moved (v33 never moved after cycle 19)
+    LATENCY-UNRELIABLE wa_0: reported 2 ii=1 (unreliable), measured 4; unit declares 3 -- rolled loop(s) ['l_S_k_0_k'] merged into the scheduled loop
+    manifest wa_0: latency=2, ii=1, status=unreliable, port_style=wire, loop=while, loop_c_steps=2, reason=rolled loop(s) ['l_S_k_0_k'] merged into the scheduled loop

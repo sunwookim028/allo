@@ -1,0 +1,16 @@
+RTL vpu_word_array:narrow: 80609 cycles in 14 traces, 67717 defined slots, RTL vs reference on defined: 67717/67717 (0.3s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[18:16:12] Compiling with g++ ...
+[18:16:18] Running simulation ...
+UNIT-DIFF  vpu_word_array:narrow annotated systemc 2/67717 defined (93501 masked: collision=2693, no read=41104, uninit=7, write cycle=48344, ww collision=1353; allo==rtl on 14) cycle=per-iteration, time unchecked (build 0.4s, run 6.6s)
+    differing defined slots by trace: wr-offsets-compute->compute=10, wr-offsets-dma->compute=12, rdw-same-port=6, both-read-one-word=6, ww-collision=3, idle-gaps=6, random-legal-0=17896, random-legal-1=17967, random-any-0=15912, random-any-1=15879, wr-offsets-compute->dma=9, wr-offsets-dma->dma=9
+    e.g. wr-offsets-compute->compute cycle 32 compute_rdata_o: allo 7fffffffffffffff rtl d8d4221ae8975c9c
+    e.g. wr-offsets-compute->compute cycle 42 compute_rdata_o: allo 7fffffffffffffff rtl 100000000000
+    e.g. wr-offsets-compute->compute cycle 54 compute_rdata_o: allo 7fffffffffffffff rtl 4069ac3c51b715ec
+    e.g. wr-offsets-compute->compute cycle 69 compute_rdata_o: allo 7fffffffffffffff rtl 1000000000

@@ -1,0 +1,159 @@
+RTL vpu_word_array:narrow: 80609 cycles in 14 traces, 67717 defined slots, RTL vs reference on defined: 67717/67717 (0.4s)
+Error: failed to run MLIR lower pipeline, printing module...
+#map = affine_map<(d0) -> (-d0 + 2)>
+#map1 = affine_map<(d0) -> (-d0 + 3)>
+#map2 = affine_map<() -> (1)>
+#map3 = affine_map<() -> (3)>
+#map4 = affine_map<(d0) -> (d0)>
+#map5 = affine_map<() -> ()>
+#map6 = affine_map<() -> (0)>
+#map7 = affine_map<() -> (2)>
+#map8 = affine_map<() -> (80609)>
+#map9 = affine_map<(d0) -> (-d0 + 1)>
+"builtin.module"() ({
+  "memref.global"() <{initial_value = dense<0> : tensor<8xi64>, sym_name = "__stateful_top_mem_1", sym_visibility = "private", type = memref<8xi64>}> {static} : () -> ()
+  "func.func"() <{function_type = (memref<80609xi1>, memref<80609xi1>, memref<80609xi3>, memref<80609xi64>, memref<80609xi64>, !allo.stream<i1, 2>, !allo.stream<i1, 2>) -> (), sym_name = "compute_0"}> ({
+  ^bb0(%arg19: memref<80609xi1>, %arg20: memref<80609xi1>, %arg21: memref<80609xi3>, %arg22: memref<80609xi64>, %arg23: memref<80609xi64>, %arg24: !allo.stream<i1, 2>, %arg25: !allo.stream<i1, 2>):
+    %30 = "arith.constant"() <{value = 0 : i32}> : () -> i32
+    %31 = "arith.constant"() <{value = 1 : i32}> : () -> i32
+    %32 = "memref.get_global"() <{name = @__stateful_top_mem_1}> : () -> memref<8xi64>
+    %33 = "memref.alloc"() <{operandSegmentSizes = array<i32: 0, 0>}> {name = "pc", unsigned} : () -> memref<3xi64>
+    "affine.for"() <{lowerBoundMap = #map6, operandSegmentSizes = array<i32: 0, 0, 0>, step = 1 : index, upperBoundMap = #map8}> ({
+    ^bb0(%arg26: index):
+      "affine.for"() <{lowerBoundMap = #map2, operandSegmentSizes = array<i32: 0, 0, 0>, step = 1 : index, upperBoundMap = #map3}> ({
+      ^bb0(%arg27: index):
+        %57 = "affine.load"(%33, %arg27) <{map = #map}> {from = "pc", unsigned} : (memref<3xi64>, index) -> i64
+        "affine.store"(%57, %33, %arg27) <{map = #map1}> {to = "pc"} : (i64, memref<3xi64>, index) -> ()
+        "affine.yield"() : () -> ()
+      }) {loop_name = "k", op_name = "S_k_0"} : () -> ()
+      %34 = "affine.load"(%arg19, %arg26) <{map = #map4}> {from = "ce", unsigned} : (memref<80609xi1>, index) -> i1
+      %35 = "memref.alloc"() <{operandSegmentSizes = array<i32: 0, 0>}> {name = "e_c", unsigned} : () -> memref<i1>
+      "affine.store"(%34, %35) <{map = #map5}> {to = "e_c"} : (i1, memref<i1>) -> ()
+      %36 = "affine.load"(%arg20, %arg26) <{map = #map4}> {from = "cw", unsigned} : (memref<80609xi1>, index) -> i1
+      %37 = "memref.alloc"() <{operandSegmentSizes = array<i32: 0, 0>}> {name = "w_c", unsigned} : () -> memref<i1>
+      "affine.store"(%36, %37) <{map = #map5}> {to = "w_c"} : (i1, memref<i1>) -> ()
+      %38 = "affine.load"(%arg21, %arg26) <{map = #map4}> {from = "ca", unsigned} : (memref<80609xi3>, index) -> i3
+      %39 = "arith.extui"(%38) : (i3) -> i32
+      %40 = "memref.alloc"() <{operandSegmentSizes = array<i32: 0, 0>}> {name = "a_c"} : () -> memref<i32>
+      "affine.store"(%39, %40) <{map = #map5}> {to = "a_c"} : (i32, memref<i32>) -> ()
+      %41 = "affine.load"(%arg22, %arg26) <{map = #map4}> {from = "cd", unsigned} : (memref<80609xi64>, index) -> i64
+      %42 = "memref.alloc"() <{operandSegmentSizes = array<i32: 0, 0>}> {name = "d_c", unsigned} : () -> memref<i64>
+      "affine.store"(%41, %42) <{map = #map5}> {to = "d_c"} : (i64, memref<i64>) -> ()
+      %43 = "affine.load"(%35) <{map = #map5}> {from = "e_c", unsigned} : (memref<i1>) -> i1
+      %44 = "arith.extui"(%43) : (i1) -> i32
+      %45 = "arith.cmpi"(%44, %31) <{predicate = 0 : i64}> : (i32, i32) -> i1
+      "scf.if"(%45) ({
+        %48 = "affine.load"(%37) <{map = #map5}> {from = "w_c", unsigned} : (memref<i1>) -> i1
+        %49 = "arith.extui"(%48) : (i1) -> i32
+        %50 = "arith.cmpi"(%49, %30) <{predicate = 0 : i64}> : (i32, i32) -> i1
+        "scf.if"(%50) ({
+          %54 = "affine.load"(%40) <{map = #map5}> {from = "a_c"} : (memref<i32>) -> i32
+          %55 = "arith.index_cast"(%54) : (i32) -> index
+          %56 = "memref.load"(%32, %55) {from = "mem", unsigned} : (memref<8xi64>, index) -> i64
+          "affine.store"(%56, %33) <{map = #map6}> {to = "pc"} : (i64, memref<3xi64>) -> ()
+          "scf.yield"() : () -> ()
+        }, {
+          %51 = "affine.load"(%42) <{map = #map5}> {from = "d_c", unsigned} : (memref<i64>) -> i64
+          %52 = "affine.load"(%40) <{map = #map5}> {from = "a_c"} : (memref<i32>) -> i32
+          %53 = "arith.index_cast"(%52) : (i32) -> index
+          "memref.store"(%51, %32, %53) {to = "mem"} : (i64, memref<8xi64>, index) -> ()
+          "scf.yield"() : () -> ()
+        }) : (i1) -> ()
+        "scf.yield"() : () -> ()
+      }, {
+      }) : (i1) -> ()
+      %46 = "affine.load"(%33) <{map = #map7}> {from = "pc", unsigned} : (memref<3xi64>) -> i64
+      "affine.store"(%46, %arg23, %arg26) <{map = #map4}> {to = "qc"} : (i64, memref<80609xi64>, index) -> ()
+      "scf.if"(%31) ({
+        "allo.stream_put"(%arg24, %31) <{indices = array<i64>}> {unsigned} : (!allo.stream<i1, 2>, i32) -> ()
+        %47 = "allo.stream_get"(%arg25) <{indices = array<i64>}> {unsigned} : (!allo.stream<i1, 2>) -> i1
+        "scf.yield"() : () -> ()
+      }, {
+      }) : (i32) -> ()
+      "affine.yield"() : () -> ()
+    }) {loop_name = "t", op_name = "S_t_0"} : () -> ()
+    "func.return"() : () -> ()
+  }) {df.kernel, itypes = "uuuuuuu", otypes = "", stypes = "_____oi"} : () -> ()
+  "func.func"() <{function_type = (memref<80609xi1>, memref<80609xi1>, memref<80609xi3>, memref<80609xi64>, memref<80609xi64>, !allo.stream<i1, 2>, !allo.stream<i1, 2>) -> (), sym_name = "dma_0"}> ({
+  ^bb0(%arg10: memref<80609xi1>, %arg11: memref<80609xi1>, %arg12: memref<80609xi3>, %arg13: memref<80609xi64>, %arg14: memref<80609xi64>, %arg15: !allo.stream<i1, 2>, %arg16: !allo.stream<i1, 2>):
+    %2 = "arith.constant"() <{value = 0 : i32}> : () -> i32
+    %3 = "arith.constant"() <{value = 1 : i32}> : () -> i32
+    %4 = "memref.get_global"() <{name = @__stateful_top_mem_1}> : () -> memref<8xi64>
+    %5 = "memref.alloc"() <{operandSegmentSizes = array<i32: 0, 0>}> {name = "pd", unsigned} : () -> memref<2xi64>
+    "affine.for"() <{lowerBoundMap = #map6, operandSegmentSizes = array<i32: 0, 0, 0>, step = 1 : index, upperBoundMap = #map8}> ({
+    ^bb0(%arg17: index):
+      "affine.for"() <{lowerBoundMap = #map2, operandSegmentSizes = array<i32: 0, 0, 0>, step = 1 : index, upperBoundMap = #map7}> ({
+      ^bb0(%arg18: index):
+        %29 = "affine.load"(%5, %arg18) <{map = #map9}> {from = "pd", unsigned} : (memref<2xi64>, index) -> i64
+        "affine.store"(%29, %5, %arg18) <{map = #map}> {to = "pd"} : (i64, memref<2xi64>, index) -> ()
+        "affine.yield"() : () -> ()
+      }) {loop_name = "k", op_name = "S_k_0"} : () -> ()
+      %6 = "affine.load"(%arg10, %arg17) <{map = #map4}> {from = "de", unsigned} : (memref<80609xi1>, index) -> i1
+      %7 = "memref.alloc"() <{operandSegmentSizes = array<i32: 0, 0>}> {name = "e_d", unsigned} : () -> memref<i1>
+      "affine.store"(%6, %7) <{map = #map5}> {to = "e_d"} : (i1, memref<i1>) -> ()
+      %8 = "affine.load"(%arg11, %arg17) <{map = #map4}> {from = "dw", unsigned} : (memref<80609xi1>, index) -> i1
+      %9 = "memref.alloc"() <{operandSegmentSizes = array<i32: 0, 0>}> {name = "w_d", unsigned} : () -> memref<i1>
+      "affine.store"(%8, %9) <{map = #map5}> {to = "w_d"} : (i1, memref<i1>) -> ()
+      %10 = "affine.load"(%arg12, %arg17) <{map = #map4}> {from = "da", unsigned} : (memref<80609xi3>, index) -> i3
+      %11 = "arith.extui"(%10) : (i3) -> i32
+      %12 = "memref.alloc"() <{operandSegmentSizes = array<i32: 0, 0>}> {name = "a_d"} : () -> memref<i32>
+      "affine.store"(%11, %12) <{map = #map5}> {to = "a_d"} : (i32, memref<i32>) -> ()
+      %13 = "affine.load"(%arg13, %arg17) <{map = #map4}> {from = "dd", unsigned} : (memref<80609xi64>, index) -> i64
+      %14 = "memref.alloc"() <{operandSegmentSizes = array<i32: 0, 0>}> {name = "d_d", unsigned} : () -> memref<i64>
+      "affine.store"(%13, %14) <{map = #map5}> {to = "d_d"} : (i64, memref<i64>) -> ()
+      %15 = "affine.load"(%7) <{map = #map5}> {from = "e_d", unsigned} : (memref<i1>) -> i1
+      %16 = "arith.extui"(%15) : (i1) -> i32
+      %17 = "arith.cmpi"(%16, %3) <{predicate = 0 : i64}> : (i32, i32) -> i1
+      "scf.if"(%17) ({
+        %20 = "affine.load"(%9) <{map = #map5}> {from = "w_d", unsigned} : (memref<i1>) -> i1
+        %21 = "arith.extui"(%20) : (i1) -> i32
+        %22 = "arith.cmpi"(%21, %2) <{predicate = 0 : i64}> : (i32, i32) -> i1
+        "scf.if"(%22) ({
+          %26 = "affine.load"(%12) <{map = #map5}> {from = "a_d"} : (memref<i32>) -> i32
+          %27 = "arith.index_cast"(%26) : (i32) -> index
+          %28 = "memref.load"(%4, %27) {from = "mem", unsigned} : (memref<8xi64>, index) -> i64
+          "affine.store"(%28, %5) <{map = #map6}> {to = "pd"} : (i64, memref<2xi64>) -> ()
+          "scf.yield"() : () -> ()
+        }, {
+          %23 = "affine.load"(%14) <{map = #map5}> {from = "d_d", unsigned} : (memref<i64>) -> i64
+          %24 = "affine.load"(%12) <{map = #map5}> {from = "a_d"} : (memref<i32>) -> i32
+          %25 = "arith.index_cast"(%24) : (i32) -> index
+          "memref.store"(%23, %4, %25) {to = "mem"} : (i64, memref<8xi64>, index) -> ()
+          "scf.yield"() : () -> ()
+        }) : (i1) -> ()
+        "scf.yield"() : () -> ()
+      }, {
+      }) : (i1) -> ()
+      %18 = "affine.load"(%5) <{map = #map2}> {from = "pd", unsigned} : (memref<2xi64>) -> i64
+      "affine.store"(%18, %arg14, %arg17) <{map = #map4}> {to = "qd"} : (i64, memref<80609xi64>, index) -> ()
+      "scf.if"(%3) ({
+        "allo.stream_put"(%arg15, %3) <{indices = array<i64>}> {unsigned} : (!allo.stream<i1, 2>, i32) -> ()
+        %19 = "allo.stream_get"(%arg16) <{indices = array<i64>}> {unsigned} : (!allo.stream<i1, 2>) -> i1
+        "scf.yield"() : () -> ()
+      }, {
+      }) : (i32) -> ()
+      "affine.yield"() : () -> ()
+    }) {loop_name = "t", op_name = "S_t_0"} : () -> ()
+    "func.return"() : () -> ()
+  }) {df.kernel, itypes = "uuuuuuu", otypes = "", stypes = "_____oi"} : () -> ()
+  "func.func"() <{function_type = (memref<80609xi1>, memref<80609xi1>, memref<80609xi3>, memref<80609xi64>, memref<80609xi1>, memref<80609xi1>, memref<80609xi3>, memref<80609xi64>, memref<80609xi64>, memref<80609xi64>) -> (), sym_name = "top"}> ({
+  ^bb0(%arg0: memref<80609xi1>, %arg1: memref<80609xi1>, %arg2: memref<80609xi3>, %arg3: memref<80609xi64>, %arg4: memref<80609xi1>, %arg5: memref<80609xi1>, %arg6: memref<80609xi3>, %arg7: memref<80609xi64>, %arg8: memref<80609xi64>, %arg9: memref<80609xi64>):
+    %0 = "allo.stream_construct"() {name = "c2d", unsigned} : () -> !allo.stream<i1, 2>
+    %1 = "allo.stream_construct"() {name = "d2c", unsigned} : () -> !allo.stream<i1, 2>
+    "func.return"() : () -> ()
+  }) {itypes = "uuuuuuuuuu", otypes = ""} : () -> ()
+}) : () -> ()
+
+UNIT-FAIL  vpu_word_array shared_sync systemc: MLIRError: Failure while executing pass pipeline:
+error: unknown: 'scf.if' op operand #0 must be 1-bit signless integer, but got 'i32'
+ note: unknown: see current operation: 
+  "scf.if"(%1) ({
+    "allo.stream_put"(%arg5, %1) <{indices = array<i64>}> {unsigned} : (!allo.stream<i1, 2>, i32) -> ()
+    %17 = "allo.stream_get"(%arg6) <{indices = array<i64>}> {unsigned} : (!allo.stream<i1, 2>) -> i1
+    "scf.yield"() : () -> ()
+  }, {
+  }) : (i32) -> ()
+error: unknown: 'scf.if' op operand #0 must be 1-bit signless integer, but got 'i32'
+ note: unknown: see current operation: 
+  "scf.if"(%1) ({
+    "allo.strea

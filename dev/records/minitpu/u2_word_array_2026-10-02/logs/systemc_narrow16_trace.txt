@@ -1,0 +1,11 @@
+RTL vpu_word_array:narrow16: 80609 cycles in 14 traces, 68666 defined slots, RTL vs reference on defined: 68666/68666 (0.3s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[18:21:05] Compiling with g++ ...
+[18:21:11] Running simulation ...
+UNIT-MATCH vpu_word_array:narrow16 trace systemc 68666/68666 defined (92552 masked: collision=2173, no read=41172, uninit=26, write cycle=48144, ww collision=1037; allo==rtl on 37724) cycle=per-iteration, time unchecked (build 0.4s, run 6.3s)

@@ -31,6 +31,7 @@ does not look at time; per-cycle timing is checked on Catapult RTL only.
 
 import argparse
 import importlib
+import inspect
 import os
 import sys
 import time
@@ -119,8 +120,13 @@ def check_trace(u, args):
             t = time.time()
             prj = os.path.join(args.project, f"{args.unit}_{inst}_{variant}_{backend}")
             make, runner = u.VARIANTS[variant]
+            # a variant that returns the read issued at t, not the RTL's
+            # delivered row: got[t] is held against the RTL's row t + k
+            shift = getattr(u, "RESP_SHIFT", {}).get(variant)
+            shift = shift(inst) if callable(shift) else (shift or {})
             try:
-                top = make(n, w)
+                # a unit with several geometries takes the instance too
+                top = make(n, w, inst) if "inst" in inspect.signature(make).parameters else make(n, w)
                 if backend == "simulator":
                     mod = df.build(top, target="simulator")
                 else:
@@ -138,20 +144,21 @@ def check_trace(u, args):
             for p in want:
                 g = [int(x) for x in got[p]]
                 r = rtl_int[p]
-                for i in range(n):
+                k_shift = shift.get(p, 0)
+                for i in range(k_shift, n):
                     why = reason[p][i]
                     if why:
                         masked += 1
                         census[why] = census.get(why, 0) + 1
-                        masked_eq += int(g[i] == r[i])
+                        masked_eq += int(g[i - k_shift] == r[i])
                         continue
                     tot += 1
-                    if g[i] != r[i]:
+                    if g[i - k_shift] != r[i]:
                         k += 1
                         lab = next(lb for lb, a, b in spans if a <= i < b)
                         per_label[lab] = per_label.get(lab, 0) + 1
                         if len(first) < 4:
-                            first.append(f"{lab} cycle {i} {p}: allo {g[i]:x} rtl {r[i]:x}")
+                            first.append(f"{lab} cycle {i} {p}: allo {g[i - k_shift]:x} rtl {r[i]:x}")
             tag = "UNIT-MATCH" if k == 0 else "UNIT-DIFF "
             cen = ", ".join(f"{a}={b}" for a, b in sorted(census.items()))
             print(f"{tag} {args.unit}:{inst} {variant} {backend} {tot - k}/{tot} defined "

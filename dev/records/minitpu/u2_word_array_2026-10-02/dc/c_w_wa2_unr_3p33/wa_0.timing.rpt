@@ -1,0 +1,81 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : wa_0
+Version: W-2024.09
+Date   : Fri Oct  2 14:38:44 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: wa_0_run_inst/v24_svs_reg
+              (rising edge-triggered flip-flop clocked by ideal_clock)
+  Endpoint: wa_0_run_inst/pc_0_sva_dfm_1_reg[0]
+            (rising edge-triggered flip-flop clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  wa_0               5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                                       Fanout     Trans      Incr       Path
+  ------------------------------------------------------------------------------------
+  clock ideal_clock (rise edge)                                     0.00       0.00
+  clock network delay (ideal)                                       0.00       0.00
+  wa_0_run_inst/v24_svs_reg/CK (DFFR_X1)                  0.00      0.00       0.00 r
+  wa_0_run_inst/v24_svs_reg/Q (DFFR_X1)                   0.01      0.10       0.10 r
+  wa_0_run_inst/v24_svs (net)                   1                   0.00       0.10 r
+  wa_0_run_inst/U602/A2 (NAND2_X1)                        0.01      0.01       0.11 r
+  wa_0_run_inst/U602/ZN (NAND2_X1)                        0.07      0.09       0.21 f
+  wa_0_run_inst/n777 (net)                     20                   0.00       0.21 f
+  wa_0_run_inst/U6/A (BUF_X1)                             0.07      0.02       0.23 f
+  wa_0_run_inst/U6/Z (BUF_X1)                             0.05      0.11       0.33 f
+  wa_0_run_inst/n664 (net)                     20                   0.00       0.33 f
+  wa_0_run_inst/U5/A (BUF_X1)                             0.05      0.02       0.35 f
+  wa_0_run_inst/U5/Z (BUF_X1)                             0.03      0.07       0.42 f
+  wa_0_run_inst/n931 (net)                     12                   0.00       0.42 f
+  wa_0_run_inst/U603/A2 (OR2_X1)                          0.03      0.01       0.44 f
+  wa_0_run_inst/U603/ZN (OR2_X1)                          0.02      0.07       0.50 f
+  wa_0_run_inst/n517 (net)                      4                   0.00       0.50 f
+  wa_0_run_inst/U604/A2 (NOR2_X1)                         0.02      0.02       0.52 f
+  wa_0_run_inst/U604/ZN (NOR2_X1)                         0.12      0.15       0.67 r
+  wa_0_run_inst/n762 (net)                     12                   0.00       0.67 r
+  wa_0_run_inst/U605/A (CLKBUF_X1)                        0.12      0.01       0.68 r
+  wa_0_run_inst/U605/Z (CLKBUF_X1)                        0.11      0.16       0.85 r
+  wa_0_run_inst/n851 (net)                     20                   0.00       0.85 r
+  wa_0_run_inst/U606/A (CLKBUF_X1)                        0.11      0.02       0.86 r
+  wa_0_run_inst/U606/Z (CLKBUF_X1)                        0.11      0.16       1.02 r
+  wa_0_run_inst/n635 (net)                     20                   0.00       1.02 r
+  wa_0_run_inst/U607/A (CLKBUF_X1)                        0.11      0.02       1.04 r
+  wa_0_run_inst/U607/Z (CLKBUF_X1)                        0.08      0.13       1.18 r
+  wa_0_run_inst/n861 (net)                     15                   0.00       1.18 r
+  wa_0_run_inst/U1012/A2 (AOI22_X1)                       0.08      0.03       1.20 r
+  wa_0_run_inst/U1012/ZN (AOI22_X1)                       0.03      0.02       1.22 f
+  wa_0_run_inst/n873 (net)                      1                   0.00       1.22 f
+  wa_0_run_inst/U1017/A1 (NAND4_X1)                       0.03      0.01       1.24 f
+  wa_0_run_inst/U1017/ZN (NAND4_X1)                       0.02      0.03       1.26 r
+  wa_0_run_inst/pc_0_sva_dfm_2[0] (net)         2                   0.00       1.26 r
+  wa_0_run_inst/pc_0_sva_dfm_1_reg[0]/D (DFFR_X1)         0.02      0.01       1.27 r
+  data arrival time                                                            1.27
+
+  clock ideal_clock (rise edge)                                     3.33       3.33
+  clock network delay (ideal)                                       0.00       3.33
+  wa_0_run_inst/pc_0_sva_dfm_1_reg[0]/CK (DFFR_X1)                  0.00       3.33 r
+  library setup time                                               -0.04       3.29
+  data required time                                                           3.29
+  ------------------------------------------------------------------------------------
+  data required time                                                           3.29
+  data arrival time                                                           -1.27
+  ------------------------------------------------------------------------------------
+  slack (MET)                                                                  2.02
+
+
+1

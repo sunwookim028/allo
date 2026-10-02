@@ -1,0 +1,6 @@
+== simulator full trace_n2000 exit 1
+RTL vpu_word_array:full: 2000 cycles in 11 traces, 996 defined slots, RTL vs reference on defined: 996/996 (0.0s)
+UNIT-FAIL  vpu_word_array trace simulator: OverflowError: Python int too large to convert to C long
+== systemc full trace_n2000 exit 1
+RTL vpu_word_array:full: 2000 cycles in 11 traces, 996 defined slots, RTL vs reference on defined: 996/996 (0.0s)
+UNIT-FAIL  vpu_word_array trace systemc: OverflowError: Python int too large to convert to C long
