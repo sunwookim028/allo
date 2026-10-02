@@ -23,7 +23,7 @@ import numpy as np
 import allo.dataflow as df
 from allo.ir.types import bfloat16, uint16
 
-from examples.minitpu.harness import rtl
+from examples.minitpu.harness import ref, rtl
 
 RTL = rtl.RtlUnit(
     top="vpu_bf16_add",
@@ -33,6 +33,8 @@ RTL = rtl.RtlUnit(
     shape="comb",
     latency=0,
 )
+REF = ref.vpu_bf16_add  # the RTL's semantics; harness/exhaustive.py holds it over 2^32
+IEEE = ref.ieee_bf16_add
 
 
 def native(n):

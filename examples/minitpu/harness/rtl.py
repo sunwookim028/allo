@@ -17,8 +17,16 @@ Three port shapes cover U1:
     on which it appeared, so the harness measures the latency rather than
     assuming it.
 ``bare``
-    ``clk`` and no valid. Outputs are sampled ``latency`` cycles after their
-    inputs, so the declared latency is an input here, not a measurement.
+    ``clk`` and no valid. The wrapper records the output after every edge
+    and ``run()`` reads each vector's result ``latency`` edges after it went
+    in, so there the declared latency is an input. ``probe_latency()``
+    measures it independently of any reference: a step from one input to
+    another, and the edge on which the output first moves.
+
+Latency counts rising edges: an input driven before edge 1 is captured by it,
+and a unit of latency ``L`` shows the result after edge ``L`` -- the number of
+registers on the path, which is how MiniTPU's RTL comments and ``localparam``
+s state it. A combinational unit has latency 0.
 
 MiniTPU's own ``tb/`` stays the second check (D-7); this is the first.
 """
@@ -78,7 +86,7 @@ class RtlUnit:
         return h.hexdigest()[:16]
 
 
-WRAPPER_VERSION = "1"
+WRAPPER_VERSION = "2"
 
 
 def _wrapper(u):
@@ -111,16 +119,15 @@ def _wrapper(u):
     if (dut.{u.valid_out}) {{
       if (j >= n) {{ std::fprintf(stderr, "more outputs than inputs\\n"); return 3; }}
 {get_out}
-      out[j * {no + 1} + {no}] = cyc;
+      out[j * {no + 1} + {no}] = cyc + 1;
       ++j;
     }}"""
         else:
+            # every edge's output: run() aligns it, probe_latency() measures
             capture = f"""
-    if (cyc >= {u.latency} && cyc - {u.latency} < n) {{
-      j = cyc - {u.latency};
+    {{ j = cyc;
 {get_out}
-      out[j * {no + 1} + {no}] = cyc;
-    }}"""
+      out[j * {no + 1} + {no}] = cyc + 1; }}"""
         body = f"""
   // reset: four cycles low, inputs idle
   dut.{u.clk} = 0;
@@ -160,7 +167,8 @@ int main(int argc, char** argv) {{
   std::fseek(fi, 0, SEEK_END);
   const uint64_t n = std::ftell(fi) / 8 / {ni};
   std::fseek(fi, 0, SEEK_SET);
-  std::vector<uint64_t> in(n * {ni}), out(n * {no + 1});
+  const uint64_t rows = {"n + " + str(u.latency) + " + 64" if u.shape == "bare" else "n"};
+  std::vector<uint64_t> in(n * {ni}), out(rows * {no + 1});
   if (std::fread(in.data(), 8, n * {ni}, fi) != n * {ni}) return 2;
   std::fclose(fi);
   V{u.top} dut;
@@ -208,9 +216,41 @@ def run(u, stim):
     """Run stimulus ``stim`` (``uint64[n, n_inputs]``) through the RTL unit.
 
     Returns ``(outputs uint64[n, n_outputs], cycles int64[n])``. ``cycles`` is
-    the cycle each output appeared on, counted from the cycle its input was
-    offered (so it is the latency for II=1 input); all zero for ``comb``.
+    each output's latency in edges (module docstring): measured for
+    ``valid``, the declared ``latency`` for ``bare``, zero for ``comb``.
     """
+    outs, cycles = _execute(u, stim)
+    if u.shape == "bare":
+        assert u.latency >= 1, "a bare unit is clocked: declare its latency"
+        n = len(stim)
+        outs = outs[u.latency - 1 : u.latency - 1 + n]
+        cycles = np.full(n, u.latency, dtype=np.int64)
+    return outs, cycles
+
+
+def probe_latency(u, x0, x1, hold=32):
+    """Measure a clocked unit's latency without a reference.
+
+    Holds input vector ``x0`` for ``hold`` cycles, then ``x1``; the latency is
+    the number of edges until the output first leaves its ``x0`` value. The
+    two vectors must give different outputs. Works for ``bare`` and
+    ``valid`` alike.
+    """
+    stim = np.array([x0] * hold + [x1] * hold, dtype=np.uint64)
+    if u.shape == "valid":
+        _, cycles = _execute(u, stim)
+        return int(cycles[hold])
+    outs, _ = _execute(u, stim)  # outs[c]: after edge c + 1
+    settled = outs[hold - 1]
+    assert (outs[hold // 2 : hold] == settled).all(), "output not settled on x0"
+    moved = np.flatnonzero((outs[hold:] != settled).any(axis=1))
+    assert len(moved), "x0 and x1 give the same output: pick another pair"
+    # input `hold` is captured by edge hold + 1, so latency = edge - hold
+    return int(moved[0]) + 1
+
+
+def _execute(u, stim):
+    """Run the driver; returns its raw outputs and per-row cycle column."""
     exe = build(u)
     stim = np.ascontiguousarray(stim, dtype=np.uint64)
     assert stim.ndim == 2 and stim.shape[1] == len(u.inputs)
