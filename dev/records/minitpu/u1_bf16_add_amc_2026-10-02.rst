@@ -1,0 +1,316 @@
+U1 pilot ``vpu_bf16_add`` through AMC
+=====================================
+
+:Date: 2026-10-02
+:Host: zhang-21
+:Tool: AMC, ``cornell-zhang/amc-dialect`` at ``fe60c121``. CIRCT is
+       ``a470836d`` and LLVM is ``62797005``. This is the build recorded in
+       ``dev/records/open_hls/amc_exploration_2026-10-02.rst``, reused
+       without rebuilding (``scratch/amc/``). Simulation used Verilator
+       5.052. Synthesis used Vivado 2022.1, ``xcu55c-fsvh2892-2L-e``, out of
+       context. Vivado 2026.1 had no licence on this host.
+:Unit: MiniTPU ``src/core/vpu/vpu_bf16_add.sv`` at ``b3ba0a4d``.
+:Variant: ``bits`` only. The ``uint16`` body is
+          ``examples/minitpu/units/bf16_add.py::bits``. ``native`` stays
+          **blocked**: AMC has no bf16 type in its frontend or its operator
+          libraries (see the exploration record).
+:Stimulus: ``harness/stimulus.binary_bf16()``, 251,936 pairs.
+:Oracle: ``harness/ref.vpu_bf16_add``. It was re-checked in this run against
+         the RTL through ``harness/rtl.py``: 251,936/251,936.
+:Repro: ``u1_bf16_add_amc/`` beside this file. Source its ``env.sh`` (the AMC
+        side), then run each script under ``scl enable gcc-toolset-13 --``.
+        Point ``TMPDIR`` at a local disk: on NFS, the second ``AMCModule``
+        call fails in ``shutil.rmtree(obj_dir)`` (``Directory not empty``,
+        because of ``.nfs`` files). ``u1_bf16_add_amc/RESULTS`` holds the raw result lines.
+
+Matrix cell (README D-9)
+------------------------
+
+**AMC, ``bits``: match (251,936/251,936 bit-exact through both routes), but
+only after workarounds.** The kernel had to be edited in 7 places to pass
+AMC's own frontend and backend. Eight AMC findings forced those edits: six
+bugs, two of them silent miscompiles. Our frontend's MLIR also needs four
+textual translations before AMC will take it. **AMC, ``native``: blocked**,
+unchanged.
+
+Results
+-------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 20 50
+
+   * - build
+     - vs RTL (251,936)
+     - cycles / QoR
+   * - (a) AMC frontend, as written (no directives), 10 ns
+     - **251,936 bit-exact**
+     - 21N+1 cycles (5,290,657 for N=251,936; 20N+1 = 321 at N=16). The
+       element loop is not pipelined. The 17-step leading-zero loop runs
+       for **every** element, not only on the normalize path. Synthesis
+       (N=16): 290 LUT, 47 FF, critical path 5.85 ns
+   * - (a) + ``s.unroll`` (leading-zero loop) + ``s.pipeline`` (element
+       loop), 10 ns
+     - **251,936 bit-exact**
+     - **II=1, N+2 cycles** (251,938). The whole adder sits in one cycle,
+       BRAM ``dout`` to ``din``. Synthesis: 268 LUT, 21 FF, 0 DSP, critical
+       path 7.33 ns (about 136 MHz), 30 logic levels
+   * - the same, ``AMC_TARGET_CLOCK_PERIOD_NS=3.333`` (300 MHz)
+     - **251,936 bit-exact**
+     - II=1, N+4 cycles. Synthesis: 350 LUT, 216 FF, **WNS -1.243 ns at
+       3.333 ns** (about 218 MHz). AMC's delay model put 4.6 ns of logic into
+       one 3.33 ns stage
+   * - (b) our frontend's ``df.region`` MLIR (A-edited body, unrolled +
+       pipelined by our schedule) + 4 text edits (R1-R4)
+     - **251,936 bit-exact**
+     - II=1, N+2 cycles (251,938), the same as (a). Without our
+       ``s.unroll``: 321 cycles at N=16, as in (a)
+
+AMC's own ``get_resource_estimates()`` is broken at this commit (E1), so the
+LUT/FF figures come from ``u1_bf16_add_amc/synth.tcl``. That script runs Vivado
+out of context on the kernel plus its FSM and BRAM adapters, with zero I/O
+delays so that the ``dout``-to-``din`` path is timed. RTLGen's figures
+(2,175 LUT, 655 FF) are its own estimator's, at N=16 and 300 MHz, so the two
+rows are not like-for-like.
+
+Route (a): AMC's own Allo frontend
+----------------------------------
+
+``kernel_bits.py`` is the ``@df.kernel`` body, mechanically dedented into a
+plain function over ``uint16[N]``. ``route_a.py`` builds it with
+``allo.customize(fn).build(target=...)``. The script checks AMC's own
+``"llvm"`` target first, to separate frontend semantics from AMC's hardware
+lowering, and then checks ``"amc"``.
+
+AMC stopped at each of the following points, in order. Each stop forced one
+edit in ``kernel_bits_amc.py``, marked there with the finding id.
+
+1. Frontend, type inference: ``KeyError: <class 'ast.Not'>``
+   (``ir/typing_rule.py:11``). That is **A1**. Edit: ``not x`` became
+   ``x == 0``.
+2. Frontend: ``RuntimeError: Unsupported bit operation``
+   (``ir/infer.py:381``). That is **A2**. Edit: ``x[k]`` became
+   ``x[k:k+1]``, and ``value[16 - offset]`` became
+   ``((value >> (16 - offset)) & 1) == 1``.
+3. Frontend: ``RuntimeError: Variable `leading_zeros` has already been
+   defined, please use a different name`` (``ir/builder.py:786``). That is
+   **A3**.
+4. Backend, ``lower_fixed_to_int``: ``error: updateCallOp: result type is
+   not memref``. This is followed by ``IRMapping.h:74 ... Assertion `result
+   && "expected 'from' to be contained within the map"' failed`` and an
+   abort. That is **A4**. Edit: ``leading_zeros17`` inlined, which removes
+   A3's statement too.
+5. Backend, ``LoopScheduleToFSM::lowerLoopLevelBody``: the same
+   ``IRMapping`` abort, with no other message. Symbolized with
+   ``circt/llvm/build/bin/llvm-symbolizer`` against
+   ``libAMCAggregateCAPI.so``. Reduced by a line-level ddmin to the
+   19-line kernel in ``repros.py::A8_slice_set``. That is **A8**. Edit:
+   every slice assignment (``mant_a[9:16] = frac_a``, ``key_a[17:25] =
+   exp_a``, the ``result_o`` fields) became shifts and ors.
+6. Found by probing, not by a crash. The first-set-bit loop with a
+   ``found`` flag was miscompiled (**A7**). Edit: the flag was removed, and
+   ``lz == 17`` now means "not found yet".
+7. Found by reading the frontend. ``x or y or z`` drops ``z`` (**A5**). The
+   NaN test has three-way ``or`` and ``and``. Edit: they are nested in
+   pairs.
+
+The **B1** workaround (a spare top bit on ``key_a >= key_b`` and on
+``lz6 < max6``) is kept, because AMC's frontend has the same bug (**A6**).
+After these edits, AMC's ``"llvm"`` target matches on all 251,936 pairs, and
+so does the RTL.
+
+Route (b): our frontend's MLIR handed to AMC
+--------------------------------------------
+
+``emit_ours.py`` runs in our env and writes ``str(module)`` text.
+``route_b.py`` runs in the AMC env and gives the text to
+``AMCModule(txt, top_func_name=...)``. Its ``+edit`` suffixes apply the
+translations named below. These were the outcomes:
+
+* **Plain ``allo.customize`` form, unmodified body.** Our frontend emits
+  **invalid IR**, which it prints in generic form and which AMC's parser
+  rejects: ``'arith.trunci' op operand type 'i1' and result type 'i1' are
+  cast incompatible``. The statement responsible is ``mant_a[16] = exp_a !=
+  0``. That is **O1**, our bug.
+* **Plain form, A-edited body.** Same error (line 286). On the region path,
+  ``hid_a: UInt(17) = exp_a != 0`` fails our own pass pipeline instead:
+  ``trunci i1 -> i17``. ``kernel_bits_amc.py`` therefore spells it
+  ``1 if exp_a != 0 else 0``.
+* **``df.region`` form, unmodified body** (the region verifies). Kernel
+  ``add_0``, or ``top``: ``updateCallOp`` (A4), then ``LoopSchedule/Utils.cpp:750:
+  Assertion `ifOps.empty() && "Loops inside if statements is unsupported
+  currently"' failed``. With R1 applied, the abort is A4's ``IRMapping``
+  abort instead.
+* **``df.region`` form, A-edited body.** The ``Loops inside if
+  statements`` abort (R1). With ``s.unroll`` + ``s.pipeline`` from our
+  schedule, AMC first aborts on ``IntegerAttr::getInt() ... "must be
+  signless integer"`` (R2). Translating that attribute gives ``error: problem
+  is infeasible`` (repeated), and then AMC's own re-parse of its loopschedule
+  IR fails with ``expected non-function type`` (R1). Rewriting rank-0
+  memrefs to ``memref<1xT>`` gives ``error: redefinition of symbol named
+  'top'`` (R4). Dropping the wrapper ``func @top`` lets the build go through
+  and match: ``region_amcedits_unroll+attrs+rank1+droptop:add_0``.
+
+Findings
+--------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 6 22 42 30
+
+   * - id
+     - class
+     - finding
+     - minimal repro / note
+   * - A1
+     - bug (AMC frontend)
+     - ``not`` has no typing rule. ``builder.py`` lowers ``ast.Not``, but
+       ``typing_rule.py``'s registry lacks it
+     - ``repros.py A1_not``. Our fork accepts it
+   * - A2
+     - bug (AMC frontend)
+     - Single-bit ``x[k]`` (read or write) is dead code on Python >= 3.9.
+       ``infer.py``/``builder.py`` test ``isinstance(slice, ast.Index)``,
+       and that class is never produced since 3.9. ``setup.py`` says
+       ``>=3.8``; the env is 3.12
+     - ``A2_bit_index``. Slices ``x[k:k+1]`` work, but bounds must be
+       constants, so a variable bit index needs shift-and-mask
+   * - A3
+     - bug (AMC frontend)
+     - A call's result cannot be assigned to an already-declared scalar.
+       ``build_Assign`` treats every ``ast.Call`` RHS as a new buffer
+     - ``A3_call_assign``
+   * - A4
+     - bug, then a **workaround** (manual inlining)
+     - A function that returns a scalar: ``FixedPointToInteger``'s
+       ``updateCallOp`` errors on non-memref results and then aborts the
+       process (``IRMapping`` assertion). The ``"llvm"`` target is fine
+     - ``A4_scalar_call``. Hits both routes. MiniTPU's nested
+       ``leading_zeros`` function cannot be kept as a function
+   * - A5
+     - bug, **silent miscompile** (AMC frontend)
+     - ``a or b or c`` and ``a and b and c`` are built from the first two
+       operands only (``build_BoolOp`` uses ``stmts[0]``, ``stmts[1]``).
+       Wrong on the ``"llvm"`` target too. Our fork folds all operands
+     - ``A5_boolop3``. In this unit the NaN test's third disjunct would
+       be dropped, so ``(+inf) + (-inf)`` would give an infinity, not NaN
+   * - A6
+     - bug (shared with ours: **B1**)
+     - AMC's frontend has B1 as well. The predicate is picked from the
+       signless type string (``"i16".startswith("i")``), so ``uint16 >
+       uint16`` is signed. The same code is in both forks
+     - ``A6_ucmp_B1``. Wrong on both targets. A comparison against a literal
+       is unsigned (both sides are ``extui`` to i32)
+   * - A7
+     - bug, **silent miscompile** (AMC backend)
+     - Take a loop that carries two scalars, where only the first is read
+       after the loop. Its exit value is wired from the *second*. With a
+       ``uint1`` flag, the same wiring fails verification instead:
+       ``'comb.mux' op failed to verify that all of {trueValue, falseValue,
+       result} have same type``. The IR is still correct after
+       ``allocate_amc``. The loopschedule ``launch`` yields ``(i6, i16,
+       i16)`` and a single ``await -> i16`` takes the wrong one
+     - ``A7_two_carried`` / ``A7_two_carried_u1``. The ``"llvm"`` target is
+       right. The MiniTPU priority encoder (``found`` flag) is exactly this
+       shape
+   * - A8
+     - bug (crash) + **missing abstraction**
+     - ``lower_bit_ops`` lowers each slice *assignment* ``x[lo:hi] = v`` to a
+       bit-serial ``scf.for`` with one select per bit. A value built that
+       way and consumed by another such loop and a select aborts
+       ``LoopScheduleToFSM`` (``IRMapping`` assertion). Even when it builds,
+       each field insert is a sequential hardware loop. There is no
+       bit-field insert that lowers to wiring
+     - ``A8_slice_set`` (ddmin-reduced). Workaround: shifts and ors
+   * - P1
+     - **workaround** (needs directives) + missing abstraction
+     - As written, AMC gives 21 cycles per element. The data-dependent
+       branch holding the 17-step loop is run on every element, and the
+       element loop is not pipelined. ``s.unroll`` + ``s.pipeline`` give
+       II=1. The RTL unit is combinational (latency 0). AMC's minimum is a
+       start/done FSM over BRAM ports, with no combinational or scalar-port
+       kernel: N+2 cycles. This is RTLGen's F3/F4 again
+     - ``route_a.py N 0 amc none|unroll``
+   * - T1
+     - bug (QoR model), provisional
+     - With a 3.333 ns target, AMC schedules 4.59 ns of post-synthesis
+       logic into one stage: WNS -1.243 ns. Its operator delays are
+       optimistic for a long chain of narrow integer operations
+     - ``AMC_TARGET_CLOCK_PERIOD_NS=3.333`` + ``synth.tcl``
+   * - E1
+     - bug (AMC Python backend)
+     - ``AMCModule.get_resource_estimates()`` calls a missing
+       ``self.get_verilog()`` and an undefined ``self.calyxDir``. It cannot
+       work
+     - ``allo/backend/amc.py:953``
+   * - R1
+     - **semantic mismatch** (IR convention) + AMC bug
+     - Our fork keeps scalars as rank-0 ``memref<iN>``; AMC's frontend uses
+       ``memref<1xiN>``. AMC does not promote rank-0 scalars to registers,
+       so: (i) a loop inside an ``if`` aborts (``Loops inside if statements
+       is unsupported currently``); (ii) the loopschedule printer emits
+       ``loopschedule.store %false, %alloc_4[ : ]``, which AMC's own parser
+       rejects (``expected non-function type``)
+     - ``route_b.py ... +rank1`` rewrites ``memref<iN>`` to ``memref<1xiN>``
+       and ``[]`` to ``[0]``
+   * - R2
+     - **semantic mismatch**
+     - Our ``s.pipeline`` writes ``pipeline_ii = 1 : ui32``; AMC's writes
+       ``: i32``. On ours AMC aborts with
+       ``IntegerAttr::getInt() ... "must be signless integer"``
+     - ``+attrs``
+   * - R3
+     - **semantic mismatch** (directive dropped silently)
+     - Our ``s.unroll`` writes ``unroll = 0 : i32``; AMC's ``s.unroll`` is
+       ``s.parallel`` and writes ``loopschedule.parallel = 0 : i32``, which
+       AMC's pipeline consumes. Ours is ignored
+     - ``+attrs``
+   * - R4
+     - bug (AMC testbench)
+     - A function named ``top`` (the name of our ``df.region``) collides
+       with AMC's generated testbench module ``top``:
+       ``redefinition of symbol named 'top'``
+     - ``+droptop``
+   * - O1
+     - bug (ours; an instance of **B2**)
+     - In plain ``allo.customize``, a comparison assigned or stored to
+       ``uint1``/``UInt(17)`` is cast with ``arith.trunci i1 -> i1`` or
+       ``i1 -> i17``. The module fails verification, and ``str(module)``
+       prints generic IR. The ``df.region`` path verifies for ``uint1`` but
+       fails for ``UInt(17)``
+     - ``emit_ours.py`` (``plain.mlir``). Not filed separately; it extends
+       B2's evidence
+
+Classification summary: 10 bugs (A1-A5, A7, A8, E1 and R4 in AMC; O1 ours),
+plus T1 (provisional), plus B1 confirmed in AMC's frontend (A6). Of these, A5
+and A7 are silent miscompiles: with them, the kernel would have built and
+simulated wrong. Three items are semantic mismatches between the two Allo
+forks' IR (R1-R3). A4 and P1 are workarounds. A8 and P1 are missing
+abstractions.
+
+How the edits distort the unit
+------------------------------
+
+The MiniTPU structure that survives: the field decode, the align, add and
+normalize steps, RNE rounding, the special-case priority chain, and the
+17-step leading-zero scan as a loop. What is lost: the ``leading_zeros``
+function boundary (A4), the ``found`` flag (A7), every ``x[k]`` and
+``x[hi:lo] = ...`` (A2, A8), and three-operand boolean expressions (A5). The
+result is a correct but different kernel. It is no longer a line-for-line
+transcription of the ``.sv``, which the ``bits`` variant was meant to be.
+
+Reproduce
+---------
+
+::
+
+   source dev/records/minitpu/u1_bf16_add_amc/env.sh
+   export TMPDIR=<local disk dir>
+   R=dev/records/minitpu/u1_bf16_add_amc
+   scl enable gcc-toolset-13 -- python $R/route_a.py 251936 0 llvm,amc unroll   # or: none
+   scl enable gcc-toolset-13 -- python $R/repros.py
+   # route (b): our env first (cwd = worktree root), then the AMC env
+   (source examples/minitpu/harness/env-zhang21.sh; $ALLO_PYTHON $R/emit_ours.py <dir> 251936)
+   scl enable gcc-toolset-13 -- python $R/route_b.py <dir> 0 region_amcedits_unroll+attrs+rank1+droptop:add_0
+   # area/timing of a dump (route_a.py prints the dump directory)
+   module load xilinx-2022.1; vivado -mode batch -source $R/synth.tcl -tclargs <dump> <out> 10.0

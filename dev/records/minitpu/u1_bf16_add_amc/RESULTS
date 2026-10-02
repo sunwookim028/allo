@@ -1,0 +1,73 @@
+# Raw result lines, 2026-10-02, zhang-21 (see ../u1_bf16_add_amc_2026-10-02.rst)
+
+## route (a), AMC_TARGET_CLOCK_PERIOD_NS default 10.0, as written (sched none)
+######## target=llvm N=251936 pairs=251936
+run 0.1s; match 251936/251936
+######## target=amc N=251936 pairs=251936
+run 18.6s; match 251936/251936
+cycles per call (N=251936): min 5290657 max 5290657
+
+## route (a), sched unroll (unroll leading-zero loop, pipeline element loop), 10.0 ns
+######## target=llvm N=251936 pairs=251936
+run 0.0s; match 251936/251936
+######## target=amc N=251936 pairs=251936
+run 18.2s; match 251936/251936
+cycles per call (N=251936): min 251938 max 251938
+
+## route (a), sched unroll, AMC_TARGET_CLOCK_PERIOD_NS=3.333
+######## target=amc N=251936 pairs=251936
+run 19.3s; match 251936/251936
+cycles per call (N=251936): min 251940 max 251940
+
+## route (b), ours_full/region_amcedits_unroll+attrs+rank1+droptop:add_0 (N=251936)
+######## region_amcedits_unroll+attrs+rank1+droptop.mlir top=add_0
+match 251936/251936; cycles (last call, N=251936) 251938
+
+## route (b), N=16, first 64 pairs
+######## region_amcedits_unroll+attrs+rank1+droptop.mlir top=add_0
+match 64/64; cycles (last call, N=16) 18
+######## region_amcedits_unroll+attrs+rank1+droptop+nopipe.mlir top=add_0
+match 64/64; cycles (last call, N=16) 33
+
+## Vivado 2022.1 OOC synth (synth.tcl), xcu55c-fsvh2892-2L-e, N=16 dumps
+-- none, 10 ns
+| CLB LUTs*               |  290 |     0 |          0 |   1303680 |  0.02 |
+| CLB Registers           |   47 |     0 |          0 |   2607360 | <0.01 |
+WNS(ns) 4.152
+  Data Path Delay:        5.813ns  (logic 1.623ns (27.920%)  route 4.190ns (72.080%))
+  Logic Levels:           24  (CARRY8=2 LUT2=1 LUT3=3 LUT4=3 LUT5=5 LUT6=10)
+-- unroll, 10 ns
+| CLB LUTs*               |  268 |     0 |          0 |   1303680 |  0.02 |
+| CLB Registers           |   21 |     0 |          0 |   2607360 | <0.01 |
+WNS(ns) 2.674
+  Data Path Delay:        7.291ns  (logic 1.937ns (26.567%)  route 5.354ns (73.433%))
+  Logic Levels:           30  (CARRY8=3 LUT3=4 LUT4=3 LUT5=8 LUT6=12)
+-- unroll, AMC 3.333 ns, synth 3.333 ns
+| CLB LUTs*               |  350 |     0 |          0 |   1303680 |  0.03 |
+| CLB Registers           |  216 |     0 |          0 |   2607360 | <0.01 |
+WNS(ns) -1.243
+  Data Path Delay:        4.586ns  (logic 1.154ns (25.164%)  route 3.432ns (74.836%))
+  Logic Levels:           19  (CARRY8=3 LUT3=2 LUT4=4 LUT5=5 LUT6=5)
+
+## repros.py
+A1_not [llvm]: FAIL KeyError: <class 'ast.Not'>
+A1_not [amc]: FAIL KeyError: <class 'ast.Not'>
+A2_bit_index [llvm]: FAIL RuntimeError: Unsupported bit operation
+A2_bit_index [amc]: FAIL RuntimeError: Unsupported bit operation
+A3_call_assign [llvm]: FAIL RuntimeError: Variable `r` has already been defined, please use a different name
+A3_call_assign [amc]: FAIL RuntimeError: Variable `r` has already been defined, please use a different name
+A4_scalar_call [llvm]: OK got [6, 14077, 58715, 54112, 2, 201, 1, 257] want [6, 14077, 58715, 54112, 2, 201, 1, 257]
+loc("-":14:12): error: updateCallOp: result type is not memref
+loc("-":14:12): error: updateCallOp: result type is not memref
+python: /work/shared/users/phd/sk3463/scratch/amc/amc-dialect/circt/llvm/mlir/include/mlir/IR/IRMapping.h:74: auto mlir::IRMapping::lookup(T) const [with T = mlir::Value]: Assertion `result && "expected 'from' to be contained within the map"' failed.
+A5_boolop3 [llvm]: MISMATCH got [0, 0, 0, 0, 1, 0, 0, 0] want [0, 0, 0, 0, 1, 1, 0, 0]
+A5_boolop3 [amc]: MISMATCH got [0, 0, 0, 0, 1, 0, 0, 0] want [0, 0, 0, 0, 1, 1, 0, 0]
+A6_ucmp_B1 [llvm]: MISMATCH got [0, 1, 0, 0, 0, 1, 0, 1] want [0, 1, 1, 1, 0, 1, 0, 1]
+A6_ucmp_B1 [amc]: MISMATCH got [0, 1, 0, 0, 0, 1, 0, 1] want [0, 1, 1, 1, 0, 1, 0, 1]
+A7_two_carried [llvm]: OK got [0, 2, 1, 0, 0, 3, 99, 8] want [0, 2, 1, 0, 0, 3, 99, 8]
+A7_two_carried [amc]: MISMATCH got [1, 1, 1, 1, 1, 1, 0, 1] want [0, 2, 1, 0, 0, 3, 99, 8]
+A7_two_carried_u1 [llvm]: OK got [0, 2, 1, 0, 0, 3, 99, 8] want [0, 2, 1, 0, 0, 3, 99, 8]
+A7_two_carried_u1 [amc]: FAIL RuntimeError: lower_loopschedule_to_fsm failed
+loc("-":2:3): error: 'comb.mux' op failed to verify that all of {trueValue, falseValue, result} have same type
+A8_slice_set [llvm]: OK got [2560, 63488, 46080, 48640, 0, 0, 0, 0] want [2560, 63488, 46080, 48640, 0, 0, 0, 0]
+python: /work/shared/users/phd/sk3463/scratch/amc/amc-dialect/circt/llvm/mlir/include/mlir/IR/IRMapping.h:74: auto mlir::IRMapping::lookup(T) const [with T = mlir::Value]: Assertion `result && "expected 'from' to be contained within the map"' failed.

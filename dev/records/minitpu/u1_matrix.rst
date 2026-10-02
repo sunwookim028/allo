@@ -81,11 +81,29 @@ zhang-21; MiniTPU at ``b3ba0a4d``; harness on branch ``u1-pilot``.
        like the ``.sv``'s gives II=48 unless it is unrolled; 32-bit
        temporaries are not narrowed
      - ``u1_bf16_add_rtlgen_2026-10-02.rst`` (F3-F5)
-   * - AMC
-     - **blocked**: no bf16 in its frontend or operator library; f32 needs
-       DesignWare models not in the repository
-     - ``dev/records/open_hls/amc_exploration_2026-10-02.rst``. A ``bits``
-       (uint16) expression might pass its integer path; untried.
+   * - AMC, ``native``
+     - **blocked**: no bf16 in its frontend or its operator library; f32
+       needs DesignWare models that are not in the repository
+     - ``dev/records/open_hls/amc_exploration_2026-10-02.rst``
+   * - AMC, ``bits``
+     - **match** 251,936/251,936 bit-exact, through AMC's own frontend and
+       through our frontend's ``df.region`` MLIR. II=1 with N+2 cycles needs
+       ``s.unroll`` + ``s.pipeline``; as written it takes 21 cycles per
+       element (P1). Synthesis (N=16, 10 ns): 268 LUT, 21 FF. This holds
+       **only after 7 kernel edits**, which come from these findings:
+       **bugs** A1 (no ``not``), A2 (``x[k]`` dead on Python >= 3.9), A3, A4
+       (scalar-returning call aborts), **A5 and A7 (silent miscompiles:
+       ``a or b or c`` drops ``c``; a two-scalar loop exits with the wrong
+       value)**, A8 (slice assignment lowers to a bit-serial loop, then a
+       crash); **B1 is present in AMC's frontend too** (A6). Our MLIR also
+       needs 4 text edits: R1-R3 are **semantic mismatches** between the
+       forks (rank-0 scalars, ``pipeline_ii`` type, ``unroll`` vs
+       ``loopschedule.parallel``), and R4 is a ``top`` name clash. One is
+       ours: O1, invalid ``trunci`` in plain ``customize`` (B2)
+     - ``u1_bf16_add_amc_2026-10-02.rst``; repros in
+       ``u1_bf16_add_amc/repros.py``. These are AMC defects, to file with
+       AMC (D-2) after triage. Also T1: at a 3.333 ns target AMC's delay
+       model misses by 1.24 ns
 
 Environment findings met on the way
 -----------------------------------
