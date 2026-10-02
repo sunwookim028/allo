@@ -146,6 +146,21 @@ the FIFOs, ``u2_word_array_2026-10-02.rst``, ``u2_fifo_2026-10-02.rst``):
   C-W1, F5) and ``core-stateful`` (D-11) held for review; ``latency-manifest-
   fix`` (C-M1) merged here.
 
+**Checkpoint 9, 2026-10-02:**
+
+- D-12 **adopted** (README): one owner per port; port kinds ``r``/``w``/``rw``;
+  a declared read latency lowers to the pipe written as data; a collision
+  rule per memory; AMC's ``count`` kept; Vitis refuses ported memories for
+  now. Prototype next: the regfile as three reader units and one writeback
+  unit.
+- D-14 follow-ups approved: scope ``-RESET_CLEARS_ALL_REGS`` (or refuse
+  mixing reset and unreset storage); fix unsigned ``Stateful`` emitted as
+  signed ``ac_int``.
+- ``core-uint-index`` + ``core-stateful`` **merged to main** (``9d48a90f``,
+  one combined regression: identical emission and gates, the same failing
+  sets, 63 new tests passing). Upstream issue filed: cornell-zhang/allo
+  #619 (unsigned index).
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
