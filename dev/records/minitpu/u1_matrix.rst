@@ -101,6 +101,17 @@ in what Allo can say.
     reused function's schedule does not travel with it (C10). *[proposals,
     with item 8, for the U3 composition design review]*
 
+12. **MiniTPU findings for its owner** (D-7: changing MiniTPU is the owner's
+    call). ``vpu_alu`` does not implement AND/OR/XOR (they return ``a``; the
+    decoder never issues them; ``docs/UNITS.md`` lists them). From U2 Phase 0
+    (``u2_phase0_2026-10-02.rst``): the assembler's output-FIFO rule counts
+    pushes in program order and ignores loop trip counts, so ``loop.begin 17
+    { vmatpush }`` passes and the RTL silently drops the 17th push; a
+    ``vmatpop`` with nothing pushed is accepted with no assertion;
+    ``vpu_fifo`` push+pop on an empty FIFO loses the word (contradicting
+    ``vpu_fifo.sv:5``; unreachable from the MXU). *[report to the owner; no
+    change to the pin]*
+
 ``vpu_bf16_add`` (pilot)
 ------------------------
 
