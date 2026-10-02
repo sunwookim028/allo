@@ -1,0 +1,2 @@
+DC_EXIT 0 WALL 68s
+Warning: You requested 8 cores. However, load on host zhang-21.ece.cornell.edu is 150.35. Tool will ignore the request and use 1 cores. (UIO-231)

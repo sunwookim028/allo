@@ -1,0 +1,2 @@
+MiniTPU RTL vpu_bf16_add: 251936 vectors, 0.1s
+RuntimeError: add_0 driver exited 4: stalled at cycle 261938: 251935 of 251936 outputs

@@ -1,0 +1,47 @@
+ 
+****************************************
+Report : clock_gating
+Design : add_0
+Version: W-2024.09
+Date   : Fri Oct  2 00:30:56 2026
+****************************************
+
+Information: Identification of clock-gating cells has not been performed. Pre-existing clock-gating cells will not be reported. (PWR-947)
+
+
+                             Clock Gating Summary
+          ------------------------------------------------------------
+          |    Number of Clock gating elements    |        3         |
+          |                                       |                  |
+          |    Number of Gated registers          |    31 (62.00%)   |
+          |                                       |                  |
+          |    Number of Ungated registers        |    19 (38.00%)   |
+          |                                       |                  |
+          |    Total number of registers          |       50         |
+          ------------------------------------------------------------
+
+
+
+                             Clock Gating Report by Origin
+          +-------------------------------------------------+------------------+
+          |                                                 |    Actual (%)    |
+          |                                                 |    Count         |
+          +-------------------------------------------------+------------------+
+          |  Number of tool-inserted clock gating elements  |     3 (100.00%)  |
+          |                                                 |                  |
+          |  Number of pre-existing clock gating elements   |     0 (0.00%)    |
+          |                                                 |                  |
+          |  Number of gated registers                      |    31 (62.00%)   |
+          |                                                 |                  |
+          |  Number of tool-inserted gated registers        |    31 (62.00%)   |
+          |                                                 |                  |
+          |  Number of pre-existing gated registers         |     0 (0.00%)    |
+          |                                                 |                  |
+          |  Number of ungated registers                    |    19 (38.00%)   |
+          |                                                 |                  |
+          |  Number of registers                            |       50         |
+          +-------------------------------------------------+------------------+
+
+
+
+1

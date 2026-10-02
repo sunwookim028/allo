@@ -1,0 +1,50 @@
+Processes/Blocks in Design
+  Process       Real Operation(s) count Latency Throughput Reset Length II Comments 
+  ------------- ----------------------- ------- ---------- ------------ -- --------
+  /add_0/run                        180       1          1            1  0          
+  Design Total:                     180       1          1            1  1          
+  
+Clock Information
+  Clock Signal Edge   Period Sharing Alloc (%) Uncertainty Used by Processes/Blocks 
+  ------------ ------ ------ ----------------- ----------- ------------------------
+  clk          rising  3.330             20.00    0.000000 /add_0/run               
+  
+I/O Data Ranges
+  Port Mode DeclType DeclWidth DeclRange ActType ActWidth ActRange 
+  ---- ---- -------- --------- --------- ------- -------- --------
+  clk  IN   Unsigned         1                                     
+  rst  IN   Unsigned         1                                     
+  v6   IN   Signed          16                                     
+  v7   IN   Signed          16                                     
+  done OUT  Unsigned         1                                     
+  v8   OUT  Signed          16                                     
+  
+Memory Resources
+
+C++ to Interface Mappings
+  Resource/Fields C++ Type Interface Range Range Expression(x) x=step+offset Expression Limits 
+  --------------- -------- --------------- ------------------- ------------- -----------------
+  /add_0/v6                [15:0]                                                              
+    v6.d          short    [15:0]          v6[x+16-1:x]        0                               
+  /add_0/v7                [15:0]                                                              
+    v7.d          short    [15:0]          v7[x+16-1:x]        0                               
+  /add_0/v8                [15:0]                                                              
+    v8.d          short    [15:0]          v8[x+16-1:x]        0                               
+  
+Multi-Cycle (Combinational) Component Usage
+  Instance Component Name Cycles 
+  -------- -------------- ------
+  
+Loops
+  Process    Loop             Iterations C-Steps Total Cycles  Duration  Unroll Init Comments 
+  ---------- ---------------- ---------- ------- ------------- --------- ------ ---- --------
+  /add_0/run run:rlp            Infinite       1            2   6.66 ns                       
+  /add_0/run  while             Infinite       1            1   3.33 ns            1          
+  
+Loop Execution Profile
+  Process    Loop             Total Cycles % of Overall Design Cycles Throughput Cycles Comments 
+  ---------- ---------------- ------------ -------------------------- ----------------- --------
+  /add_0/run run:rlp                    1                       50.00                1           
+  /add_0/run  while                     1                       50.00                1           
+  
+End of Report
