@@ -566,7 +566,11 @@ class ASTTransformer(ASTBuilder):
         cast_map = {
             # Index <-> UInt/Int
             (Int, Index): arith_d.IndexCastOp,
-            (UInt, Index): arith_d.IndexCastOp,
+            # A UInt index must be zero-extended: arith.index_cast sign-extends
+            # (uint8 200 -> index -56), index_castui does not. (Index, UInt)
+            # stays index_cast: a 64-bit index into a <= 64-bit UInt truncates
+            # identically either way.
+            (UInt, Index): arith_d.IndexCastUIOp,
             (Index, Int): arith_d.IndexCastOp,
             (Index, UInt): arith_d.IndexCastOp,
             # UInt/Int <-> Float
@@ -604,7 +608,7 @@ class ASTTransformer(ASTBuilder):
                 IntegerType.get_signless(32), op_result, ip=ctx.get_ip()
             )
             op_result = op.result
-            opcls = arith_d.IndexCastOp  # proceed to build cast to index
+            opcls = arith_d.IndexCastUIOp  # the ui32 above is unsigned
         elif isinstance(src_type, Index) and isinstance(res_type, Float):
             op = arith_d.IndexCastOp(
                 IntegerType.get_signless(32), op_result, ip=ctx.get_ip()
