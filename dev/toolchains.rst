@@ -166,6 +166,32 @@ reproduce or re-point every row. The conda env, ``LLVM_BUILD_DIR`` and
 |                                                |                                             | cites Xcelium cosim results from elsewhere.)    |
 +------------------------------------------------+---------------------------------------------+-------------------------------------------------+
 
+Toolchains on zhang-21
+~~~~~~~~~~~~~~~~~~~~~~
+
+Surveyed read-only by the ``zhang21`` agent session on 2026-10-02, for hosting the
+MiniTPU unit ladder (README, D-7). Catapult, Xcelium and the licence variables
+are in ``dev/records/catapult_handoff/zhang21_inventory_2026-10-01.md``.
+
+- **Host:** RHEL 8.10, glibc 2.28, 64 cores. The system g++ is 8.5, too old for
+  Verilator 5 ``--timing``; ``gcc-toolset-13`` (g++ 13.3.1,
+  ``/opt/rh/gcc-toolset-13``) is available.
+- **allo checkout:** ``/work/shared/users/phd/sk3463/allo``. Its bindings are
+  current, built by ``reproduce.sh`` at ``c3de83f3``. Run scripts from the
+  physical path (``cd -P``), not through the ``/home/sk3463/work/allo``
+  symlink.
+- **Disk:** ``/work/shared/users`` is NFS with 9.4 TB free; put clones and
+  projects there. ``/scratch`` is local, 195 GB free. ``/home`` is full, so
+  avoid ``$HOME``.
+- **Verilator: not installed.** Options: conda-forge 5.052 (there is no 5.051)
+  in a separate env, or build the pinned version from source with
+  ``gcc-toolset-13``. The build dependencies are present.
+- **Vivado:** 2019.2, 2022.1, 2023.2 and 2024.2 under ``/opt/xilinx/Vivado``, and
+  2026.1 under ``/opt/xilinx/2026.1``. All have the ``xczu7ev`` part. The 2026.1
+  module sets ``XILINXD_LICENSE_FILE``; a licence checkout has not been tested.
+- **Python (allo env):** 3.12.12, numpy 2.4.0, torch 2.10.0+cu128. That is not the
+  pinned ``torch==2.14.0`` CPU, so the ACT flow needs a separate env there.
+
 hlslibs ``ac_types`` (no Catapult licence needed)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
