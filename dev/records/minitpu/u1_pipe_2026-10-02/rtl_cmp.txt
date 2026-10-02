@@ -1,0 +1,22 @@
+RTL-CMP acc24_add_pipe acc24_bits_ii1_5p0: values 352116/352116 vs MiniTPU RTL; latency catapult {19: 352116} vs minitpu [3] (declared 3); 19.0000 cyc/vector, first output cycle 20; ready period 0; 1.6s
+RTL-CMP acc24_add_pipe acc24_bits_ii1_2p0: values 352116/352116 vs MiniTPU RTL; latency catapult {21: 352116} vs minitpu [3] (declared 3); 19.0000 cyc/vector, first output cycle 22; ready period 0; 1.8s
+RTL-CMP acc24_add_pipe acc24_bits_u_ii1_5p0: values 352116/352116 vs MiniTPU RTL; latency catapult {2: 352116} vs minitpu [3] (declared 3); 1.0000 cyc/vector, first output cycle 3; ready period 0; 0.3s
+RTL-CMP acc24_add_pipe acc24_bits_u_ii1_2p0: values 352116/352116 vs MiniTPU RTL; latency catapult {3: 352116} vs minitpu [3] (declared 3); 1.0000 cyc/vector, first output cycle 4; ready period 0; 0.3s
+RTL-CMP acc24_add_pipe acc24_bits_u_ii1_5p0_cyc3: values 352116/352116 vs MiniTPU RTL; latency catapult {2: 352116} vs minitpu [3] (declared 3); 1.0000 cyc/vector, first output cycle 3; ready period 0; 0.3s
+RTL-CMP acc24_add_pipe acc24_staged_ii1_5p0: values 352116/352116 vs MiniTPU RTL; latency catapult {23: 1, 41: 1, 59: 1, 77: 1, 95: 352112} vs minitpu [3] (declared 3); 19.0000 cyc/vector, first output cycle 24; ready period 0; 2.0s
+RTL-CMP acc24_add_pipe acc24_staged_u_ii1_5p0: values 352116/352116 vs MiniTPU RTL; latency catapult {5: 352116} vs minitpu [3] (declared 3); 1.0000 cyc/vector, first output cycle 6; ready period 0; 0.3s
+RTL-CMP acc24_add_pipe acc24_u_5p0_io1: values 352116/352116 vs MiniTPU RTL; latency catapult {1: 352116} vs minitpu [3] (declared 3); 1.0000 cyc/vector, first output cycle 2; ready period 0; 0.3s
+RTL-CMP acc24_add_pipe acc24_u_5p0_io3: values 352116/352116 vs MiniTPU RTL; latency catapult {3: 352116} vs minitpu [3] (declared 3); 1.0000 cyc/vector, first output cycle 4; ready period 0; 0.3s
+RTL-CMP acc24_add_pipe acc24_u_5p0_io6: values 352116/352116 vs MiniTPU RTL; latency catapult {6: 352116} vs minitpu [3] (declared 3); 1.0000 cyc/vector, first output cycle 7; ready period 0; 0.3s
+RTL-CMP acc24_add_pipe acc24_u_2p0_io3: values 352116/352116 vs MiniTPU RTL; latency catapult {3: 352116} vs minitpu [3] (declared 3); 1.0000 cyc/vector, first output cycle 4; ready period 0; 0.3s
+RTL-CMP acc24_add_pipe acc24_bits_u_ii1_5p0: values 352116/352116 vs MiniTPU RTL; latency catapult {2: 2, 3: 176058, 4: 176056} vs minitpu [3] (declared 3); 1.5000 cyc/vector, first output cycle 3; ready period 3; 0.4s
+RTL-CMP acc24_add_pipe acc24_staged_u_ii1_5p0: values 352116/352116 vs MiniTPU RTL; latency catapult {5: 2, 6: 2, 7: 2, 8: 2, 9: 2, 10: 352106} vs minitpu [3] (declared 3); 1.5000 cyc/vector, first output cycle 6; ready period 3; 0.4s
+RTL-CMP acc24_add_pipe acc24_u_5p0_io3: values 352116/352116 vs MiniTPU RTL; latency catapult {3: 1, 4: 2, 5: 352113} vs minitpu [3] (declared 3); 1.5000 cyc/vector, first output cycle 4; ready period 3; 0.4s
+RTL-CMP bf16_add_pipe bf16_bits_ii1_5p0: values 251936/251936 vs MiniTPU RTL; latency catapult {2: 245344, 18: 6592} vs minitpu [2] (declared 2); 1.4187 cyc/vector, first output cycle 3; ready period 0; 0.3s
+RTL-CMP bf16_add_pipe bf16_bits_u_ii1_5p0: values 251936/251936 vs MiniTPU RTL; latency catapult {2: 251936} vs minitpu [2] (declared 2); 1.0000 cyc/vector, first output cycle 3; ready period 0; 0.2s
+RTL-CMP bf16_add_pipe bf16_bits_u_ii1_2p0: values 251936/251936 vs MiniTPU RTL; latency catapult {3: 251936} vs minitpu [2] (declared 2); 1.0000 cyc/vector, first output cycle 4; ready period 0; 0.3s
+RTL-CMP bf16_add_pipe bf16_bits_u_ii1_5p0_cyc2: values 251936/251936 vs MiniTPU RTL; latency catapult {1: 251936} vs minitpu [2] (declared 2); 1.0000 cyc/vector, first output cycle 2; ready period 0; 0.3s
+RTL-CMP bf16_add_pipe bf16_u_5p0_io2: values 251936/251936 vs MiniTPU RTL; latency catapult {2: 251936} vs minitpu [2] (declared 2); 1.0000 cyc/vector, first output cycle 3; ready period 0; 0.3s
+RTL-CMP bf16_add_pipe bf16_native_ii1_5p0: values 249907/251936 vs MiniTPU RTL; latency catapult {1: 251936} vs minitpu [2] (declared 2); 1.0000 cyc/vector, first output cycle 2; ready period 0; 7.7s
+       2028  NaN payload: ac_std_float all-ones 0x7fff/0xffff, rtl +0x7fc0  e.g. 0+7fc0: catapult 7fff minitpu 7fc0, 0+7f81: catapult 7fff minitpu 7fc0
+          1  (+0)+(-0): allo +0 (IEEE), rtl -0  e.g. 0+8000: catapult 0 minitpu 8000
