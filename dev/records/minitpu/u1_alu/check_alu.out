@@ -1,0 +1,56 @@
+RTL vpu_alu: 5079552 vectors, latency [3] (declared 3), 1.5s
+UNIT-DIFF  alu native simulator 5051836/5079552 latency=3 (build 0.3s, run 0.1s)
+          1  ADD: (+0)+(-0) = -0 (IEEE: +0)  e.g. 0000+0000+8000: allo 0000 rtl 8000
+       3810  ADD/SUB/MUL: NaN result is always +0x7fc0  e.g. 0000+0000+ffc0: allo ffc0 rtl 7fc0, 0000+0000+ff81: allo ffc0 rtl 7fc0, 0000+0000+ffff: allo ffc0 rtl 7fc0
+          1  SUB: (+0)-(+0) = -0 (IEEE: +0)  e.g. 0001+0000+0000: allo 0000 rtl 8000
+       1320  MUL: subnormal operand flushed to signed 0  e.g. 0002+0001+3f80: allo 0001 rtl 0000, 0002+0001+3f81: allo 0001 rtl 0000, 0002+0001+3fff: allo 0002 rtl 0000
+       4745  MUL: product < 2^-126 flushed to signed 0  e.g. 0002+0080+3c00: allo 0001 rtl 0000, 0002+0080+bc00: allo 8001 rtl 8000, 0002+0081+3b80: allo 0001 rtl 0000
+      12980  simulator: a bf16 value through a phi is re-rounded via f32 (x86 __truncsfbf2), so a NaN that should pass through loses its payload  e.g. 0003+7f81+0000: allo 7fc0 rtl 7f81, 0003+7f81+0001: allo 7fc0 rtl 7f81, 0003+7f81+0002: allo 7fc0 rtl 7f81
+       4859  MAX/MIN: NaN ordered by bf16_gt key, payload kept (IEEE maximum: NaN)  e.g. 0004+0000+7f81: allo 7fc0 rtl 7f81, 0004+0000+7fff: allo 7fc0 rtl 7fff, 0004+0000+ffc0: allo ffc0 rtl 0000
+UNIT-DIFF  alu native systemc 5064720/5079552 latency=3 (build 0.2s, run 26.9s)
+       6249  ADD/SUB/MUL: NaN result is always +0x7fc0  e.g. 0000+0000+7fc0: allo 7fff rtl 7fc0, 0000+0000+7f81: allo 7fff rtl 7fc0, 0000+0000+7fff: allo 7fff rtl 7fc0
+          1  ADD: (+0)+(-0) = -0 (IEEE: +0)  e.g. 0000+0000+8000: allo 0000 rtl 8000
+          1  SUB: (+0)-(+0) = -0 (IEEE: +0)  e.g. 0001+0000+0000: allo 0000 rtl 8000
+       1320  MUL: subnormal operand flushed to signed 0  e.g. 0002+0001+3f80: allo 0001 rtl 0000, 0002+0001+3f81: allo 0001 rtl 0000, 0002+0001+3fff: allo 0002 rtl 0000
+       4745  MUL: product < 2^-126 flushed to signed 0  e.g. 0002+0080+3c00: allo 0001 rtl 0000, 0002+0080+bc00: allo 8001 rtl 8000, 0002+0081+3b80: allo 0001 rtl 0000
+       2514  MAX/MIN: NaN ordered by bf16_gt key, payload kept (IEEE maximum: NaN)  e.g. 0004+0000+7fc0: allo 0000 rtl 7fc0, 0004+0000+7f81: allo 0000 rtl 7f81, 0004+0000+7fff: allo 0000 rtl 7fff
+          2  MAX/MIN: rtl orders -0 < +0 by bf16_gt, allo returns either zero  e.g. 0004+8000+0000: allo 8000 rtl 0000, 0005+0000+8000: allo 0000 rtl 8000
+UNIT-MATCH alu bits simulator 5079552/5079552 latency=3 (build 0.7s, run 0.7s)
+UNIT-MATCH alu bits systemc 5079552/5079552 latency=3 (build 0.5s, run 44.4s)
+UNIT-MATCH alu bits_dispatch simulator 5079552/5079552 latency=3 (build 0.7s, run 0.1s)
+UNIT-MATCH alu bits_dispatch systemc 5079552/5079552 latency=3 (build 0.5s, run 24.9s)
+UNIT-DIFF  alu engines_native simulator 5069695/5079552 latency=3 (build 0.3s, run 0.2s)
+          1  ADD: (+0)+(-0) = -0 (IEEE: +0)  e.g. 0000+0000+8000: allo 0000 rtl 8000
+       3790  ADD/SUB/MUL: NaN result is always +0x7fc0  e.g. 0000+0000+ffc0: allo ffc0 rtl 7fc0, 0000+0000+ff81: allo ffc0 rtl 7fc0, 0000+0000+ffff: allo ffc0 rtl 7fc0
+          1  SUB: (+0)-(+0) = -0 (IEEE: +0)  e.g. 0001+0000+0000: allo 0000 rtl 8000
+       1320  MUL: subnormal operand flushed to signed 0  e.g. 0002+0001+3f80: allo 0001 rtl 0000, 0002+0001+3f81: allo 0001 rtl 0000, 0002+0001+3fff: allo 0002 rtl 0000
+       4745  MUL: product < 2^-126 flushed to signed 0  e.g. 0002+0080+3c00: allo 0001 rtl 0000, 0002+0080+bc00: allo 8001 rtl 8000, 0002+0081+3b80: allo 0001 rtl 0000
+UNIT-DIFF  alu engines_native systemc 5067236/5079552 latency=3 (build 0.2s, run 41.3s)
+       6249  ADD/SUB/MUL: NaN result is always +0x7fc0  e.g. 0000+0000+7fc0: allo 7fff rtl 7fc0, 0000+0000+7f81: allo 7fff rtl 7fc0, 0000+0000+7fff: allo 7fff rtl 7fc0
+          1  ADD: (+0)+(-0) = -0 (IEEE: +0)  e.g. 0000+0000+8000: allo 0000 rtl 8000
+          1  SUB: (+0)-(+0) = -0 (IEEE: +0)  e.g. 0001+0000+0000: allo 0000 rtl 8000
+       1320  MUL: subnormal operand flushed to signed 0  e.g. 0002+0001+3f80: allo 0001 rtl 0000, 0002+0001+3f81: allo 0001 rtl 0000, 0002+0001+3fff: allo 0002 rtl 0000
+       4745  MUL: product < 2^-126 flushed to signed 0  e.g. 0002+0080+3c00: allo 0001 rtl 0000, 0002+0080+bc00: allo 8001 rtl 8000, 0002+0081+3b80: allo 0001 rtl 0000
+UNIT-DIFF  alu add_bits_mul_native simulator 5072213/5079552 latency=3 (build 0.6s, run 0.7s)
+       1274  ADD/SUB/MUL: NaN result is always +0x7fc0  e.g. 0002+0000+7f80: allo ffc0 rtl 7fc0, 0002+0000+ff80: allo ffc0 rtl 7fc0, 0002+0000+ffc0: allo ffc0 rtl 7fc0
+       1320  MUL: subnormal operand flushed to signed 0  e.g. 0002+0001+3f80: allo 0001 rtl 0000, 0002+0001+3f81: allo 0001 rtl 0000, 0002+0001+3fff: allo 0002 rtl 0000
+       4745  MUL: product < 2^-126 flushed to signed 0  e.g. 0002+0080+3c00: allo 0001 rtl 0000, 0002+0080+bc00: allo 8001 rtl 8000, 0002+0081+3b80: allo 0001 rtl 0000
+UNIT-DIFF  alu add_bits_mul_native systemc 5072282/5079552 latency=3 (build 0.4s, run 43.5s)
+       1205  ADD/SUB/MUL: NaN result is always +0x7fc0  e.g. 0002+0000+ff80: allo ffc0 rtl 7fc0, 0002+0000+ffc0: allo ffc0 rtl 7fc0, 0002+0000+ff81: allo ffc0 rtl 7fc0
+       1320  MUL: subnormal operand flushed to signed 0  e.g. 0002+0001+3f80: allo 0001 rtl 0000, 0002+0001+3f81: allo 0001 rtl 0000, 0002+0001+3fff: allo 0002 rtl 0000
+       4745  MUL: product < 2^-126 flushed to signed 0  e.g. 0002+0080+3c00: allo 0001 rtl 0000, 0002+0080+bc00: allo 8001 rtl 8000, 0002+0081+3b80: allo 0001 rtl 0000
+UNIT-MATCH alu netlist simulator 5079552/5079552 latency=3 (build 1.0s, run 97.8s)
+UNIT-MATCH alu netlist systemc 5079552/5079552 latency=3 (build 0.8s, run 88.3s)
+UNIT-DIFF  alu netlist_native simulator 5069696/5079552 latency=3 (build 0.6s, run 95.5s)
+          1  ADD: (+0)+(-0) = -0 (IEEE: +0)  e.g. 0000+0000+8000: allo 0000 rtl 8000
+       3789  ADD/SUB/MUL: NaN result is always +0x7fc0  e.g. 0000+0000+ffc0: allo ffc0 rtl 7fc0, 0000+0000+ff81: allo ffc0 rtl 7fc0, 0000+0000+ffff: allo ffc0 rtl 7fc0
+          1  SUB: (+0)-(+0) = -0 (IEEE: +0)  e.g. 0001+0000+0000: allo 0000 rtl 8000
+       1320  MUL: subnormal operand flushed to signed 0  e.g. 0002+0001+3f80: allo 0001 rtl 0000, 0002+0001+3f81: allo 0001 rtl 0000, 0002+0001+3fff: allo 0002 rtl 0000
+       4745  MUL: product < 2^-126 flushed to signed 0  e.g. 0002+0080+3c00: allo 0001 rtl 0000, 0002+0080+bc00: allo 8001 rtl 8000, 0002+0081+3b80: allo 0001 rtl 0000
+UNIT-DIFF  alu netlist_native systemc 5067236/5079552 latency=3 (build 0.5s, run 85.3s)
+       6249  ADD/SUB/MUL: NaN result is always +0x7fc0  e.g. 0000+0000+7fc0: allo 7fff rtl 7fc0, 0000+0000+7f81: allo 7fff rtl 7fc0, 0000+0000+7fff: allo 7fff rtl 7fc0
+          1  ADD: (+0)+(-0) = -0 (IEEE: +0)  e.g. 0000+0000+8000: allo 0000 rtl 8000
+          1  SUB: (+0)-(+0) = -0 (IEEE: +0)  e.g. 0001+0000+0000: allo 0000 rtl 8000
+       1320  MUL: subnormal operand flushed to signed 0  e.g. 0002+0001+3f80: allo 0001 rtl 0000, 0002+0001+3f81: allo 0001 rtl 0000, 0002+0001+3fff: allo 0002 rtl 0000
+       4745  MUL: product < 2^-126 flushed to signed 0  e.g. 0002+0080+3c00: allo 0001 rtl 0000, 0002+0080+bc00: allo 8001 rtl 8000, 0002+0081+3b80: allo 0001 rtl 0000
+real	9m22.556s
