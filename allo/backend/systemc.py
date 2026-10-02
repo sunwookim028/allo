@@ -11,6 +11,7 @@ SystemC-only steps of that flow. See ``docs/source/backends/systemc.rst``.
 """
 
 import os
+import re
 
 import numpy as np
 
@@ -114,9 +115,25 @@ def write_data(dtype, arr, shape, path):
         f.write("\n")
 
 
+def _int_container(dtype):
+    """The numpy container of an ``i<N>``/``ui<N>`` of any width up to 64
+    (``ui24`` -> uint32), as the simulator's argument path accepts it; None
+    for anything else."""
+    m = re.fullmatch(r"(u?)i(\d+)", str(dtype))
+    if not m or int(m.group(2)) > 64:
+        return None
+    width = next(w for w in (8, 16, 32, 64) if int(m.group(2)) <= w)
+    return np.dtype(f"{'u' if m.group(1) else ''}int{width}")
+
+
 def read_data(dtype, shape, path):
     """Read one ``output<k>.data`` file written by the emitted testbench."""
     if str(dtype) not in _FLOAT_BITS:
+        container = _int_container(dtype)
+        if container is not None:
+            # the tb prints integers in decimal; any width, not only 8/16/32/64
+            vals = np.loadtxt(path, dtype=np.int64 if container.kind == "i" else np.uint64, ndmin=1)
+            return vals.astype(container).reshape(shape)
         return read_tensor_from_file(dtype, shape, path)
     bits = np.loadtxt(path, dtype=np.uint64, ndmin=1)
     return bits_to_float(dtype, bits).reshape(shape)
