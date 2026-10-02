@@ -223,6 +223,19 @@ where a contract demands.**
   CCORE; RTLGen and AMC refuse it.
 - Evidence: `dev/records/minitpu/latency_report_2026-10-02.rst`.
 
+**D-11 (2026-10-02). `Stateful` state persists across calls on every
+backend, and one `Stateful` has one kernel.**
+- A `Stateful` array or scalar keeps its value from one call of the region
+  to the next, on the simulator, in SystemC csim and in any cosim Allo
+  drives. Found at U2: the simulator already persists, SystemC csim and
+  RTLGen cosim restarted per call (`u2_regfile_2026-10-02.rst`, M1).
+- Two kernels sharing one `Stateful` is refused at build, on every backend.
+  The simulator ran them unordered with no warning (M2); Vitis refused;
+  SystemC refused. A memory with several ports is a different thing, and is
+  the subject of the memory-port proposal that follows.
+- Verdicts in the unit ladder use single-call traces until the
+  implementation lands (branch `core-stateful`).
+
 ## Milestones
 
 Each milestone passes on **one acceptance check** and names the tools it uses

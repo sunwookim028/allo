@@ -45,6 +45,21 @@ in what Allo can say.
 - U2: undefined behaviour is **masked and counted**; ``vpu_regfile`` pilot
   first (branch ``u2-regfile``), then a checkpoint.
 
+**Owner's decisions, 2026-10-02, checkpoint 3** (after the ``vpu_regfile``
+pilot, ``u2_regfile_2026-10-02.rst``):
+
+- Async read: **pursue a combinational (same-cycle) read**, not a recorded
+  deviation. Branch ``u2-comb-read``.
+- ``Stateful``: **persists across calls on every backend**; sharing one
+  ``Stateful`` across kernels is **refused**. README D-11. Implementation on
+  a review branch ``core-stateful``.
+- Memory ports (G1) and the dropped ``Memory`` fields: **draft a D-n** for
+  "``compose`` declares memory ports" (modelled on AMC's port type) for the
+  owner's review before code.
+- Rest of U2: ``vpu_word_array``, ``vpu_fifo`` and the output FIFO in
+  **parallel tracks**, with the pilot's ``trace``, ``ported`` and ``wire``
+  expressions. B4/S6 (``core-uint-index``, in review) stay worked around.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
