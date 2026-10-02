@@ -3389,12 +3389,18 @@ void SystemCModuleEmitter::emitModule(ModuleOp module) {  // override (base emit
 #ifndef AC_STD_FLOAT_BFLOAT16_ROUND_OVERRIDE
 #define AC_STD_FLOAT_BFLOAT16_ROUND_OVERRIDE AC_RND_CONV
 #endif
-#include <mc_connections.h>   // MatchLib Connections (LI valid/ready channels)
-#include <connections/connections_fifo.h>  // vendor FWFT Connections::Fifo (buffered streams)
+// The ac types come BEFORE mc_connections.h: Connections' marshaller.h defines
+// its Wrapped<> specializations (ac::bfloat16's AC_SPECIAL_FLOAT_WRAPPER, the
+// ac_std_float one) only for the ac headers already included. With
+// ac_std_float.h after it, Catapult's `go analyze` failed every bf16 port with
+// CRD-135 "class ac::bfloat16 has no member Marshall"; g++ csim compiles the
+// non-synthesis Connections path and never saw it.
 #include <ac_int.h>
 #include <ac_fixed.h>
+#include <ac_std_float.h>   // IEEE floats: ac_ieee_float<binaryNN>; ac::bfloat16
+#include <mc_connections.h>   // MatchLib Connections (LI valid/ready channels)
+#include <connections/connections_fifo.h>  // vendor FWFT Connections::Fifo (buffered streams)
 #include <ac_channel.h>     // local self-FIFO streams (one-kernel put+get+status)
-#include <ac_std_float.h>   // IEEE floats: ac_ieee_float<binaryNN>
 #include <cstring>          // std::memcpy for bit-reinterpret (bitcast)
 #include <stdint.h>
 // f16: Catapult has no native `half`; alias it to ac_ieee_float<binary16>.
@@ -3458,29 +3464,13 @@ template <>
 inline ac_ieee_float<binary32> _ffrombits<ac_ieee_float<binary32> >(unsigned long long b) {
   ac_ieee_float<binary32> v; v.set_data(ac_int<32, true>((long long)b)); return v;
 }
-// tb/Connections waveform trace of a float (trace its raw bit pattern). Needed
-// because Connections/sc_signal ports templated on these types call sc_trace.
-// Those calls are unqualified and made from INSIDE namespaces sc_core and
-// Connections, so an overload is found only by argument-dependent lookup: it
-// must live in the namespace of the float type itself. ac_ieee_float is a
-// global class template (associated namespace: the global one), so its
-// overloads are global; ac::bfloat16 lives in namespace ac, so its overload
-// must too -- a global one is never found ("no matching function for call to
-// sc_trace(sc_trace_file*&, const ac::bfloat16&, ...)"). double needs none:
-// sc_core has its own. The inner calls name sc_core:: so they cannot recurse.
-inline void sc_trace(sc_core::sc_trace_file *tf, const half &h, const std::string &n) {
-  sc_core::sc_trace(tf, (unsigned short)_fbits(h), n);
-}
-namespace ac {
-inline void sc_trace(sc_core::sc_trace_file *tf, const ac::bfloat16 &h,
-                     const std::string &n) {
-  sc_core::sc_trace(tf, (unsigned short)_fbits(h), n);
-}
-} // namespace ac
-inline void sc_trace(sc_core::sc_trace_file *tf, const ac_ieee_float<binary32> &h,
-                     const std::string &n) {
-  sc_core::sc_trace(tf, (unsigned)_fbits(h), n);
-}
+// Waveform trace of a float: Connections/sc_signal ports call sc_trace on their
+// payload, unqualified, from inside sc_core and Connections. ac_sc.h (pulled in
+// by mc_connections.h) supplies those overloads for every ac float, ac::bfloat16
+// included, in namespace ac_tracing made visible to sc_core -- but only when
+// ac_std_float.h was included first, which the include order above guarantees.
+// The emitter used to write its own; with the library's in scope they are
+// ambiguous, and without them a global bf16 overload was never found by ADL.
 // csim: a float signal must compare BITS, not values. sc_signal::write() and
 // update() skip a write whose value `==` the current one, and IEEE says
 // +0 == -0: a -0 written after a +0 (or the reverse) never reaches the reader,
@@ -3519,9 +3509,12 @@ ALLO_SIGNAL_BITS_EQ_ALL(double)
 } // namespace sc_core
 #endif
 // Make ac_ieee_float<Format> a valid Connections channel/Combinational payload.
-// (bf16 needs NOTHING here: ac::bfloat16 already has one --
-// ac_marshaller.h: AC_SPECIAL_FLOAT_WRAPPER(ac::bfloat16, 16) -- which is why a
-// bf16 Stream costs less to support on this target than an f32 one did.)
+// (bf16 needs nothing HERE: marshaller.h has AC_SPECIAL_FLOAT_WRAPPER(ac::bfloat16,
+// 16) -- but only if ac_std_float.h was included before mc_connections.h, which
+// is why that include sits above it.)
+// (Since ac_std_float.h precedes mc_connections.h, marshaller.h also defines
+// Wrapped<ac_ieee_float<binaryNN>> for the IEEE widths, and those explicit
+// specializations win; this partial one is kept for the SCVerify TU below.)
 // Connections' marshaller.h ships Wrapped<> specializations for ac_std_float,
 // ac::bfloat16 and ac_float, but NOT ac_ieee_float -- so a Stream/Channel of
 // f32 (ac_ieee_float<binary32>) fails to synthesize (marshaller.h needs

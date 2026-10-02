@@ -157,10 +157,14 @@ def test_systemc_bf16():
     # the per-float-type shims
     assert "_fbits(const ac::bfloat16 &v)" in code
     assert "_ffrombits<ac::bfloat16>(unsigned long long b)" in code
-    # in namespace ac: Connections/sc_signal call sc_trace unqualified from
-    # their own namespaces, so only ADL finds it (a global one fails g++)
-    assert ("namespace ac {\ninline void sc_trace(sc_core::sc_trace_file *tf, "
-            "const ac::bfloat16 &h,") in code    # the testbench reads bf16 as raw bits, not as float text (which loses
+    # ac_std_float.h before Connections: marshaller.h's Wrapped<ac::bfloat16>
+    # and ac_sc.h's sc_trace(ac::bfloat16) exist only if it came first, so the
+    # emitter writes no sc_trace of its own (it would be ambiguous)
+    assert code.index("#include <ac_std_float.h>") < code.index(
+        "#include <mc_connections.h>"
+    )
+    assert "inline void sc_trace(" not in code
+    # the testbench reads bf16 as raw bits, not as float text (which loses
     # NaNs and, through the truncating float->bf16 ctor, values)
     assert "unsigned long long _v; for (int f = 0" in code
     assert "_ffrombits< ac::bfloat16 >(_v)" in code

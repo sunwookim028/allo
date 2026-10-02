@@ -11,6 +11,7 @@ SystemC install (``SYSTEMC_HOME``). See docs/source/backends/systemc.rst,
 """
 
 import os
+import subprocess
 import tempfile
 
 import ml_dtypes
@@ -18,7 +19,7 @@ import numpy as np
 import pytest
 
 import allo.dataflow as df
-from allo.ir.types import bfloat16, float16, float32, int32, uint16, UInt, Stream
+from allo.ir.types import bfloat16, float16, float32, int32, uint16, UInt, Stream, Wire
 
 needs_csim = pytest.mark.skipif(
     not (os.environ.get("MGC_HOME") and os.environ.get("SYSTEMC_HOME")),
@@ -239,3 +240,41 @@ def test_uint_helper_result_compiles_and_runs():
     _csim(_uint_helper(len(a)), a, c)
     want = [16 - int(x).bit_length() for x in a]
     assert c.tolist() == want
+
+
+def _synthesis_syntax_check(code, tmp):
+    """g++ -fsyntax-only -D__SYNTHESIS__: the code path Catapult's front end
+    sees, which the csim compile does not. Catches what `go analyze` would
+    reject in Connections/ac headers, in a second instead of minutes."""
+    mgc = os.environ["MGC_HOME"]
+    path = os.path.join(tmp, "kernel.cpp")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(code)
+    r = subprocess.run(
+        [os.path.join(mgc, "bin", "g++"), "-std=c++17", "-fsyntax-only",
+         "-D__SYNTHESIS__", f"-I{mgc}/shared/include", path],
+        capture_output=True, text=True, check=False,
+    )
+    assert r.returncode == 0, r.stderr[-2000:]
+
+
+needs_mgc = pytest.mark.skipif(
+    not os.environ.get("MGC_HOME"), reason="needs Catapult's g++ and headers (MGC_HOME)"
+)
+
+
+@needs_mgc
+@pytest.mark.parametrize("T", [bfloat16, float16, float32])
+def test_float_ports_pass_the_synthesis_front_end(T):
+    """C1: ac_std_float.h must precede mc_connections.h.
+
+    marshaller.h defines Wrapped<ac::bfloat16> only if ac_std_float.h was seen
+    first; included after it, every bf16 port failed Catapult's `go analyze`
+    with CRD-135 "class ac::bfloat16 has no member Marshall". The csim compile
+    takes the non-synthesis Connections path and never saw it.
+    """
+    code = df.build(_square_stream(T, 8), target="systemc").hls_code
+    assert code.index("#include <ac_std_float.h>") < code.index("#include <mc_connections.h>")
+    with tempfile.TemporaryDirectory() as tmp:
+        _synthesis_syntax_check(code, tmp)
+

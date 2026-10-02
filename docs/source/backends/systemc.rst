@@ -315,3 +315,16 @@ one design per bug (it skips without ``MGC_HOME`` and ``SYSTEMC_HOME``).
   from the signless call result (``ac_int<5,true>``), and the pointer did not
   convert. The call site now reads the callee's ``otypes`` too. The fix is in
   the shared ``VhlsModuleEmitter::emitCall``, so Vitis and Catapult C++ get it.
+- **bf16 ports failed Catapult's ``go analyze``** (C1, the MiniTPU Catapult
+  track, ``dev/records/minitpu/u1_bf16_add_catapult_2026-10-02/``): ``CRD-135
+  class "ac::bfloat16" has no member "Marshall"``. Connections' ``marshaller.h``
+  defines ``Wrapped<ac::bfloat16>`` (and ``Wrapped<ac_ieee_float<...>>``) only if
+  ``ac_std_float.h`` was included before ``mc_connections.h``; the emitter
+  included it after. The g++ csim compiles the non-synthesis Connections path and
+  never saw it; ``g++ -fsyntax-only -D__SYNTHESIS__`` does, in a second, and is
+  what ``test_float_ports_pass_the_synthesis_front_end`` runs. The ac headers now
+  come first. With that order ``ac_sc.h`` also supplies ``sc_trace`` for every
+  ac float, so the emitter's own overloads (the first entry above) are gone: they
+  were ambiguous with the library's. Checked by hand: the ``bf16_add`` native unit
+  passes ``go analyze`` and ``go compile`` unpatched (Catapult 2024.2,
+  2026-10-02).
