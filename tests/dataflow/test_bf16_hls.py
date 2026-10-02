@@ -157,7 +157,10 @@ def test_systemc_bf16():
     # the per-float-type shims
     assert "_fbits(const ac::bfloat16 &v)" in code
     assert "operator>>(std::istream &is, ac::bfloat16 &h)" in code
-    assert "sc_trace(sc_core::sc_trace_file *tf, const ac::bfloat16 &h," in code
+    # in namespace ac: Connections/sc_signal call sc_trace unqualified from
+    # their own namespaces, so only ADL finds it (a global one fails g++)
+    assert ("namespace ac {\ninline void sc_trace(sc_core::sc_trace_file *tf, "
+            "const ac::bfloat16 &h,") in code
     # the testbench must read bf16 as float text, not as `long long`
     assert "ac::bfloat16 _v; for (int f = 0" in code
     assert "AC_STD_FLOAT_BFLOAT16_ROUND_OVERRIDE AC_RND_CONV" in code

@@ -250,3 +250,19 @@ Limits and known failures
   simulated-clock simulator with a ``get_cycles()`` read-out; it was not merged, because it
   rewrites the same code this fork rewrote for OpenMP team sizing. ``dev/systemc/SIMULATOR.md``
   describes it.
+
+Known fixed
+-----------
+
+Each of these passed every emit-only test and failed the first time g++ or the
+testbench ran. ``tests/dataflow/test_systemc_csim_regress.py`` compiles and runs
+one design per bug (it skips without ``MGC_HOME`` and ``SYSTEMC_HOME``).
+
+- **bf16 ports did not compile** (found by the MiniTPU ``bf16_add`` unit,
+  2026-10-02): ``no matching function for call to sc_trace(sc_trace_file*&,
+  const ac::bfloat16&, ...)``. Connections and ``sc_signal`` call ``sc_trace``
+  unqualified from inside their own namespaces, so only argument-dependent lookup
+  finds an overload, and it looks in the float type's namespace. The emitted
+  overload was global; ``ac::bfloat16`` lives in ``ac``. It is now emitted in
+  ``namespace ac``. ``ac_ieee_float`` (f16, f32) is a global template, so its
+  global overloads were found; ``double`` uses SystemC's own.
