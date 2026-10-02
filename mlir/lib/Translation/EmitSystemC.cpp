@@ -111,6 +111,13 @@ static SmallString<32> getStreamPayloadTypeName(Type valType, bool isUnsigned) {
   return getSCTypeName(valType);
 }
 
+// A float element type as the testbench spells it. The tb's data files carry
+// floats as raw IEEE bits (allo/backend/systemc.py writes and reads them).
+static bool isFloatCType(const std::string &t) {
+  return t == "half" || t == "double" || t == "ac::bfloat16" ||
+         t.find("ieee_float") != std::string::npos;
+}
+
 // A Channel's PROTOCOL picks genuinely different hardware, not a cosmetic label:
 //   valid_ready -> Connections::Combinational<T>              (full handshake, back-pressure)
 //   valid_only  -> raw sc_signal<T> _dat + sc_signal<bool> _vld  (no ready line)
@@ -3392,14 +3399,16 @@ typedef ac_ieee_float<binary16> half;
 // accessor (data_ac_int(), works in csim AND synthesis); the generic template is
 // a csim-only fallback for any non-float mem-port payload (memcpy guarded out of
 // synthesis, where it would only be reached by an untested double mem-port).
+// data_ac_int() is SIGNED: a negative 16-bit float's bits would sign-extend
+// (0x8000 -> 0xffff8000), so go through the unsigned type of the float's width.
 inline unsigned long long _fbits(const half &v) {
-  return (unsigned long long)v.data_ac_int().to_uint();
+  return (unsigned long long)(unsigned short)v.data_ac_int().to_int();
 }
 inline unsigned long long _fbits(const ac::bfloat16 &v) {
-  return (unsigned long long)v.data_ac_int().to_uint();
+  return (unsigned long long)(unsigned short)v.data_ac_int().to_int();
 }
 inline unsigned long long _fbits(const ac_ieee_float<binary32> &v) {
-  return (unsigned long long)v.data_ac_int().to_uint();
+  return (unsigned long long)(unsigned)v.data_ac_int().to_int();
 }
 template <class T> inline unsigned long long _fbits(const T &v) {
 #ifdef __SYNTHESIS__
@@ -3411,13 +3420,28 @@ template <class T> inline unsigned long long _fbits(const T &v) {
 // Reconstruct a memory element from the DATAW raw bits: value-cast for integers,
 // set_data() bit-load for floats (a value-cast would corrupt the float; memcpy is
 // rejected under synthesis as above).
-// tb: data files hold float text -> read a float and convert.
-inline std::istream &operator>>(std::istream &is, half &h) { float f; is >> f; h = half(f); return is; }
-inline std::istream &operator>>(std::istream &is, ac::bfloat16 &h) {
-  float f; is >> f; h = ac::bfloat16(f); return is;
+// raw bits -> float: the inverse of _fbits, for the testbench's data files.
+// The files carry a float's IEEE bit pattern as an unsigned integer, never
+// decimal text: `>> float` fails on "nan"/"inf" (failbit, after which every
+// later read silently yields 0), loses a NaN's sign and payload, and
+// ac::bfloat16(float) truncates toward zero, so the shortest decimal of a bf16
+// value (e.g. "1.00781" for 1.0078125) parsed and converted to the bf16 BELOW.
+template <class T> inline T _ffrombits(unsigned long long b) {
+#ifdef __SYNTHESIS__
+  return (T)b;
+#else
+  T v; std::memcpy(&v, &b, sizeof(T)); return v; // double (csim/tb only)
+#endif
 }
-inline std::istream &operator>>(std::istream &is, ac_ieee_float<binary32> &h) {
-  float f; is >> f; h = ac_ieee_float<binary32>(f); return is;
+template <> inline half _ffrombits<half>(unsigned long long b) {
+  half v; v.set_data(ac_int<16, true>((long long)b)); return v;
+}
+template <> inline ac::bfloat16 _ffrombits<ac::bfloat16>(unsigned long long b) {
+  ac::bfloat16 v; v.set_data(ac_int<16, true>((long long)b)); return v;
+}
+template <>
+inline ac_ieee_float<binary32> _ffrombits<ac_ieee_float<binary32> >(unsigned long long b) {
+  ac_ieee_float<binary32> v; v.set_data(ac_int<32, true>((long long)b)); return v;
 }
 // tb/Connections waveform trace of a float (trace its raw bit pattern). Needed
 // because Connections/sc_signal ports templated on these types call sc_trace.
@@ -3902,9 +3926,7 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
       indent(); os << "int _snk_done = 0;  // stream sinks drained; the last one sc_stop()s\n";
     }
     for (auto &a : ioArrays) {
-      bool isF = (a.ctype == "half" || a.ctype == "double" ||
-                  a.ctype == "ac::bfloat16" ||
-                  a.ctype.find("ieee_float") != std::string::npos);
+      bool isF = isFloatCType(a.ctype);
       if (a.dir == 'i') {
         // src_<port>: drive one INPUT port from input<k>.data (written by hls.py)
         indent(); os << "void src_" << a.member << "() {\n";
@@ -3914,10 +3936,13 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         indent();
         // Wide read temp so a char-width element (int8_t/uint8_t) parses as an
         // integer, not a single character (see the memory-port preload note).
-        std::string rt = isF ? a.ctype : std::string("long long");
+        // Floats arrive as their raw bits (see _ffrombits).
+        std::string rt = isF ? "unsigned long long" : "long long";
+        std::string conv = isF ? "_ffrombits< " + a.ctype + " >(_v)"
+                               : "(" + a.ctype + ")_v";
         os << "{ std::ifstream _f(\"input" << a.fileIdx << ".data\"); " << rt
            << " _v; for (int f = 0; f < " << a.total << "; ++f) { _f >> _v; ch_"
-           << a.member << ".Push((" << a.ctype << ")_v); } }\n";
+           << a.member << ".Push(" << conv << "); } }\n";
         reduceIndent();
         indent(); os << "}\n";
       } else if (a.dir == 'o') {
@@ -3928,13 +3953,13 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         indent(); os << "wait();\n";
         indent();
         // Symmetric to the input read: cast a char-width element to a wide int so
-        // operator<< prints its NUMERIC value, not a character; floats keep full
-        // round-trippable precision.
+        // operator<< prints its NUMERIC value, not a character; floats are
+        // written as their raw bits (exact for every value, NaN included).
         if (isF)
           os << "{ std::ofstream _f(\"output" << a.fileIdx
              << ".data\"); for (int f = 0; f < " << a.total
-             << "; ++f) _f << std::setprecision(9) << ch_" << a.member
-             << ".Pop() << \"\\n\"; }\n";
+             << "; ++f) _f << _fbits(ch_" << a.member
+             << ".Pop()) << \"\\n\"; }\n";
         else
           os << "{ std::ofstream _f(\"output" << a.fileIdx
              << ".data\"); for (int f = 0; f < " << a.total
@@ -3972,16 +3997,16 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         // Read integers into a WIDE temp: a char-width element (int8_t/uint8_t is
         // signed/unsigned char) would otherwise trigger operator>>'s FORMATTED
         // CHARACTER extraction (reads '6','5' from "65"), not integer parsing.
-        // Floats keep their own operator>> overload.
-        bool isF = (mi.ctype == "half" || mi.ctype == "double" ||
-                    mi.ctype == "ac::bfloat16" ||
-                    mi.ctype.find("ieee_float") != std::string::npos);
-        std::string rt = isF ? mi.ctype : std::string("long long");
+        // Floats are read as raw bits (see _ffrombits).
+        bool isF = isFloatCType(mi.ctype);
+        std::string rt = isF ? "unsigned long long" : "long long";
+        std::string conv = isF ? "_ffrombits< " + mi.ctype + " >(_v)"
+                               : "(" + mi.ctype + ")_v";
         // Exposed memories live in the tb; replicated ones are still inside the DUT.
         std::string owner = mi.exposed ? "t." : "t.dut.";
         os << "{ std::ifstream _f(\"input" << mi.inIdx << ".data\"); " << rt
            << " _v; for (int f = 0; f < " << mi.total << "; ++f) { _f >> _v; "
-           << owner << mi.chan << "_mem.mem[f] = (" << mi.ctype << ")_v; } }\n";
+           << owner << mi.chan << "_mem.mem[f] = " << conv << "; } }\n";
       }
     indent(); os << "t.rst = 0; sc_start(1, SC_NS);\n";
     // A stream output stops the sim via sc_stop (self-synchronizing: the sink
@@ -4031,29 +4056,25 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         os << "{ std::ofstream _f(\"output" << m.outIdx << ".data\");\n";
         indent();
         os << "  for (int f = 0; f < " << m.total << "; ++f) {\n";
-        // float memories accumulate/write as float; integers as before.
-        bool isFloat = (m.ctype == "half" || m.ctype == "double" ||
-                        m.ctype.find("ieee_float") != std::string::npos);
+        // Floats are written as raw bits. Replicas hold disjoint elements and
+        // +0 (all-zero bits) elsewhere, so OR-ing their bits merges them exactly
+        // (a float sum would turn -0 into +0 and could not carry NaN bits).
+        bool isFloat = isFloatCType(m.ctype);
         indent();
-        os << (isFloat ? "    float _s = 0;\n" : "    long long _s = 0;\n");
+        os << (isFloat ? "    unsigned long long _s = 0;\n" : "    long long _s = 0;\n");
         for (auto &mi : memInsts)
           if (mi.dir != 'i' && mi.outIdx == m.outIdx) {
             // Exposed memories live in the tb; replicated ones inside the DUT.
             std::string owner = mi.exposed ? "t." : "t.dut.";
             indent();
             if (isFloat)
-              os << "    _s += " << owner << mi.chan << "_mem.mem[f].to_float();\n";
+              os << "    _s |= _fbits(" << owner << mi.chan << "_mem.mem[f]);\n";
             else
               os << "    _s += (long long) " << owner << mi.chan
                  << "_mem.mem[f];\n";
           }
         indent();
-        // float outputs: write full round-trippable precision (float32 needs 9
-        // significant digits) so the data-file text doesn't lose bits.
-        if (isFloat)
-          os << "    _f << std::setprecision(9) << _s << \"\\n\";\n";
-        else
-          os << "    _f << _s << \"\\n\";\n";
+        os << "    _f << _s << \"\\n\";\n";
         indent();
         os << "  } }\n";
       }

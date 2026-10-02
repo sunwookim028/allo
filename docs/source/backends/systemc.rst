@@ -278,3 +278,16 @@ one design per bug (it skips without ``MGC_HOME`` and ``SYSTEMC_HOME``).
   the largest array ``+ 200000``; override with ``-D``) an undrained output
   prints ``TB DEADLOCK`` and exits 1, so a hang in csim now means the design
   deadlocks, and says so.
+- **Float testbench data went through decimal text** (same unit). Inputs were
+  written by Python as ``str(x)`` and read with ``>> float``; outputs were
+  printed at ``setprecision(9)``. Three losses: libstdc++'s ``>> float`` sets
+  ``failbit`` on ``"nan"`` and ``"inf"``, after which every later read of the
+  file silently fails; a NaN's sign and payload cannot survive text; and
+  ``ac::bfloat16(float)`` truncates, so the shortest decimal of a bf16 value
+  reads back as the bf16 below it (``0x3f81`` prints as ``1.00781``, which
+  becomes ``0x3f80``). The data files now carry each float's IEEE bit pattern as
+  an unsigned integer: ``allo/backend/systemc.py`` writes and reads bits, and the
+  testbench converts with ``_ffrombits<T>`` (``set_data``) and ``_fbits``. This
+  holds for f16, bf16, f32 and f64, for stream and memory ports; integers are
+  unchanged. Memory read-out merges replicas by OR-ing bits instead of summing
+  floats, and ``_fbits`` no longer sign-extends a negative 16-bit float.
