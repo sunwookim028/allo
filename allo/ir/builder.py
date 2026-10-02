@@ -64,6 +64,7 @@ from .utils import (
     get_func_id_from_param_types,
     resolve_generic_types,
     parse_ast,
+    callee_global_vars,
 )
 from .infer import TypeInferer
 from .units import bind_ports
@@ -1397,12 +1398,12 @@ class ASTTransformer(ASTBuilder):
                 lower = (
                     0
                     if index.lower is None
-                    else ASTResolver.resolve_constant(index.lower, ctx)
+                    else ASTResolver.resolve_constant(index.lower, ctx, True)
                 )
                 upper = (
                     size
                     if index.upper is None
-                    else ASTResolver.resolve_constant(index.upper, ctx)
+                    else ASTResolver.resolve_constant(index.upper, ctx, True)
                 )
                 if index.step is None:
                     step = 1
@@ -2970,11 +2971,14 @@ class ASTTransformer(ASTBuilder):
 
             # Run type inference on the tree before building
             # We need a fresh type inference context
+            # The region's names resolve where it was written (C3).
+            region_vars = callee_global_vars(ctx.global_vars, obj, ctx.top_py_globals)
             type_inf_ctx = ASTContext(
                 tree=tree,
-                global_vars=ctx.global_vars.copy(),
+                global_vars=region_vars.copy(),
                 mlir_ctx=ctx.mlir_ctx,
             )
+            type_inf_ctx.top_py_globals = ctx.top_py_globals
             # Propagate type parameters from subscript call (e.g., inner[2, 2])
             if ctx.inst is not None:
                 type_inf_ctx.inst = ctx.inst
@@ -3000,6 +3004,7 @@ class ASTTransformer(ASTBuilder):
 
             # Create a new context
             new_ctx = ctx.copy()
+            new_ctx.global_vars = region_vars
             # Clear top_func to avoid nested definition behavior which assumes context sharing
             # recursive build should start fresh but share globals/module
             new_ctx.top_func = None
@@ -3145,12 +3150,16 @@ class ASTTransformer(ASTBuilder):
                             lower = (
                                 0
                                 if index.lower is None
-                                else ASTResolver.resolve_constant(index.lower, ctx)
+                                else ASTResolver.resolve_constant(
+                                    index.lower, ctx, True
+                                )
                             )
                             upper = (
                                 size
                                 if index.upper is None
-                                else ASTResolver.resolve_constant(index.upper, ctx)
+                                else ASTResolver.resolve_constant(
+                                    index.upper, ctx, True
+                                )
                             )
                             if index.step is None:
                                 step = 1
@@ -3622,24 +3631,87 @@ class ASTTransformer(ASTBuilder):
             raise RuntimeError(f"Unsupported function {fn_name} with type {arg_types}")
 
         # User-defined subfunction
-        func = ctx.global_vars[obj_name]
+        py_func = obj if inspect.isfunction(obj) else None
+        func = py_func if py_func is not None else ctx.global_vars[obj_name]
         new_args = [
             ASTTransformer.get_mlir_op_result(ctx, stmt)
             for stmt in build_stmts(ctx, node.args)
         ]
-        func_name = obj_name if ctx.func_id is None else f"{obj_name}_{ctx.func_id}"
-        if func_name not in ctx.global_vars or not isinstance(
-            ctx.global_vars[func_name], func_d.FuncOp
+        if py_func is not None:
+            # Convert a scalar argument to its parameter's type, as an
+            # assignment does (C5). Only where the MLIR types differ, which
+            # was an invalid ``func.call`` before.
+            params = node.tree.body[0].args.args
+            for i, (arg_node, param) in enumerate(zip(node.args, params)):
+                want = getattr(param, "dtype", None)
+                have = getattr(arg_node, "dtype", None)
+                if (
+                    want is None
+                    or have is None
+                    or getattr(param, "shape", None) not in (None, tuple())
+                    or getattr(arg_node, "shape", None) not in (None, tuple())
+                    or isinstance(new_args[i].type, (MemRefType, RankedTensorType))
+                    or new_args[i].type == want.build()
+                ):
+                    continue
+                new_args[i] = ASTTransformer.get_mlir_op_result(
+                    ctx,
+                    ASTTransformer.build_cast_op(
+                        ctx, MockArg(new_args[i], is_affine=False), have, want
+                    ),
+                )
+            # A Python function is keyed on its object, not on the name it is
+            # called by: one built ``func.func`` per (function, template id).
+            # Its symbol is its def name; another object of the same def name
+            # gets ``<name>_v<n>`` (C1, C2).
+            built = ctx.py_func_ops.get((py_func, ctx.func_id))
+            if built is not None:
+                func_name, func_op = built
+                stmts = [func_op]
+            else:
+                base = node.tree.body[0].name
+                taken = {name for name, _ in ctx.py_func_ops.values()}
+                taken.update(
+                    name
+                    for name, val in ctx.global_vars.items()
+                    if isinstance(val, func_d.FuncOp)
+                )
+                n = 0
+                while True:
+                    sym = base if n == 0 else f"{base}_v{n}"
+                    func_name = sym if ctx.func_id is None else f"{sym}_{ctx.func_id}"
+                    if func_name not in taken:
+                        break
+                    n += 1
+                node.tree.body[0].name = sym
+        else:
+            func_name = obj_name if ctx.func_id is None else f"{obj_name}_{ctx.func_id}"
+        if py_func is not None and built is not None:
+            pass  # already built: call it
+        elif py_func is not None or (
+            func_name not in ctx.global_vars
+            or not isinstance(ctx.global_vars[func_name], func_d.FuncOp)
         ):  # function not built yet
             # Create a new context to avoid name collision
             func_ctx = ctx.copy()
+            if py_func is not None:
+                # Its free names resolve in its own module and closure (C3).
+                func_ctx.global_vars = callee_global_vars(
+                    ctx.global_vars, py_func, ctx.top_py_globals
+                )
             func_ctx.call_args = new_args
             func_ctx.set_ip(ctx.top_func)
             stmts = build_stmts(func_ctx, node.tree.body)
             func_ctx.pop_ip()
             func_ctx.call_args = []
             for key, value in func_ctx.global_vars.items():
-                if isinstance(value, func_d.FuncOp):
+                # Never over a name the caller binds to something else: the
+                # callee's ``inner`` is not the caller's ``inner`` (C3).
+                if isinstance(value, func_d.FuncOp) and (
+                    py_func is None
+                    or key not in ctx.global_vars
+                    or isinstance(ctx.global_vars[key], func_d.FuncOp)
+                ):
                     ctx.global_vars[key] = value
             # Attach buffers to function
             # FIXME: Should create subschedule
@@ -3647,6 +3719,8 @@ class ASTTransformer(ASTBuilder):
                 if isinstance(buffer, (memref_d.AllocOp, MockArg)):
                     # Intermediate buffers and function arguments
                     setattr(func, name, MockBuffer(func_name, name))
+            if py_func is not None:
+                ctx.py_func_ops[(py_func, ctx.func_id)] = (func_name, stmts[-1])
         elif isinstance(func, func_d.FuncOp):
             # Has already been defined in the top-level scope
             stmts = [func]

@@ -122,6 +122,36 @@ class ASTContext:
         # track the current AST node being visited for error reporting
         self.current_node = None
         self.global_op_cache = {}
+        # ``__globals__`` of the Python function being compiled (set by
+        # ``customize``); a called function nested in that same module keeps
+        # the caller's view (see ``callee_global_vars``).
+        self.top_py_globals = None
+        # Python function object (and template id) -> (symbol, func.func) of
+        # each called Python function already built, shared by every copy of
+        # this context. A called function is keyed on its object, not on the
+        # name it is called by, so two functions with one name never share a
+        # symbol and one function called by two names is built once.
+        self.py_func_ops = {}
+
+    def is_local(self, name):
+        """True when ``name`` is a kernel parameter or local in scope, which
+        shadows a global of the same name. A ``meta_for`` index is a
+        placeholder symbol whose value lives in ``global_vars``: not local."""
+        for scope in reversed(self.scopes):
+            if name in scope:
+                entry = scope[name]
+                return not (
+                    isinstance(entry, tuple)
+                    and len(entry) > 1
+                    and entry[1] == "placeholder"
+                )
+        return False
+
+    def names_local(self, node):
+        """True when the expression ``node`` reads a local (see ``is_local``)."""
+        return node is not None and any(
+            isinstance(n, ast.Name) and self.is_local(n.id) for n in ast.walk(node)
+        )
 
     def copy(self):
         ctx = ASTContext(
@@ -149,6 +179,8 @@ class ASTContext:
         if hasattr(self, "func_suffix"):
             ctx.func_suffix = self.func_suffix
         ctx.global_op_cache = self.global_op_cache
+        ctx.top_py_globals = self.top_py_globals
+        ctx.py_func_ops = self.py_func_ops
         # Propagate the Stateful name -> (global_name, memref_type) map so a
         # kernel nested in a region can resolve a region-scope Stateful by
         # name. The map holds symbol references and types (not MLIR ops),
