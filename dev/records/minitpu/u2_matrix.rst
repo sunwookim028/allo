@@ -34,7 +34,7 @@ decide before the rest of U2" in ``u2_regfile_2026-10-02.rst``. In short:
 8. **Joined traces** shrink the undefined census (3 vs 484). *[keep joined]*
 
 ``vpu_regfile`` (U2 pilot, w16; w256 where marked)
--------------------------------------------------
+---------------------------------------------------
 
 .. list-table::
    :header-rows: 1
@@ -136,15 +136,6 @@ Record: ``u2_word_array_2026-10-02.rst`` (branch ``u2-word-array``). Read
 latency 3 (compute) / 2 (DMA), write visibility 1; two read/write ports;
 same-word cross-port collisions undefined and masked.
 
-``vpu_fifo`` and the MXU output FIFO (w32d4; output = 64x16; input = 257x4)
------------------------------------------------------------------------------
-
-Record: ``u2_fifo_2026-10-02.rst``. The probe question -- is ``vpu_fifo``
-a ``Stream`` with its ports? -- is answered there: a Stream is a link, not
-a unit; behind a head register it is bit-exact in simulation (``stream``),
-but Catapult cannot schedule the self-FIFO (C1), so every column that
-reaches RTL uses the explicit ring (``trace``/``ported``/``wire``).
-
 .. list-table::
    :header-rows: 1
    :widths: 18 40 42
@@ -218,6 +209,22 @@ reaches RTL uses the explicit ring (``trace``/``ported``/``wire``).
        VMEM's 2RW; the 3-entry pipes become 7- and 5-port memories
      - ``amc/``.
 
+``vpu_fifo`` and the MXU output FIFO (w32d4; output = 64x16; input = 257x4)
+-----------------------------------------------------------------------------
+
+Record: ``u2_fifo_2026-10-02.rst``. The probe question -- is ``vpu_fifo``
+a ``Stream`` with its ports? -- is answered there: a Stream is a link, not
+a unit; behind a head register it is bit-exact in simulation (``stream``),
+but Catapult cannot schedule the self-FIFO (C1), so every column that
+reaches RTL uses the explicit ring (``trace``/``ported``/``wire``).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 40 42
+
+   * - Tool
+     - Cell
+     - Evidence / note
    * - Allo simulator, ``trace``/``ported``/``stream``
      - **match** on every instance it can run: w32d4 213,166/213,166, output 219,756/219,756,
        d16w48 55,028/55,028 (``empty`` masked and counted, 27,105 at w32d4). ``stream`` =
