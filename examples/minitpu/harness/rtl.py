@@ -19,6 +19,18 @@ Three port shapes cover U1:
 ``bare``
     ``clk`` and no valid. Outputs are sampled ``latency`` cycles after their
     inputs, so the declared latency is an input here, not a measurement.
+    With ``reset=True`` the active-low reset is pulsed first and ``warmup``
+    idle cycles follow it (a Catapult thread's reset action).
+``stream``
+    ``clk``, active-low reset, and a latency-insensitive valid/ready
+    handshake on every data port (Catapult/Connections: ``<p>_vld``,
+    ``<p>_rdy``, ``<p>_dat``). Each input port is an independent stream that
+    offers vector k until it is accepted; the output's ready is held high, or
+    dropped one cycle in every ``out_ready_period`` to exercise backpressure.
+    A transfer happens on a rising edge with valid and ready both high. The
+    wrapper stamps each input's accept cycle (the last port's) and each
+    output's cycle, so latency and throughput are both measured;
+    ``last_stats`` holds the totals of the latest run.
 
 MiniTPU's own ``tb/`` stays the second check (D-7); this is the first.
 """
@@ -61,13 +73,19 @@ class RtlUnit:
     sources: list  # paths relative to the MiniTPU clone
     inputs: list  # [(port, width)], data ports only
     outputs: list  # [(port, width)]
-    shape: str = "comb"  # comb | valid | bare
+    shape: str = "comb"  # comb | valid | bare | stream
     latency: int = 0  # declared; sampled at this depth for "bare"
     clk: str = "clk_i"
     rst_n: str = "rst_ni"
     valid_in: str = "valid_i"
     valid_out: str = "valid_o"
     defines: list = field(default_factory=list)
+    reset: bool = None  # pulse rst_n first; default: valid/stream yes, bare no
+    warmup: int = 0  # idle cycles after reset before the first input
+    vld: str = "_vld"  # stream shape: per-port handshake suffixes
+    rdy: str = "_rdy"
+    dat: str = "_dat"
+    out_ready_period: int = 0  # stream: 0 = output always ready
 
     def key(self, home):
         h = hashlib.sha256(repr(self).encode())
@@ -78,7 +96,7 @@ class RtlUnit:
         return h.hexdigest()[:16]
 
 
-WRAPPER_VERSION = "1"
+WRAPPER_VERSION = "2"
 
 
 def _wrapper(u):
@@ -93,7 +111,9 @@ def _wrapper(u):
         for i, (p, _) in enumerate(u.outputs)
     )
     zero_in = "\n".join(f"    dut.{p} = 0;" for p, _ in u.inputs)
-    if u.shape == "comb":
+    if u.shape == "stream":
+        body = _stream_body(u)
+    elif u.shape == "comb":
         body = f"""
   for (uint64_t k = 0; k < n; ++k) {{
 {set_in}
@@ -103,6 +123,7 @@ def _wrapper(u):
       out[j * {no + 1} + {no}] = 0; }}
   }}"""
     else:
+        do_rst = u.reset if u.reset is not None else u.shape == "valid"
         valid_set = (
             f"dut.{u.valid_in} = k < n;" if u.shape == "valid" else ""
         )
@@ -124,11 +145,12 @@ def _wrapper(u):
         body = f"""
   // reset: four cycles low, inputs idle
   dut.{u.clk} = 0;
-  {"dut." + u.rst_n + " = 0;" if u.shape == "valid" else ""}
+  {"dut." + u.rst_n + " = 0;" if do_rst else ""}
 {zero_in}
   {"dut." + u.valid_in + " = 0;" if u.shape == "valid" else ""}
   for (int r = 0; r < 4; ++r) {{ dut.{u.clk} = 0; dut.eval(); dut.{u.clk} = 1; dut.eval(); }}
-  {"dut." + u.rst_n + " = 1;" if u.shape == "valid" else ""}
+  {"dut." + u.rst_n + " = 1;" if do_rst else ""}
+  for (int w = 0; w < {u.warmup}; ++w) {{ dut.{u.clk} = 0; dut.eval(); dut.{u.clk} = 1; dut.eval(); }}
   uint64_t j = 0;
   const uint64_t limit = n + {u.latency} + 64;
   for (uint64_t cyc = 0; cyc < limit; ++cyc) {{
@@ -173,6 +195,63 @@ int main(int argc, char** argv) {{
 """
 
 
+def _stream_body(u):
+    """Valid/ready driver: independent input streams, one output stream."""
+    ni = len(u.inputs)
+    (op, _), = u.outputs  # one output stream
+    lines = []
+    for i, (p, _) in enumerate(u.inputs):
+        lines.append(f"    dut.{p}{u.vld} = k[{i}] < n;")
+        lines.append(f"    dut.{p}{u.dat} = k[{i}] < n ? in[k[{i}] * {ni} + {i}] : 0;")
+    drive = "\n".join(lines)
+    fire = "\n".join(
+        f"    fire[{i}] = dut.{p}{u.vld} && dut.{p}{u.rdy};" for i, (p, _) in enumerate(u.inputs)
+    )
+    per = u.out_ready_period
+    ordy = f"(cyc % {per}) != {per} - 1" if per else "1"
+    return f"""
+  // reset: four cycles low, every valid low, output not ready
+  uint64_t k[{ni}] = {{0}};
+  bool fire[{ni}];
+  std::vector<uint64_t> acc(n, 0);  // cycle the vector's last input was accepted
+  dut.{u.rst_n} = 0;
+  for (int i = 0; i < {ni}; ++i) k[i] = n;  // idle during reset
+{drive}
+  dut.{op}{u.rdy} = 0;
+  for (int r = 0; r < 4; ++r) {{ dut.{u.clk} = 0; dut.eval(); dut.{u.clk} = 1; dut.eval(); }}
+  dut.{u.rst_n} = 1;
+  for (int w = 0; w < {u.warmup}; ++w) {{ dut.{u.clk} = 0; dut.eval(); dut.{u.clk} = 1; dut.eval(); }}
+  for (int i = 0; i < {ni}; ++i) k[i] = 0;
+  uint64_t j = 0, cyc = 0, last = 0, first_out = 0;
+  while (j < n) {{
+    dut.{u.clk} = 0;
+{drive}
+    dut.{op}{u.rdy} = {ordy};
+    dut.eval();  // ready/valid settle; the transfer happens on the next rising edge
+{fire}
+    const bool ofire = dut.{op}{u.vld} && dut.{op}{u.rdy};
+    const uint64_t odat = (uint64_t)dut.{op}{u.dat};
+    dut.{u.clk} = 1;
+    dut.eval();
+    for (int i = 0; i < {ni}; ++i)
+      if (fire[i]) {{ if (acc[k[i]] < cyc) acc[k[i]] = cyc; ++k[i]; last = cyc; }}
+    if (ofire) {{
+      out[j * 2] = odat;
+      out[j * 2 + 1] = cyc - acc[j];
+      if (j == 0) first_out = cyc;
+      ++j; last = cyc;
+    }}
+    ++cyc;
+    if (cyc - last > 10000) {{
+      std::fprintf(stderr, "stalled at cycle %llu: %llu of %llu outputs\\n",
+                   (unsigned long long)cyc, (unsigned long long)j, (unsigned long long)n);
+      return 4;
+    }}
+  }}
+  std::printf("STREAM cycles=%llu first_out=%llu n=%llu\\n", (unsigned long long)cyc,
+              (unsigned long long)first_out, (unsigned long long)n);"""
+
+
 def build(u, cache=None):
     """Build the unit's driver once; return the binary's path."""
     home = minitpu_home()
@@ -209,7 +288,9 @@ def run(u, stim):
 
     Returns ``(outputs uint64[n, n_outputs], cycles int64[n])``. ``cycles`` is
     the cycle each output appeared on, counted from the cycle its input was
-    offered (so it is the latency for II=1 input); all zero for ``comb``.
+    offered (so it is the latency for II=1 input); all zero for ``comb``. For
+    ``stream`` it is the output's cycle minus its inputs' accept cycle, and
+    ``last_stats`` gets the total cycle count.
     """
     exe = build(u)
     stim = np.ascontiguousarray(stim, dtype=np.uint64)
@@ -231,6 +312,13 @@ def run(u, stim):
         if w < 64:
             outs[:, i] &= np.uint64((1 << w) - 1)
     cycles = raw[:, -1].astype(np.int64)
-    if u.shape != "comb":
+    if u.shape in ("valid", "bare"):
         cycles = cycles - np.arange(len(cycles), dtype=np.int64)
+    last_stats.clear()
+    for line in r.stdout.splitlines():
+        if line.startswith("STREAM "):
+            last_stats.update((k, int(v)) for k, v in (f.split("=") for f in line.split()[1:]))
     return outs, cycles
+
+
+last_stats = {}  # stream shape: {"cycles", "first_out", "n"} of the latest run()

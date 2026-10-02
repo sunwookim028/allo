@@ -1,0 +1,10 @@
+10a11
+> #include <ac_std_float.h>   // [hand-patch P1] moved before mc_connections.h
+16d16
+< #include <ac_std_float.h>   // IEEE floats: ac_ieee_float<binaryNN>
+436,438c436
+< #ifndef __SYNTHESIS__
+<       wait();
+< #endif
+---
+>       wait();  // [hand-patch P3] also under __SYNTHESIS__

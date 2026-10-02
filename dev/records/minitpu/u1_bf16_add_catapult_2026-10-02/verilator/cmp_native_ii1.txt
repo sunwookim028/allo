@@ -1,0 +1,8 @@
+MiniTPU RTL vpu_bf16_add: 251936 vectors, 0.1s
+Catapult RTL /work/shared/users/phd/sk3463/scratch/u1_cat/native_ii1_n251936.prj/build/Catapult/top.v1: shape=stream 7.8s stats={'cycles': 251939, 'first_out': 3, 'n': 251936}
+  latency (output cycle - input accept cycle): {2: 251936}
+  251936 outputs in 251939 cycles: 1.0000 cycles/vector, first output at cycle 3
+DIFF catapult-rtl vs minitpu-rtl: 249907/251936 equal
+  catapult-rtl vs IEEE RNE (ref.ieee_bf16_add): 249908/251936 equal
+       2028  NaN payload: ac_std_float all-ones 0x7fff/0xffff, rtl +0x7fc0  e.g. 0000+7fc0: catapult 7fff minitpu 7fc0, 0000+7f81: catapult 7fff minitpu 7fc0, 0000+7fff: catapult 7fff minitpu 7fc0
+          1  (+0)+(-0): allo +0 (IEEE), rtl -0  e.g. 0000+8000: catapult 0000 minitpu 8000

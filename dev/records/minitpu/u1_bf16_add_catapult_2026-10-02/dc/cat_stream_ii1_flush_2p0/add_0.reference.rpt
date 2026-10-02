@@ -1,0 +1,112 @@
+ 
+****************************************
+Report : reference
+Design : add_0
+Version: W-2024.09
+Date   : Fri Oct  2 00:31:00 2026
+****************************************
+
+Attributes:
+    b - black box (unknown)
+   bo - allows boundary optimization
+    d - dont_touch
+   mo - map_only
+    h - hierarchical
+    n - noncombinational
+    r - removable
+    s - synthetic operator
+    u - contains unmapped logic
+
+Reference          Library       Unit Area   Count    Total Area   Attributes
+-----------------------------------------------------------------------------
+AND2_X1            NangateOpenCellLibrary
+                                  1.064000      62     65.968001  
+AND2_X2            NangateOpenCellLibrary
+                                  1.330000       1      1.330000  
+AND3_X1            NangateOpenCellLibrary
+                                  1.330000       3      3.990000  
+AND4_X1            NangateOpenCellLibrary
+                                  1.596000      10     15.960000  
+AOI21_X1           NangateOpenCellLibrary
+                                  1.064000      12     12.768000  
+AOI21_X2           NangateOpenCellLibrary
+                                  1.862000       1      1.862000  
+AOI22_X1           NangateOpenCellLibrary
+                                  1.330000      14     18.620001  
+AOI211_X1          NangateOpenCellLibrary
+                                  1.330000       7      9.310000  
+AOI221_X1          NangateOpenCellLibrary
+                                  1.596000       4      6.384000  
+AOI222_X1          NangateOpenCellLibrary
+                                  2.128000       1      2.128000  
+AOI222_X2          NangateOpenCellLibrary
+                                  3.724000       1      3.724000  
+BUF_X1             NangateOpenCellLibrary
+                                  0.798000      23     18.353999  
+BUF_X2             NangateOpenCellLibrary
+                                  1.064000       2      2.128000  
+CLKBUF_X1          NangateOpenCellLibrary
+                                  0.798000      17     13.566000  
+CLKBUF_X2          NangateOpenCellLibrary
+                                  1.064000       2      2.128000  
+DFFR_X1            NangateOpenCellLibrary
+                                  5.320000      78    414.960013  n
+DFFR_X2            NangateOpenCellLibrary
+                                  5.852000       1      5.852000  n
+FA_X1              NangateOpenCellLibrary
+                                  4.256000       3     12.768000  r
+INV_X1             NangateOpenCellLibrary
+                                  0.532000     120     63.840001  
+INV_X2             NangateOpenCellLibrary
+                                  0.798000       1      0.798000  
+MUX2_X1            NangateOpenCellLibrary
+                                  1.862000      69    128.477999  
+NAND2_X1           NangateOpenCellLibrary
+                                  0.798000     133    106.133997  
+NAND2_X2           NangateOpenCellLibrary
+                                  1.330000       1      1.330000  
+NAND3_X1           NangateOpenCellLibrary
+                                  1.064000       1      1.064000  
+NAND4_X1           NangateOpenCellLibrary
+                                  1.330000       9     11.970000  
+NOR2_X1            NangateOpenCellLibrary
+                                  0.798000      58     46.283999  
+NOR2_X2            NangateOpenCellLibrary
+                                  1.330000       1      1.330000  
+NOR3_X1            NangateOpenCellLibrary
+                                  1.064000       1      1.064000  
+NOR4_X1            NangateOpenCellLibrary
+                                  1.330000       3      3.990000  
+OAI21_X1           NangateOpenCellLibrary
+                                  1.064000      41     43.624000  
+OAI22_X1           NangateOpenCellLibrary
+                                  1.330000       8     10.640000  
+OAI211_X1          NangateOpenCellLibrary
+                                  1.330000      11     14.630000  
+OAI221_X1          NangateOpenCellLibrary
+                                  1.596000       1      1.596000  
+OAI222_X1          NangateOpenCellLibrary
+                                  2.128000       1      2.128000  
+OR2_X1             NangateOpenCellLibrary
+                                  1.064000      47     50.008000  
+OR2_X2             NangateOpenCellLibrary
+                                  1.330000       5      6.650000  
+OR3_X1             NangateOpenCellLibrary
+                                  1.330000       1      1.330000  
+OR4_X2             NangateOpenCellLibrary
+                                  1.862000       2      3.724000  
+SNPS_CLOCK_GATE_HIGH_add_0_run_1
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_add_0_run_2
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_add_0_run_3
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_add_0_run_4
+                                  3.990000       1      3.990000  b, h
+XNOR2_X1           NangateOpenCellLibrary
+                                  1.596000      27     43.091999  
+XOR2_X1            NangateOpenCellLibrary
+                                  1.596000      19     30.323999  
+-----------------------------------------------------------------------------
+Total 44 references                                  1201.788010
+1

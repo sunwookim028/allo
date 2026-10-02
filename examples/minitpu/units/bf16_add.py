@@ -35,6 +35,30 @@ RTL = rtl.RtlUnit(
 )
 
 
+def catapult_rtl(v1_dir, top="add_0", shape="stream", **kw):
+    """The RTL Catapult wrote for a SystemC emission of this unit.
+
+    ``v1_dir`` is ``<prj>/build/Catapult/<top>.v1``; ``concat_sim_rtl.v``
+    carries the ``ccs_*``/``mgc_*`` simulation primitives with the design.
+    Ports are the emitted ``add_0``'s: ``v6``, ``v7`` in, ``v8`` out, as
+    Connections valid/ready (``stream``) or, for a ``Wire`` emission, plain
+    16-bit ports (``bare``, with ``reset=True`` and the declared ``latency``).
+    Reset is ``rst``, active low (``async_reset_signal_is(rst, false)``).
+    """
+    import os
+
+    return rtl.RtlUnit(
+        top=top,
+        sources=[os.path.join(os.path.abspath(v1_dir), "concat_sim_rtl.v")],
+        inputs=[("v6", 16), ("v7", 16)],
+        outputs=[("v8", 16)],
+        shape=shape,
+        clk="clk",
+        rst_n="rst",
+        **kw,
+    )
+
+
 def native(n):
     @df.region()
     def top(A: bfloat16[n], B: bfloat16[n], C: bfloat16[n]):
@@ -65,6 +89,8 @@ def _is_nan(x):
 # Rules that name a difference between an Allo result and the RTL's, first
 # match wins. Each is a measured RTL deviation from IEEE (harness/ref.py).
 EXPLAIN = [
+    ("NaN payload: ac_std_float all-ones 0x7fff/0xffff, rtl +0x7fc0",
+     lambda s, g, w: (int(g) & 0x7FFF) == 0x7FFF and int(w) == 0x7FC0),
     ("NaN sign: allo keeps it, rtl always +0x7fc0",
      lambda s, g, w: _is_nan(g) and int(w) == 0x7FC0),
     ("NaN payload/canonical form differs",

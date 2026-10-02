@@ -1,0 +1,7 @@
+allo simulator native n=251936: 0.3s
+allo-simulator vs catapult-rtl: 249908/251936 equal
+  diffs where both NaN: 2028  other: 0
+  simulator NaN encodings: [('7fc0', 1048), ('ffc0', 980)]
+  catapult NaN encodings: [('7fff', 1052), ('ffff', 976)]
+allo-simulator vs ref.ieee_bf16_add: 251936/251936
+NaN sign differs (catapult vs IEEE/numpy=simulator): [('7f80+ff80', 'cat 7fff', 'ieee ffc0'), ('7fc0+ffff', 'cat ffff', 'ieee 7fc0'), ('7f81+ffc0', 'cat ffff', 'ieee 7fc0'), ('7f81+ffff', 'cat ffff', 'ieee 7fc0'), ('ff80+7f80', 'cat 7fff', 'ieee ffc0'), ('ffc0+7fc0', 'cat 7fff', 'ieee ffc0'), ('ffc0+7fff', 'cat 7fff', 'ieee ffc0'), ('ff81+7fc0', 'cat 7fff', 'ieee ffc0'), ('ff81+7f81', 'cat 7fff', 'ieee ffc0'), ('ff81+7fff', 'cat 7fff', 'ieee ffc0'), ('ffff+7fff', 'cat 7fff', 'ieee ffc0'), ('7f8a+fff9', 'cat ffff', 'ieee 7fc0')]
