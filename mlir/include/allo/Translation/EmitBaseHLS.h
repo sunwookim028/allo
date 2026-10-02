@@ -78,6 +78,10 @@ public:
   // suffix (e.g. `.to_int64()`) when converting a >64-bit ac_int to a native
   // int/index, which under __SYNTHESIS__ has no implicit conversion. Default: none.
   virtual void emitNarrowCastSuffix(Value src, Value dst) {}
+  // Hook called by emitCast for the right-hand side: a backend whose types have
+  // no implicit conversion (ac floats) may write the whole conversion
+  // expression and return true. Default: false, i.e. `dst = src;` as before.
+  virtual bool emitCastExpr(Operation *op, Value src, Value dst) { return false; }
   virtual void emitGetBit(allo::GetIntBitOp op) {}
   virtual void emitSetBit(allo::SetIntBitOp op) {}
   virtual void emitGetSlice(allo::GetIntSliceOp op) {}
