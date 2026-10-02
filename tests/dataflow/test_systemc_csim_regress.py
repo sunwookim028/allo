@@ -158,3 +158,23 @@ def test_float_io_is_bit_exact(T, reverse):
     _csim(_copy(T, len(a), reverse), a, b)
     got = b.view(bits.dtype)
     assert [hex(x) for x in got] == [hex(x) for x in bits]
+
+
+@needs_csim
+@pytest.mark.parametrize("reverse", [False, True], ids=["stream", "memport"])
+@pytest.mark.parametrize("T", [bfloat16, float16, float32])
+def test_signed_zero_survives_a_signal(T, reverse):
+    """Bug 4: sc_signal skips a write that compares `==` to its current value.
+
+    IEEE says +0 == -0, so a -0 after a +0 (or the reverse) never reached the
+    reader of a Connections channel or a memory pin; csim flipped the sign of
+    zeros that the RTL's wires carry. Float signals now compare bits.
+    """
+    w = 32 if T is float32 else 16
+    sign = 1 << (w - 1)
+    bits = np.array([0, sign, 0, 0, sign, sign, 0, sign], dtype=np.uint32 if w == 32 else np.uint16)
+    a = bits.view(_NP[T])
+    b = np.zeros(len(a), dtype=_NP[T])
+    _csim(_copy(T, len(a), reverse), a, b)
+    got = b.view(bits.dtype)
+    assert [hex(x) for x in got] == [hex(x) for x in bits]

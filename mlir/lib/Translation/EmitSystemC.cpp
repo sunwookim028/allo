@@ -3466,6 +3466,43 @@ inline void sc_trace(sc_core::sc_trace_file *tf, const ac_ieee_float<binary32> &
                      const std::string &n) {
   sc_core::sc_trace(tf, (unsigned)_fbits(h), n);
 }
+// csim: a float signal must compare BITS, not values. sc_signal::write() and
+// update() skip a write whose value `==` the current one, and IEEE says
+// +0 == -0: a -0 written after a +0 (or the reverse) never reaches the reader,
+// on every Connections channel (sc_signal<Message>) and memory pin alike. A
+// wire in RTL carries the sign bit, so csim disagreed with the RTL. Specialize
+// both members for each float payload and writer policy to compare _fbits.
+// Only for the OSCI kernel these members are written for (2.3.2+, sc_signal_t);
+// never under synthesis, and not under Xcelium's own SystemC (NCSC).
+#if !defined(__SYNTHESIS__) && !defined(NCSC) && defined(SC_VERSION_MAJOR) &&     \
+    (SC_VERSION_MAJOR * 100 + SC_VERSION_MINOR) * 100 + SC_VERSION_PATCH >= 20302
+namespace sc_core {
+#define ALLO_SIGNAL_BITS_EQ(T, POL)                                              \
+  template <> inline void sc_signal_t<T, POL>::write(const T &value_) {          \
+    bool value_changed = _fbits(m_new_val) != _fbits(value_);                    \
+    if (!policy_type::check_write(this, value_changed))                         \
+      return;                                                                    \
+    m_new_val = value_;                                                          \
+    if (value_changed || policy_type::needs_update())                            \
+      request_update();                                                          \
+  }                                                                              \
+  template <> inline void sc_signal_t<T, POL>::update() {                        \
+    policy_type::update();                                                       \
+    if (_fbits(m_new_val) != _fbits(m_cur_val))                                  \
+      do_update();                                                               \
+  }
+#define ALLO_SIGNAL_BITS_EQ_ALL(T)                                               \
+  ALLO_SIGNAL_BITS_EQ(T, SC_ONE_WRITER)                                          \
+  ALLO_SIGNAL_BITS_EQ(T, SC_MANY_WRITERS)                                        \
+  ALLO_SIGNAL_BITS_EQ(T, SC_UNCHECKED_WRITERS)
+ALLO_SIGNAL_BITS_EQ_ALL(ac::bfloat16)
+ALLO_SIGNAL_BITS_EQ_ALL(half)
+ALLO_SIGNAL_BITS_EQ_ALL(ac_ieee_float<binary32>)
+ALLO_SIGNAL_BITS_EQ_ALL(double)
+#undef ALLO_SIGNAL_BITS_EQ_ALL
+#undef ALLO_SIGNAL_BITS_EQ
+} // namespace sc_core
+#endif
 // Make ac_ieee_float<Format> a valid Connections channel/Combinational payload.
 // (bf16 needs NOTHING here: ac::bfloat16 already has one --
 // ac_marshaller.h: AC_SPECIAL_FLOAT_WRAPPER(ac::bfloat16, 16) -- which is why a
