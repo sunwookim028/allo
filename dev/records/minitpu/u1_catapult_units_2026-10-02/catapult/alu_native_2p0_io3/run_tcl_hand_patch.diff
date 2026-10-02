@@ -1,0 +1,13 @@
+--- alu_native_2p0_io3.prj/run.tcl.emitted	2026-10-02 04:05:41.580712843 -0400
++++ alu_native_2p0_io3.prj/run.tcl	2026-10-02 04:05:41.580712843 -0400
+@@ -28,6 +28,10 @@
+ go compile
+ 
+ solution library add ccs_sample_mem
++go architect
++cycle set {v3.Push()} -from {v0.Pop()} -equal 3  ;# [hand-patch: declared latency]
++cycle set {v3.Push()} -from {v1.Pop()} -equal 3  ;# [hand-patch: declared latency]
++cycle set {v3.Push()} -from {v2.Pop()} -equal 3  ;# [hand-patch: declared latency]
+ go assembly
+ go extract
+ 

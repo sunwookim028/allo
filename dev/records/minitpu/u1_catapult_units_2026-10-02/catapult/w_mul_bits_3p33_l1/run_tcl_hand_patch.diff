@@ -1,0 +1,11 @@
+--- w_mul_bits_3p33_l1.prj/run.tcl.emitted	2026-10-02 04:33:39.848652419 -0400
++++ w_mul_bits_3p33_l1.prj/run.tcl	2026-10-02 04:33:39.848652419 -0400
+@@ -28,6 +28,8 @@
+ go compile
+ 
+ solution library add ccs_sample_mem
++go architect
++cycle set /mul_0/run/while -equal 1  ;# [hand-patch: declared latency]
+ go assembly
+ go extract
+ 

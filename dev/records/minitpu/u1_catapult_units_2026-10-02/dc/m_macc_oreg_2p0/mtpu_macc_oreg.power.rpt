@@ -1,0 +1,58 @@
+ 
+****************************************
+Report : power
+        -analysis_effort low
+Design : mtpu_macc_oreg
+Version: W-2024.09
+Date   : Fri Oct  2 04:37:58 2026
+****************************************
+
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+Design        Wire Load Model            Library
+------------------------------------------------
+mtpu_macc_oreg         5K_hvratio_1_1    NangateOpenCellLibrary
+
+
+Global Operating Voltage = 1.1  
+Power-specific unit information :
+    Voltage Units = 1V
+    Capacitance Units = 1.000000ff
+    Time Units = 1ns
+    Dynamic Power Units = 1uW    (derived from V,C,T units)
+    Leakage Power Units = 1nW
+
+
+Attributes
+----------
+i - Including register clock pin internal power
+
+
+  Cell Internal Power  = 153.7677 uW   (64%)
+  Net Switching Power  =  87.0872 uW   (36%)
+                         ---------
+Total Dynamic Power    = 240.8549 uW  (100%)
+
+Cell Leakage Power     =  10.1618 uW
+
+
+                 Internal         Switching           Leakage            Total
+Power Group      Power            Power               Power              Power   (   %    )  Attrs
+--------------------------------------------------------------------------------------------------
+io_pad             0.0000            0.0000            0.0000            0.0000  (   0.00%)
+memory             0.0000            0.0000            0.0000            0.0000  (   0.00%)
+black_box          0.0000            0.0000            0.0000            0.0000  (   0.00%)
+clock_network     46.9059            0.0000            0.0000           46.9059  (  18.69%)  i
+register          29.6592           13.4676        1.8973e+03           45.0241  (  17.94%)
+sequential         0.0000            0.0000            0.0000            0.0000  (   0.00%)
+combinational     77.2026           73.6196        8.2645e+03          159.0867  (  63.38%)
+--------------------------------------------------------------------------------------------------
+Total            153.7677 uW        87.0872 uW     1.0162e+04 nW       251.0167 uW
+1

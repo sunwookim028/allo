@@ -1,0 +1,43 @@
+ 
+****************************************
+Report : area
+Design : mxu_acc24_add_pipe
+Version: W-2024.09
+Date   : Fri Oct  2 04:38:03 2026
+****************************************
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                           76
+Number of nets:                          1330
+Number of cells:                         1230
+Number of combinational cells:           1140
+Number of sequential cells:                90
+Number of macros/black boxes:               0
+Number of buf/inv:                        170
+Number of references:                      36
+
+Combinational area:               1149.652000
+Buf/Inv area:                       92.568001
+Noncombinational area:             406.979985
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                  1556.631985
+Total area:                 undefined
+
+Hierarchical area distribution
+------------------------------
+
+                                  Global cell area          Local cell area
+                                  ------------------  ---------------------------- 
+Hierarchical cell                 Absolute   Percent  Combi-     Noncombi-  Black-
+                                  Total      Total    national   national   boxes   Design
+--------------------------------  ---------  -------  ---------  ---------  ------  ---------
+mxu_acc24_add_pipe                1556.6320    100.0  1149.6520   406.9800  0.0000  mxu_acc24_add_pipe
+--------------------------------  ---------  -------  ---------  ---------  ------  ---------
+Total                                                 1149.6520   406.9800  0.0000
+
+1

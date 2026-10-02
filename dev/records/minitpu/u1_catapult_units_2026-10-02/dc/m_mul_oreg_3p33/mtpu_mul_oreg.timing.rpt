@@ -1,0 +1,139 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : mtpu_mul_oreg
+Version: W-2024.09
+Date   : Fri Oct  2 04:40:10 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: a[5] (input port clocked by ideal_clock)
+  Endpoint: r_reg[0] (rising edge-triggered flip-flop clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  mtpu_mul_oreg      5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                        Fanout     Trans      Incr       Path
+  ---------------------------------------------------------------------
+  clock ideal_clock (rise edge)                      0.00       0.00
+  clock network delay (ideal)                        0.00       0.00
+  input external delay                               0.00       0.00 r
+  a[5] (in)                                0.01      0.01       0.01 r
+  a[5] (net)                     4                   0.00       0.01 r
+  U113/A (INV_X1)                          0.01      0.02       0.03 r
+  U113/ZN (INV_X1)                         0.02      0.03       0.06 f
+  n324 (net)                     8                   0.00       0.06 f
+  U172/A4 (NOR4_X1)                        0.02      0.02       0.08 f
+  U172/ZN (NOR4_X1)                        0.08      0.13       0.21 r
+  n160 (net)                     2                   0.00       0.21 r
+  U189/A (AOI21_X1)                        0.08      0.01       0.22 r
+  U189/ZN (AOI21_X1)                       0.03      0.03       0.25 f
+  n186 (net)                     1                   0.00       0.25 f
+  U220/A (FA_X1)                           0.03      0.02       0.27 f
+  U220/S (FA_X1)                           0.02      0.12       0.40 r
+  n199 (net)                     1                   0.00       0.40 r
+  U226/A (FA_X1)                           0.02      0.03       0.42 r
+  U226/S (FA_X1)                           0.02      0.10       0.52 f
+  n351 (net)                     3                   0.00       0.52 f
+  U223/A2 (NOR2_X1)                        0.02      0.01       0.53 f
+  U223/ZN (NOR2_X1)                        0.02      0.03       0.57 r
+  n195 (net)                     1                   0.00       0.57 r
+  U225/B2 (OAI21_X1)                       0.02      0.01       0.58 r
+  U225/ZN (OAI21_X1)                       0.02      0.02       0.60 f
+  n268 (net)                     1                   0.00       0.60 f
+  U292/B (FA_X1)                           0.02      0.02       0.63 f
+  U292/CO (FA_X1)                          0.01      0.08       0.71 f
+  n270 (net)                     1                   0.00       0.71 f
+  U293/CI (FA_X1)                          0.01      0.02       0.73 f
+  U293/CO (FA_X1)                          0.01      0.07       0.80 f
+  n264 (net)                     1                   0.00       0.80 f
+  U291/CI (FA_X1)                          0.01      0.02       0.82 f
+  U291/CO (FA_X1)                          0.01      0.07       0.89 f
+  n261 (net)                     1                   0.00       0.89 f
+  U289/CI (FA_X1)                          0.01      0.02       0.91 f
+  U289/CO (FA_X1)                          0.01      0.07       0.98 f
+  n258 (net)                     1                   0.00       0.98 f
+  U288/CI (FA_X1)                          0.01      0.02       1.00 f
+  U288/CO (FA_X1)                          0.01      0.07       1.07 f
+  n255 (net)                     1                   0.00       1.07 f
+  U286/CI (FA_X1)                          0.01      0.02       1.09 f
+  U286/CO (FA_X1)                          0.01      0.07       1.16 f
+  n252 (net)                     1                   0.00       1.16 f
+  U285/CI (FA_X1)                          0.01      0.02       1.18 f
+  U285/CO (FA_X1)                          0.01      0.07       1.25 f
+  n249 (net)                     1                   0.00       1.25 f
+  U284/CI (FA_X1)                          0.01      0.02       1.27 f
+  U284/CO (FA_X1)                          0.02      0.08       1.35 f
+  n274 (net)                     2                   0.00       1.35 f
+  U103/A1 (NOR2_X2)                        0.02      0.02       1.37 f
+  U103/ZN (NOR2_X2)                        0.08      0.09       1.46 r
+  n387 (net)                    13                   0.00       1.46 r
+  U228/A (INV_X1)                          0.08      0.02       1.49 r
+  U228/ZN (INV_X1)                         0.04      0.06       1.54 f
+  n385 (net)                    10                   0.00       1.54 f
+  U242/A (FA_X1)                           0.04      0.04       1.58 f
+  U242/CO (FA_X1)                          0.01      0.09       1.67 f
+  n207 (net)                     1                   0.00       1.67 f
+  U236/CI (FA_X1)                          0.01      0.02       1.69 f
+  U236/CO (FA_X1)                          0.01      0.07       1.76 f
+  n201 (net)                     1                   0.00       1.76 f
+  U232/CI (FA_X1)                          0.01      0.02       1.78 f
+  U232/CO (FA_X1)                          0.01      0.07       1.85 f
+  n204 (net)                     1                   0.00       1.85 f
+  U235/CI (FA_X1)                          0.01      0.02       1.87 f
+  U235/CO (FA_X1)                          0.01      0.07       1.94 f
+  n210 (net)                     1                   0.00       1.94 f
+  U240/CI (FA_X1)                          0.01      0.02       1.96 f
+  U240/CO (FA_X1)                          0.01      0.07       2.03 f
+  n219 (net)                     1                   0.00       2.03 f
+  U251/CI (FA_X1)                          0.01      0.02       2.05 f
+  U251/CO (FA_X1)                          0.01      0.07       2.12 f
+  n222 (net)                     1                   0.00       2.12 f
+  U253/CI (FA_X1)                          0.01      0.02       2.14 f
+  U253/S (FA_X1)                           0.02      0.12       2.26 r
+  n291 (net)                     3                   0.00       2.26 r
+  U273/A2 (OR2_X1)                         0.02      0.01       2.27 r
+  U273/ZN (OR2_X1)                         0.01      0.03       2.30 r
+  n239 (net)                     1                   0.00       2.30 r
+  U274/A2 (NOR2_X1)                        0.01      0.01       2.31 r
+  U274/ZN (NOR2_X1)                        0.01      0.01       2.32 f
+  n245 (net)                     1                   0.00       2.32 f
+  U280/A1 (NAND4_X1)                       0.01      0.01       2.33 f
+  U280/ZN (NAND4_X1)                       0.01      0.01       2.35 r
+  n246 (net)                     1                   0.00       2.35 r
+  U281/A3 (AND3_X1)                        0.01      0.01       2.35 r
+  U281/ZN (AND3_X1)                        0.05      0.09       2.45 r
+  n389 (net)                    10                   0.00       2.45 r
+  U343/A1 (NAND2_X1)                       0.05      0.02       2.47 r
+  U343/ZN (NAND2_X1)                       0.03      0.05       2.52 f
+  n380 (net)                     7                   0.00       2.52 f
+  U366/B (AOI211_X1)                       0.03      0.02       2.54 f
+  U366/ZN (AOI211_X1)                      0.04      0.07       2.61 r
+  r_d[0] (net)                   1                   0.00       2.61 r
+  r_reg[0]/D (DFF_X1)                      0.04      0.01       2.62 r
+  data arrival time                                             2.62
+
+  clock ideal_clock (rise edge)                      3.33       3.33
+  clock network delay (ideal)                        0.00       3.33
+  r_reg[0]/CK (DFF_X1)                               0.00       3.33 r
+  library setup time                                -0.04       3.29
+  data required time                                            3.29
+  ---------------------------------------------------------------------
+  data required time                                            3.29
+  data arrival time                                            -2.62
+  ---------------------------------------------------------------------
+  slack (MET)                                                   0.67
+
+
+1

@@ -1,0 +1,58 @@
+ 
+****************************************
+Report : power
+        -analysis_effort low
+Design : vpu_bf16_mul_pipe
+Version: W-2024.09
+Date   : Fri Oct  2 04:37:59 2026
+****************************************
+
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+Design        Wire Load Model            Library
+------------------------------------------------
+vpu_bf16_mul_pipe      5K_hvratio_1_1    NangateOpenCellLibrary
+
+
+Global Operating Voltage = 1.1  
+Power-specific unit information :
+    Voltage Units = 1V
+    Capacitance Units = 1.000000ff
+    Time Units = 1ns
+    Dynamic Power Units = 1uW    (derived from V,C,T units)
+    Leakage Power Units = 1nW
+
+
+Attributes
+----------
+i - Including register clock pin internal power
+
+
+  Cell Internal Power  = 251.1180 uW   (75%)
+  Net Switching Power  =  83.7815 uW   (25%)
+                         ---------
+Total Dynamic Power    = 334.8994 uW  (100%)
+
+Cell Leakage Power     =  13.4807 uW
+
+
+                 Internal         Switching           Leakage            Total
+Power Group      Power            Power               Power              Power   (   %    )  Attrs
+--------------------------------------------------------------------------------------------------
+io_pad             0.0000            0.0000            0.0000            0.0000  (   0.00%)
+memory             0.0000            0.0000            0.0000            0.0000  (   0.00%)
+black_box          0.0000            0.0000            0.0000            0.0000  (   0.00%)
+clock_network    115.8976            0.0000            0.0000          115.8976  (  33.27%)  i
+register          55.7351           22.5013        4.9836e+03           83.2201  (  23.89%)
+sequential         0.0000            0.0000            0.0000            0.0000  (   0.00%)
+combinational     79.4852           61.2801        8.4971e+03          149.2624  (  42.84%)
+--------------------------------------------------------------------------------------------------
+Total            251.1180 uW        83.7814 uW     1.3481e+04 nW       348.3801 uW
+1

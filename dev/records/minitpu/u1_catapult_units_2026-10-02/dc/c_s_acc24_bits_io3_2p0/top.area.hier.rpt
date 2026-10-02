@@ -1,0 +1,71 @@
+ 
+****************************************
+Report : area
+Design : top
+Version: W-2024.09
+Date   : Fri Oct  2 04:39:08 2026
+****************************************
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                          161
+Number of nets:                          1737
+Number of cells:                         1572
+Number of combinational cells:           1330
+Number of sequential cells:               219
+Number of macros/black boxes:               0
+Number of buf/inv:                        227
+Number of references:                      49
+
+Combinational area:               1386.923999
+Buf/Inv area:                      126.616001
+Noncombinational area:            1146.460035
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                  2533.384035
+Total area:                 undefined
+
+Hierarchical area distribution
+------------------------------
+
+                                  Global cell area          Local cell area
+                                  ------------------  ---------------------------- 
+Hierarchical cell                 Absolute   Percent  Combi-     Noncombi-  Black-
+                                  Total      Total    national   national   boxes   Design
+--------------------------------  ---------  -------  ---------  ---------  ------  -----------------------------
+top                               2533.3840    100.0  1386.9240  1090.6000  0.0000  top
+u0/clk_gate_add_0_run_inst/add_0_run_v10_Pop_mioi_inst/add_0_run_v10_Pop_mioi_v10_Pop_mio_wait_dp_inst/v10_Pop_mioi_idat_bfwt_23_0_reg
+                                     3.9900      0.2     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_add_0_12
+u0/clk_gate_add_0_run_inst/add_0_run_v11_Pop_mioi_inst/add_0_run_v11_Pop_mioi_v11_Pop_mio_wait_dp_inst/v11_Pop_mioi_idat_bfwt_23_0_reg
+                                     3.9900      0.2     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_add_0_13
+u0/clk_gate_add_0_run_inst/l_S_i_0_i_exp_large_7_0_lpi_1_dfm_1_1_reg
+                                     3.9900      0.2     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_add_0_0
+u0/clk_gate_add_0_run_inst/l_S_i_0_i_exp_large_7_0_lpi_1_dfm_2_reg
+                                     3.9900      0.2     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_add_0_8
+u0/clk_gate_add_0_run_inst/l_S_i_0_i_exp_s2_8_0_sva_2_1_reg
+                                     3.9900      0.2     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_add_0_5
+u0/clk_gate_add_0_run_inst/l_S_i_0_i_i_18_0_sva_reg
+                                     3.9900      0.2     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_add_0_2
+u0/clk_gate_add_0_run_inst/l_S_i_0_i_if_3_v211_qr_lpi_1_dfm_1_1_2_reg
+                                     3.9900      0.2     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_add_0_9
+u0/clk_gate_add_0_run_inst/l_S_i_0_i_sign_large_lpi_1_dfm_4_1_reg
+                                     3.9900      0.2     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_add_0_3
+u0/clk_gate_add_0_run_inst/l_S_i_0_i_sign_large_lpi_1_dfm_4_2_reg
+                                     3.9900      0.2     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_add_0_4
+u0/clk_gate_add_0_run_inst/l_S_i_0_i_stage_0_3_reg
+                                     3.9900      0.2     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_add_0_1
+u0/clk_gate_add_0_run_inst/l_S_i_0_i_v137_qr_lpi_1_dfm_1_19_3_reg
+                                     3.9900      0.2     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_add_0_7
+u0/clk_gate_add_0_run_inst/l_S_i_0_i_v137_qr_lpi_1_dfm_1_2_1_reg
+                                     3.9900      0.2     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_add_0_6
+u0/clk_gate_add_0_run_inst/reg_v12_Push_mioi_iswt0_cse_reg
+                                     3.9900      0.2     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_add_0_11
+u0/clk_gate_add_0_run_inst/v12_Push_mioi_idat_14_0_reg
+                                     3.9900      0.2     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_add_0_10
+--------------------------------  ---------  -------  ---------  ---------  ------  -----------------------------
+Total                                                 1386.9240  1146.4600  0.0000
+
+1

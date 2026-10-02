@@ -1,0 +1,142 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : top
+Version: W-2024.09
+Date   : Fri Oct  2 04:41:15 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: u0/mul_0_run_inst/mul_0_run_v1_Pop_mioi_inst/mul_0_run_v1_Pop_mioi_v1_Pop_mio_wait_dp_inst/v1_Pop_mioi_bcwt_reg
+              (rising edge-triggered flip-flop clocked by ideal_clock)
+  Endpoint: u0/mul_0_run_inst/v2_Push_mioi_idat_22_16_reg[6]
+            (rising edge-triggered flip-flop clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  top                5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                                       Fanout     Trans      Incr       Path
+  ------------------------------------------------------------------------------------
+  clock ideal_clock (rise edge)                                     0.00       0.00
+  clock network delay (ideal)                                       0.00       0.00
+  u0/mul_0_run_inst/mul_0_run_v1_Pop_mioi_inst/mul_0_run_v1_Pop_mioi_v1_Pop_mio_wait_dp_inst/v1_Pop_mioi_bcwt_reg/CK (DFFR_X1)
+                                                          0.00      0.00       0.00 r
+  u0/mul_0_run_inst/mul_0_run_v1_Pop_mioi_inst/mul_0_run_v1_Pop_mioi_v1_Pop_mio_wait_dp_inst/v1_Pop_mioi_bcwt_reg/Q (DFFR_X1)
+                                                          0.09      0.18       0.18 r
+  u0/mul_0_run_inst/mul_0_run_v1_Pop_mioi_inst/v1_Pop_mioi_bcwt (net)
+                                               16                   0.00       0.18 r
+  U306/A1 (AOI22_X1)                                      0.09      0.03       0.21 r
+  U306/ZN (AOI22_X1)                                      0.05      0.08       0.29 f
+  n356 (net)                                   11                   0.00       0.29 f
+  U355/A2 (NOR2_X1)                                       0.05      0.02       0.31 f
+  U355/ZN (NOR2_X1)                                       0.05      0.08       0.38 r
+  intadd_2/B[1] (net)                           3                   0.00       0.38 r
+  U448/A (INV_X1)                                         0.05      0.02       0.40 r
+  U448/ZN (INV_X1)                                        0.01      0.02       0.42 f
+  n260 (net)                                    2                   0.00       0.42 f
+  U450/A1 (NOR3_X1)                                       0.01      0.01       0.43 f
+  U450/ZN (NOR3_X1)                                       0.06      0.07       0.50 r
+  n273 (net)                                    3                   0.00       0.50 r
+  U451/A (AOI21_X1)                                       0.06      0.02       0.52 r
+  U451/ZN (AOI21_X1)                                      0.02      0.03       0.54 f
+  intadd_0/A[0] (net)                           1                   0.00       0.54 f
+  intadd_0/U13/A (FA_X1)                                  0.02      0.02       0.57 f
+  intadd_0/U13/CO (FA_X1)                                 0.01      0.08       0.65 f
+  intadd_0/n12 (net)                            1                   0.00       0.65 f
+  intadd_0/U12/CI (FA_X1)                                 0.01      0.02       0.67 f
+  intadd_0/U12/CO (FA_X1)                                 0.01      0.07       0.74 f
+  intadd_0/n11 (net)                            1                   0.00       0.74 f
+  intadd_0/U11/CI (FA_X1)                                 0.01      0.02       0.76 f
+  intadd_0/U11/CO (FA_X1)                                 0.01      0.07       0.83 f
+  intadd_0/n10 (net)                            1                   0.00       0.83 f
+  intadd_0/U10/CI (FA_X1)                                 0.01      0.02       0.85 f
+  intadd_0/U10/CO (FA_X1)                                 0.01      0.07       0.92 f
+  intadd_0/n9 (net)                             1                   0.00       0.92 f
+  intadd_0/U9/CI (FA_X1)                                  0.01      0.02       0.94 f
+  intadd_0/U9/CO (FA_X1)                                  0.01      0.07       1.01 f
+  intadd_0/n8 (net)                             1                   0.00       1.01 f
+  intadd_0/U8/CI (FA_X1)                                  0.01      0.02       1.03 f
+  intadd_0/U8/CO (FA_X1)                                  0.01      0.07       1.10 f
+  intadd_0/n7 (net)                             1                   0.00       1.10 f
+  intadd_0/U7/CI (FA_X1)                                  0.01      0.02       1.12 f
+  intadd_0/U7/CO (FA_X1)                                  0.01      0.07       1.19 f
+  intadd_0/n6 (net)                             1                   0.00       1.19 f
+  intadd_0/U6/CI (FA_X1)                                  0.01      0.02       1.21 f
+  intadd_0/U6/CO (FA_X1)                                  0.01      0.07       1.28 f
+  intadd_0/n5 (net)                             1                   0.00       1.28 f
+  intadd_0/U5/CI (FA_X1)                                  0.01      0.02       1.30 f
+  intadd_0/U5/CO (FA_X1)                                  0.01      0.07       1.37 f
+  intadd_0/n4 (net)                             1                   0.00       1.37 f
+  intadd_0/U4/CI (FA_X1)                                  0.01      0.02       1.39 f
+  intadd_0/U4/CO (FA_X1)                                  0.01      0.07       1.47 f
+  intadd_0/n3 (net)                             1                   0.00       1.47 f
+  intadd_0/U3/CI (FA_X1)                                  0.01      0.02       1.48 f
+  intadd_0/U3/CO (FA_X1)                                  0.01      0.07       1.56 f
+  intadd_0/n2 (net)                             1                   0.00       1.56 f
+  intadd_0/U2/CI (FA_X1)                                  0.01      0.02       1.57 f
+  intadd_0/U2/CO (FA_X1)                                  0.01      0.07       1.64 f
+  intadd_0/n1 (net)                             1                   0.00       1.64 f
+  U466/A (INV_X1)                                         0.01      0.01       1.66 f
+  U466/ZN (INV_X1)                                        0.01      0.02       1.68 r
+  n380 (net)                                    2                   0.00       1.68 r
+  U467/A2 (NAND2_X1)                                      0.01      0.01       1.69 r
+  U467/ZN (NAND2_X1)                                      0.01      0.02       1.71 f
+  n352 (net)                                    3                   0.00       1.71 f
+  U468/A (INV_X1)                                         0.01      0.01       1.73 f
+  U468/ZN (INV_X1)                                        0.02      0.03       1.75 r
+  n296 (net)                                    3                   0.00       1.75 r
+  U481/A2 (NAND2_X1)                                      0.02      0.02       1.77 r
+  U481/ZN (NAND2_X1)                                      0.04      0.05       1.82 f
+  n329 (net)                                   10                   0.00       1.82 f
+  U490/B2 (AOI221_X1)                                     0.04      0.02       1.84 f
+  U490/ZN (AOI221_X1)                                     0.09      0.14       1.98 r
+  n330 (net)                                    4                   0.00       1.98 r
+  U493/A1 (NAND3_X1)                                      0.09      0.02       2.00 r
+  U493/ZN (NAND3_X1)                                      0.03      0.05       2.05 f
+  n321 (net)                                    3                   0.00       2.05 f
+  U494/A2 (NOR2_X1)                                       0.03      0.01       2.07 f
+  U494/ZN (NOR2_X1)                                       0.04      0.06       2.13 r
+  n316 (net)                                    3                   0.00       2.13 r
+  U496/A1 (NAND2_X1)                                      0.04      0.02       2.14 r
+  U496/ZN (NAND2_X1)                                      0.02      0.04       2.18 f
+  n312 (net)                                    4                   0.00       2.18 f
+  U497/B2 (OAI21_X1)                                      0.02      0.02       2.19 f
+  U497/ZN (OAI21_X1)                                      0.03      0.05       2.24 r
+  n303 (net)                                    2                   0.00       2.24 r
+  U498/A (OAI21_X1)                                       0.03      0.01       2.26 r
+  U498/ZN (OAI21_X1)                                      0.01      0.03       2.28 f
+  n302 (net)                                    1                   0.00       2.28 f
+  U499/B (XOR2_X1)                                        0.01      0.02       2.30 f
+  U499/Z (XOR2_X1)                                        0.02      0.06       2.36 f
+  n311 (net)                                    2                   0.00       2.36 f
+  U505/C1 (OAI211_X1)                                     0.02      0.01       2.37 f
+  U505/ZN (OAI211_X1)                                     0.02      0.03       2.40 r
+  u0/mul_0_run_inst/N43 (net)                   1                   0.00       2.40 r
+  u0/mul_0_run_inst/v2_Push_mioi_idat_22_16_reg[6]/D (DFFR_X1)
+                                                          0.02      0.01       2.41 r
+  data arrival time                                                            2.41
+
+  clock ideal_clock (rise edge)                                     3.33       3.33
+  clock network delay (ideal)                                       0.00       3.33
+  u0/mul_0_run_inst/v2_Push_mioi_idat_22_16_reg[6]/CK (DFFR_X1)     0.00       3.33 r
+  library setup time                                               -0.04       3.29
+  data required time                                                           3.29
+  ------------------------------------------------------------------------------------
+  data required time                                                           3.29
+  data arrival time                                                           -2.41
+  ------------------------------------------------------------------------------------
+  slack (MET)                                                                  0.88
+
+
+1

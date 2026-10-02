@@ -1,0 +1,31 @@
+ 
+****************************************
+Report : area
+Design : mtpu_macc_oreg
+Version: W-2024.09
+Date   : Fri Oct  2 04:37:58 2026
+****************************************
+
+Information: Updating design information... (UID-85)
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                           57
+Number of nets:                           361
+Number of cells:                          275
+Number of combinational cells:            251
+Number of sequential cells:                24
+Number of macros/black boxes:               0
+Number of buf/inv:                         46
+Number of references:                      21
+
+Combinational area:                408.576003
+Buf/Inv area:                       24.472000
+Noncombinational area:             108.527996
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                   517.103999
+Total area:                 undefined
+1
