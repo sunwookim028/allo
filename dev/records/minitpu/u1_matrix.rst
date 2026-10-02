@@ -55,13 +55,19 @@ in what Allo can say.
 7. **Report AMC's silent miscompiles** (A5 ``a or b or c`` drops ``c``; A7 a
    two-scalar loop exits with the wrong one) to AMC's author? *[yes, after the
    owner's go-ahead]*
-8. **A pipelined leaf** (``vpu_bf16_mul_pipe``, U1 multipliers). In Allo it
-   is the comb unit: the simulator is untimed, ``s.pipeline`` gives II not
-   depth, and a ``Stream`` between stage kernels is a FIFO, not a register
-   (in csim it halves throughput at depth 1). Add a register/latency form
-   (``Reg[T]``, ``delay``, or ``latency=`` on a kernel or unit), or accept
-   "latency not expressible" as a recorded deviation like item 4?
-   *[recorded deviation for U1; the proposal goes with item 4 to U3]*
+8. **Declared latency on a unit** (``u1_pipe_2026-10-02.rst``). Allo cannot
+   state it; the simulator is untimed and csim's cycles are the handshakes'
+   (2 per kernel, whatever the unit). Unconstrained, Catapult picks the
+   latency from the clock (acc24: 2 at 5 ns, 3 at 2 ns, against MiniTPU's 3);
+   a hand-patched I/O cycle constraint pins it exactly (measured = declared
+   for 1, 2, 3, 6) and Catapult refuses an infeasible one. Adopt the proposal
+   (``latency=L, ii=`` on a kernel/unit; Catapult honours via ``cycle set
+   -from``, csim and the simulator report "unchecked"/"untimed", RTLGen/AMC
+   refuse; the harness checks it on RTL only)? The multipliers reached the same finding
+   independently (``vpu_bf16_mul_pipe``: a ``Stream`` between stage kernels is
+   a FIFO, not a register; at depth 1 it halves throughput).
+   *[yes, as a D-n proposal;
+   csim stays "unchecked" until U3 needs cycle-locked composition]*
 9. **Two more SystemC bugs from the multipliers** (S4: ``bf16 -> f32``
    widening does not compile; S5: a ``UInt(24)`` port cannot be read back).
    *[fix on ``systemc-u1-fixes`` with a regression test each]*
@@ -164,6 +170,55 @@ in what Allo can say.
        ``u1_bf16_add_amc/repros.py``. These are AMC defects, to file with
        AMC (D-2) after triage. Also T1: at a 3.333 ns target AMC's delay
        model misses by 1.24 ns
+
+``vpu_bf16_add_pipe`` (latency 2)
+---------------------------------
+
+Same function as ``vpu_bf16_add``, so the same two Allo expressions. The
+value cells repeat the pilot's; the latency cells are new. Evidence:
+``u1_pipe_2026-10-02.rst`` (values ``check.txt``, csim ``csim_cycles.txt``,
+RTL ``rtl_cmp.txt``).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 40 42
+
+   * - Tool
+     - Cell
+     - Evidence / note
+   * - Allo simulator, ``native``
+     - **finding, semantic mismatch**: 250,955/251,936; the 981 are the RTL's
+       NaN (``+0x7FC0``) and ``(+0)+(-0)=-0`` rules. Latency: **untimed**
+     - as the pilot
+   * - Allo simulator, ``bits``
+     - **match** 251,936/251,936 (B1 workaround). Latency: **untimed**
+     - ``bf16_add.bits`` reused unchanged
+   * - SystemC csim, ``native``
+     - **finding, semantic mismatch**: 249,907/251,936 (2,028 ``ac::bfloat16``
+       NaN ``0x7FFF``/``0xFFFF``; 1 signed zero). Latency: **finding, semantic
+       mismatch** (L3): csim reads 2 for every one-kernel unit -- the
+       handshakes' count, equal to 2 here by coincidence
+     - ``csim_cycles.py`` stamps the emitted testbench
+   * - SystemC csim, ``bits``
+     - **match** 251,936/251,936; latency as ``native`` (unchecked)
+     - with the merged emitter fixes
+   * - Catapult RTL, ``bits``
+     - **match** 251,936/251,936 **at latency 2, II=1** (5.0 ns) -- but only
+       with ``s.unroll("leading_zeros17:offset")``: rolled, Catapult says
+       "II 1" and the RTL takes 2 or 18 cycles per vector, data-dependent
+       (1.42 average; **finding L5**), and fails to schedule at 2.0 ns. At
+       2.0 ns unrolled: latency **3**, not 2 (**L2**). Pinned by a
+       hand-patched I/O cycle constraint: 2 at 5.0 ns; at 2.0 ns Catapult
+       **refuses** (SCHD-30) (**L4**)
+     - Verilator ``stream`` shape vs MiniTPU ``valid``; full stimulus
+   * - Catapult RTL, ``native``
+     - **finding, semantic mismatch** (NaN, signed zero, as the pilot);
+       latency **1** at 5.0 ns where ``bits`` gives 2 (**L2**)
+     - ``bf16_native_ii1_5p0``
+   * - RTLGen, AMC
+     - **n/a** (not run): the function is the pilot's; neither has a latency
+       directive to test (proposal: refuse)
+     - pilot rows
 
 ``vpu_bf16_mul``
 ----------------
@@ -283,6 +338,61 @@ one in Allo at all: on the simulator and SystemC side **it does not** (L1-L3).
    * - Catapult, RTLGen, AMC
      - not tried
      - out of this session's scope
+
+``mxu_acc24_add_pipe`` (latency 3)
+----------------------------------
+
+New variants in ``units/acc24_add_pipe.py``: ``native`` (float32 + bitcast
+round, a workaround), ``bits`` (the ``.sv``, three stages in one kernel),
+``staged`` (three kernels, one ``Stream`` per stage register bank).
+Evidence: ``u1_pipe_2026-10-02.rst``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 40 42
+
+   * - Tool
+     - Cell
+     - Evidence / note
+   * - Allo simulator, ``native``
+     - **finding, workaround + semantic mismatch**: 350,021/352,116. No acc24
+       type (V2); 113 double roundings (one acc24 ulp, README divergence 5);
+       1,981 NaN encodings; 1 signed zero. Latency **untimed**
+     - ``check.txt``
+   * - Allo simulator, ``bits`` / ``staged``
+     - **match** 352,116/352,116 both, first time, after B1 spare bits at 5
+       compares (V3). Latency **untimed**; ``staged`` states three stages and
+       the simulator cannot see them (L1)
+     - 
+   * - SystemC csim, ``native``
+     - **finding, semantic mismatch** (V1): 349,935/352,116 -- **every NaN
+       result (2,067) becomes a zero** (``-0``/``+0``): ``ac_ieee_float<binary32>`` NaN
+       is ``0x7FFFFFFF`` and the round step carries it into the sign; plus the
+       113 double roundings and 1 signed zero
+     - NaN encoding probed in C++
+   * - SystemC csim, ``bits`` / ``staged``
+     - **match** 352,116/352,116 both. Latency **finding** (L3): csim reads 2
+       (``bits``, with or without ``s.pipeline``) and 6 (``staged``) for a unit
+       of latency 3
+     - ``csim_cycles.txt``
+   * - Catapult RTL, ``bits``
+     - **match** 352,116/352,116 bit-exact on every build. Latency: unrolled
+       LZC + ``s.pipeline``, **2** at 5.0 ns and 3 at 2.0 ns (**L2**, the
+       clock decides); rolled (as written), 19 cyc/vector under a
+       "pipelined II=1" message (**L5**). **Pinned to 3 at II=1** by the
+       hand-patched ``cycle set {v12.Push()} -from {v10.Pop()} -equal 3``,
+       at 5.0 and 2.0 ns; -equal 1 and 6 also measured exactly; an
+       infeasible loop constraint is refused (SCHD-3) (**L4**). ``cycle set
+       <loop> -equal 3`` is not latency (measured 2)
+     - ``emit_csyn.py --io``, ``cmp_rtl.py``
+   * - Catapult RTL, ``staged``
+     - **finding, missing abstraction** (L1): latency **5** at 5.0 ns, II=1
+       (unrolled), not 3: stage kernels are not register stages
+     - ``acc24_staged_u_ii1_5p0``
+   * - RTLGen, AMC
+     - **not run** (time bound). Expected to take ``bits``; no latency
+       directive in either
+     - proposal: refuse a declared latency
 
 Environment findings met on the way
 -----------------------------------

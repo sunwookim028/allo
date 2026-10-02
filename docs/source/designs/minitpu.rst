@@ -731,7 +731,12 @@ seeded random. Exhaustive sweeps stay on the RTL side, where MiniTPU's own
 **Latency** is declared in the unit file, from the RTL's parameters or
 ``docs/isa_latency.json``, and checked against the RTL's measured value. Allo's
 simulator is untimed, so on the Allo side latency is checked only on RTL that
-Allo produced (Catapult today), on the Catapult track.
+Allo produced (Catapult today), on the Catapult track. Allo cannot yet
+*declare* a latency either: SystemC csim's cycles are its handshakes' (2 per
+kernel, whatever the unit), Catapult picks the latency from the clock unless an
+I/O cycle constraint pins it, and a chain of stage kernels is not a chain of
+registers. Measurements and a proposal:
+``dev/records/minitpu/u1_pipe_2026-10-02.rst``.
 
 ``vpu_bf16_add`` as measured, 2026-10-02
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

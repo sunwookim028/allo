@@ -10,6 +10,7 @@ in the module's header comment and two register banks (``s1_*_q``, then
 
 from examples.minitpu.harness import ref, rtl
 from examples.minitpu.harness import stimulus as stim
+from examples.minitpu.units import bf16_add
 
 RTL = rtl.RtlUnit(
     top="vpu_bf16_add_pipe",
@@ -30,7 +31,11 @@ def stimulus():
     return stim.binary_bf16()
 
 
-VARIANTS = {}
+# Same function as vpu_bf16_add, so the same two Allo expressions: ``bits`` is
+# bf16_add's line-for-line transcription (with its B1 spare-bit workaround).
+# Neither states the latency -- the simulator is untimed; what an Allo unit can
+# say about "latency 2" is dev/records/minitpu/u1_pipe_2026-10-02.rst.
+VARIANTS = bf16_add.VARIANTS
 
 # Every difference between IEEE and the RTL, by cause (first match wins);
 # also the EXPLAIN rules for an Allo variant that computes IEEE.
@@ -40,4 +45,6 @@ DEVIATIONS = [
     ("(+0)+(-0) = -0 (IEEE RNE: +0)",
      lambda s, g, w: ref.is_zero(s[0]) and ref.is_zero(s[1]) and int(w) == int(s[1])),
 ]
-EXPLAIN = DEVIATIONS
+# Allo variants are explained by bf16_add's rules, which add Catapult's
+# ac_std_float NaN encoding (met by the SystemC ``native`` build).
+EXPLAIN = bf16_add.EXPLAIN
