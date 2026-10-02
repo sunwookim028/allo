@@ -1,0 +1,112 @@
+ 
+****************************************
+Report : reference
+Design : rf_0
+Version: W-2024.09
+Date   : Fri Oct  2 16:41:14 2026
+****************************************
+
+Attributes:
+    b - black box (unknown)
+   bo - allows boundary optimization
+    d - dont_touch
+   mo - map_only
+    h - hierarchical
+    n - noncombinational
+    r - removable
+    s - synthetic operator
+    u - contains unmapped logic
+
+Reference          Library       Unit Area   Count    Total Area   Attributes
+-----------------------------------------------------------------------------
+AOI22_X1           NangateOpenCellLibrary
+                                  1.330000     768   1021.440033  
+CLKBUF_X1          NangateOpenCellLibrary
+                                  0.798000      16     12.768000  
+DFFR_X1            NangateOpenCellLibrary
+                                  5.320000       2     10.640000  n
+DFF_X1             NangateOpenCellLibrary
+                                  4.522000     512   2315.263916  n
+INV_X1             NangateOpenCellLibrary
+                                  0.532000      17      9.044000  
+NAND2_X1           NangateOpenCellLibrary
+                                  0.798000      16     12.768000  
+NAND3_X1           NangateOpenCellLibrary
+                                  1.064000      26     27.664000  
+NAND4_X1           NangateOpenCellLibrary
+                                  1.330000     192    255.360008  
+NOR2_X1            NangateOpenCellLibrary
+                                  0.798000      37     29.525999  
+NOR2_X2            NangateOpenCellLibrary
+                                  1.330000      96    127.680004  
+OR2_X1             NangateOpenCellLibrary
+                                  1.064000       7      7.448000  
+OR4_X1             NangateOpenCellLibrary
+                                  1.596000      48     76.607998  
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_0
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_1
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_2
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_3
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_4
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_5
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_6
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_7
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_8
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_9
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_10
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_11
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_12
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_13
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_14
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_15
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_16
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_17
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_18
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_19
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_20
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_21
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_22
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_23
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_24
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_25
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_26
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_27
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_28
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_29
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_30
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_rf_0_wr_31
+                                  3.990000       1      3.990000  b, h
+-----------------------------------------------------------------------------
+Total 44 references                                  4033.889959
+1

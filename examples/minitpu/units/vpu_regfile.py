@@ -63,6 +63,11 @@ Catapult RTL a cycle is whatever the schedule makes of an iteration, which
     ``sc_signal`` storage (the record's form e, no hand patch), so Catapult's
     RTL reads at latency 0 and shows a write 1 edge later, as MiniTPU does.
     SystemC only. ``dev/records/minitpu/u2_comb_wire_impl_2026-10-02.rst``.
+``comb_unreset`` (README D-14)
+    ``comb`` with ``mem @ Stateful(reset=False)``: the storage is not reset,
+    as MiniTPU's is not. The emitter writes it from a clock-edge ``SC_METHOD``
+    with no reset action, and ``run.tcl`` sets ``-RESET_CLEARS_ALL_REGS no``.
+    SystemC only. ``dev/records/minitpu/u2_unreset_impl_2026-10-02.rst``.
 ``trace_raw``
     ``trace`` as first written (no workarounds); evidence only.
 
@@ -703,6 +708,66 @@ def comb_read(n, w=16):
     return top
 
 
+def comb_unreset(n, w=16):
+    """D-14: ``comb`` with ``mem`` declared ``@ Stateful(reset=False)``: the
+    storage survives reset, as MiniTPU's does (``rst_ni`` unused). The SystemC
+    emitter moves the write to a clock-edge ``SC_METHOD`` with no reset action
+    and ``run.tcl`` gets ``-RESET_CLEARS_ALL_REGS no``. The body is ``comb``'s."""
+    W = UInt(w)
+
+    @df.region()
+    def top(RA: A5[n], RB: A5[n], RC: A5[n], WA: A5[n], WD: W[n], WE: uint1[n],
+            QA: W[n], QB: W[n], QC: W[n]):
+        w_ra: Wire[UInt(5)]
+        w_rb: Wire[UInt(5)]
+        w_rc: Wire[UInt(5)]
+        w_wa: Wire[UInt(5)]
+        w_wd: Wire[UInt(w)]
+        w_we: Wire[uint1]
+        w_qa: Wire[UInt(w), comb]
+        w_qb: Wire[UInt(w), comb]
+        w_qc: Wire[UInt(w), comb]
+
+        @df.kernel(mapping=[1], args=[RA, RB, RC, WA, WD, WE])
+        def src(ra: A5[n], rb: A5[n], rc: A5[n], wa: A5[n], wd: W[n], we: uint1[n]):
+            for t in range(n):
+                w_ra.put(ra[t])
+                w_rb.put(rb[t])
+                w_rc.put(rc[t])
+                w_wa.put(wa[t])
+                w_wd.put(wd[t])
+                w_we.put(we[t])
+
+        @df.kernel(mapping=[1], args=[])
+        def rf():
+            mem: W[32] @ Stateful(reset=False)
+            for _ in range(n):
+                a5: UInt(5) = w_ra.get()
+                a: int32 = a5  # B4 workaround; B5: not in one step
+                b5: UInt(5) = w_rb.get()
+                b: int32 = b5  # B4 workaround; B5: not in one step
+                c5: UInt(5) = w_rc.get()
+                c: int32 = c5  # B4 workaround; B5: not in one step
+                x5: UInt(5) = w_wa.get()
+                x: int32 = x5  # B4 workaround; B5: not in one step
+                d: UInt(w) = w_wd.get()
+                e: uint1 = w_we.get()
+                w_qa.put(mem[a])
+                w_qb.put(mem[b])
+                w_qc.put(mem[c])
+                if e:
+                    mem[x] = d
+
+        @df.kernel(mapping=[1], args=[QA, QB, QC])
+        def sink(qa: W[n], qb: W[n], qc: W[n]):
+            for t in range(n):
+                qa[t] = w_qa.get()
+                qb[t] = w_qb.get()
+                qc[t] = w_qc.get()
+
+    return top
+
+
 VARIANTS = {
     "trace": (trace, _run_flat),
     "trace_raw": (trace_raw, _run_flat),
@@ -714,4 +779,5 @@ VARIANTS = {
     "wire": (wire, _run_flat),
     "wire_stateful": (wire_stateful, _run_flat),
     "comb": (comb_read, _run_flat),
+    "comb_unreset": (comb_unreset, _run_flat),
 }

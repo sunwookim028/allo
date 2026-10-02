@@ -1,0 +1,25 @@
+--- kernel.cpp.emitted	2026-10-02 16:42:22.133652658 -0400
++++ kernel.cpp	2026-10-02 16:42:22.145652343 -0400
+@@ -812,19 +812,19 @@
+   void snk_v69() {
+     ch_v69.ResetRead();
+     wait();
+-    { std::ofstream _f("output0.data"); for (int f = 0; f < 64; ++f) _f << (long long)(ch_v69.Pop()) << "\n"; }
++    { std::ofstream _f("output0.data"); for (int f = 0; f < 64; ++f) _f << (ch_v69.Pop()).to_int64() << "\n"; }
+     if (++_snk_done == 3) sc_stop();
+   }
+   void snk_v70() {
+     ch_v70.ResetRead();
+     wait();
+-    { std::ofstream _f("output1.data"); for (int f = 0; f < 64; ++f) _f << (long long)(ch_v70.Pop()) << "\n"; }
++    { std::ofstream _f("output1.data"); for (int f = 0; f < 64; ++f) _f << (ch_v70.Pop()).to_int64() << "\n"; }
+     if (++_snk_done == 3) sc_stop();
+   }
+   void snk_v71() {
+     ch_v71.ResetRead();
+     wait();
+-    { std::ofstream _f("output2.data"); for (int f = 0; f < 64; ++f) _f << (long long)(ch_v71.Pop()) << "\n"; }
++    { std::ofstream _f("output2.data"); for (int f = 0; f < 64; ++f) _f << (ch_v71.Pop()).to_int64() << "\n"; }
+     if (++_snk_done == 3) sc_stop();
+   }
+ };

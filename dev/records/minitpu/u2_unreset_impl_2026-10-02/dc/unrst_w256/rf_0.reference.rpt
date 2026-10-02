@@ -1,0 +1,30 @@
+ 
+****************************************
+Report : reference
+Design : rf_0
+Version: W-2024.09
+Date   : Fri Oct  2 16:47:17 2026
+****************************************
+
+Attributes:
+    b - black box (unknown)
+   bo - allows boundary optimization
+    d - dont_touch
+   mo - map_only
+    h - hierarchical
+    n - noncombinational
+    r - removable
+    s - synthetic operator
+    u - contains unmapped logic
+
+Reference          Library       Unit Area   Count    Total Area   Attributes
+-----------------------------------------------------------------------------
+DFFR_X1            NangateOpenCellLibrary
+                                  5.320000       2     10.640000  n
+OR2_X1             NangateOpenCellLibrary
+                                  1.064000       1      1.064000  
+rf_0_comb                     22775.186597       1  22775.186597  h
+rf_0_wr                       37417.686650       1  37417.686650  b, h, n
+-----------------------------------------------------------------------------
+Total 4 references                                  60204.577247
+1
