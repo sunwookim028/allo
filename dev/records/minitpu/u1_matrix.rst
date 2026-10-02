@@ -480,3 +480,7 @@ Environment findings met on the way
 * The emitted SystemC testbench and Catapult's g++ 10.3: the ``allo`` env's
   activate script puts ``gcc-toolset-13`` first and Catapult's module puts its
   own ``python`` first; ``harness/env-zhang21.sh`` fixes the order.
+* **Unconfirmed, seen once:** a SystemC kernel that reads back its own
+  output-port element (``c[i] = c[i] * 256``) failed g++ with ``'v2' was not
+  declared`` (``systemc-u1-fixes``, while writing the S5 test). Not yet
+  reproduced on purpose.
