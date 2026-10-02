@@ -2424,29 +2424,32 @@ class ASTTransformer(ASTBuilder):
         else:
             lhs = build_stmt(ctx, node.left)
             rhs = build_stmt(ctx, node.comparators[0])
-            # Cast lhs and rhs to the same type
-            lhs = ASTTransformer.build_cast_op(ctx, lhs, node.left.dtype, node.dtype)
+            # Cast lhs and rhs to the common operand type
+            cmp_type = node.operand_dtype
+            lhs = ASTTransformer.build_cast_op(ctx, lhs, node.left.dtype, cmp_type)
             rhs = ASTTransformer.build_cast_op(
-                ctx, rhs, node.comparators[0].dtype, node.dtype
+                ctx, rhs, node.comparators[0].dtype, cmp_type
             )
             # avoid rebuilding the same op
             rhs_res, lhs_res = ASTTransformer.get_mlir_op_result(
                 ctx, rhs
             ), ASTTransformer.get_mlir_op_result(ctx, lhs)
             dtype = str(rhs_res.type)
-            if dtype.startswith("i") or dtype.startswith("ui"):
-                op = ATTR_MAP["int" if dtype.startswith("i") else "uint"][
+            # MLIR integers are signless (`i8`, never `ui8`), so signedness
+            # must come from the Allo type, as for div/rem/shift/min/max.
+            if isinstance(cmp_type, (Int, UInt, Index)):
+                op = ATTR_MAP["uint" if isinstance(cmp_type, UInt) else "int"][
                     type(node.ops[0])
                 ]
                 predicate = IntegerAttr.get(IntegerType.get_signless(64), op)
                 return arith_d.CmpIOp(predicate, lhs_res, rhs_res, ip=ctx.get_ip())
-            if dtype.startswith("!allo.Fixed") or dtype.startswith("!allo.UFixed"):
-                op = ATTR_MAP["fixed" if dtype.startswith("f") else "ufixed"][
+            if isinstance(cmp_type, (Fixed, UFixed)):
+                op = ATTR_MAP["ufixed" if isinstance(cmp_type, UFixed) else "fixed"][
                     type(node.ops[0])
                 ]
                 predicate = IntegerAttr.get(IntegerType.get_signless(64), op)
                 return allo_d.CmpFixedOp(predicate, lhs_res, rhs_res, ip=ctx.get_ip())
-            if dtype.startswith("f"):
+            if isinstance(cmp_type, Float):
                 op = ATTR_MAP["float"][type(node.ops[0])]
                 predicate = IntegerAttr.get(IntegerType.get_signless(64), op)
                 return arith_d.CmpFOp(predicate, lhs_res, rhs_res, ip=ctx.get_ip())
