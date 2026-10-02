@@ -1,0 +1,41 @@
+{
+ "clock_period_ns": 2.0,
+ "definition": "latency: rising edges from the input-accepting edge to the edge after which the output is visible, no stall; ii: cycles between iterations of the I/O loop",
+ "solution": "/work/shared/users/phd/sk3463/scratch/u3fc/cat/composed_w32_2p0.prj/build/Catapult/top.v1",
+ "tool": "catapult",
+ "units": {
+  "consumer_0": {
+   "ii": 1,
+   "io": {
+    "v17.Pop()": 0,
+    "v18.Push()": 2,
+    "v19.Push()": 0,
+    "v20.Pop()": 1
+   },
+   "iterations": 64,
+   "latency": 2,
+   "loop": "l_S_t_0_t1",
+   "loop_c_steps": 3,
+   "port_style": "connections",
+   "process": "/top/consumer_0/run",
+   "status": "scheduled"
+  },
+  "producer_0": {
+   "ii": 1,
+   "io": {
+    "v0.Pop()": 0,
+    "v1.Pop()": 0,
+    "v2.Pop()": 0,
+    "v3.Push()": 0,
+    "v4.Push()": 1
+   },
+   "iterations": 64,
+   "latency": 1,
+   "loop": "l_S_t_0_t",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/top/producer_0/run",
+   "status": "scheduled"
+  }
+ }
+}

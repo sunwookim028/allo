@@ -272,6 +272,18 @@ reaches RTL uses the explicit ring (``trace``/``ported``/``wire``).
        as a self-loop, ``_enq``/``_deq`` ports, synchronous ``_cnt``) is a chained feedback
        path; csim accepts it. Not refused by the emitter
      - ``catapult/stream_*/csyn.log.gz``.
+   * - Catapult, ``composed`` (two-kernel ``Stream``, U3 prep)
+     - **match on the consumer-visible contract, every instance**: ``pop_data`` on every pop
+       cycle 11,694/11,694 (w32d4), 13,120/13,120 (output), 2,767/2,767 (input, after the S7 TB
+       patch); ``empty`` 99.6 % at s=-2, ``full`` 90 %. Scheduled at II=1 in five builds (C1 is
+       the self-loop only). Push to pop 3 cycles (MiniTPU 1); no pass-through on full (M4): 0.3-
+       0.6 % stall cycles. Stream alone (DC): 867 / 6,640 / 6,510 um^2 = -8 / +8 / -5 % vs
+       MiniTPU + oreg, a third to a half below the ring. Reset: region-only (words survive a
+       mid-trace ``rst_ni``); overflow: ``put`` stalls, ``try_put`` refuses = the RTL's drop
+       (M5: the output FIFO must use ``try_put``). Part A: no MXU consumer peeks
+       (``try_get`` suffices; ``mxu.sv:111``, ``mxu_pop_engine.sv:35-45``)
+     - ``u3_fifo_composed_2026-10-02.rst``; simulator / csim ``pop_data`` exact too
+       (S8 on the 64-bit instance in csim, as before).
    * - RTLGen
      - **match** 11,212/11,212 (4,096 cycles) at **II=1** as written and partitioned (identical
        netlists): 4 registers and a **combinational** read mux -- ``pop_data`` is asynchronous

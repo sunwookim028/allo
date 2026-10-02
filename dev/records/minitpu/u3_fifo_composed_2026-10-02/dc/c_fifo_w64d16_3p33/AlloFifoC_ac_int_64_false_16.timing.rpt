@@ -1,0 +1,77 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : AlloFifoC_ac_int_64_false_16
+Version: W-2024.09
+Date   : Fri Oct  2 15:17:10 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: AlloFifoC_ac_int_64_false_16_Seq_inst/tail_reg[3]
+              (rising edge-triggered flip-flop clocked by ideal_clock)
+  Endpoint: deq_dat[53]
+            (output port clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  AlloFifoC_ac_int_64_false_16
+                     5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                                       Fanout     Trans      Incr       Path
+  ------------------------------------------------------------------------------------
+  clock ideal_clock (rise edge)                                     0.00       0.00
+  clock network delay (ideal)                                       0.00       0.00
+  AlloFifoC_ac_int_64_false_16_Seq_inst/tail_reg[3]/CK (DFFR_X1)
+                                                          0.00      0.00       0.00 r
+  AlloFifoC_ac_int_64_false_16_Seq_inst/tail_reg[3]/QN (DFFR_X1)
+                                                          0.05      0.11       0.11 r
+  n1464 (net)                                   9                   0.00       0.11 r
+  U858/A1 (NAND2_X1)                                      0.05      0.02       0.13 r
+  U858/ZN (NAND2_X1)                                      0.02      0.04       0.17 f
+  n731 (net)                                    4                   0.00       0.17 f
+  U869/A2 (NOR2_X1)                                       0.02      0.02       0.19 f
+  U869/ZN (NOR2_X1)                                       0.12      0.15       0.34 r
+  n1366 (net)                                  12                   0.00       0.34 r
+  U902/A (CLKBUF_X1)                                      0.12      0.01       0.35 r
+  U902/Z (CLKBUF_X1)                                      0.11      0.16       0.51 r
+  n1103 (net)                                  20                   0.00       0.51 r
+  U1108/A (CLKBUF_X1)                                     0.11      0.02       0.53 r
+  U1108/Z (CLKBUF_X1)                                     0.11      0.16       0.69 r
+  n1217 (net)                                  20                   0.00       0.69 r
+  U1446/A (CLKBUF_X1)                                     0.11      0.02       0.71 r
+  U1446/Z (CLKBUF_X1)                                     0.08      0.13       0.84 r
+  n1421 (net)                                  15                   0.00       0.84 r
+  U1626/A1 (AOI22_X1)                                     0.08      0.03       0.87 r
+  U1626/ZN (AOI22_X1)                                     0.04      0.02       0.89 f
+  n1425 (net)                                   1                   0.00       0.89 f
+  U1628/A3 (NAND4_X1)                                     0.04      0.01       0.90 f
+  U1628/ZN (NAND4_X1)                                     0.02      0.03       0.94 r
+  n1441 (net)                                   1                   0.00       0.94 r
+  U1634/A1 (OR2_X1)                                       0.02      0.01       0.94 r
+  U1634/ZN (OR2_X1)                                       0.02      0.04       0.98 r
+  deq_dat[53] (net)                             1                   0.00       0.98 r
+  deq_dat[53] (out)                                       0.02      0.05       1.03 r
+  data arrival time                                                            1.03
+
+  clock ideal_clock (rise edge)                                     3.33       3.33
+  clock network delay (ideal)                                       0.00       3.33
+  output external delay                                             0.00       3.33
+  data required time                                                           3.33
+  ------------------------------------------------------------------------------------
+  data required time                                                           3.33
+  data arrival time                                                           -1.03
+  ------------------------------------------------------------------------------------
+  slack (MET)                                                                  2.30
+
+
+1

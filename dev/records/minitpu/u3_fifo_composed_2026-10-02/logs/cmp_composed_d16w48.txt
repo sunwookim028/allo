@@ -1,0 +1,19 @@
+RTL vpu_fifo:d16w48: 10138 cycles in 4 traces (fill-full-passthrough-drain, wrap-half-full, random-legal-noreset-0, random-legal-noreset-1), 27964 defined slots, 3475 pops, 3475 pushes (7.5s)
+/work/shared/users/phd/sk3463/scratch/wt-u2fc/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui1[0m
+  warnings.warn(self.message, category=self.category)
+/work/shared/users/phd/sk3463/scratch/wt-u2fc/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui64 vs ui48[0m
+  warnings.warn(self.message, category=self.category)
+COMPOSED vpu_fifo:d16w48 composed simulator (build 0.3s, run 0.1s): pop_data 3475/3475 on pop cycles; empty 7554/10137 at s=+7 (7527 at s=0); full 7899/10137 at s=+3 (7897 at s=0)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[19:37:54] Compiling with g++ ...
+[19:37:58] Running simulation ...
+COMPOSED vpu_fifo:d16w48 composed systemc (build 0.3s, run 4.6s): pop_data 3475/3475 on pop cycles; empty 9922/10137 at s=+0 (9922 at s=0); full 8072/10137 at s=-1 (8033 at s=0)
+EXIT 0

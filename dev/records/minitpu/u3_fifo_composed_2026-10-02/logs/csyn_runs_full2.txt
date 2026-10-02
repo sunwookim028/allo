@@ -1,0 +1,11 @@
+EMITTED vpu_fifo composed n=40057 -> /work/shared/users/phd/sk3463/scratch/u3fc/cat/composed_w32_3p33_n40057.prj io=[] flush=False
+CATAPULT vpu_fifo composed n=40057 pipeline=['producer_0:t', 'consumer_0:t'] unroll=[] clock=3.33 io=[] tcl=[] flush=False: exit 0, 41s, log /work/shared/users/phd/sk3463/scratch/u3fc/cat/composed_w32_3p33_n40057.prj/csyn.log
+CATAPULT_EXIT 0 WALL 41s
+EMITTED vpu_fifo composed n=40206 -> /work/shared/users/phd/sk3463/scratch/u3fc/cat/composed_w64d16_3p33_n40206.prj io=[] flush=False
+CATAPULT vpu_fifo composed n=40206 pipeline=['producer_0:t', 'consumer_0:t'] unroll=[] clock=3.33 io=[] tcl=[] flush=False: exit 0, 42s, log /work/shared/users/phd/sk3463/scratch/u3fc/cat/composed_w64d16_3p33_n40206.prj/csyn.log
+CATAPULT_EXIT 0 WALL 42s
+PATCH-S7 3 testbench casts
+EMITTED vpu_fifo composed n=10055 -> /work/shared/users/phd/sk3463/scratch/u3fc/cat/composed_w257_3p33_n10055.prj io=[] flush=False
+CATAPULT vpu_fifo composed n=10055 pipeline=['producer_0:t', 'consumer_0:t'] unroll=[] clock=3.33 io=[] tcl=[] flush=False: exit 0, 41s, log /work/shared/users/phd/sk3463/scratch/u3fc/cat/composed_w257_3p33_n10055.prj/csyn.log
+CATAPULT_EXIT 0 WALL 41s
+ALLDONE3

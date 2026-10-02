@@ -1,0 +1,31 @@
+ 
+****************************************
+Report : area
+Design : AlloFifoC_ac_int_64_false_16
+Version: W-2024.09
+Date   : Fri Oct  2 15:17:10 2026
+****************************************
+
+Information: Updating design information... (UID-85)
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                          208
+Number of nets:                          2084
+Number of cells:                         1953
+Number of combinational cells:            883
+Number of sequential cells:              1051
+Number of macros/black boxes:               0
+Number of buf/inv:                        105
+Number of references:                      37
+
+Combinational area:               1072.778025
+Buf/Inv area:                       82.991998
+Noncombinational area:            5567.380177
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                  6640.158202
+Total area:                 undefined
+1

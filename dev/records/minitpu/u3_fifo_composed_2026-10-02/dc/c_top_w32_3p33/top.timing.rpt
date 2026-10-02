@@ -1,0 +1,90 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : top
+Version: W-2024.09
+Date   : Fri Oct  2 15:19:34 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: v36_fifo/AlloFifoC_ac_int_32_false_4_Seq_inst/head_reg[0]
+              (rising edge-triggered flip-flop clocked by ideal_clock)
+  Endpoint: u1/clk_gate_consumer_0_run_inst/l_S_t_0_t1_t1_6_0_sva_5_0_reg/latch
+            (gating element for clock ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  top                5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                                       Fanout     Trans      Incr       Path
+  ------------------------------------------------------------------------------------
+  clock ideal_clock (rise edge)                                     0.00       0.00
+  clock network delay (ideal)                                       0.00       0.00
+  v36_fifo/AlloFifoC_ac_int_32_false_4_Seq_inst/head_reg[0]/CK (DFFR_X1)
+                                                          0.00      0.00       0.00 r
+  v36_fifo/AlloFifoC_ac_int_32_false_4_Seq_inst/head_reg[0]/QN (DFFR_X1)
+                                                          0.02      0.09       0.09 f
+  n432 (net)                                    6                   0.00       0.09 f
+  U580/B1 (AOI22_X1)                                      0.02      0.02       0.10 f
+  U580/ZN (AOI22_X1)                                      0.04      0.06       0.16 r
+  n389 (net)                                    2                   0.00       0.16 r
+  U581/A (AOI211_X1)                                      0.04      0.01       0.18 r
+  U581/ZN (AOI211_X1)                                     0.01      0.02       0.20 f
+  n371 (net)                                    1                   0.00       0.20 f
+  U582/A (OAI21_X1)                                       0.01      0.01       0.21 f
+  U582/ZN (OAI21_X1)                                      0.03      0.03       0.23 r
+  n418 (net)                                    2                   0.00       0.23 r
+  U583/A2 (AND3_X1)                                       0.03      0.01       0.24 r
+  U583/ZN (AND3_X1)                                       0.01      0.05       0.30 r
+  u1/consumer_0_run_inst/consumer_0_run_v20_Pop_mioi_inst/v20_Pop_mioi_biwt (net)
+                                                2                   0.00       0.30 r
+  U586/A2 (NOR2_X1)                                       0.01      0.01       0.31 r
+  U586/ZN (NOR2_X1)                                       0.01      0.01       0.32 f
+  n402 (net)                                    2                   0.00       0.32 f
+  U587/B2 (AOI22_X1)                                      0.01      0.01       0.34 f
+  U587/ZN (AOI22_X1)                                      0.03      0.05       0.38 r
+  n373 (net)                                    1                   0.00       0.38 r
+  U588/A (OAI21_X1)                                       0.03      0.01       0.40 r
+  U588/ZN (OAI21_X1)                                      0.01      0.02       0.42 f
+  n375 (net)                                    1                   0.00       0.42 f
+  U589/A (AOI21_X1)                                       0.01      0.01       0.43 f
+  U589/ZN (AOI21_X1)                                      0.08      0.10       0.53 r
+  u1/consumer_0_run_inst/run_wen (net)          7                   0.00       0.53 r
+  U632/A (INV_X1)                                         0.08      0.02       0.55 r
+  U632/ZN (INV_X1)                                        0.02      0.01       0.56 f
+  n396 (net)                                    1                   0.00       0.56 f
+  U633/A4 (NOR4_X1)                                       0.02      0.01       0.57 f
+  U633/ZN (NOR4_X1)                                       0.04      0.08       0.65 r
+  u1/consumer_0_run_inst/N55 (net)              1                   0.00       0.65 r
+  u1/clk_gate_consumer_0_run_inst/l_S_t_0_t1_t1_6_0_sva_5_0_reg/EN (SNPS_CLOCK_GATE_HIGH_consumer_0_0)
+                                                                    0.00       0.65 r
+  u1/clk_gate_consumer_0_run_inst/l_S_t_0_t1_t1_6_0_sva_5_0_reg/EN (net)
+                                                                    0.00       0.65 r
+  u1/clk_gate_consumer_0_run_inst/l_S_t_0_t1_t1_6_0_sva_5_0_reg/latch/E (CLKGATETST_X1)
+                                                          0.04      0.01       0.66 r
+  data arrival time                                                            0.66
+
+  clock ideal_clock (rise edge)                                     3.33       3.33
+  clock network delay (ideal)                                       0.00       3.33
+  u1/clk_gate_consumer_0_run_inst/l_S_t_0_t1_t1_6_0_sva_5_0_reg/latch/CK (CLKGATETST_X1)
+                                                                    0.00       3.33 r
+  clock gating setup time                                          -0.09       3.24
+  data required time                                                           3.24
+  ------------------------------------------------------------------------------------
+  data required time                                                           3.24
+  data arrival time                                                           -0.66
+  ------------------------------------------------------------------------------------
+  slack (MET)                                                                  2.59
+
+
+1

@@ -1,0 +1,74 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : AlloFifoC_ap_uint_257_4
+Version: W-2024.09
+Date   : Fri Oct  2 15:18:25 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: AlloFifoC_ap_uint_257_4_Seq_inst/tail_reg[0]
+              (rising edge-triggered flip-flop clocked by ideal_clock)
+  Endpoint: deq_dat[48]
+            (output port clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  AlloFifoC_ap_uint_257_4
+                     5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                                       Fanout     Trans      Incr       Path
+  ------------------------------------------------------------------------------------
+  clock ideal_clock (rise edge)                                     0.00       0.00
+  clock network delay (ideal)                                       0.00       0.00
+  AlloFifoC_ap_uint_257_4_Seq_inst/tail_reg[0]/CK (DFFR_X1)
+                                                          0.00      0.00       0.00 r
+  AlloFifoC_ap_uint_257_4_Seq_inst/tail_reg[0]/Q (DFFR_X1)
+                                                          0.01      0.10       0.10 f
+  tail[0] (net)                                 5                   0.00       0.10 f
+  U814/A2 (NOR2_X1)                                       0.01      0.02       0.11 f
+  U814/ZN (NOR2_X1)                                       0.13      0.16       0.27 r
+  n713 (net)                                   13                   0.00       0.27 r
+  U888/A (CLKBUF_X1)                                      0.13      0.01       0.28 r
+  U888/Z (CLKBUF_X1)                                      0.10      0.16       0.44 r
+  n893 (net)                                   20                   0.00       0.44 r
+  U889/A (CLKBUF_X1)                                      0.10      0.02       0.46 r
+  U889/Z (CLKBUF_X1)                                      0.10      0.15       0.61 r
+  n896 (net)                                   20                   0.00       0.61 r
+  U1068/A (CLKBUF_X1)                                     0.10      0.02       0.63 r
+  U1068/Z (CLKBUF_X1)                                     0.10      0.15       0.78 r
+  n1102 (net)                                  20                   0.00       0.78 r
+  U1069/A (CLKBUF_X1)                                     0.10      0.02       0.80 r
+  U1069/Z (CLKBUF_X1)                                     0.10      0.16       0.96 r
+  n1048 (net)                                  20                   0.00       0.96 r
+  U1070/B1 (AOI22_X1)                                     0.10      0.03       0.98 r
+  U1070/ZN (AOI22_X1)                                     0.03      0.04       1.02 f
+  n646 (net)                                    1                   0.00       1.02 f
+  U1071/A2 (NAND2_X1)                                     0.03      0.01       1.03 f
+  U1071/ZN (NAND2_X1)                                     0.02      0.04       1.07 r
+  deq_dat[48] (net)                             1                   0.00       1.07 r
+  deq_dat[48] (out)                                       0.02      0.05       1.12 r
+  data arrival time                                                            1.12
+
+  clock ideal_clock (rise edge)                                     3.33       3.33
+  clock network delay (ideal)                                       0.00       3.33
+  output external delay                                             0.00       3.33
+  data required time                                                           3.33
+  ------------------------------------------------------------------------------------
+  data required time                                                           3.33
+  data arrival time                                                           -1.12
+  ------------------------------------------------------------------------------------
+  slack (MET)                                                                  2.21
+
+
+1

@@ -1,0 +1,64 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : AlloFifoC_ac_int_32_false_4
+Version: W-2024.09
+Date   : Fri Oct  2 15:16:00 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: AlloFifoC_ac_int_32_false_4_Seq_inst/tail_reg[0]
+              (rising edge-triggered flip-flop clocked by ideal_clock)
+  Endpoint: deq_dat[0] (output port clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  AlloFifoC_ac_int_32_false_4
+                     5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                                       Fanout     Trans      Incr       Path
+  ------------------------------------------------------------------------------------
+  clock ideal_clock (rise edge)                                     0.00       0.00
+  clock network delay (ideal)                                       0.00       0.00
+  AlloFifoC_ac_int_32_false_4_Seq_inst/tail_reg[0]/CK (DFFR_X1)
+                                                          0.00      0.00       0.00 r
+  AlloFifoC_ac_int_32_false_4_Seq_inst/tail_reg[0]/Q (DFFR_X1)
+                                                          0.01      0.10       0.10 f
+  tail[0] (net)                                 5                   0.00       0.10 f
+  U160/A2 (NOR2_X1)                                       0.01      0.02       0.11 f
+  U160/ZN (NOR2_X1)                                       0.13      0.16       0.27 r
+  n163 (net)                                   13                   0.00       0.27 r
+  U161/A (BUF_X1)                                         0.13      0.02       0.29 r
+  U161/Z (BUF_X1)                                         0.10      0.14       0.42 r
+  n169 (net)                                   20                   0.00       0.42 r
+  U162/B1 (AOI22_X1)                                      0.10      0.03       0.45 r
+  U162/ZN (AOI22_X1)                                      0.03      0.04       0.49 f
+  n100 (net)                                    1                   0.00       0.49 f
+  U163/A2 (NAND2_X1)                                      0.03      0.01       0.50 f
+  U163/ZN (NAND2_X1)                                      0.02      0.04       0.54 r
+  deq_dat[0] (net)                              1                   0.00       0.54 r
+  deq_dat[0] (out)                                        0.02      0.05       0.59 r
+  data arrival time                                                            0.59
+
+  clock ideal_clock (rise edge)                                     2.00       2.00
+  clock network delay (ideal)                                       0.00       2.00
+  output external delay                                             0.00       2.00
+  data required time                                                           2.00
+  ------------------------------------------------------------------------------------
+  data required time                                                           2.00
+  data arrival time                                                           -0.59
+  ------------------------------------------------------------------------------------
+  slack (MET)                                                                  1.41
+
+
+1

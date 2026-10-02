@@ -114,8 +114,10 @@ def _reset(t, k=2):
     return t.idle(k, rst_ni=0)
 
 
-def random_trace(inst, n, seed, legal):
-    """Bursty pushes and pops, biased so the count sweeps empty..full."""
+def random_trace(inst, n, seed, legal, resets=True):
+    """Bursty pushes and pops, biased so the count sweeps empty..full.
+    ``resets=False``: no reset after the initial one (the composed form: a
+    mid-stream reset is not a FIFO command there, U3 record)."""
     w, d = GEOM[inst]
     rng = rng_for("fifo", inst, seed, legal)
     t = _reset(Trace(_defaults()))
@@ -131,6 +133,8 @@ def random_trace(inst, n, seed, legal):
             if pop and count == 0:
                 pop = False
         rst = int(rng.random() > 0.002)
+        if not resets:  # same draw, so the commands are the same trace
+            rst = 1
         t.cycle(rst_ni=rst, push_i=int(push), push_data_i=word(rng, w), pop_i=int(pop))
         if not rst:
             count = 0
@@ -198,6 +202,40 @@ def traces(inst):
     tr += [(f"random-legal-{s}", random_trace(inst, n, s, True), True) for s in range(2)]
     tr += [(f"random-any-{s}", random_trace(inst, n, s, False), False) for s in range(2)]
     return tr
+
+
+def traces_composed(inst):
+    """The legal traces for the composed (two-kernel ``Stream``) form, U3
+    record: the directed legal traces minus ``reset-mid-stream``, and the
+    random legal traces with no reset after the initial one. A mid-stream
+    reset is a pointer clear on ``vpu_fifo`` and a region reset on a Stream
+    (finding 3 of the record); it is demonstrated separately, not in the
+    verdict trace. Seeds (``seeds()``) are added by the record's script."""
+    n = 20000 if inst not in ("input", "d16w48") else 5000
+    tr = [(lab, c, legal) for lab, c, legal in directed(inst) if legal and lab != "reset-mid-stream"]
+    tr += [(f"random-legal-noreset-{s}", random_trace(inst, n, s, True, resets=False), True) for s in range(2)]
+    return [(lab, _drained(inst, c), legal) for lab, c, legal in tr]
+
+
+def _drained(inst, cmd):
+    """``cmd`` with the words it leaves in the FIFO popped at its end, so a
+    Stream carries nothing into the next trace (the next trace's initial
+    reset clears ``vpu_fifo``'s pointers, not a Stream: U3 record)."""
+    w, d = GEOM[inst]
+    count = 0
+    for r, p, q in zip(cmd["rst_ni"], cmd["push_i"], cmd["pop_i"]):
+        if r == 0:
+            count = 0
+            continue
+        count += int(p == 1 and (count < d or q == 1)) - int(q == 1 and (count > 0 or p == 1))
+    if count == 0:
+        return cmd
+    t = Trace(_defaults())
+    for _ in range(count):
+        t.cycle(pop_i=1)
+    t.idle(1)
+    from examples.minitpu.harness.traces import concat
+    return concat(cmd, t.cmd())
 
 
 def probes(inst):
@@ -801,8 +839,104 @@ def wire_np(n, w=32):
     return top
 
 
+def composed(n, w=32):
+    """U3 (``u3_fifo_composed_2026-10-02.rst``): the FIFO as ``Stream[W, d]``
+    BETWEEN two kernels, the form the MXU composite would use. ``producer``
+    is the push half of the trace (``rst``/``push``/``push_data`` per cycle:
+    a blocking ``put`` on every push), ``consumer`` the pop half (a blocking
+    ``get`` on every pop; ``pop_data`` is the word got on that cycle and 0
+    otherwise -- no head register, because Part A found that both MXU
+    consumers pop in the cycle they consume the head). ``full`` is the
+    producer's view of the stream, ``empty`` the consumer's. A mid-stream
+    ``rst_ni`` is NOT a stream operation (a Stream has no pointer clear and
+    the two kernels are not cycle-locked): the verdict trace resets only at
+    the start (``traces_composed``). No workaround beyond S6."""
+    W = UInt(w)
+    d = DEPTH_OF[w]
+
+    @df.region()
+    def top(RST: uint1[n], PUSH: uint1[n], PD: W[n], POP: uint1[n],
+            QD: W[n], QE: uint1[n], QF: uint1[n]):
+        q: Stream[UInt(w), d]
+
+        @df.kernel(mapping=[1], args=[RST, PUSH, PD, QF])
+        def producer(rst: uint1[n], push: uint1[n], pd: W[n], qf: uint1[n]):
+            for t in range(n):
+                r: uint1 = rst[t]
+                p: uint1 = push[t]
+                x: W = pd[t]
+                f: uint1 = q.full()
+                qf[t] = f
+                if r == 1:
+                    if p == 1:
+                        q.put(x)
+
+        @df.kernel(mapping=[1], args=[POP, QD, QE])
+        def consumer(pop: uint1[n], qd: W[n], qe: uint1[n]):
+            for t in range(n):
+                g: uint1 = pop[t]
+                e: uint1 = q.empty()
+                qe[t] = e
+                out: W = 0
+                if g == 1:
+                    out = q.get()
+                qd[t] = out
+
+    return top
+
+
+def composed_try(n, w=32):
+    """``composed`` with the non-blocking ends, for the illegal-program
+    demonstration (H7): a push on full is *refused* by ``try_put`` (the RTL
+    drops it, a blocking ``put`` stalls the producer), a pop on empty gets
+    nothing from ``try_get`` (the RTL returns stale data). On a push cycle
+    ``full`` reports the refusal (``1 - ok``, which is ``full`` by the FIFO's
+    semantics), on a pop cycle ``empty`` reports "nothing got"; elsewhere the
+    flags are the stream's. The results are consumed (B7)."""
+    W = UInt(w)
+    d = DEPTH_OF[w]
+
+    @df.region()
+    def top(RST: uint1[n], PUSH: uint1[n], PD: W[n], POP: uint1[n],
+            QD: W[n], QE: uint1[n], QF: uint1[n]):
+        q: Stream[UInt(w), d]
+
+        @df.kernel(mapping=[1], args=[RST, PUSH, PD, QF])
+        def producer(rst: uint1[n], push: uint1[n], pd: W[n], qf: uint1[n]):
+            for t in range(n):
+                r: uint1 = rst[t]
+                p: uint1 = push[t]
+                x: W = pd[t]
+                fl: uint1 = q.full()
+                if r == 1:
+                    if p == 1:
+                        ok: uint1 = q.try_put(x)
+                        fl = 1 - ok
+                qf[t] = fl
+
+        @df.kernel(mapping=[1], args=[POP, QD, QE])
+        def consumer(pop: uint1[n], qd: W[n], qe: uint1[n]):
+            for t in range(n):
+                g: uint1 = pop[t]
+                e: uint1 = q.empty()
+                out: W = 0
+                if g == 1:
+                    got: W
+                    ok2: uint1
+                    got, ok2 = q.try_get()
+                    e = 1 - ok2
+                    if ok2 == 1:
+                        out = got
+                qe[t] = e
+                qd[t] = out
+
+    return top
+
+
 VARIANTS = {
     "trace": (trace, _run_flat),
+    "composed": (composed, _run_flat),
+    "composed_try": (composed_try, _run_flat),
     "ported": (ported, _run_flat),
     "wire": (wire, _run_flat),
     "stream": (stream, _run_flat),

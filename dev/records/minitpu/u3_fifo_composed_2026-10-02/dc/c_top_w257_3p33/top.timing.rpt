@@ -1,0 +1,82 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : top
+Version: W-2024.09
+Date   : Fri Oct  2 15:22:04 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: v36_fifo/AlloFifoC_ap_uint_257_4_Seq_inst/tail_reg[0]
+              (rising edge-triggered flip-flop clocked by ideal_clock)
+  Endpoint: u1/consumer_0_run_inst/v18_Push_mioi_idat_reg[30]
+            (rising edge-triggered flip-flop clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  top                5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                                       Fanout     Trans      Incr       Path
+  ------------------------------------------------------------------------------------
+  clock ideal_clock (rise edge)                                     0.00       0.00
+  clock network delay (ideal)                                       0.00       0.00
+  v36_fifo/AlloFifoC_ap_uint_257_4_Seq_inst/tail_reg[0]/CK (DFFR_X1)
+                                                          0.00      0.00       0.00 r
+  v36_fifo/AlloFifoC_ap_uint_257_4_Seq_inst/tail_reg[0]/Q (DFFR_X1)
+                                                          0.01      0.09       0.09 f
+  v36_fifo/tail[0] (net)                        3                   0.00       0.09 f
+  U1888/A1 (NOR2_X1)                                      0.01      0.01       0.10 f
+  U1888/ZN (NOR2_X1)                                      0.13      0.15       0.25 r
+  n1993 (net)                                  13                   0.00       0.25 r
+  U1889/A (CLKBUF_X1)                                     0.13      0.01       0.27 r
+  U1889/Z (CLKBUF_X1)                                     0.10      0.16       0.43 r
+  n2016 (net)                                  20                   0.00       0.43 r
+  U1905/A (CLKBUF_X1)                                     0.10      0.02       0.44 r
+  U1905/Z (CLKBUF_X1)                                     0.10      0.15       0.59 r
+  n1980 (net)                                  20                   0.00       0.59 r
+  U2037/A (CLKBUF_X1)                                     0.10      0.02       0.61 r
+  U2037/Z (CLKBUF_X1)                                     0.10      0.15       0.76 r
+  n1857 (net)                                  20                   0.00       0.76 r
+  U2818/A (CLKBUF_X1)                                     0.10      0.02       0.78 r
+  U2818/Z (CLKBUF_X1)                                     0.10      0.16       0.94 r
+  n2007 (net)                                  20                   0.00       0.94 r
+  U3238/B1 (AOI22_X1)                                     0.10      0.03       0.97 r
+  U3238/ZN (AOI22_X1)                                     0.03      0.04       1.00 f
+  n2009 (net)                                   1                   0.00       1.00 f
+  U3239/A2 (NAND2_X1)                                     0.03      0.01       1.01 f
+  U3239/ZN (NAND2_X1)                                     0.02      0.03       1.04 r
+  n1102 (net)                                   2                   0.00       1.04 r
+  U3240/B2 (AOI22_X1)                                     0.02      0.01       1.06 r
+  U3240/ZN (AOI22_X1)                                     0.04      0.02       1.08 f
+  n2013 (net)                                   1                   0.00       1.08 f
+  U3241/A (INV_X1)                                        0.04      0.01       1.09 f
+  U3241/ZN (INV_X1)                                       0.01      0.02       1.11 r
+  u1/consumer_0_run_inst/N45 (net)              1                   0.00       1.11 r
+  u1/consumer_0_run_inst/v18_Push_mioi_idat_reg[30]/D (DFFR_X1)
+                                                          0.01      0.01       1.12 r
+  data arrival time                                                            1.12
+
+  clock ideal_clock (rise edge)                                     3.33       3.33
+  clock network delay (ideal)                                       0.00       3.33
+  u1/consumer_0_run_inst/v18_Push_mioi_idat_reg[30]/CK (DFFR_X1)
+                                                                    0.00       3.33 r
+  library setup time                                               -0.03       3.30
+  data required time                                                           3.30
+  ------------------------------------------------------------------------------------
+  data required time                                                           3.30
+  data arrival time                                                           -1.12
+  ------------------------------------------------------------------------------------
+  slack (MET)                                                                  2.17
+
+
+1
