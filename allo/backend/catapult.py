@@ -999,9 +999,11 @@ def catapult_latency_manifest(sol_dir, log_path=None, declared=None):
     is visible, with every port ready (a declared latency is a no-stall
     property). For a Connections kernel it is ``max(Push c-step) - min(Pop
     c-step)`` inside the loop that does the I/O. For a ``Wire``-port kernel
-    (no Pop/Push ops; ``sc_in`` reads are not scheduled ops) it is cycle.rpt's
-    process latency, which is defined there because the process loop is the
-    I/O loop (u1_catapult_units N4: equal to the measured latency on 19/19).
+    (no Pop/Push ops; ``sc_in`` reads are not scheduled ops) it is the
+    steady-state ``while`` loop's c-steps: cycle.rpt's process latency counts
+    the reset action's c-step as well (``process_latency``, kept beside it),
+    one more than the port-to-port latency measured on the RTL
+    (u2_word_array C-M1).
 
     ``status`` is ``scheduled`` when the number is the RTL's, ``unreliable``
     with a ``reason`` when the schedule does not determine it (a rolled loop
@@ -1054,13 +1056,22 @@ def catapult_latency_manifest(sol_dir, log_path=None, declared=None):
             u["port_style"] = "wire"
             p = sch["processes"].get(proc, {})
             lat = p.get("latency")
-            u["latency"] = lat if lat is not None and lat >= 0 else None
+            # cycle.rpt's process latency is the SEQUENTIAL's c-step count:
+            # the reset action (`run:rlp`, one c-step) plus the steady-state
+            # loop. The port-to-port latency the harness measures is the
+            # steady-state loop's c-steps alone (u2_word_array C-M1: process
+            # latency 2, measured 1; the regfile's L=1 read 1 by coincidence),
+            # so report that and keep the process count beside it.
+            u["process_latency"] = lat if lat is not None and lat >= 0 else None
+            u["latency"] = u["process_latency"]
             u["ii"] = p.get("throughput")
             main = [lp for lp in loops.values() if lp["loop"] == "while"]
             if main:
                 u["loop"] = "while"
                 u["loop_c_steps"] = main[0]["c_steps"]
                 u["ii"] = main[0]["ii"] or u["ii"]
+                if main[0]["c_steps"] is not None:
+                    u["latency"] = main[0]["c_steps"]
             if u["latency"] is None:
                 reasons.append(f"cycle.rpt process latency {lat}")
         # A rolled loop of this kernel that cycle.rpt does not list was merged

@@ -25,6 +25,25 @@ ROLLED = (
 )
 
 
+# A Wire-port kernel (MiniTPU's vpu_word_array, `wire` form, both shift loops
+# unrolled; dev/records/minitpu/u2_word_array_2026-10-02/catapult/wire_unr_n64_3p33):
+# the process latency counts the reset c-step (2), the RTL measures 1.
+WIRE_UNROLLED = (
+    "Processes/Blocks in Design\n  Process       Real Operation(s) count Latency Throughput Reset Length II Comments\n  ------------- ----------------------- ------- ---------- ------------ -- --------\n  /wa_0/run                          76       2          1            1  0\n  Design Total:                      76       2          1            1  1\n\nClock Information\n  Clock Signal Edge   Period Sharing Alloc (%) Uncertainty Used by Processes/Blocks\n  ------------ ------ ------ ----------------- ----------- ------------------------\n  clk          rising  3.330             20.00    0.000000 /wa_0/run\n\nLoops\n  Process   Loop             Iterations C-Steps Total Cycles  Duration  Unroll Init Comments\n  --------- ---------------- ---------- ------- ------------- --------- ------ ---- --------\n  /wa_0/run run:rlp            Infinite       1            2   6.66 ns\n  /wa_0/run  while             Infinite       1            1   3.33 ns            1\n\n",
+    # a Wire kernel's cycle_set.tcl has no Pop/Push: sc_in reads are not scheduled ops
+    "directive set /wa_0/run/while/mem:rsc.@ CSTEPS_FROM {{.. == 0}}\ndirective set /wa_0/run/while/v40.write() CSTEPS_FROM {{.. == 0}}\n",
+    "# $PROJECT_HOME/../kernel.cpp(575): Loop '/wa_0/run/l_S_k_0_k' iterated at most 2 times. (LOOP-2)\n# $PROJECT_HOME/../kernel.cpp(570): Loop '/wa_0/run/while' is left rolled. (LOOP-4)\n# Info: $PROJECT_HOME/../kernel.cpp(570): Loop '/wa_0/run/while' is pipelined with initiation interval 1 and no flushing (SCHD-43)\n",
+)
+# The same kernel with the shift loop left rolled (wire_n64_3p33): Catapult
+# merges it into the steady-state loop ("Prescheduled LOOP '/wa_0/run/while'
+# (2 c-steps) (SCHD-7)"), so the number is flagged, not reported.
+WIRE_ROLLED = (
+    WIRE_UNROLLED[0].replace("/wa_0/run                          76       2          1            1  0", "/wa_0/run                          70       3          2            1  0").replace("while             Infinite       1            1   3.33 ns            1", "while             Infinite       2            3   9.99 ns            1"),
+    WIRE_UNROLLED[1],
+    WIRE_UNROLLED[2] + "# $PROJECT_HOME/../kernel.cpp(575): Loop '/wa_0/run/l_S_k_0_k' is left rolled. (LOOP-4)\n",
+)
+
+
 def _sol(tmp_path, fx):
     sol = tmp_path / "top.v1"
     sol.mkdir()
@@ -48,6 +67,21 @@ def test_rolled_inner_loop_is_flagged_not_reported(tmp_path):
     assert u["status"] == "unreliable"
     assert "l_S_offset_0_offset" in u["reason"]
     assert u["cycles_per_vector_max"] == 19
+
+
+def test_wire_kernel_latency_excludes_the_reset_step(tmp_path):
+    sol, log = _sol(tmp_path, WIRE_UNROLLED)
+    u = catapult_latency_manifest(sol, log)["units"]["wa_0"]
+    assert u["port_style"] == "wire"
+    assert (u["latency"], u["ii"], u["status"]) == (1, 1, "scheduled")  # was 2
+    assert u["process_latency"] == 2 and u["loop_c_steps"] == 1
+
+
+def test_wire_kernel_with_a_merged_rolled_loop_is_flagged(tmp_path):
+    sol, log = _sol(tmp_path, WIRE_ROLLED)
+    u = catapult_latency_manifest(sol, log)["units"]["wa_0"]
+    assert u["status"] == "unreliable" and "l_S_k_0_k" in u["reason"]
+    assert u["latency"] == 2  # the merged loop's 2 c-steps, not the process's 3
 
 
 KERNEL = """SC_MODULE(add_0) {
