@@ -78,8 +78,17 @@ in what Allo can say.
     module, ``K = 5`` in the caller's: Allo computes ``x * 5``). C4: a
     module-level numpy array silently replaces a kernel parameter of the same
     name. Neither raises. Every cross-module unit reuse -- which composition
-    from U3 on rests on -- is exposed. *[fix before U3, on review branch
-    ``core-scoping`` with the same impact check as item 1; in progress]*
+    from U3 on rests on -- is exposed. **Fixed** with C1, C2, C5 and one more
+    silent case (a slice bound read from a same-named global) on
+    ``core-scoping`` (``b8cf732e``, 17 new tests, 15 fail on ``main``):
+    TinyTPU emission byte-identical, every gate and test outcome unchanged,
+    and a trace of all 825 function builds in the test run shows nothing
+    relied on the old resolution. Upstream has the same code
+    (``dev/records/limitations/frontend_scoping_2026-10-02.rst`` on that
+    branch, with a draft issue). Left open: slicing a kernel *parameter*
+    (``a[1:2]``) crashes LLVM in the simulator on ``main`` too; ``Stateful``
+    globals are named by variable name (two ``test_stateful`` failures on
+    ``main``). *[merge with item 1; file both upstream issues]*
 11. **ALU engines, by reuse.** All three compositions match the RTL bit for
     bit, but function-level engine swapping works only by naming convention
     (C1, C2, C11), a ``@df.unit``'s sizes freeze at decoration (C9), and a
