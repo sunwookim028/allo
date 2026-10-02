@@ -199,6 +199,30 @@ not a commitment. Harness work goes into the method-agnostic core first.
   call as *provisional* with its reason, and keeps going. Changes to the
   programming model or passes stay proposals until reviewed.
 
+**D-10 (2026-10-02, provisional until the owner confirms). A unit's latency
+is reported by its backend and checked on its RTL; it is constrained only
+where a contract demands.**
+- Every backend that produces RTL writes `latency.json` beside the build:
+  per unit, `latency` (input-accept edge to output-visible edge, no stall),
+  `ii`, the port style, and a `status` with a reason. A number whose status
+  is not `scheduled` is not consumed. Catapult and Vitis do this now; RTLGen
+  and AMC already report it and get adapters at M2.
+- A latency table that ACT or an assembler consumes is built from manifests,
+  per (unit, backend, clock), never a constant in the source: the same adder
+  is 2 cycles in Catapult, 5 in Vitis and 1 in AMC at 5 ns.
+- The harness checks every RTL unit's measured latency and rate against its
+  manifest. A MiniTPU-declared latency is reported beside it and decides a
+  verdict only when the unit is pinned.
+- `latency=L` on a kernel is optional, for a contract outside the tool
+  (matching MiniTPU at D-7; cycle-locked composition at U3). Catapult honours
+  it on stream ports and refuses a Wire kernel, `L < 1`, or an infeasible L,
+  quoting the cause. Vitis meets L by missing the clock, so Allo refuses when
+  the estimate exceeds the target. RTLGen and AMC refuse until they grow a
+  bound.
+- `comb` is a port shape, not `latency=0`: Catapult emits a combinational
+  CCORE; RTLGen and AMC refuse it.
+- Evidence: `dev/records/minitpu/latency_report_2026-10-02.rst`.
+
 ## Milestones
 
 Each milestone passes on **one acceptance check** and names the tools it uses

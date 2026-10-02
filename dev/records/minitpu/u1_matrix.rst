@@ -21,6 +21,30 @@ change to Allo's programming model. What failed were bugs (Allo core: unsigned
 compares; SystemC emitter: seven; AMC: two silent miscompiles) and four gaps
 in what Allo can say.
 
+**Owner's decisions, 2026-10-02** (checkpoint 2, by question):
+
+- Items 1, 2, 10: **merged** to ``main`` at ``db184ebc`` (``core-uint-compare``,
+  ``core-scoping``, ``systemc-u1-fixes``; regression against a ``main``
+  baseline: identical failure sets on every suite, all TinyTPU gates, byte-
+  identical emission). Upstream issues filed: cornell-zhang/allo #617
+  (unsigned compares), #618 (scoping).
+- Item 3: **don't-care** for NaN sign/payload and the zero sign in verdicts,
+  classification kept; a D-n proposal for stating a unit's NaN/zero policy
+  is owed.
+- Item 4: **reframed.** A combinational leaf is only a problem at a
+  standalone top level; inside its sequential parent it is combinational
+  logic between registers (the ALU already does this). Catapult can also emit
+  a clockless CCORE (``latency_report_2026-10-02.rst``). Not an
+  expressiveness gap.
+- Item 8: **report first, constrain by contract** -- the owner's point that a
+  compiler can consume what the HLS tool scheduled. D-10 drafted in the
+  README (provisional) from ``latency_report_2026-10-02.rst``.
+- Item 7 and 13: **filed.** AMC cornell-zhang/amc-dialect #126; MiniTPU
+  sunwookim028/minitpu-tmp #18 (ALU and/or/xor), #19 (FIFO rule ignores loop
+  trip counts; push+pop on empty), #20 (unchecked ``vmatpop``).
+- U2: undefined behaviour is **masked and counted**; ``vpu_regfile`` pilot
+  first (branch ``u2-regfile``), then a checkpoint.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
