@@ -60,6 +60,23 @@ pilot, ``u2_regfile_2026-10-02.rst``):
   **parallel tracks**, with the pilot's ``trace``, ``ported`` and ``wire``
   expressions. B4/S6 (``core-uint-index``, in review) stay worked around.
 
+**Owner's decisions, 2026-10-02, checkpoint 4** (on the D-12 study,
+``d12_memory_ports_2026-10-02.rst``):
+
+- Q1 (one owner per port): **under review in chat**; D-12 stays a proposal
+  until the owner's wording.
+- Q2: the VREG write port is **one writeback unit** owning ``vreg.w``, fed
+  over channels (true to ``vpu.sv``, refusable at composition).
+- Q4: the VMEM compute/DMA same-word collision is an **obligation on the
+  Allo composition**, checked by stress cosim; reported to MiniTPU as an
+  assembler gap (issue #21).
+- Q7: the regfile prototype (3 reader + 1 writer units) plus
+  ``vpu_word_array`` is the **U2 acceptance** for the memory-port item --
+  with the owner's condition that the decomposition be target-neutral: the
+  port declaration is the contract, and replica (FPGA LUTRAM-like), register
+  array + muxes (ASIC cells) or SRAM macro are per-backend lowerings stated
+  in ``memory.json``, never part of the declaration.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
