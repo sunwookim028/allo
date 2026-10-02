@@ -74,6 +74,12 @@ in what Allo can say.
    a FIFO, not a register; at depth 1 it halves throughput).
    *[yes, as a D-n proposal;
    csim stays "unchecked" until U3 needs cycle-locked composition]*
+   *Followed up 2026-10-02* (``latency_report_2026-10-02.rst``, branch
+   ``latency-report``): every RTL backend already *reports* the scheduled
+   latency exactly (Catapult 75/75 builds, Vitis 10/10, RTLGen 17/17, AMC
+   14/14 against measured RTL), so the proposed D-10 makes report-and-check
+   the default and ``latency=`` the exception; Catapult CCORE gives a
+   clockless ``bf16_add`` (item 4).
 9. **Two more SystemC bugs from the multipliers** (S4: ``bf16 -> f32``
    widening does not compile; S5: a ``UInt(24)`` port cannot be read back).
    *[fix on ``systemc-u1-fixes`` with a regression test each]*

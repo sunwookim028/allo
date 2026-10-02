@@ -1,0 +1,61 @@
+{
+  "bf16_add_bits": {
+    "control": {
+      "clk": "clk",
+      "done": "done",
+      "rst": "rst",
+      "start": "start"
+    },
+    "determinacy": "counted_static",
+    "latency": 22,
+    "latency_bound": false,
+    "module": "bf16_add_bits",
+    "operators": [],
+    "reads": [
+      [
+        {
+          "addr": "A_rd0_addr",
+          "arg": 0,
+          "bank": 0,
+          "base": "A_rd0",
+          "data": "A_rd0_data",
+          "factor": 1,
+          "latency": 1,
+          "width": 16
+        }
+      ],
+      [
+        {
+          "addr": "B_rd0_addr",
+          "arg": 1,
+          "bank": 0,
+          "base": "B_rd0",
+          "data": "B_rd0_data",
+          "factor": 1,
+          "latency": 1,
+          "width": 16
+        }
+      ]
+    ],
+    "registers": [],
+    "results": [],
+    "scalars": [],
+    "streams": [],
+    "symbol": "bf16_add_bits",
+    "writes": [
+      [
+        {
+          "addr": "C_wr0_addr",
+          "arg": 2,
+          "bank": 0,
+          "base": "C_wr0",
+          "data": "C_wr0_data",
+          "factor": 1,
+          "latency": 1,
+          "we": "C_wr0_we",
+          "width": 16
+        }
+      ]
+    ]
+  }
+}

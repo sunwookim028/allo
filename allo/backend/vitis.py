@@ -604,3 +604,80 @@ def generate_hbm_config(top_func_name, hbm_mapping, arg_name_mapping=None):
 
     cfg_lines.append("")  # Add trailing newline
     return "\n".join(cfg_lines)
+
+
+# ---------------------------------------------------------------------------
+# Latency manifest (Vitis HLS csynth): per module, the scheduled port-to-port
+# latency and II, read back from the solution. Same contract as Catapult's
+# (allo/backend/catapult.py: catapult_latency_manifest).
+# ---------------------------------------------------------------------------
+
+_ST_FIFO = re.compile(r"^ST_(\d+) : Operation \d+ .*?_ssdm_op_(Read|Write)\.ap_fifo")
+
+
+def vitis_latency_manifest(sol_dir):
+    """Per-module latency of one Vitis HLS solution (``<prj>/out.prj/solution1``).
+
+    Latency is ``max(ap_fifo write state) - min(ap_fifo read state)`` in the
+    module's ``.autopilot/db/<m>.verbose.sched.rpt``: equal to the
+    Verilator-measured port-to-port latency on 10/10 builds (and to
+    ``PipelineDepth - 2`` for those one-loop units), with or without
+    ``#pragma HLS latency`` (dev/records/minitpu/latency_report_2026-10-02.rst).
+    A module whose ports are not ap_fifo (ap_memory arrays) gets ``unknown``.
+    A module whose estimated clock exceeds the target is ``unreliable``: Vitis
+    meets a latency directive by missing the clock, with only a warning
+    (HLS 200-871), so the number holds only at a slower clock.
+    """
+    import glob
+    import os
+    import xml.etree.ElementTree as ET
+
+    units = {}
+    for xml in sorted(
+        glob.glob(os.path.join(sol_dir, "syn", "report", "*_csynth.xml"))
+    ):
+        mod = os.path.basename(xml)[: -len("_csynth.xml")]
+        r = ET.parse(xml).getroot()
+        est = r.findtext(
+            "PerformanceEstimates/SummaryOfTimingAnalysis/EstimatedClockPeriod"
+        )
+        tgt = r.findtext("UserAssignments/TargetClockPeriod")
+        loops = r.find("PerformanceEstimates/SummaryOfLoopLatency")
+        u = {"latency": None, "ii": None, "status": "unknown"}
+        if loops is not None and len(loops):
+            lp = loops[0]
+            u["loop"] = lp.tag
+            u["pipeline_depth"] = int(lp.findtext("PipelineDepth") or 0) or None
+            ii = lp.findtext("PipelineII")
+            u["ii"] = int(ii) if ii and ii.isdigit() else None
+        u["clock_target_ns"] = float(tgt) if tgt else None
+        u["clock_estimated_ns"] = float(est) if est else None
+        sched = os.path.join(sol_dir, ".autopilot", "db", f"{mod}.verbose.sched.rpt")
+        rd, wr = [], []
+        if os.path.exists(sched):
+            with open(sched, "r", encoding="utf-8", errors="replace") as f:
+                for line in f:
+                    m = _ST_FIFO.match(line)
+                    if m:
+                        (rd if m.group(2) == "Read" else wr).append(int(m.group(1)))
+        if rd and wr:
+            u["latency"] = max(wr) - min(rd)
+            u["status"] = "scheduled"
+        else:
+            u["reason"] = "no ap_fifo read and write in the schedule (ap_memory ports?)"
+        if u["status"] == "scheduled" and est and tgt and float(est) > float(tgt):
+            u["status"] = "unreliable"
+            u["reason"] = (
+                f"estimated clock {est} ns exceeds the target {tgt} ns: the "
+                f"schedule holds only at the slower clock"
+            )
+        units[mod] = u
+    return {
+        "tool": "vitis_hls",
+        "solution": os.path.abspath(sol_dir),
+        "definition": (
+            "latency: rising edges from the input-accepting edge to the edge after "
+            "which the output is visible, no stall; ii: the I/O loop's II"
+        ),
+        "units": units,
+    }

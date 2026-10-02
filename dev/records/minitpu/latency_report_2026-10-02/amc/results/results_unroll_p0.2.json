@@ -1,0 +1,8 @@
+[
+ {
+  "sched": "unroll",
+  "period_ns": 0.2,
+  "N": 16,
+  "error": "RuntimeError: lower_amc_to_loopschedule_vivado failed"
+ }
+]
