@@ -1,0 +1,263 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+##################################################################
+U1 Record: ``vpu_bf16_add`` as the RTL's Own Algorithm (``bits``)
+##################################################################
+
+.. note::
+
+   **Dated measurement record**, 2026-10-02 (host clock 2026-10-01). zhang-21,
+   branch ``u1-bits`` off ``u1-pilot`` (``4da88a79``), worktree
+   ``scratch/wt-u1-bits``, ``source examples/minitpu/harness/env-zhang21.sh``
+   (conda ``allo``, ``LLVM_BUILD_DIR`` from the env, ``OMP_NUM_THREADS=8``,
+   Catapult 2024.2 SystemC). Oracle: MiniTPU ``b3ba0a4`` ``vpu_bf16_add.sv``
+   under Verilator 5.052. Stimulus: ``harness/stimulus.binary_bf16()``,
+   251936 vector pairs.
+
+The ``bits`` variant (``examples/minitpu/units/bf16_add.py``) writes
+``vpu_bf16_add.sv`` line for line in Allo on ``uint16`` ports and ``UInt(N)``
+locals: field extraction, the 25-bit ``{exp, mant}`` magnitude compare,
+alignment with nine guard bits, add/subtract, a ``leading_zeros17`` function,
+normalize with the subnormal clamp, RNE, and the RTL's specials (NaN always
+``+0x7FC0``, ``(+0)+(-0) = -0``). The point of the variant is not the match but
+what Allo made us change to get it (README D-9).
+
+Result
+======
+
+.. code-block:: text
+
+   $ $ALLO_PYTHON -m examples.minitpu.harness.check bf16_add --variant bits
+   RTL vpu_bf16_add: 251936 vectors, latency [0] (declared 0), 0.1s
+   UNIT-MATCH bf16_add bits simulator 251936/251936 latency=0 (build 0.5s, run 0.1s)
+
+   $ ... --variant bits --backend systemc
+   UNIT-FAIL  bf16_add bits systemc: RuntimeError: Failed to compile with g++ ...
+
+The first draft, a literal transcription, built at once and gave
+``1535/2000`` on the first 2000 vectors; the only defect was B1 below. With
+B1 worked around at its two sites the full set matches. Without each
+workaround, on the full set: the 25-bit key compare alone costs **100291 /
+251936** vectors, the 5-bit normalize-shift compare alone **5911 / 251936**.
+
+Matrix row (README D-9)
+-----------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 16 62
+
+   * - Tool
+     - Cell
+     - Note
+   * - Allo simulator
+     - match (finding)
+     - 251936/251936 only after working around B1.
+   * - Allo LLVM backend (``allo.customize``)
+     - finding
+     - B1 (same wrong answer), B2 (verifier rejects ``uint1`` compare result).
+   * - Allo HLS C++ emitter
+     - finding
+     - Emits ``uint8_t > uint8_t``: computes the *unsigned* answer, so it and
+       the simulator disagree on the same Allo program (B1).
+   * - SystemC emitter / csim
+     - blocked
+     - S1 (every ``uint16`` region port), S2 (nested function returning
+       ``UInt``), then the known testbench deadlock (S3).
+   * - Catapult, RTLGen, AMC
+     - not tried
+     - Out of this session's scope.
+
+Findings
+========
+
+Classes are README D-9's: **bug**, **missing abstraction**, **workaround**
+(works only by distorting the unit), **semantic mismatch** (tools disagree on
+what the unit means).
+
+B1. ``UInt`` comparisons are lowered as *signed* -- **bug** (also a **semantic mismatch** between backends)
+----------------------------------------------------------------------------------------------------------
+
+``ASTTransformer.build_Compare`` (``allo/ir/builder.py:2436``) picks the
+predicate from ``str(rhs_res.type)``: ``"int"`` if it starts with ``i``,
+``"uint"`` if it starts with ``ui``. Allo's integer types are signless in MLIR
+(``i25``, never ``ui25``), so the unsigned table is dead code and every
+``<``/``<=``/``>``/``>=`` between two ``UInt(N)`` is ``cmpi slt/sle/sgt/sge``.
+It bites whenever the operand's top bit can be set. Upstream
+``cornell-zhang/allo`` ``main`` has the same code. Equality is unaffected, and
+so is ``UInt`` against an integer literal (the rule widens both to a signed
+``Int(32+)`` with zero extension).
+
+.. code-block:: python
+
+   def kernel(a: uint8, b: uint8) -> int32:
+       r: int32 = 0
+       if a > b:          # lowered: arith.cmpi sgt, %arg0, %arg1 : i8
+           r = 1
+       return r
+   allo.customize(kernel).build()(200, 100)   # -> 0
+   # target="vhls" emits `bool v3 = v0 > v1;` on uint8_t -> 1
+
+So the simulator and LLVM backend return 0 and the HLS C++ returns 1 for the
+same source. In this unit it hit ``{exp_a, mant_a} >= {exp_b, mant_b}`` (25
+bits, top bit = exponent MSB) and ``leading_zeros < max_normalize_shift``
+(``UInt(5)``, 17 reads as -15).
+
+*Workaround in the unit:* give each compared operand one spare zero bit on
+top (``key_a: UInt(26)``; ``lz6``/``max6: UInt(6)`` copies), so the signed
+predicate sees non-negative values. This is a distortion of declared widths,
+marked ``(B1)`` at both sites.
+
+*Proposed fix* (core change, so a proposal): decide the table from the
+inferred Allo type, ``isinstance(node.dtype, UInt)``, not from the MLIR type
+string. ``node.dtype`` is already the common operand type from ``cmp_rule``.
+
+B2. A comparison's inferred type is its operand type, not ``uint1`` -- **bug**
+-------------------------------------------------------------------------------
+
+``TypeInferer.visit_Compare`` (``allo/ir/infer.py:988``) sets
+``node.dtype`` to the operand type from ``cmp_rule``, but the op built is an
+``i1``. Assigning or returning the comparison as ``uint1`` then casts
+"``UInt(8)`` to ``UInt(1)``" and emits ``arith.trunci`` from ``i1`` to ``i1``,
+which the LLVM backend's re-parse rejects:
+
+.. code-block:: python
+
+   def kernel(a: uint8, b: uint8) -> uint1:
+       r: uint1 = a == b      # also: return a == b
+       return r
+   allo.customize(kernel).build()
+   # 'arith.trunci' op operand type 'i1' and result type 'i1' are cast incompatible
+
+The dataflow simulator path accepted the same pattern (``same_sign: uint1 =
+sign_a == sign_b``, ``a_is_large: uint1 = key_a >= key_b``) and computed the
+right bit, so the unit never needed a workaround; the defect is in the IR all
+the same. Same family as ip_gaps' "a full-width bit slice does not build"
+(``trunci`` of equal widths). *Proposed fix:* keep the operand type on a
+separate attribute for the builder's casts and set ``node.dtype = uint1``.
+
+S1. SystemC emitter loses the unsignedness of memref ports -- **bug**
+----------------------------------------------------------------------
+
+Any region with a ``uint16`` port fails to compile, independent of the
+kernel body:
+
+.. code-block:: python
+
+   @df.region()
+   def top(A: uint16[4], C: uint16[4]):
+       @df.kernel(mapping=[1], args=[A, C])
+       def k(a: uint16[4], c: uint16[4]):
+           for i in range(4):
+               c[i] = a[i]
+   df.build(top, target="systemc", mode="csim", project=...)
+   # kernel: In<ac_int<16,false>> v0;  Out<ac_int<16,true>> v1;
+   # top:    In<ac_int<16,true>>  v3;  Out<ac_int<16,true>> v4;
+   # error: no matching function for call to
+   #   InBlocking<ac_int<16,false>>::Bind(In<ac_int<16,true>>&)
+
+``linkPayloadUnsigned`` (``mlir/lib/Translation/EmitSystemC.cpp:79``) recovers
+signedness from an ``unsigned`` attribute on the defining op or on some user.
+A kernel's read port has unsigned loads, so it is right; its write port's
+stores carry no attribute, and the top level's arguments have no tagged user
+at all, so both default to signed. *Proposed fix:* read the function's
+``itypes``/``otypes`` strings, as ``EmitVivadoHLS.cpp:3167`` does, before
+falling back to the users.
+
+*Probe:* the same unit with ``int16`` ports (bits sliced out exactly as
+before) gets past S1 -- the ports agree because all are signed -- which is the
+evidence that S1 is the port path only. That is a **workaround** (it changes
+the interface's type) and is not committed.
+
+S2. SystemC emitter: a nested function returning ``UInt`` -- **bug**
+---------------------------------------------------------------------
+
+``leading_zeros17(value: UInt(17)) -> UInt(5)`` emits the callee as
+``void leading_zeros17(ac_int<17,false>, ac_int<5,false>*)`` and the call site's
+result buffer as ``ac_int<5,true> v191``; g++ rejects the pointer conversion.
+Same root cause as S1 (a memref's signedness recovered from tagged users).
+Inlining the loop into the kernel body (the int16 probe above) gets past it.
+The simulator is fine with the function.
+
+S3. SystemC testbench deadlock -- **bug**, known, not debugged
+--------------------------------------------------------------
+
+With S1 and S2 worked around (int16 ports, inlined loop) the design compiled
+and csim then produced nothing for >10 min at n = 251936. That is the
+coordinator's known defect: ``tb::src()`` pushes all of input 0 before any of
+input 1 into unbuffered ``Combinational`` channels while the kernel pops them
+interleaved. Being fixed on a separate branch; recorded as *blocked*.
+
+M1. No bit concatenation -- **missing abstraction**
+----------------------------------------------------
+
+SV ``{(exp_a != 0), frac_a, 9'b0}`` and ``{exp_a, mant_a}`` have no Allo
+expression (``concat`` is tensor concatenation). Written as a zeroed local and
+slice stores::
+
+   mant_a: UInt(17) = 0
+   mant_a[16] = exp_a != 0
+   mant_a[9:16] = frac_a
+
+Slice stores on scalars (and single-bit stores, ``magnitude[1] = ...``,
+``result_o[15] = sign_a``) all work, so this keeps the RTL's structure at the
+cost of 2-3 statements per concatenation. The alternative, shift-and-or,
+would need explicit widening first (see M3). A ``concat(a, b, ...)`` with the
+width the sum of the parts' would remove the scaffold.
+
+M2. No reduction operators -- **missing abstraction** (trivial)
+----------------------------------------------------------------
+
+``|magnitude[6:0]`` becomes ``magnitude[0:7] != 0``. Exact, no distortion.
+
+M3. Slice notation is ``[lo:hi)``, SV's is ``[hi:lo]`` -- **missing abstraction** (notation)
+---------------------------------------------------------------------------------------------
+
+``a_i[14:7]`` is ``a_i[7:15]``. Every slice is rewritten; an off-by-one here
+compiles silently. Nothing distorted, but it is the commonest source of
+transcription error when mirroring RTL.
+
+M4. Width semantics differ from SV's -- **semantic mismatch** (latent; not hit)
+--------------------------------------------------------------------------------
+
+SV sizes an expression by its context (the assignment target); Allo sizes it
+bottom-up by ``typing_rule.py``: ``UInt(a) + UInt(b)`` is ``UInt(max+1)``, a
+shift keeps the left operand's width, and an integer literal is ``int32``, so
+``exp_result + 1`` is a signed ``Int(34)``. Truncation happens only at the
+assignment. For this unit that coincides with the RTL everywhere -- the RTL's
+explicit ``{1'b0, x}`` widenings are simply unnecessary in Allo -- but an
+expression used *inline* (e.g. ``if exp_large - exp_small >= 10``) would be
+evaluated at a different width than SV's 9-bit wrap. A shift that should
+carry into a wider target (``x << 9`` with ``x: uint1``) loses the bits by ``shift_rule`` (result = left operand type) unless
+``x`` is widened first.
+
+M5. Shift by at least the width is undefined in the simulator -- **semantic mismatch** (latent; not hit)
+---------------------------------------------------------------------------------------------------------
+
+SV ``x >> s`` with ``s >= $bits(x)`` is 0. Allo lowers to ``arith.shrui``,
+which is poison past the width; on x86 the simulator returns the host's
+32-bit-masked shift:
+
+.. code-block:: text
+
+   x: UInt(17) = 0x1FFFF;  amt: UInt(6) = s[i];  y: UInt(17) = x >> amt
+   amt = 17, 31, 32, 33  ->  0x0, 0x0, 0x1ffff, 0xffff     (SV: 0, 0, 0, 0)
+
+The unit is safe because the RTL itself clamps ``align_shift`` to 10 and
+``normalize_shift`` to 16 below the 17/18-bit operands; a unit that relies on
+SV's shift-out-to-zero would silently diverge.
+
+What worked as written
+======================
+
+Recorded so the next unit does not re-probe them: scalar bit reads give
+``uint1`` and can be used directly as an ``if`` condition and under ``not``;
+variable shift amounts of a narrower ``UInt``; ``x if c else y`` on mixed
+widths; augmented assignment (``magnitude >>= 1``, ``exp_result -=
+normalize_shift``); a nested function with a 17-step flag loop
+(``leading_zeros17``, the RTL has no ``break`` either); ``UInt(N)`` annotations
+in a nested function's signature; locals declared inside ``elif`` bodies;
+declaring every RTL ``logic`` at the top with a zero default, as
+``always_comb`` does. The only structural departures from the ``.sv`` are B1's
+spare bits and M1's concatenation scaffolds.
