@@ -38,9 +38,18 @@ zhang-21; MiniTPU at ``b3ba0a4d``; harness on branch ``u1-pilot``.
    * - Catapult csyn / RTL
      - in progress (branch ``u1-catapult``)
      -
-   * - RTLGen
-     - not tried yet
-     - builds and runs on zhang-21 (``dev/records/open_hls/rtlgen_exploration_2026-10-02.rst``)
+   * - RTLGen, ``native``
+     - **finding, semantic mismatch + missing abstraction**: 249,995/251,936
+       match. The others are NaN encodings (RTLGen keeps sign and payload)
+       and ``(+0)+(-0)``. The adder is an extern Vivado IP with no RTL body,
+       so cosim checks a DPI-C model, and ``add_rtl_model`` is unimplemented
+     - ``u1_bf16_add_rtlgen_2026-10-02.rst`` (F1, F2)
+   * - RTLGen, ``bits``
+     - **match**: 251,936/251,936 bit-exact, II=1, N+6 cycles. Findings: no
+       combinational kernel (latency >= 1 with start/done); a ``for`` loop
+       like the ``.sv``'s gives II=48 unless it is unrolled; 32-bit
+       temporaries are not narrowed
+     - ``u1_bf16_add_rtlgen_2026-10-02.rst`` (F3-F5)
    * - AMC
      - **blocked**: no bf16 in its frontend or operator library; f32 needs
        DesignWare models not in the repository
