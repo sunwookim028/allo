@@ -370,6 +370,8 @@ private:
   // Narrow a >64-bit ac_int to a native int/index with an explicit
   // .to_int64()/.to_uint64() (no implicit conversion under __SYNTHESIS__).
   void emitNarrowCastSuffix(Value src, Value dst) override;
+  // float <-> float / int conversions through the _f* helpers in the header.
+  bool emitCastExpr(Operation *op, Value src, Value dst) override;
   // max/min with both operands cast to the result type (a float literal mixed
   // with an ac_ieee_float operand otherwise fails template deduction).
   void emitMaxMin(Operation *op, const char *syntax) override;
@@ -2514,6 +2516,54 @@ void SystemCModuleEmitter::emitStreamFull(StreamFullOp op) {  // override (base 
 // call compiles in both csim and synthesis. `index` (emitted as `int`) is a
 // native signed 64-bit type -- e.g. a bit-slice range endpoint computed wide
 // (ap_int<66>) then cast to index would otherwise fail to convert.
+// A cast with a float on either side. ac floats have explicit constructors only,
+// so the base's `T v = x;` copy-initialization failed g++ for every such pair
+// except a few that happen to have an implicit path (and those truncated): the
+// ac::bfloat16 constructors hard-code AC_TRN_ZERO, while arith.truncf/sitofp
+// round to nearest even. Every pair goes through the header's helpers instead,
+// which convert via ac_std_float (AC_RND_CONV) -- one rounding, to nearest even:
+//   float -> float   _fto< D >(_fstd(x))
+//   int   -> float   _ito< D >(ac_int<W, S>(x))   S from sitofp/uitofp
+//   float -> int     _fstd(x).convert_to_ac_int<W, S>()   (toward zero, as fptosi)
+bool SystemCModuleEmitter::emitCastExpr(Operation *op, Value src, Value dst) {  // override (base emitter)
+  Type st = src.getType(), dt = dst.getType();
+  bool sF = llvm::isa<FloatType>(st), dF = llvm::isa<FloatType>(dt);
+  if (!sF && !dF)
+    return false;
+  if (st == dt)
+    return false;
+  std::string D = std::string(getSCTypeName(dt).str());
+  if (sF && dF) {
+    os << "_fto< " << D << " >(_fstd(";
+    emitValue(src);
+    os << "))";
+    return true;
+  }
+  if (dF) { // int -> float
+    auto it = llvm::dyn_cast<IntegerType>(st);
+    unsigned w = it ? it.getWidth() : 64; // index -> 64-bit signed
+    bool uns = isa<arith::UIToFPOp>(op);
+    os << "_ito< " << D << " >(ac_int<" << w << ", " << (uns ? "false" : "true")
+       << ">(";
+    emitValue(src);
+    os << "))";
+    return true;
+  }
+  // float -> int
+  auto it = llvm::dyn_cast<IntegerType>(dt);
+  unsigned w = it ? it.getWidth() : 64;
+  bool uns = isa<arith::FPToUIOp>(op) ||
+             (it && it.getSignedness() == IntegerType::SignednessSemantics::Unsigned);
+  os << "(" << D << ")(_fstd(";
+  emitValue(src);
+  os << ").template convert_to_ac_int<" << w << ", " << (uns ? "false" : "true")
+     << ">()";
+  if (w <= 64)
+    os << (uns ? ".to_uint64()" : ".to_int64()");
+  os << ")";
+  return true;
+}
+
 void SystemCModuleEmitter::emitNarrowCastSuffix(Value src, Value dst) {  // override (base emitter)
   auto si = llvm::dyn_cast<IntegerType>(src.getType());
   if (!si || si.getWidth() <= 64)
@@ -3479,6 +3529,43 @@ template <> inline ac::bfloat16 _ffrombits<ac::bfloat16>(unsigned long long b) {
 template <>
 inline ac_ieee_float<binary32> _ffrombits<ac_ieee_float<binary32> >(unsigned long long b) {
   ac_ieee_float<binary32> v; v.set_data(ac_int<32, true>((long long)b)); return v;
+}
+// Float conversions (casts). ac floats have explicit constructors only, and
+// ac::bfloat16's hard-code round-toward-zero; arith casts round to nearest
+// even. So convert through ac_std_float, whose conversions are AC_RND_CONV:
+// _fstd(x) is the source as an ac_std_float, _fto/_ito round it (once) into D.
+template <class D> struct _fstd_of;
+template <> struct _fstd_of<ac::bfloat16> { typedef ac_std_float<16, 8> t; };
+template <> struct _fstd_of<half> { typedef ac_std_float<16, 5> t; };
+template <> struct _fstd_of<ac_ieee_float<binary32> > { typedef ac_std_float<32, 8> t; };
+inline ac_std_float<16, 8> _fstd(const ac::bfloat16 &x) { return x.to_ac_std_float(); }
+template <ac_ieee_float_format F>
+inline typename ac_ieee_float<F>::ac_std_float_t _fstd(const ac_ieee_float<F> &x) {
+  return x.to_ac_std_float();
+}
+inline ac_std_float<64, 11> _fstd(double x) { return ac_std_float<64, 11>(x); }
+template <> struct _fstd_of<double> { typedef ac_std_float<64, 11> t; };
+template <class D> struct _fconv {
+  template <int W, int E> static D from(const ac_std_float<W, E> &s) {
+    return D(typename _fstd_of<D>::t(s));
+  }
+  template <int WI, bool SI> static D fromi(const ac_int<WI, SI> &x) {
+    return D(typename _fstd_of<D>::t(x));
+  }
+};
+template <> struct _fconv<double> {
+  template <int W, int E> static double from(const ac_std_float<W, E> &s) {
+    return ac_std_float<64, 11>(s).to_double();
+  }
+  template <int WI, bool SI> static double fromi(const ac_int<WI, SI> &x) {
+    return ac_std_float<64, 11>(x).to_double();
+  }
+};
+template <class D, int W, int E> inline D _fto(const ac_std_float<W, E> &s) {
+  return _fconv<D>::from(s);
+}
+template <class D, int WI, bool SI> inline D _ito(const ac_int<WI, SI> &x) {
+  return _fconv<D>::fromi(x);
 }
 // Waveform trace of a float: Connections/sc_signal ports call sc_trace on their
 // payload, unqualified, from inside sc_core and Connections. ac_sc.h (pulled in

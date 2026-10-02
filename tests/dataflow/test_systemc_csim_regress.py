@@ -19,7 +19,7 @@ import numpy as np
 import pytest
 
 import allo.dataflow as df
-from allo.ir.types import bfloat16, float16, float32, int32, uint16, UInt, Stream, Wire
+from allo.ir.types import bfloat16, float16, float32, float64, int32, uint16, UInt, Stream, Wire
 
 needs_csim = pytest.mark.skipif(
     not (os.environ.get("MGC_HOME") and os.environ.get("SYSTEMC_HOME")),
@@ -315,3 +315,47 @@ def test_wire_only_kernel_waits_under_synthesis():
     # the per-iteration wait() is NOT inside an `#ifndef __SYNTHESIS__` guard
     i = loop.index("wait();  // no handshake in the body")
     assert "#ifndef __SYNTHESIS__" not in loop[:i].splitlines()[-1]
+
+
+def _cast(S, D, N):
+    @df.region()
+    def top(A: S[N], C: D[N]):
+        @df.kernel(mapping=[1], args=[A, C])
+        def k(a: S[N], c: D[N]):
+            for i in range(N):
+                c[i] = a[i]
+
+    return top
+
+
+_CASTS = {
+    "bf16": (bfloat16, ml_dtypes.bfloat16), "f16": (float16, np.float16),
+    "f32": (float32, np.float32), "f64": (float64, np.float64),
+    "i32": (int32, np.int32), "ui16": (uint16, np.uint16),
+}
+
+
+@needs_csim
+@pytest.mark.parametrize(
+    "src,dst",
+    [("bf16", "f32"), ("f32", "bf16"), ("f64", "f16"), ("f16", "f64"),
+     ("i32", "bf16"), ("ui16", "f32"), ("f32", "i32"), ("bf16", "ui16")],
+)
+def test_float_casts_compile_and_round_to_nearest_even(src, dst):
+    """S4: a cast with an ac float on either side.
+
+    The base emitter wrote ``D v = x;``; ac floats have only explicit
+    constructors, so g++ rejected bf16 -> f32 and most other pairs, and the
+    pairs that compiled (into bf16) truncated where arith rounds to nearest
+    even. Values include rounding ties (1 + 3*2^-8 -> bf16, 259 -> bf16) and a
+    fraction to truncate toward zero (2.7 -> int).
+    """
+    (S, sn), (D, dn) = _CASTS[src], _CASTS[dst]
+    if np.issubdtype(sn, np.integer):
+        a = np.array([1, 2, 259, 100], dtype=sn)
+    else:
+        a = np.array([1.5, 2.7, 259, 1 + 3 / 256], dtype=np.float64).astype(sn)
+    c = np.zeros(len(a), dtype=dn)
+    _csim(_cast(S, D, len(a)), a, c)
+    want = a.astype(np.float64).astype(dn) if np.issubdtype(sn, np.integer) else a.astype(dn)
+    np.testing.assert_array_equal(c.astype(np.float64), want.astype(np.float64))

@@ -2616,12 +2616,16 @@ void allo::hls::VhlsModuleEmitter::emitCast(CastOpType op) {
   fixUnsignedType(result, op->hasAttr("unsigned"));
   emitValue(result);
   os << " = ";
-  emitValue(op.getOperand());
-  // Backend hook: the SystemC emitter appends a .to_int64()/.to_uint64() when
-  // narrowing a >64-bit ac_int to a native int/index (no implicit conversion
-  // under __SYNTHESIS__ -> Catapult CRD-413). Default is a no-op, so Vivado/Vitis
-  // output (whose ap_int narrows implicitly) is unchanged.
-  emitNarrowCastSuffix(op.getOperand(), op.getResult());
+  // Backend hook (default: no-op, so Vivado/Vitis output is unchanged): the
+  // SystemC emitter writes float conversions itself (see emitCastExpr there).
+  if (!emitCastExpr(op, op.getOperand(), result)) {
+    emitValue(op.getOperand());
+    // Backend hook: the SystemC emitter appends a .to_int64()/.to_uint64() when
+    // narrowing a >64-bit ac_int to a native int/index (no implicit conversion
+    // under __SYNTHESIS__ -> Catapult CRD-413). Default is a no-op, so
+    // Vivado/Vitis output (whose ap_int narrows implicitly) is unchanged.
+    emitNarrowCastSuffix(op.getOperand(), op.getResult());
+  }
   os << ";";
   emitInfoAndNewLine(op);
 }
