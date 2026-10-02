@@ -250,3 +250,89 @@ Limits and known failures
   simulated-clock simulator with a ``get_cycles()`` read-out; it was not merged, because it
   rewrites the same code this fork rewrote for OpenMP team sizing. ``dev/systemc/SIMULATOR.md``
   describes it.
+
+Known fixed
+-----------
+
+Each of these passed every emit-only test and failed the first time g++ or the
+testbench ran. ``tests/dataflow/test_systemc_csim_regress.py`` compiles and runs
+one design per bug (it skips without ``MGC_HOME`` and ``SYSTEMC_HOME``).
+
+- **bf16 ports did not compile** (found by the MiniTPU ``bf16_add`` unit,
+  2026-10-02): ``no matching function for call to sc_trace(sc_trace_file*&,
+  const ac::bfloat16&, ...)``. Connections and ``sc_signal`` call ``sc_trace``
+  unqualified from inside their own namespaces, so only argument-dependent lookup
+  finds an overload, and it looks in the float type's namespace. The emitted
+  overload was global; ``ac::bfloat16`` lives in ``ac``. It is now emitted in
+  ``namespace ac``. ``ac_ieee_float`` (f16, f32) is a global template, so its
+  global overloads were found; ``double`` uses SystemC's own.
+- **The testbench deadlocked with two or more boundary streams** (same unit):
+  one ``src()`` thread pushed all of input 0 before any of input 1, and one
+  ``snk()`` drained all of output 0 before output 1, over ``Combinational``
+  channels that hold no data. A kernel computing ``a[i] + b[i]`` blocked on its
+  first pop of ``b`` while ``src`` blocked on its second push of ``a``: no
+  output, and the csim spun forever. The testbench now runs one ``SC_THREAD`` per
+  boundary stream (``src_<port>``/``snk_<port>``), so it accepts any order the
+  kernel can consume or produce in, and the last sink calls ``sc_stop()``. The
+  run is bounded too: after ``ALLO_TB_MAX_CYCLES`` cycles (default ``2000 x``
+  the largest array ``+ 200000``; override with ``-D``) an undrained output
+  prints ``TB DEADLOCK`` and exits 1, so a hang in csim now means the design
+  deadlocks, and says so.
+- **Float testbench data went through decimal text** (same unit). Inputs were
+  written by Python as ``str(x)`` and read with ``>> float``; outputs were
+  printed at ``setprecision(9)``. Three losses: libstdc++'s ``>> float`` sets
+  ``failbit`` on ``"nan"`` and ``"inf"``, after which every later read of the
+  file silently fails; a NaN's sign and payload cannot survive text; and
+  ``ac::bfloat16(float)`` truncates, so the shortest decimal of a bf16 value
+  reads back as the bf16 below it (``0x3f81`` prints as ``1.00781``, which
+  becomes ``0x3f80``). The data files now carry each float's IEEE bit pattern as
+  an unsigned integer: ``allo/backend/systemc.py`` writes and reads bits, and the
+  testbench converts with ``_ffrombits<T>`` (``set_data``) and ``_fbits``. This
+  holds for f16, bf16, f32 and f64, for stream and memory ports; integers are
+  unchanged. Memory read-out merges replicas by OR-ing bits instead of summing
+  floats, and ``_fbits`` no longer sign-extends a negative 16-bit float.
+- **csim flipped the sign of zeros on a signal** (found while testing the
+  previous fix). ``sc_signal::write()`` and ``update()`` drop a write whose value
+  ``==`` the current one, and IEEE says ``+0 == -0``: a ``-0`` written after a
+  ``+0``, or the reverse, never reached the reader of a Connections channel or a
+  memory pin. An RTL wire carries the sign bit, so csim and RTL disagreed. The
+  header now specializes both members for each float payload (bf16, f16, f32,
+  f64) and writer policy to compare bits. It applies to the OSCI kernel only
+  (2.3.2 and later); not under ``__SYNTHESIS__``, and not under Xcelium's own
+  SystemC (``NCSC``), so **the testbench side of an RTL cosim still has this
+  defect** -- a cosim mismatch on a signed zero is the testbench's, not the RTL's.
+- **Any region with a ``uint16`` port did not compile** (the ``bf16_add``
+  ``bits`` variant, S1 in ``dev/records/minitpu/u1_bf16_add_bits_2026-10-02.rst``).
+  A link's sign is not in its MLIR type (signless ``i16``); the emitter recovered
+  it from an ``unsigned`` attribute on the defining op or on a user. A kernel's
+  write port has only stores, which carry none, and a region's ports have no
+  tagged user at all, so both emitted as signed ``ac_int`` and could not bind to
+  the unsigned read port. A function argument's sign is now read from the
+  function's ``itypes``, as the HLS emitters do.
+- **A nested function returning ``UInt`` did not compile** (S2, same record).
+  The callee's signature took its result's sign from its ``otypes``
+  (``f(..., ac_int<5,false>*)``) but the call site declared the result buffer
+  from the signless call result (``ac_int<5,true>``), and the pointer did not
+  convert. The call site now reads the callee's ``otypes`` too. The fix is in
+  the shared ``VhlsModuleEmitter::emitCall``, so Vitis and Catapult C++ get it.
+- **bf16 ports failed Catapult's ``go analyze``** (C1, the MiniTPU Catapult
+  track, ``dev/records/minitpu/u1_bf16_add_catapult_2026-10-02/``): ``CRD-135
+  class "ac::bfloat16" has no member "Marshall"``. Connections' ``marshaller.h``
+  defines ``Wrapped<ac::bfloat16>`` (and ``Wrapped<ac_ieee_float<...>>``) only if
+  ``ac_std_float.h`` was included before ``mc_connections.h``; the emitter
+  included it after. The g++ csim compiles the non-synthesis Connections path and
+  never saw it; ``g++ -fsyntax-only -D__SYNTHESIS__`` does, in a second, and is
+  what ``test_float_ports_pass_the_synthesis_front_end`` runs. The ac headers now
+  come first. With that order ``ac_sc.h`` also supplies ``sc_trace`` for every
+  ac float, so the emitter's own overloads (the first entry above) are gone: they
+  were ambiguous with the library's. Checked by hand: the ``bf16_add`` native unit
+  passes ``go analyze`` and ``go compile`` unpatched (Catapult 2024.2,
+  2026-10-02).
+- **A kernel whose links are all ``Wire``\ s failed synthesis** (C2, same
+  record): ``CIN-123 Loop 'while' in thread 'run' must have a wait``. A
+  steady-state kernel's synthesized ``while (1)`` relied on its Connections
+  handshake for the cycle boundary and emitted its ``wait()`` for csim only; a
+  ``Wire`` is a plain ``sc_signal`` and has no handshake. A loop body with no
+  stream or channel op now gets its ``wait()`` under synthesis too (valid_only
+  channel helpers already wait). Checked by hand: the ``bf16_add`` Wire variant
+  passes ``go analyze`` and ``go compile`` unpatched.

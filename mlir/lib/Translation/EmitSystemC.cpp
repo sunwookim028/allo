@@ -77,6 +77,21 @@ static SmallString<32> getSCTypeName(Type valType) {
 // so recover it here from the defining construct or any user. (Without this every
 // UInt payload emits as ac_int<W,true> -> signed, breaking csim of UInt designs.)
 static bool linkPayloadUnsigned(Value linkVal) {
+  // A function argument (a kernel's port, a region's boundary array) has no
+  // defining op, and its users need not be tagged: stores carry no `unsigned`
+  // attr, and a region's arguments are only passed on to calls. Its sign is in
+  // the function's `itypes` string, as the HLS emitters read it. Without this
+  // a UInt kernel's write port and every UInt top-level port emitted signed,
+  // so In<ac_int<16,false>> was bound to In<ac_int<16,true>> and g++ failed.
+  if (auto barg = llvm::dyn_cast<BlockArgument>(linkVal))
+    if (auto f = llvm::dyn_cast_or_null<func::FuncOp>(
+            barg.getOwner()->getParentOp()))
+      if (barg.getOwner() == &f.getBody().front())
+        if (auto it = f->getAttrOfType<StringAttr>("itypes")) {
+          StringRef s = it.getValue();
+          if (barg.getArgNumber() < s.size() && s[barg.getArgNumber()] == 'u')
+            return true;
+        }
   if (Operation *def = linkVal.getDefiningOp())
     if (def->hasAttr("unsigned"))
       return true;
@@ -109,6 +124,13 @@ static SmallString<32> getStreamPayloadTypeName(Type valType, bool isUnsigned) {
                            std::to_string(it.getWidth()) + ">");
   }
   return getSCTypeName(valType);
+}
+
+// A float element type as the testbench spells it. The tb's data files carry
+// floats as raw IEEE bits (allo/backend/systemc.py writes and reads them).
+static bool isFloatCType(const std::string &t) {
+  return t == "half" || t == "double" || t == "ac::bfloat16" ||
+         t.find("ieee_float") != std::string::npos;
 }
 
 // A Channel's PROTOCOL picks genuinely different hardware, not a cosmetic label:
@@ -1034,11 +1056,27 @@ void SystemCModuleEmitter::emitAffineFor(affine::AffineForOp op) {  // override 
   emitBlock(*op.getBody());
   // csim only: an SC_THREAD does not yield on its own, so a body issuing non-blocking
   // stream ops needs a per-iteration wait() or peer threads never run. Under synthesis
-  // the PushNB/PopNB handshake supplies the cycle boundary.
-  os << "#ifndef __SYNTHESIS__\n";
+  // the PushNB/PopNB handshake supplies the cycle boundary -- but only where there is
+  // one. A body whose links are all `Wire`s (plain sc_signal read/write) has no
+  // stream or channel op (valid_only channel helpers wait() themselves), so the
+  // synthesized `while (1)` had no wait() and Catapult refused it (CIN-123 "Loop
+  // 'while' in thread 'run' must have a wait"). Such a body gets its wait() under
+  // synthesis too.
+  bool hasHandshake = false;
+  op.walk([&](Operation *o) {
+    if (isa<allo::StreamPutOp, allo::StreamGetOp, allo::StreamTryPutOp,
+            allo::StreamTryGetOp, allo::ChannelPutOp, allo::ChannelGetOp,
+            allo::ChannelTryPutOp, allo::ChannelTryGetOp>(o))
+      hasHandshake = true;
+  });
+  if (hasHandshake)
+    os << "#ifndef __SYNTHESIS__\n";
   indent();
-  os << "wait();\n";
-  os << "#endif\n";
+  os << "wait();" << (hasHandshake ? "" : "  // no handshake in the body: the cycle "
+                                          "boundary, in csim and synthesis")
+     << "\n";
+  if (hasHandshake)
+    os << "#endif\n";
   reduceIndent();
   indent();
   os << "}\n";
@@ -3367,12 +3405,18 @@ void SystemCModuleEmitter::emitModule(ModuleOp module) {  // override (base emit
 #ifndef AC_STD_FLOAT_BFLOAT16_ROUND_OVERRIDE
 #define AC_STD_FLOAT_BFLOAT16_ROUND_OVERRIDE AC_RND_CONV
 #endif
-#include <mc_connections.h>   // MatchLib Connections (LI valid/ready channels)
-#include <connections/connections_fifo.h>  // vendor FWFT Connections::Fifo (buffered streams)
+// The ac types come BEFORE mc_connections.h: Connections' marshaller.h defines
+// its Wrapped<> specializations (ac::bfloat16's AC_SPECIAL_FLOAT_WRAPPER, the
+// ac_std_float one) only for the ac headers already included. With
+// ac_std_float.h after it, Catapult's `go analyze` failed every bf16 port with
+// CRD-135 "class ac::bfloat16 has no member Marshall"; g++ csim compiles the
+// non-synthesis Connections path and never saw it.
 #include <ac_int.h>
 #include <ac_fixed.h>
+#include <ac_std_float.h>   // IEEE floats: ac_ieee_float<binaryNN>; ac::bfloat16
+#include <mc_connections.h>   // MatchLib Connections (LI valid/ready channels)
+#include <connections/connections_fifo.h>  // vendor FWFT Connections::Fifo (buffered streams)
 #include <ac_channel.h>     // local self-FIFO streams (one-kernel put+get+status)
-#include <ac_std_float.h>   // IEEE floats: ac_ieee_float<binaryNN>
 #include <cstring>          // std::memcpy for bit-reinterpret (bitcast)
 #include <stdint.h>
 // f16: Catapult has no native `half`; alias it to ac_ieee_float<binary16>.
@@ -3392,14 +3436,16 @@ typedef ac_ieee_float<binary16> half;
 // accessor (data_ac_int(), works in csim AND synthesis); the generic template is
 // a csim-only fallback for any non-float mem-port payload (memcpy guarded out of
 // synthesis, where it would only be reached by an untested double mem-port).
+// data_ac_int() is SIGNED: a negative 16-bit float's bits would sign-extend
+// (0x8000 -> 0xffff8000), so go through the unsigned type of the float's width.
 inline unsigned long long _fbits(const half &v) {
-  return (unsigned long long)v.data_ac_int().to_uint();
+  return (unsigned long long)(unsigned short)v.data_ac_int().to_int();
 }
 inline unsigned long long _fbits(const ac::bfloat16 &v) {
-  return (unsigned long long)v.data_ac_int().to_uint();
+  return (unsigned long long)(unsigned short)v.data_ac_int().to_int();
 }
 inline unsigned long long _fbits(const ac_ieee_float<binary32> &v) {
-  return (unsigned long long)v.data_ac_int().to_uint();
+  return (unsigned long long)(unsigned)v.data_ac_int().to_int();
 }
 template <class T> inline unsigned long long _fbits(const T &v) {
 #ifdef __SYNTHESIS__
@@ -3411,31 +3457,80 @@ template <class T> inline unsigned long long _fbits(const T &v) {
 // Reconstruct a memory element from the DATAW raw bits: value-cast for integers,
 // set_data() bit-load for floats (a value-cast would corrupt the float; memcpy is
 // rejected under synthesis as above).
-// tb: data files hold float text -> read a float and convert.
-inline std::istream &operator>>(std::istream &is, half &h) { float f; is >> f; h = half(f); return is; }
-inline std::istream &operator>>(std::istream &is, ac::bfloat16 &h) {
-  float f; is >> f; h = ac::bfloat16(f); return is;
+// raw bits -> float: the inverse of _fbits, for the testbench's data files.
+// The files carry a float's IEEE bit pattern as an unsigned integer, never
+// decimal text: `>> float` fails on "nan"/"inf" (failbit, after which every
+// later read silently yields 0), loses a NaN's sign and payload, and
+// ac::bfloat16(float) truncates toward zero, so the shortest decimal of a bf16
+// value (e.g. "1.00781" for 1.0078125) parsed and converted to the bf16 BELOW.
+template <class T> inline T _ffrombits(unsigned long long b) {
+#ifdef __SYNTHESIS__
+  return (T)b;
+#else
+  T v; std::memcpy(&v, &b, sizeof(T)); return v; // double (csim/tb only)
+#endif
 }
-inline std::istream &operator>>(std::istream &is, ac_ieee_float<binary32> &h) {
-  float f; is >> f; h = ac_ieee_float<binary32>(f); return is;
+template <> inline half _ffrombits<half>(unsigned long long b) {
+  half v; v.set_data(ac_int<16, true>((long long)b)); return v;
 }
-// tb/Connections waveform trace of a float (trace its raw bit pattern). Needed
-// because Connections/sc_signal ports templated on these types call sc_trace.
-inline void sc_trace(sc_core::sc_trace_file *tf, const half &h, const std::string &n) {
-  sc_trace(tf, (unsigned short)_fbits(h), n);
+template <> inline ac::bfloat16 _ffrombits<ac::bfloat16>(unsigned long long b) {
+  ac::bfloat16 v; v.set_data(ac_int<16, true>((long long)b)); return v;
 }
-inline void sc_trace(sc_core::sc_trace_file *tf, const ac::bfloat16 &h,
-                     const std::string &n) {
-  sc_trace(tf, (unsigned short)_fbits(h), n);
+template <>
+inline ac_ieee_float<binary32> _ffrombits<ac_ieee_float<binary32> >(unsigned long long b) {
+  ac_ieee_float<binary32> v; v.set_data(ac_int<32, true>((long long)b)); return v;
 }
-inline void sc_trace(sc_core::sc_trace_file *tf, const ac_ieee_float<binary32> &h,
-                     const std::string &n) {
-  sc_trace(tf, (unsigned)_fbits(h), n);
-}
+// Waveform trace of a float: Connections/sc_signal ports call sc_trace on their
+// payload, unqualified, from inside sc_core and Connections. ac_sc.h (pulled in
+// by mc_connections.h) supplies those overloads for every ac float, ac::bfloat16
+// included, in namespace ac_tracing made visible to sc_core -- but only when
+// ac_std_float.h was included first, which the include order above guarantees.
+// The emitter used to write its own; with the library's in scope they are
+// ambiguous, and without them a global bf16 overload was never found by ADL.
+// csim: a float signal must compare BITS, not values. sc_signal::write() and
+// update() skip a write whose value `==` the current one, and IEEE says
+// +0 == -0: a -0 written after a +0 (or the reverse) never reaches the reader,
+// on every Connections channel (sc_signal<Message>) and memory pin alike. A
+// wire in RTL carries the sign bit, so csim disagreed with the RTL. Specialize
+// both members for each float payload and writer policy to compare _fbits.
+// Only for the OSCI kernel these members are written for (2.3.2+, sc_signal_t);
+// never under synthesis, and not under Xcelium's own SystemC (NCSC).
+#if !defined(__SYNTHESIS__) && !defined(NCSC) && defined(SC_VERSION_MAJOR) &&     \
+    (SC_VERSION_MAJOR * 100 + SC_VERSION_MINOR) * 100 + SC_VERSION_PATCH >= 20302
+namespace sc_core {
+#define ALLO_SIGNAL_BITS_EQ(T, POL)                                              \
+  template <> inline void sc_signal_t<T, POL>::write(const T &value_) {          \
+    bool value_changed = _fbits(m_new_val) != _fbits(value_);                    \
+    if (!policy_type::check_write(this, value_changed))                         \
+      return;                                                                    \
+    m_new_val = value_;                                                          \
+    if (value_changed || policy_type::needs_update())                            \
+      request_update();                                                          \
+  }                                                                              \
+  template <> inline void sc_signal_t<T, POL>::update() {                        \
+    policy_type::update();                                                       \
+    if (_fbits(m_new_val) != _fbits(m_cur_val))                                  \
+      do_update();                                                               \
+  }
+#define ALLO_SIGNAL_BITS_EQ_ALL(T)                                               \
+  ALLO_SIGNAL_BITS_EQ(T, SC_ONE_WRITER)                                          \
+  ALLO_SIGNAL_BITS_EQ(T, SC_MANY_WRITERS)                                        \
+  ALLO_SIGNAL_BITS_EQ(T, SC_UNCHECKED_WRITERS)
+ALLO_SIGNAL_BITS_EQ_ALL(ac::bfloat16)
+ALLO_SIGNAL_BITS_EQ_ALL(half)
+ALLO_SIGNAL_BITS_EQ_ALL(ac_ieee_float<binary32>)
+ALLO_SIGNAL_BITS_EQ_ALL(double)
+#undef ALLO_SIGNAL_BITS_EQ_ALL
+#undef ALLO_SIGNAL_BITS_EQ
+} // namespace sc_core
+#endif
 // Make ac_ieee_float<Format> a valid Connections channel/Combinational payload.
-// (bf16 needs NOTHING here: ac::bfloat16 already has one --
-// ac_marshaller.h: AC_SPECIAL_FLOAT_WRAPPER(ac::bfloat16, 16) -- which is why a
-// bf16 Stream costs less to support on this target than an f32 one did.)
+// (bf16 needs nothing HERE: marshaller.h has AC_SPECIAL_FLOAT_WRAPPER(ac::bfloat16,
+// 16) -- but only if ac_std_float.h was included before mc_connections.h, which
+// is why that include sits above it.)
+// (Since ac_std_float.h precedes mc_connections.h, marshaller.h also defines
+// Wrapped<ac_ieee_float<binaryNN>> for the IEEE widths, and those explicit
+// specializations win; this partial one is kept for the SCVerify TU below.)
 // Connections' marshaller.h ships Wrapped<> specializations for ac_std_float,
 // ac::bfloat16 and ac_float, but NOT ac_ieee_float -- so a Stream/Channel of
 // f32 (ac_ieee_float<binary32>) fails to synthesize (marshaller.h needs
@@ -3858,74 +3953,84 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         os << mi.chan << "_mem." << (sfx + 1) << "(" << mi.chan << sfx << ");\n";
       }
     }
-    indent(); os << "SC_THREAD(src); sensitive << clk.posedge_event(); "
-                    "async_reset_signal_is(rst, false);\n";
-    indent(); os << "SC_THREAD(snk); sensitive << clk.posedge_event(); "
-                    "async_reset_signal_is(rst, false);\n";
+    // ONE thread per boundary stream, never one thread for all of them. A single
+    // src() that pushed all of input 0 and then all of input 1 deadlocked any
+    // kernel that pops its inputs interleaved (a[i] + b[i]): Combinational
+    // channels hold no data, so src blocks on input 0's second Push while the
+    // kernel blocks on input 1's first Pop. One snk() draining output 0 before
+    // output 1 deadlocks the mirror case. With a thread per channel the testbench
+    // accepts every order the kernel can produce or consume in, so a tb hang
+    // means the DESIGN deadlocks, not the testbench.
+    for (auto &a : ioArrays) {
+      if (a.dir != 'i' && a.dir != 'o')
+        continue;
+      indent();
+      os << "SC_THREAD(" << (a.dir == 'i' ? "src_" : "snk_") << a.member
+         << "); sensitive << clk.posedge_event(); "
+            "async_reset_signal_is(rst, false);\n";
+    }
     reduceIndent();
     indent(); os << "}\n";
-    // src: drive each INPUT port from input<k>.data (written by hls.py from A)
-    indent(); os << "void src() {\n";
-    addIndent();
-    for (auto &a : ioArrays)
-      if (a.dir == 'i') { indent(); os << "ch_" << a.member << ".ResetWrite();\n"; }
-    indent(); os << "wait();\n";
-    for (auto &a : ioArrays)
-      if (a.dir == 'i') {
-        indent();
-        // Wide read temp so a char-width element (int8_t/uint8_t) parses as an
-        // integer, not a single character (see the memory-port preload note).
-        bool isF = (a.ctype == "half" || a.ctype == "double" ||
-                    a.ctype == "ac::bfloat16" ||
-                    a.ctype.find("ieee_float") != std::string::npos);
-        std::string rt = isF ? a.ctype : std::string("long long");
-        os << "{ std::ifstream _f(\"input" << a.fileIdx << ".data\"); " << rt
-           << " _v; for (int f = 0; f < " << a.total << "; ++f) { _f >> _v; ch_"
-           << a.member << ".Push((" << a.ctype << ")_v); } }\n";
-      }
-    reduceIndent();
-    indent(); os << "}\n";
-    // A stream OUTPUT (snk drains it) drives sc_stop; if there are only
+    // A stream OUTPUT (a snk drains it) drives sc_stop; if there are only
     // memory-port outputs, fall back to a time-based run (below).
-    bool hasStreamOut = false;
+    int numStreamOut = 0;
     for (auto &a : ioArrays)
       if (a.dir == 'o')
-        hasStreamOut = true;
+        ++numStreamOut;
+    bool hasStreamOut = numStreamOut > 0;
     int64_t maxTotal = 1;
     for (auto &a : ioArrays)
       maxTotal = std::max(maxTotal, a.total);
     for (auto &m : memArrays)
       maxTotal = std::max(maxTotal, m.total);
-
-    // snk: write each OUTPUT port to output<k>.data (read back into B by hls.py)
-    indent(); os << "void snk() {\n";
-    addIndent();
-    for (auto &a : ioArrays)
-      if (a.dir == 'o') { indent(); os << "ch_" << a.member << ".ResetRead();\n"; }
-    indent(); os << "wait();\n";
-    for (auto &a : ioArrays)
-      if (a.dir == 'o') {
+    if (hasStreamOut) {
+      indent(); os << "int _snk_done = 0;  // stream sinks drained; the last one sc_stop()s\n";
+    }
+    for (auto &a : ioArrays) {
+      bool isF = isFloatCType(a.ctype);
+      if (a.dir == 'i') {
+        // src_<port>: drive one INPUT port from input<k>.data (written by hls.py)
+        indent(); os << "void src_" << a.member << "() {\n";
+        addIndent();
+        indent(); os << "ch_" << a.member << ".ResetWrite();\n";
+        indent(); os << "wait();\n";
+        indent();
+        // Wide read temp so a char-width element (int8_t/uint8_t) parses as an
+        // integer, not a single character (see the memory-port preload note).
+        // Floats arrive as their raw bits (see _ffrombits).
+        std::string rt = isF ? "unsigned long long" : "long long";
+        std::string conv = isF ? "_ffrombits< " + a.ctype + " >(_v)"
+                               : "(" + a.ctype + ")_v";
+        os << "{ std::ifstream _f(\"input" << a.fileIdx << ".data\"); " << rt
+           << " _v; for (int f = 0; f < " << a.total << "; ++f) { _f >> _v; ch_"
+           << a.member << ".Push(" << conv << "); } }\n";
+        reduceIndent();
+        indent(); os << "}\n";
+      } else if (a.dir == 'o') {
+        // snk_<port>: write one OUTPUT port to output<k>.data (read back by hls.py)
+        indent(); os << "void snk_" << a.member << "() {\n";
+        addIndent();
+        indent(); os << "ch_" << a.member << ".ResetRead();\n";
+        indent(); os << "wait();\n";
         indent();
         // Symmetric to the input read: cast a char-width element to a wide int so
-        // operator<< prints its NUMERIC value, not a character; floats keep full
-        // round-trippable precision.
-        bool isF = (a.ctype == "half" || a.ctype == "double" ||
-                    a.ctype == "ac::bfloat16" ||
-                    a.ctype.find("ieee_float") != std::string::npos);
+        // operator<< prints its NUMERIC value, not a character; floats are
+        // written as their raw bits (exact for every value, NaN included).
         if (isF)
           os << "{ std::ofstream _f(\"output" << a.fileIdx
              << ".data\"); for (int f = 0; f < " << a.total
-             << "; ++f) _f << std::setprecision(9) << ch_" << a.member
-             << ".Pop() << \"\\n\"; }\n";
+             << "; ++f) _f << _fbits(ch_" << a.member
+             << ".Pop()) << \"\\n\"; }\n";
         else
           os << "{ std::ofstream _f(\"output" << a.fileIdx
              << ".data\"); for (int f = 0; f < " << a.total
              << "; ++f) _f << (long long)(ch_" << a.member
              << ".Pop()) << \"\\n\"; }\n";
+        indent(); os << "if (++_snk_done == " << numStreamOut << ") sc_stop();\n";
+        reduceIndent();
+        indent(); os << "}\n";
       }
-    if (hasStreamOut) { indent(); os << "sc_stop();\n"; }
-    reduceIndent();
-    indent(); os << "}\n";
+    }
     reduceIndent();
     os << "};\n\n";
 
@@ -3953,16 +4058,16 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         // Read integers into a WIDE temp: a char-width element (int8_t/uint8_t is
         // signed/unsigned char) would otherwise trigger operator>>'s FORMATTED
         // CHARACTER extraction (reads '6','5' from "65"), not integer parsing.
-        // Floats keep their own operator>> overload.
-        bool isF = (mi.ctype == "half" || mi.ctype == "double" ||
-                    mi.ctype == "ac::bfloat16" ||
-                    mi.ctype.find("ieee_float") != std::string::npos);
-        std::string rt = isF ? mi.ctype : std::string("long long");
+        // Floats are read as raw bits (see _ffrombits).
+        bool isF = isFloatCType(mi.ctype);
+        std::string rt = isF ? "unsigned long long" : "long long";
+        std::string conv = isF ? "_ffrombits< " + mi.ctype + " >(_v)"
+                               : "(" + mi.ctype + ")_v";
         // Exposed memories live in the tb; replicated ones are still inside the DUT.
         std::string owner = mi.exposed ? "t." : "t.dut.";
         os << "{ std::ifstream _f(\"input" << mi.inIdx << ".data\"); " << rt
            << " _v; for (int f = 0; f < " << mi.total << "; ++f) { _f >> _v; "
-           << owner << mi.chan << "_mem.mem[f] = (" << mi.ctype << ")_v; } }\n";
+           << owner << mi.chan << "_mem.mem[f] = " << conv << "; } }\n";
       }
     indent(); os << "t.rst = 0; sc_start(1, SC_NS);\n";
     // A stream output stops the sim via sc_stop (self-synchronizing: the sink
@@ -3974,7 +4079,22 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
     // former free-running body, over-accumulated `both` outputs.
     indent(); os << "t.rst = 1;\n";
     if (hasStreamOut) {
-      indent(); os << "sc_start();\n";
+      // Bounded, so a deadlocked design FAILS instead of spinning forever (an
+      // unbounded sc_start() keeps ticking the clock with nothing to do). Same
+      // cap as the memory-output path below; -DALLO_TB_MAX_CYCLES=N overrides.
+      int64_t capCycles = maxTotal * 2000 + 200000;
+      indent(); os << "#ifndef ALLO_TB_MAX_CYCLES\n";
+      indent(); os << "#define ALLO_TB_MAX_CYCLES " << capCycles << "LL\n";
+      indent(); os << "#endif\n";
+      indent(); os << "sc_start((double)ALLO_TB_MAX_CYCLES, SC_NS);\n";
+      indent();
+      os << "if (sc_core::sc_get_status() != sc_core::SC_STOPPED) {\n";
+      indent();
+      os << "  std::cerr << \"TB DEADLOCK: stream outputs not drained after \" "
+            "<< ALLO_TB_MAX_CYCLES << \" cycles (\" << t._snk_done << \" of "
+         << numStreamOut << " sinks done)\" << std::endl;\n";
+      indent(); os << "  return 1;\n";
+      indent(); os << "}\n";
     } else {
       // Poll the DUT's hardware `done` port (AND of all kernels' completion) --
       // valid in BOTH csim and RTL cosim, unlike the C-side __allo_done counter
@@ -3997,29 +4117,25 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         os << "{ std::ofstream _f(\"output" << m.outIdx << ".data\");\n";
         indent();
         os << "  for (int f = 0; f < " << m.total << "; ++f) {\n";
-        // float memories accumulate/write as float; integers as before.
-        bool isFloat = (m.ctype == "half" || m.ctype == "double" ||
-                        m.ctype.find("ieee_float") != std::string::npos);
+        // Floats are written as raw bits. Replicas hold disjoint elements and
+        // +0 (all-zero bits) elsewhere, so OR-ing their bits merges them exactly
+        // (a float sum would turn -0 into +0 and could not carry NaN bits).
+        bool isFloat = isFloatCType(m.ctype);
         indent();
-        os << (isFloat ? "    float _s = 0;\n" : "    long long _s = 0;\n");
+        os << (isFloat ? "    unsigned long long _s = 0;\n" : "    long long _s = 0;\n");
         for (auto &mi : memInsts)
           if (mi.dir != 'i' && mi.outIdx == m.outIdx) {
             // Exposed memories live in the tb; replicated ones inside the DUT.
             std::string owner = mi.exposed ? "t." : "t.dut.";
             indent();
             if (isFloat)
-              os << "    _s += " << owner << mi.chan << "_mem.mem[f].to_float();\n";
+              os << "    _s |= _fbits(" << owner << mi.chan << "_mem.mem[f]);\n";
             else
               os << "    _s += (long long) " << owner << mi.chan
                  << "_mem.mem[f];\n";
           }
         indent();
-        // float outputs: write full round-trippable precision (float32 needs 9
-        // significant digits) so the data-file text doesn't lose bits.
-        if (isFloat)
-          os << "    _f << std::setprecision(9) << _s << \"\\n\";\n";
-        else
-          os << "    _f << _s << \"\\n\";\n";
+        os << "    _f << _s << \"\\n\";\n";
         indent();
         os << "  } }\n";
       }

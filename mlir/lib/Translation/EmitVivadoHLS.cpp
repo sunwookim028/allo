@@ -2640,6 +2640,21 @@ void allo::hls::VhlsModuleEmitter::emitCall(func::CallOp op) {
   // Handle returned value by the callee.
   // For HLS C++, any function with return values needs those values
   // declared as variables and passed as pointer arguments.
+  // The callee's signature took its results' sign from its `otypes` (see
+  // emitFunction); the call site's buffers are signless values, so take the
+  // same sign here, or a UInt result's buffer is a signed type whose address
+  // does not convert to the callee's unsigned pointer.
+  std::string otypes;
+  if (auto callee = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+          op, op.getCalleeAttr()))
+    if (auto ot = callee->getAttrOfType<StringAttr>("otypes"))
+      otypes = ot.getValue().str();
+  unsigned resIdx = 0;
+  for (auto result : op.getResults()) {
+    if (!isDeclared(result))
+      fixUnsignedType(result, resIdx < otypes.size() && otypes[resIdx] == 'u');
+    ++resIdx;
+  }
   for (auto result : op.getResults()) {
     if (!isDeclared(result)) {
       indent();

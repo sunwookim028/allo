@@ -156,10 +156,19 @@ def test_systemc_bf16():
     assert "ac::bfloat16 v3 = v2 * v2;" in code
     # the per-float-type shims
     assert "_fbits(const ac::bfloat16 &v)" in code
-    assert "operator>>(std::istream &is, ac::bfloat16 &h)" in code
-    assert "sc_trace(sc_core::sc_trace_file *tf, const ac::bfloat16 &h," in code
-    # the testbench must read bf16 as float text, not as `long long`
-    assert "ac::bfloat16 _v; for (int f = 0" in code
+    assert "_ffrombits<ac::bfloat16>(unsigned long long b)" in code
+    # ac_std_float.h before Connections: marshaller.h's Wrapped<ac::bfloat16>
+    # and ac_sc.h's sc_trace(ac::bfloat16) exist only if it came first, so the
+    # emitter writes no sc_trace of its own (it would be ambiguous)
+    assert code.index("#include <ac_std_float.h>") < code.index(
+        "#include <mc_connections.h>"
+    )
+    assert "inline void sc_trace(" not in code
+    # the testbench reads bf16 as raw bits, not as float text (which loses
+    # NaNs and, through the truncating float->bf16 ctor, values)
+    assert "unsigned long long _v; for (int f = 0" in code
+    assert "_ffrombits< ac::bfloat16 >(_v)" in code
+
     assert "AC_STD_FLOAT_BFLOAT16_ROUND_OVERRIDE AC_RND_CONV" in code
 
 

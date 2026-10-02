@@ -12,6 +12,8 @@ SystemC-only steps of that flow. See ``docs/source/backends/systemc.rst``.
 
 import os
 
+import numpy as np
+
 from .._mlir.ir import StringAttr
 from ..ir.transform import find_func_in_module
 from ..passes import analyze_arg_load_store
@@ -51,6 +53,82 @@ def stamp_arg_dirs(module):
             )
 
 
+# Floats cross the testbench's data files as their raw IEEE bits, written as an
+# unsigned integer per line: the emitted tb rebuilds the value with set_data()
+# (``_ffrombits``) and writes it back with ``_fbits``. Decimal text was not
+# exact: libstdc++'s ``>> float`` fails on "nan"/"inf" (and every read after
+# it), a NaN's sign and payload are lost, and ac::bfloat16(float) truncates, so
+# the shortest decimal of a bf16 value read back as the bf16 below it.
+_FLOAT_BITS = {"f16": 16, "bf16": 16, "f32": 32, "f64": 64}
+_UINT = {16: np.uint16, 32: np.uint32, 64: np.uint64}
+_FLOAT_NP = {"f16": np.float16, "f32": np.float32, "f64": np.float64}
+
+
+def _bf16_np():
+    try:
+        import ml_dtypes  # pylint: disable=import-outside-toplevel
+
+        return ml_dtypes.bfloat16
+    except ImportError:
+        return None
+
+
+def float_to_bits(dtype, arr):
+    """``arr`` as the unsigned bit patterns of float type ``dtype``."""
+    dtype = str(dtype)
+    arr = np.asarray(arr)
+    if dtype == "bf16":
+        bf16 = _bf16_np()
+        if bf16 is not None and arr.dtype == bf16:
+            return arr.view(np.uint16)
+        if bf16 is not None:
+            # ml_dtypes rounds to nearest even, like the simulator's bf16
+            return np.ascontiguousarray(arr.astype(bf16)).view(np.uint16)
+        f = np.ascontiguousarray(arr.astype(np.float32)).view(np.uint32)
+        return (f >> 16).astype(np.uint16)  # exact for bf16-valued float32
+    t = _FLOAT_NP[dtype]
+    return np.ascontiguousarray(arr.astype(t)).view(_UINT[_FLOAT_BITS[dtype]])
+
+
+def bits_to_float(dtype, bits):
+    """The inverse of :func:`float_to_bits`; bf16 comes back as ml_dtypes'
+    bfloat16 when available, else as the (exactly equal) float32."""
+    dtype = str(dtype)
+    bits = np.asarray(bits).astype(_UINT[_FLOAT_BITS[dtype]])
+    if dtype == "bf16":
+        bf16 = _bf16_np()
+        if bf16 is not None:
+            return bits.view(bf16)
+        return (bits.astype(np.uint32) << 16).view(np.float32)
+    return bits.view(_FLOAT_NP[dtype])
+
+
+def write_data(dtype, arr, shape, path):
+    """Write one ``input<k>.data`` file: floats as bits, integers as text."""
+    if str(dtype) not in _FLOAT_BITS:
+        write_tensor_to_file(arr, shape, path)
+        return
+    bits = float_to_bits(dtype, arr).reshape(-1)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(str(int(b)) for b in bits.tolist()))
+        f.write("\n")
+
+
+def read_data(dtype, shape, path):
+    """Read one ``output<k>.data`` file written by the emitted testbench."""
+    if str(dtype) not in _FLOAT_BITS:
+        return read_tensor_from_file(dtype, shape, path)
+    bits = np.loadtxt(path, dtype=np.uint64, ndmin=1)
+    return bits_to_float(dtype, bits).reshape(shape)
+
+
+def bits_equal(dtype, a, b):
+    """Exact equality; floats by bit pattern (NaN == NaN, -0 != +0)."""
+    if str(dtype) in _FLOAT_BITS:
+        return np.array_equal(float_to_bits(dtype, a), float_to_bits(dtype, b))
+    return np.array_equal(a, b)
+
+
 def write_inputs(module, top, inputs, args, project):
     """Write the arrays the testbench reads as ``input<k>.data``.
 
@@ -61,9 +139,9 @@ def write_inputs(module, top, inputs, args, project):
     """
     dirs = analyze_arg_load_store(module)[top]
     k = 0
-    for (_, shape), arg, d in zip(inputs, args, dirs):
+    for (dtype, shape), arg, d in zip(inputs, args, dirs):
         if d in {"in", "both"}:
-            write_tensor_to_file(arg, shape, f"{project}/input{k}.data")
+            write_data(dtype, arg, shape, f"{project}/input{k}.data")
             k += 1
     return dirs
 
@@ -78,7 +156,7 @@ def read_outputs(inputs, args, dirs, project, store_output):
                 raise RuntimeError(
                     f"Output file {fpath} not found. Simulation might have failed."
                 )
-            store_output(arg, read_tensor_from_file(dtype, shape, fpath))
+            store_output(arg, read_data(dtype, shape, fpath))
             k += 1
 
 
