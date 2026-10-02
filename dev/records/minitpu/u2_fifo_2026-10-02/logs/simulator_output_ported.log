@@ -1,0 +1,5 @@
+RTL vpu_fifo:output: 80240 cycles in 12 traces, 219756 defined slots, RTL vs reference on defined: 219756/219756 (0.3s)
+/work/shared/users/phd/sk3463/scratch/wt-u2ff/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui1[0m
+  warnings.warn(self.message, category=self.category)
+UNIT-MATCH vpu_fifo:output ported simulator 219756/219756 defined (20964 masked: empty=20959, pre-reset=3, uninit=2; allo==rtl on 20960) cycle=order-only (build 0.6s, run 2.6s)

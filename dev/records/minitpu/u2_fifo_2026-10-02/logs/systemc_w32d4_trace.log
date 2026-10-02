@@ -1,0 +1,11 @@
+RTL vpu_fifo:w32d4: 80092 cycles in 10 traces, 213166 defined slots, RTL vs reference on defined: 213166/213166 (0.3s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[18:14:09] Compiling with g++ ...
+[18:14:15] Running simulation ...
+UNIT-MATCH vpu_fifo:w32d4 trace systemc 213166/213166 defined (27110 masked: empty=27105, pre-reset=3, uninit=2; allo==rtl on 27106) cycle=per-iteration, time unchecked (build 0.3s, run 6.6s)

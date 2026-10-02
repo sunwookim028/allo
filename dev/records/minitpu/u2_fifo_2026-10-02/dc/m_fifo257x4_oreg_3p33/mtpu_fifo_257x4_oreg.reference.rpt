@@ -1,0 +1,66 @@
+ 
+****************************************
+Report : reference
+Design : mtpu_fifo_257x4_oreg
+Version: W-2024.09
+Date   : Fri Oct  2 14:25:57 2026
+****************************************
+
+Attributes:
+    b - black box (unknown)
+   bo - allows boundary optimization
+    d - dont_touch
+   mo - map_only
+    h - hierarchical
+    n - noncombinational
+    r - removable
+    s - synthetic operator
+    u - contains unmapped logic
+
+Reference          Library       Unit Area   Count    Total Area   Attributes
+-----------------------------------------------------------------------------
+AND2_X1            NangateOpenCellLibrary
+                                  1.064000       7      7.448000  
+AOI21_X1           NangateOpenCellLibrary
+                                  1.064000       3      3.192000  
+AOI22_X1           NangateOpenCellLibrary
+                                  1.330000     516    686.280022  
+AOI221_X1          NangateOpenCellLibrary
+                                  1.596000       1      1.596000  
+CLKBUF_X1          NangateOpenCellLibrary
+                                  0.798000      52     41.495999  
+DFF_X1             NangateOpenCellLibrary
+                                  4.522000    1294   5851.467788  n
+INV_X1             NangateOpenCellLibrary
+                                  0.532000       7      3.724000  
+MUX2_X1            NangateOpenCellLibrary
+                                  1.862000       1      1.862000  
+NAND2_X1           NangateOpenCellLibrary
+                                  0.798000     259    206.681994  
+NAND3_X1           NangateOpenCellLibrary
+                                  1.064000       1      1.064000  
+NOR2_X1            NangateOpenCellLibrary
+                                  0.798000      12      9.576000  
+NOR2_X2            NangateOpenCellLibrary
+                                  1.330000       1      1.330000  
+NOR3_X1            NangateOpenCellLibrary
+                                  1.064000       4      4.256000  
+OAI21_X1           NangateOpenCellLibrary
+                                  1.064000       3      3.192000  
+SNPS_CLOCK_GATE_HIGH_mtpu_fifo_oreg_WIDTH257_DEPTH4_0
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_mtpu_fifo_oreg_WIDTH257_DEPTH4_1
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_mtpu_fifo_oreg_WIDTH257_DEPTH4_2
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_mtpu_fifo_oreg_WIDTH257_DEPTH4_3
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_mtpu_fifo_oreg_WIDTH257_DEPTH4_4
+                                  3.990000       1      3.990000  b, h
+XNOR2_X1           NangateOpenCellLibrary
+                                  1.596000       1      1.596000  
+XOR2_X1            NangateOpenCellLibrary
+                                  1.596000       1      1.596000  
+-----------------------------------------------------------------------------
+Total 21 references                                  6846.307803
+1

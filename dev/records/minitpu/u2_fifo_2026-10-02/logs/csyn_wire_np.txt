@@ -1,0 +1,3 @@
+EMITTED vpu_fifo wire_np n=64 -> /work/shared/users/phd/sk3463/scratch/u2ff/cat/wire_np_part_w32_3p33.prj io=[] flush=False
+CATAPULT vpu_fifo wire_np n=64 pipeline=['fifo_0:_'] unroll=[] clock=3.33 io=[] tcl=[] flush=False: exit 0, 47s, log /work/shared/users/phd/sk3463/scratch/u2ff/cat/wire_np_part_w32_3p33.prj/csyn.log
+CATAPULT_EXIT 0 WALL 47s

@@ -1,0 +1,25 @@
+RTL-TRACE vpu_fifo:output wire_w64d16_3p33: defined 219756/219756 at measured output latency L=1 (MiniTPU 0); 20964 masked; by port {'pop_data_o': 0, 'empty_o': 0, 'full_o': 0}; first-3000 hits by L {0: 6936, 1: 8327, 2: 6938, 3: 6372, 4: 6032, 5: 5799, 6: 5639, 7: 5510}; 80240 cycles; 16.1s
+    PROBE push -> empty_o: MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+    PROBE push -> pop_data_o (fall-through): MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+    PROBE last push -> full_o: MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+    PROBE pop -> pop_data_o: MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+RTL-TRACE vpu_fifo:output wire_part_w64d16_3p33: defined 219756/219756 at measured output latency L=1 (MiniTPU 0); 20964 masked; by port {'pop_data_o': 0, 'empty_o': 0, 'full_o': 0}; first-3000 hits by L {0: 6936, 1: 8327, 2: 6938, 3: 6372, 4: 6032, 5: 5799, 6: 5639, 7: 5510}; 80240 cycles; 16.0s
+    PROBE push -> empty_o: MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+    PROBE push -> pop_data_o (fall-through): MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+    PROBE last push -> full_o: MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+    PROBE pop -> pop_data_o: MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+RTL-TRACE vpu_fifo:w32d4 wire_part_w32_2p0: defined 213166/213166 at measured output latency L=1 (MiniTPU 0); 27110 masked; by port {'pop_data_o': 0, 'empty_o': 0, 'full_o': 0}; first-3000 hits by L {0: 6708, 1: 8224, 2: 6713, 3: 6059, 4: 5684, 5: 5468, 6: 5313, 7: 5207}; 80092 cycles; 18.1s
+    PROBE push -> empty_o: MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+    PROBE push -> pop_data_o (fall-through): MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+    PROBE last push -> full_o: MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+    PROBE pop -> pop_data_o: MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+RTL-TRACE vpu_fifo:input wire_part_w257_3p33: defined 53862/53862 at measured output latency L=1 (MiniTPU 0); 6414 masked; by port {'pop_data_o': 0, 'empty_o': 0, 'full_o': 0}; first-3000 hits by L {0: 6539, 1: 7987, 2: 6543, 3: 6014, 4: 5709, 5: 5491, 6: 5332, 7: 5229}; 20092 cycles; 16.4s
+    PROBE push -> empty_o: MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+    PROBE push -> pop_data_o (fall-through): MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+    PROBE last push -> full_o: MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+    PROBE pop -> pop_data_o: MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+RTL-TRACE vpu_fifo:w32d4 wire_np_part_w32_3p33: defined 213166/213166 at measured output latency L=1 (MiniTPU 0); 27110 masked; by port {'pop_data_o': 0, 'empty_o': 0, 'full_o': 0}; first-3000 hits by L {0: 6708, 1: 8224, 2: 6713, 3: 6059, 4: 5684, 5: 5468, 6: 5313, 7: 5207}; 80092 cycles; 17.0s
+    PROBE push -> empty_o: MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+    PROBE push -> pop_data_o (fall-through): MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+    PROBE last push -> full_o: MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+    PROBE pop -> pop_data_o: MiniTPU 1; Catapult pre-sampled 2, post-sampled 2

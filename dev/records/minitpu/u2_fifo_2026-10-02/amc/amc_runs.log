@@ -1,0 +1,12 @@
+RAN llvm none N=4096 0.2s
+cycle time: 16392
+RAN amc none N=4096 26.4s
+   rpt {'name': 'fifo', 'hash': '65af3d73b73ac546f75156e63a2a082da21b750cecc9409b3b3cbce8a42386a6', 'time': '10/02/2026, 14:16:26', 'version': {'verilator': 'Verilator 5.052 2026-09-05 rev conda-forge build'}, 'cycles': 16392}
+LoopBand(['S_t_0'])
+cycle time: 12299
+RAN amc pipeline N=4096 16.0s
+   rpt {'name': 'fifo', 'hash': '04b11f84088d5c70d32da3ab5c1fa40ae4fdf2466a9f01f859523a0a6743242e', 'time': '10/02/2026, 14:16:54', 'version': {'verilator': 'Verilator 5.052 2026-09-05 rev conda-forge build'}, 'cycles': 12299}
+LoopBand(['S_t_0'])
+cycle time: 12299
+RAN amc part N=4096 14.7s
+   rpt {'name': 'fifo', 'hash': 'e676e295526970f820ff1c3bf0ee16cf6fc87a18f5e7ef9c79c63a65d3ca1867', 'time': '10/02/2026, 14:17:12', 'version': {'verilator': 'Verilator 5.052 2026-09-05 rev conda-forge build'}, 'cycles': 12299}

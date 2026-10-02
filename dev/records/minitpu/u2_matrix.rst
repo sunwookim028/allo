@@ -136,6 +136,15 @@ Record: ``u2_word_array_2026-10-02.rst`` (branch ``u2-word-array``). Read
 latency 3 (compute) / 2 (DMA), write visibility 1; two read/write ports;
 same-word cross-port collisions undefined and masked.
 
+``vpu_fifo`` and the MXU output FIFO (w32d4; output = 64x16; input = 257x4)
+-----------------------------------------------------------------------------
+
+Record: ``u2_fifo_2026-10-02.rst``. The probe question -- is ``vpu_fifo``
+a ``Stream`` with its ports? -- is answered there: a Stream is a link, not
+a unit; behind a head register it is bit-exact in simulation (``stream``),
+but Catapult cannot schedule the self-FIFO (C1), so every column that
+reaches RTL uses the explicit ring (``trace``/``ported``/``wire``).
+
 .. list-table::
    :header-rows: 1
    :widths: 18 40 42
@@ -208,3 +217,62 @@ same-word cross-port collisions undefined and masked.
        logical ports ``(w, r, r, w, w)``, all registered, on **1RW + 1R** physical -- not
        VMEM's 2RW; the 3-entry pipes become 7- and 5-port memories
      - ``amc/``.
+
+   * - Allo simulator, ``trace``/``ported``/``stream``
+     - **match** on every instance it can run: w32d4 213,166/213,166, output 219,756/219,756,
+       d16w48 55,028/55,028 (``empty`` masked and counted, 27,105 at w32d4). ``stream`` =
+       ``Stream[W, d-1]`` + head register, one special case for H12 (M3)
+     - ``u2_fifo_2026-10-02/logs/simulator_*``. The regfile's B4/S6 workarounds carried over.
+   * - Allo simulator, ``stream_raw``
+     - **finding, missing abstraction** (H6, no peek): 176,457/213,166; flags-only ``empty``
+       76,248/80,091, ``full`` 79,710/80,091, all misses after an H12 event or a reset with
+       words inside (M3). **finding, bug B7** (silent): a ``try_put`` with an unused result is
+       dropped
+     - ``logs/flags_only_w32d4.txt``; ``repros.py`` B7.
+   * - Allo simulator, ``wire``; 257 b
+     - **blocked**: ``Wire`` fails in LLVM translation (as the regfile); 257 b has no numpy
+       dtype (B6, refused by the unit's ``_args``)
+     - --
+   * - SystemC csim, ``trace``/``ported``/``stream``
+     - **match** w32d4 and d16w48 (same counts as the simulator). **finding, bug S8** (silent)
+       on the 64-bit ``output`` instance: 160,478/219,756 for every variant -- the testbench
+       parses a port through ``long long``, a value >= 2^63 and everything after it on that
+       port read as ``0x7fffffffffffffff``
+     - ``logs/systemc_*``; ``repros.py`` S8. 257 b: S7 (``KeyError`` class), as the regfile.
+   * - SystemC csim, ``stream_raw``
+     - **finding, missing abstraction** H6: 176,457/213,166, identical to the simulator.
+       **finding, bug S9** (silent): a self-FIFO's ``full()`` counter advances on a refused
+       ``try_put`` and never reads full again
+     - ``repros.py`` S9.
+   * - SystemC csim, ``wire``
+     - **finding, semantic mismatch**: 150,379/213,166, 146,159/219,756; src/sink not
+       cycle-locked to ``fifo_0`` (limitation 22)
+     - as the regfile.
+   * - Catapult, ``wire``
+     - **match at +1 edge** on all three instances: w32d4 213,166/213,166 (3.33 and 2.0 ns;
+       with and without partition: a 4- or 16-entry array is registers either way), output
+       219,756/219,756, input 53,862/53,862 (after the S7 TB hand-patch). Probes: push to
+       ``empty``/``pop_data``/``full``, pop to ``pop_data`` all 2 edges vs MiniTPU's 1 (G2).
+       ``latency.json``: ``latency 2, ii 1, scheduled, wire`` = **LATENCY-MATCH** (D-10).
+       Area (DC, same flow) vs MiniTPU + output registers: +102 % (32x4), +59 % (64x16),
+       +71 % (257x4); B4's ``int32`` pointers are 351 um^2 of the 962 excess at 32x4
+       (``wire_np``: +65 %). Every design meets 3.33 and 2.0 ns
+     - ``u2_fifo_2026-10-02/catapult/``, ``dc/``, ``logs/cmp_wire.txt``,
+       ``logs/latency_manifests.txt``.
+   * - Catapult, ``stream``/``stream_raw``/``stream_nodrain``
+     - **blocked; finding, bug C1 (D-1)**: SCHD-30 "could not schedule even with unlimited
+       resources", pipelined or not, drain or not: the self-FIFO lowering (``AlloFifoC`` bound
+       as a self-loop, ``_enq``/``_deq`` ports, synchronous ``_cnt``) is a chained feedback
+       path; csim accepts it. Not refused by the emitter
+     - ``catapult/stream_*/csyn.log.gz``.
+   * - RTLGen
+     - **match** 11,212/11,212 (4,096 cycles) at **II=1** as written and partitioned (identical
+       netlists): 4 registers and a **combinational** read mux -- ``pop_data`` is asynchronous
+       there (H4 refuted for RTLGen; port timing not observable through array ports)
+     - ``u2_fifo_2026-10-02/rtlgen/``.
+   * - AMC
+     - **match** unpipelined 11,212/11,212 (16,392 cycles, 4/iteration). **finding, bug A1**
+       (AMC): pipelined II=3 (12,299 cycles) and partitioned + pipelined both 9,467/11,212 --
+       flags exact, ``pop_data`` wrong from the first fill; ``amcMemory0`` declares
+       ``(w, r, w)`` on ``4xi32``, all registered
+     - ``u2_fifo_2026-10-02/amc/``.

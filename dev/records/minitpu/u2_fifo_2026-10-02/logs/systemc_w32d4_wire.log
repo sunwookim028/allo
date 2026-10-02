@@ -1,0 +1,16 @@
+RTL vpu_fifo:w32d4: 80092 cycles in 10 traces, 213166 defined slots, RTL vs reference on defined: 213166/213166 (0.3s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[18:14:57] Compiling with g++ ...
+[18:15:03] Running simulation ...
+UNIT-DIFF  vpu_fifo:w32d4 wire systemc 150379/213166 defined (27110 masked: empty=27105, pre-reset=3, uninit=2; allo==rtl on 9828) cycle=per-iteration, time unchecked (build 0.5s, run 6.4s)
+    differing defined slots by trace: fill-full-passthrough-drain=30, wrap-half-full=17, push+pop-on-empty=9, overflow=20, underflow=4, reset-mid-stream=13, random-legal-0=17386, random-legal-1=17228, random-any-0=14534, random-any-1=13546
+    e.g. fill-full-passthrough-drain cycle 3 pop_data_o: allo 0 rtl 59609c83
+    e.g. fill-full-passthrough-drain cycle 4 pop_data_o: allo 0 rtl 59609c83
+    e.g. fill-full-passthrough-drain cycle 5 pop_data_o: allo 0 rtl 59609c83
+    e.g. fill-full-passthrough-drain cycle 6 pop_data_o: allo 0 rtl 59609c83

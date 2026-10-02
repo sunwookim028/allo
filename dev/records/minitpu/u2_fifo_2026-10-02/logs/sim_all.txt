@@ -1,0 +1,34 @@
+== simulator w32d4 trace exit 0
+RTL vpu_fifo:w32d4: 80092 cycles in 10 traces, 213166 defined slots, RTL vs reference on defined: 213166/213166 (0.3s)
+UNIT-MATCH vpu_fifo:w32d4 trace simulator 213166/213166 defined (27110 masked: empty=27105, pre-reset=3, uninit=2; allo==rtl on 27106) cycle=order-only (build 0.3s, run 0.1s)
+== simulator w32d4 ported exit 0
+RTL vpu_fifo:w32d4: 80092 cycles in 10 traces, 213166 defined slots, RTL vs reference on defined: 213166/213166 (0.3s)
+UNIT-MATCH vpu_fifo:w32d4 ported simulator 213166/213166 defined (27110 masked: empty=27105, pre-reset=3, uninit=2; allo==rtl on 27106) cycle=order-only (build 0.7s, run 3.1s)
+== simulator w32d4 stream exit 0
+RTL vpu_fifo:w32d4: 80092 cycles in 10 traces, 213166 defined slots, RTL vs reference on defined: 213166/213166 (0.3s)
+UNIT-MATCH vpu_fifo:w32d4 stream simulator 213166/213166 defined (27110 masked: empty=27105, pre-reset=3, uninit=2; allo==rtl on 1608) cycle=order-only (build 0.3s, run 0.2s)
+== simulator w32d4 stream_raw exit 1
+RTL vpu_fifo:w32d4: 80092 cycles in 10 traces, 213166 defined slots, RTL vs reference on defined: 213166/213166 (0.3s)
+UNIT-DIFF  vpu_fifo:w32d4 stream_raw simulator 81611/213166 defined (27110 masked: empty=27105, pre-reset=3, uninit=2; allo==rtl on 1335) cycle=order-only (build 0.2s, run 0.3s)
+    differing defined slots by trace: fill-full-passthrough-drain=35, wrap-half-full=26, push+pop-on-empty=8, overflow=26, underflow=2, reset-mid-stream=10, random-legal-0=35431, random-legal-1=34355, random-any-0=32119, random-any-1=29543
+    e.g. fill-full-passthrough-drain cycle 3 pop_data_o: allo 0 rtl 59609c83
+    e.g. fill-full-passthrough-drain cycle 4 pop_data_o: allo 0 rtl 59609c83
+    e.g. fill-full-passthrough-drain cycle 5 pop_data_o: allo 0 rtl 59609c83
+    e.g. fill-full-passthrough-drain cycle 6 pop_data_o: allo 0 rtl 59609c83
+== simulator output trace exit 0
+RTL vpu_fifo:output: 80240 cycles in 12 traces, 219756 defined slots, RTL vs reference on defined: 219756/219756 (0.2s)
+UNIT-MATCH vpu_fifo:output trace simulator 219756/219756 defined (20964 masked: empty=20959, pre-reset=3, uninit=2; allo==rtl on 20960) cycle=order-only (build 0.3s, run 0.1s)
+== simulator output ported exit 0
+RTL vpu_fifo:output: 80240 cycles in 12 traces, 219756 defined slots, RTL vs reference on defined: 219756/219756 (0.3s)
+UNIT-MATCH vpu_fifo:output ported simulator 219756/219756 defined (20964 masked: empty=20959, pre-reset=3, uninit=2; allo==rtl on 20960) cycle=order-only (build 0.6s, run 2.6s)
+== simulator output stream exit 0
+RTL vpu_fifo:output: 80240 cycles in 12 traces, 219756 defined slots, RTL vs reference on defined: 219756/219756 (0.3s)
+UNIT-MATCH vpu_fifo:output stream simulator 219756/219756 defined (20964 masked: empty=20959, pre-reset=3, uninit=2; allo==rtl on 203) cycle=order-only (build 0.4s, run 0.2s)
+== simulator output stream_raw exit 1
+RTL vpu_fifo:output: 80240 cycles in 12 traces, 219756 defined slots, RTL vs reference on defined: 219756/219756 (0.3s)
+UNIT-DIFF  vpu_fifo:output stream_raw simulator 81461/219756 defined (20964 masked: empty=20959, pre-reset=3, uninit=2; allo==rtl on 870) cycle=order-only (build 0.3s, run 0.3s)
+    differing defined slots by trace: fill-full-passthrough-drain=81, wrap-half-full=105, push+pop-on-empty=8, overflow=73, underflow=2, reset-mid-stream=10, random-legal-0=36161, random-legal-1=36712, random-any-0=32387, random-any-1=32745, tb_mxu_single_port lane 0=7, tb_mxu_single_port lane 1=4
+    e.g. fill-full-passthrough-drain cycle 3 pop_data_o: allo 0 rtl c9f71e7195b89619
+    e.g. fill-full-passthrough-drain cycle 4 pop_data_o: allo 0 rtl c9f71e7195b89619
+    e.g. fill-full-passthrough-drain cycle 5 pop_data_o: allo 0 rtl c9f71e7195b89619
+    e.g. fill-full-passthrough-drain cycle 6 pop_data_o: allo 0 rtl c9f71e7195b89619

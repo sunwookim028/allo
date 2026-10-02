@@ -1,0 +1,102 @@
+EXPORTED trace N=4096 W=32 D=4 in 0.2s
+INFO: [PREP] Performing if-conversion on hyperblock (at 'rd' fifo_rtlgen.py:67:16)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'rd' fifo_rtlgen.py:66:12)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'wr' fifo_rtlgen.py:62:16)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'wr' fifo_rtlgen.py:60:12)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'do_pop' fifo_rtlgen.py:56:16)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'do_pop' fifo_rtlgen.py:55:12)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'do_push' fifo_rtlgen.py:51:16)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'do_push' fifo_rtlgen.py:50:12)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'cnt' fifo_rtlgen.py:43:8)
+WARN: [PREP] The local array memref<4xi32> is read before anything writes it. Simulation reads zeros and the hardware reads whatever the buffer held on the previous iteration, so csim and cosim will disagree; write every element the kernel reads (at fifo_rtlgen.py:36:16)
+INFO: [SCHED] --------------------------------------------------------
+INFO: [SCHED] -- Start scheduling for fifo
+INFO: [SCHED] --------------------------------------------------------
+INFO: [SCHED] Detected as a for-loop, using modulo-scheduling in the innermost body (at loop 't' fifo_rtlgen.py:29:4)
+INFO: [SCHED] Initiation interval search seeded at II=1 (resource-min II=1, pipeline-directive floor minII=1) (at loop 't' fifo_rtlgen.py:29:4)
+INFO: [SCHED] Lifetime repair re-placed the schedule's slack: modeled chain and pulse cost 1248 -> 496 (at loop 't' fifo_rtlgen.py:29:4)
+INFO: [SCHED] Scheduled: II=1 (fully pipelined), latency = 4097 (at loop 't' fifo_rtlgen.py:29:4)
+- V e r i l a t i o n   R e p o r t: Verilator 5.052 2026-09-05 rev conda-forge build 
+- Verilator: Built from 0.038 MB sources in 2 modules, into 0.080 MB in 6 C++ files needing 0.000 MB
+- Verilator: Walltime 0.048 s (elab=0.001, cvt=0.016, bld=0.000); cpu 0.022 s on 1 threads; allocated 20.512 MB
+make: Entering directory '/work/shared/users/phd/sk3463/scratch/rtlgen/tmp/allo_cosim_iljjulz3/sim_build'
+ccache x86_64-conda-linux-gnu-c++  -I.  -MMD -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include/vltstd -DVERILATOR=1 -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -DVM_TRACE_SAIF=0 -DVM_VPI=1 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-int-in-bool-context -Wno-shadow -Wno-sign-compare -Wno-subobject-linkage -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable      -Os  -c -o verilator.o /work/shared/users/phd/sk3463/scratch/rtlgen/env/lib/python3.12/site-packages/cocotb/share/lib/verilator/verilator.cpp
+ccache x86_64-conda-linux-gnu-c++ -Os  -I.  -MMD -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include/vltstd -DVERILATOR=1 -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -DVM_TRACE_SAIF=0 -DVM_VPI=1 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-int-in-bool-context -Wno-shadow -Wno-sign-compare -Wno-subobject-linkage -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable      -c -o verilated.o /work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include/verilated.cpp
+ccache x86_64-conda-linux-gnu-c++ -Os  -I.  -MMD -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include/vltstd -DVERILATOR=1 -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -DVM_TRACE_SAIF=0 -DVM_VPI=1 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-int-in-bool-context -Wno-shadow -Wno-sign-compare -Wno-subobject-linkage -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable      -c -o verilated_dpi.o /work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include/verilated_dpi.cpp
+ccache x86_64-conda-linux-gnu-c++ -Os  -I.  -MMD -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include/vltstd -DVERILATOR=1 -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -DVM_TRACE_SAIF=0 -DVM_VPI=1 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-int-in-bool-context -Wno-shadow -Wno-sign-compare -Wno-subobject-linkage -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable      -c -o verilated_vpi.o /work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include/verilated_vpi.cpp
+ccache x86_64-conda-linux-gnu-c++ -Os  -I.  -MMD -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include/vltstd -DVERILATOR=1 -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -DVM_TRACE_SAIF=0 -DVM_VPI=1 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-int-in-bool-context -Wno-shadow -Wno-sign-compare -Wno-subobject-linkage -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable      -c -o verilated_threads.o /work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include/verilated_threads.cpp
+python3 /work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/bin/verilator_includer -DVL_INCLUDE_OPT=include Vtop.cpp Vtop___024root__0.cpp Vtop__Dpi.cpp Vtop___024root__Slow.cpp Vtop___024root__0__Slow.cpp Vtop__Syms__Slow.cpp > Vtop__ALL.cpp
+ccache x86_64-conda-linux-gnu-c++ -Os  -I.  -MMD -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include/vltstd -DVERILATOR=1 -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -DVM_TRACE_SAIF=0 -DVM_VPI=1 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-int-in-bool-context -Wno-shadow -Wno-sign-compare -Wno-subobject-linkage -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable      -c -o Vtop__ALL.o Vtop__ALL.cpp
+x86_64-conda-linux-gnu-c++    -rdynamic verilator.o verilated.o verilated_dpi.o verilated_vpi.o verilated_threads.o Vtop__ALL.a   -Wl,-rpath,/work/shared/users/phd/sk3463/scratch/rtlgen/env/lib/python3.12/site-packages/cocotb/libs -L/work/shared/users/phd/sk3463/scratch/rtlgen/env/lib/python3.12/site-packages/cocotb/libs -lcocotbvpi_verilator  -pthread -lpthread -latomic -ldl   -o fifo
+rm Vtop__ALL.verilator_deplist.tmp
+make: Leaving directory '/work/shared/users/phd/sk3463/scratch/rtlgen/tmp/allo_cosim_iljjulz3/sim_build'
+     -.--ns INFO     gpi                                ../gpi/GpiCommon.cpp:242  in gpi_load_users                  Loaded entry library: '/work/shared/users/phd/sk3463/scratch/rtlgen/env/lib/libpython3.12.so.1.0'
+     -.--ns INFO     gpi                                ../gpi/GpiCommon.cpp:233  in gpi_load_users                  Running entry func 'initialize' from loaded library '/work/shared/users/phd/sk3463/scratch/rtlgen/env/lib/python3.12/site-packages/cocotb/simulator.cpython-312-x86_64-linux-gnu.so'
+     -.--ns INFO     pygpi                              ..ib/pygpi/embed.cpp:114  in initialize                      Using Python 3.12.12 interpreter at /work/shared/users/phd/sk3463/scratch/rtlgen/env/bin/python
+     -.--ns INFO     gpi                                ../gpi/GpiCommon.cpp:74   in gpi_print_registered_impl       GPI: VPI support registered
+     0.00ns INFO     cocotb.initialize                  Seeding Python random module with 1790964986
+     0.00ns INFO     cocotb.initialize                  Initialized cocotb v2.1.0 from /work/shared/users/phd/sk3463/scratch/rtlgen/env/lib/python3.12/site-packages/cocotb
+     0.00ns INFO     cocotb.initialize                  Running on Verilator version 5.052 2026-09-05
+     0.00ns INFO     cocotb.regression                  Running tests
+     0.00ns INFO     cocotb.regression                  running allo.backend.rtl.sim.cocotb_tb.cosim (1/1)
+ 13679.40ns INFO     cocotb.regression                  allo.backend.rtl.sim.cocotb_tb.cosim passed
+ 13679.40ns INFO     cocotb.regression                  **********************************************************************************************
+                                                        ** TEST                                  STATUS  SIM TIME (ns)  REAL TIME (s)  RATIO (ns/s) **
+                                                        **********************************************************************************************
+                                                        ** allo.backend.rtl.sim.cocotb_tb.cosim   PASS       13679.40           1.27      10732.45  **
+                                                        **********************************************************************************************
+                                                        ** TESTS=1 PASS=1 FAIL=0 SKIP=0                      13679.40           1.28      10724.66  **
+                                                        **********************************************************************************************
+- :0: Verilog $finish
+COSIM trace N=4096 cycles=CosimResult(cycles=4097, latency_ns=13656.666666666666, waveform=None, result=None) 7.2s
+EXPORTED trace_part N=4096 W=32 D=4 in 0.3s
+INFO: [PREP] Performing if-conversion on hyperblock (at 'rd' fifo_rtlgen.py:67:16)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'rd' fifo_rtlgen.py:66:12)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'wr' fifo_rtlgen.py:62:16)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'wr' fifo_rtlgen.py:60:12)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'do_pop' fifo_rtlgen.py:56:16)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'do_pop' fifo_rtlgen.py:55:12)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'do_push' fifo_rtlgen.py:51:16)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'do_push' fifo_rtlgen.py:50:12)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'cnt' fifo_rtlgen.py:43:8)
+WARN: [PREP] The local array memref<4xi32> is read before anything writes it. Simulation reads zeros and the hardware reads whatever the buffer held on the previous iteration, so csim and cosim will disagree; write every element the kernel reads (at fifo_rtlgen.py:36:16)
+INFO: [SCHED] --------------------------------------------------------
+INFO: [SCHED] -- Start scheduling for fifo
+INFO: [SCHED] --------------------------------------------------------
+INFO: [SCHED] Detected as a for-loop, using modulo-scheduling in the innermost body (at loop 't' fifo_rtlgen.py:29:4)
+INFO: [SCHED] Initiation interval search seeded at II=1 (resource-min II=1, pipeline-directive floor minII=1) (at loop 't' fifo_rtlgen.py:29:4)
+INFO: [SCHED] Lifetime repair re-placed the schedule's slack: modeled chain and pulse cost 1248 -> 496 (at loop 't' fifo_rtlgen.py:29:4)
+INFO: [SCHED] Scheduled: II=1 (fully pipelined), latency = 4097 (at loop 't' fifo_rtlgen.py:29:4)
+- V e r i l a t i o n   R e p o r t: Verilator 5.052 2026-09-05 rev conda-forge build 
+- Verilator: Built from 0.038 MB sources in 2 modules, into 0.080 MB in 6 C++ files needing 0.000 MB
+- Verilator: Walltime 0.062 s (elab=0.002, cvt=0.030, bld=0.000); cpu 0.025 s on 1 threads; allocated 20.469 MB
+make: Entering directory '/work/shared/users/phd/sk3463/scratch/rtlgen/tmp/allo_cosim_bmtc7k2h/sim_build'
+ccache x86_64-conda-linux-gnu-c++  -I.  -MMD -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include/vltstd -DVERILATOR=1 -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -DVM_TRACE_SAIF=0 -DVM_VPI=1 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-int-in-bool-context -Wno-shadow -Wno-sign-compare -Wno-subobject-linkage -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable      -Os  -c -o verilator.o /work/shared/users/phd/sk3463/scratch/rtlgen/env/lib/python3.12/site-packages/cocotb/share/lib/verilator/verilator.cpp
+ccache x86_64-conda-linux-gnu-c++ -Os  -I.  -MMD -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include/vltstd -DVERILATOR=1 -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -DVM_TRACE_SAIF=0 -DVM_VPI=1 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-int-in-bool-context -Wno-shadow -Wno-sign-compare -Wno-subobject-linkage -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable      -c -o verilated.o /work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include/verilated.cpp
+ccache x86_64-conda-linux-gnu-c++ -Os  -I.  -MMD -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include/vltstd -DVERILATOR=1 -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -DVM_TRACE_SAIF=0 -DVM_VPI=1 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-int-in-bool-context -Wno-shadow -Wno-sign-compare -Wno-subobject-linkage -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable      -c -o verilated_dpi.o /work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include/verilated_dpi.cpp
+ccache x86_64-conda-linux-gnu-c++ -Os  -I.  -MMD -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include/vltstd -DVERILATOR=1 -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -DVM_TRACE_SAIF=0 -DVM_VPI=1 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-int-in-bool-context -Wno-shadow -Wno-sign-compare -Wno-subobject-linkage -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable      -c -o verilated_vpi.o /work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include/verilated_vpi.cpp
+ccache x86_64-conda-linux-gnu-c++ -Os  -I.  -MMD -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include/vltstd -DVERILATOR=1 -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -DVM_TRACE_SAIF=0 -DVM_VPI=1 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-int-in-bool-context -Wno-shadow -Wno-sign-compare -Wno-subobject-linkage -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable      -c -o verilated_threads.o /work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include/verilated_threads.cpp
+python3 /work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/bin/verilator_includer -DVL_INCLUDE_OPT=include Vtop.cpp Vtop___024root__0.cpp Vtop__Dpi.cpp Vtop___024root__Slow.cpp Vtop___024root__0__Slow.cpp Vtop__Syms__Slow.cpp > Vtop__ALL.cpp
+ccache x86_64-conda-linux-gnu-c++ -Os  -I.  -MMD -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include -I/work/shared/users/phd/sk3463/scratch/rtlgen/env/share/verilator/include/vltstd -DVERILATOR=1 -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -DVM_TRACE_SAIF=0 -DVM_VPI=1 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-int-in-bool-context -Wno-shadow -Wno-sign-compare -Wno-subobject-linkage -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable      -c -o Vtop__ALL.o Vtop__ALL.cpp
+x86_64-conda-linux-gnu-c++    -rdynamic verilator.o verilated.o verilated_dpi.o verilated_vpi.o verilated_threads.o Vtop__ALL.a   -Wl,-rpath,/work/shared/users/phd/sk3463/scratch/rtlgen/env/lib/python3.12/site-packages/cocotb/libs -L/work/shared/users/phd/sk3463/scratch/rtlgen/env/lib/python3.12/site-packages/cocotb/libs -lcocotbvpi_verilator  -pthread -lpthread -latomic -ldl   -o fifo
+rm Vtop__ALL.verilator_deplist.tmp
+make: Leaving directory '/work/shared/users/phd/sk3463/scratch/rtlgen/tmp/allo_cosim_bmtc7k2h/sim_build'
+     -.--ns INFO     gpi                                ../gpi/GpiCommon.cpp:242  in gpi_load_users                  Loaded entry library: '/work/shared/users/phd/sk3463/scratch/rtlgen/env/lib/libpython3.12.so.1.0'
+     -.--ns INFO     gpi                                ../gpi/GpiCommon.cpp:233  in gpi_load_users                  Running entry func 'initialize' from loaded library '/work/shared/users/phd/sk3463/scratch/rtlgen/env/lib/python3.12/site-packages/cocotb/simulator.cpython-312-x86_64-linux-gnu.so'
+     -.--ns INFO     pygpi                              ..ib/pygpi/embed.cpp:114  in initialize                      Using Python 3.12.12 interpreter at /work/shared/users/phd/sk3463/scratch/rtlgen/env/bin/python
+     -.--ns INFO     gpi                                ../gpi/GpiCommon.cpp:74   in gpi_print_registered_impl       GPI: VPI support registered
+     0.00ns INFO     cocotb.initialize                  Seeding Python random module with 1790964992
+     0.00ns INFO     cocotb.initialize                  Initialized cocotb v2.1.0 from /work/shared/users/phd/sk3463/scratch/rtlgen/env/lib/python3.12/site-packages/cocotb
+     0.00ns INFO     cocotb.initialize                  Running on Verilator version 5.052 2026-09-05
+     0.00ns INFO     cocotb.regression                  Running tests
+     0.00ns INFO     cocotb.regression                  running allo.backend.rtl.sim.cocotb_tb.cosim (1/1)
+ 13679.40ns INFO     cocotb.regression                  allo.backend.rtl.sim.cocotb_tb.cosim passed
+ 13679.40ns INFO     cocotb.regression                  **********************************************************************************************
+                                                        ** TEST                                  STATUS  SIM TIME (ns)  REAL TIME (s)  RATIO (ns/s) **
+                                                        **********************************************************************************************
+                                                        ** allo.backend.rtl.sim.cocotb_tb.cosim   PASS       13679.40           1.56       8744.06  **
+                                                        **********************************************************************************************
+                                                        ** TESTS=1 PASS=1 FAIL=0 SKIP=0                      13679.40           1.57       8738.60  **
+                                                        **********************************************************************************************
+- :0: Verilog $finish
+COSIM trace_part N=4096 cycles=CosimResult(cycles=4097, latency_ns=13656.666666666666, waveform=None, result=None) 5.2s

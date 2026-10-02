@@ -1,0 +1,16 @@
+RTL vpu_fifo:output: 80240 cycles in 12 traces, 219756 defined slots, RTL vs reference on defined: 219756/219756 (0.3s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[18:15:12] Compiling with g++ ...
+[18:15:17] Running simulation ...
+UNIT-DIFF  vpu_fifo:output trace systemc 160478/219756 defined (20964 masked: empty=20959, pre-reset=3, uninit=2; allo==rtl on 1) cycle=per-iteration, time unchecked (build 0.2s, run 5.7s)
+    differing defined slots by trace: fill-full-passthrough-drain=39, wrap-half-full=55, push+pop-on-empty=4, overflow=35, underflow=1, reset-mid-stream=5, random-legal-0=15511, random-legal-1=15827, random-any-0=13694, random-any-1=14102, tb_mxu_single_port lane 0=3, tb_mxu_single_port lane 1=2
+    e.g. fill-full-passthrough-drain cycle 3 pop_data_o: allo 7fffffffffffffff rtl c9f71e7195b89619
+    e.g. fill-full-passthrough-drain cycle 4 pop_data_o: allo 7fffffffffffffff rtl c9f71e7195b89619
+    e.g. fill-full-passthrough-drain cycle 5 pop_data_o: allo 7fffffffffffffff rtl c9f71e7195b89619
+    e.g. fill-full-passthrough-drain cycle 6 pop_data_o: allo 7fffffffffffffff rtl c9f71e7195b89619

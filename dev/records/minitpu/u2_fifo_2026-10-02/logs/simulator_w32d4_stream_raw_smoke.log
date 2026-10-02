@@ -1,0 +1,10 @@
+RTL vpu_fifo:w32d4: 400 cycles in 7 traces, 1158 defined slots, RTL vs reference on defined: 1158/1158 (0.0s)
+/work/shared/users/phd/sk3463/scratch/wt-u2ff/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui1[0m
+  warnings.warn(self.message, category=self.category)
+UNIT-DIFF  vpu_fifo:w32d4 stream_raw simulator 167/1158 defined (42 masked: empty=37, pre-reset=3, uninit=2; allo==rtl on 4) cycle=order-only (build 0.3s, run 0.0s)
+    differing defined slots by trace: fill-full-passthrough-drain=35, wrap-half-full=26, push+pop-on-empty=8, overflow=26, underflow=2, reset-mid-stream=10, random-legal-0=884
+    e.g. fill-full-passthrough-drain cycle 3 pop_data_o: allo 0 rtl 59609c83
+    e.g. fill-full-passthrough-drain cycle 4 pop_data_o: allo 0 rtl 59609c83
+    e.g. fill-full-passthrough-drain cycle 5 pop_data_o: allo 0 rtl 59609c83
+    e.g. fill-full-passthrough-drain cycle 6 pop_data_o: allo 0 rtl 59609c83

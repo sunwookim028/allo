@@ -1,0 +1,10 @@
+wire_part_w257_3p33 manifest: {'latency': 2, 'ii': 1, 'status': 'scheduled', 'port_style': 'wire'}
+    LATENCY-MATCH fifo_0: reported 2 ii=1 (scheduled), measured 2 at 1 cyc/vector; unit declares 1; pinned 1
+wire_w32_3p33 manifest: {'latency': 2, 'ii': 1, 'status': 'scheduled', 'port_style': 'wire'}
+    LATENCY-MATCH fifo_0: reported 2 ii=1 (scheduled), measured 2 at 1 cyc/vector; unit declares 1; pinned 1
+wire_part_w32_3p33 manifest: {'latency': 2, 'ii': 1, 'status': 'scheduled', 'port_style': 'wire'}
+    LATENCY-MATCH fifo_0: reported 2 ii=1 (scheduled), measured 2 at 1 cyc/vector; unit declares 1; pinned 1
+wire_w64d16_3p33 manifest: {'latency': 2, 'ii': 1, 'status': 'scheduled', 'port_style': 'wire'}
+    LATENCY-MATCH fifo_0: reported 2 ii=1 (scheduled), measured 2 at 1 cyc/vector; unit declares 1; pinned 1
+wire_part_w64d16_3p33 manifest: {'latency': 2, 'ii': 1, 'status': 'scheduled', 'port_style': 'wire'}
+    LATENCY-MATCH fifo_0: reported 2 ii=1 (scheduled), measured 2 at 1 cyc/vector; unit declares 1; pinned 1

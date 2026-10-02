@@ -1,0 +1,73 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : mtpu_fifo_257x4_oreg
+Version: W-2024.09
+Date   : Fri Oct  2 14:25:57 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: u/u/rd_ptr_q_reg[1]
+              (rising edge-triggered flip-flop clocked by ideal_clock)
+  Endpoint: u/pop_data_reg[118]
+            (rising edge-triggered flip-flop clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  mtpu_fifo_257x4_oreg
+                     5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                        Fanout     Trans      Incr       Path
+  ---------------------------------------------------------------------
+  clock ideal_clock (rise edge)                      0.00       0.00
+  clock network delay (ideal)                        0.00       0.00
+  u/u/rd_ptr_q_reg[1]/CK (DFF_X1)          0.00      0.00       0.00 r
+  u/u/rd_ptr_q_reg[1]/Q (DFF_X1)           0.01      0.09       0.09 f
+  u/u/rd_ptr_q[1] (net)          3                   0.00       0.09 f
+  U821/A2 (NOR2_X1)                        0.01      0.01       0.10 f
+  U821/ZN (NOR2_X1)                        0.12      0.15       0.25 r
+  n1219 (net)                   12                   0.00       0.25 r
+  U822/A (CLKBUF_X1)                       0.12      0.01       0.26 r
+  U822/Z (CLKBUF_X1)                       0.10      0.16       0.42 r
+  n1379 (net)                   20                   0.00       0.42 r
+  U997/A (CLKBUF_X1)                       0.10      0.02       0.44 r
+  U997/Z (CLKBUF_X1)                       0.11      0.16       0.60 r
+  n1390 (net)                   20                   0.00       0.60 r
+  U998/A (CLKBUF_X1)                       0.11      0.02       0.62 r
+  U998/Z (CLKBUF_X1)                       0.11      0.16       0.78 r
+  n1351 (net)                   20                   0.00       0.78 r
+  U1259/A (CLKBUF_X1)                      0.11      0.02       0.80 r
+  U1259/Z (CLKBUF_X1)                      0.10      0.16       0.95 r
+  n1232 (net)                   19                   0.00       0.95 r
+  U1260/A1 (AOI22_X1)                      0.10      0.03       0.98 r
+  U1260/ZN (AOI22_X1)                      0.04      0.02       1.00 f
+  n1075 (net)                    1                   0.00       1.00 f
+  U1261/A2 (NAND2_X1)                      0.04      0.01       1.01 f
+  U1261/ZN (NAND2_X1)                      0.01      0.03       1.04 r
+  n689 (net)                     1                   0.00       1.04 r
+  u/pop_data_reg[118]/D (DFF_X1)           0.01      0.01       1.05 r
+  data arrival time                                             1.05
+
+  clock ideal_clock (rise edge)                      3.33       3.33
+  clock network delay (ideal)                        0.00       3.33
+  u/pop_data_reg[118]/CK (DFF_X1)                    0.00       3.33 r
+  library setup time                                -0.03       3.30
+  data required time                                            3.30
+  ---------------------------------------------------------------------
+  data required time                                            3.30
+  data arrival time                                            -1.05
+  ---------------------------------------------------------------------
+  slack (MET)                                                   2.25
+
+
+1

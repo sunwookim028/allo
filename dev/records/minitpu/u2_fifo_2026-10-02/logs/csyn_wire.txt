@@ -1,0 +1,12 @@
+EMITTED vpu_fifo wire n=64 -> /work/shared/users/phd/sk3463/scratch/u2ff/cat/wire_w32_3p33.prj io=[] flush=False
+CATAPULT vpu_fifo wire n=64 pipeline=['fifo_0:_'] unroll=[] clock=3.33 io=[] tcl=[] flush=False: exit 0, 49s, log /work/shared/users/phd/sk3463/scratch/u2ff/cat/wire_w32_3p33.prj/csyn.log
+CATAPULT_EXIT 0 WALL 49s
+EMITTED vpu_fifo wire n=64 -> /work/shared/users/phd/sk3463/scratch/u2ff/cat/wire_part_w32_3p33.prj io=[] flush=False
+CATAPULT vpu_fifo wire n=64 pipeline=['fifo_0:_'] unroll=[] clock=3.33 io=[] tcl=[] flush=False: exit 0, 38s, log /work/shared/users/phd/sk3463/scratch/u2ff/cat/wire_part_w32_3p33.prj/csyn.log
+CATAPULT_EXIT 0 WALL 38s
+EMITTED vpu_fifo wire n=64 -> /work/shared/users/phd/sk3463/scratch/u2ff/cat/wire_w64d16_3p33.prj io=[] flush=False
+CATAPULT vpu_fifo wire n=64 pipeline=['fifo_0:_'] unroll=[] clock=3.33 io=[] tcl=[] flush=False: exit 0, 41s, log /work/shared/users/phd/sk3463/scratch/u2ff/cat/wire_w64d16_3p33.prj/csyn.log
+CATAPULT_EXIT 0 WALL 41s
+EMITTED vpu_fifo wire n=64 -> /work/shared/users/phd/sk3463/scratch/u2ff/cat/wire_part_w64d16_3p33.prj io=[] flush=False
+CATAPULT vpu_fifo wire n=64 pipeline=['fifo_0:_'] unroll=[] clock=3.33 io=[] tcl=[] flush=False: exit 0, 42s, log /work/shared/users/phd/sk3463/scratch/u2ff/cat/wire_part_w64d16_3p33.prj/csyn.log
+CATAPULT_EXIT 0 WALL 42s

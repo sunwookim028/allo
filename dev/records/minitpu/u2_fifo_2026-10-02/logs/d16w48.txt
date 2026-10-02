@@ -1,0 +1,24 @@
+== simulator d16w48 trace exit 0
+RTL vpu_fifo:d16w48: 20182 cycles in 10 traces, 55028 defined slots, RTL vs reference on defined: 55028/55028 (8.2s)
+UNIT-MATCH vpu_fifo:d16w48 trace simulator 55028/55028 defined (5518 masked: empty=5513, pre-reset=3, uninit=2; allo==rtl on 5514) cycle=order-only (build 0.3s, run 0.1s)
+== simulator d16w48 stream exit 0
+RTL vpu_fifo:d16w48: 20182 cycles in 10 traces, 55028 defined slots, RTL vs reference on defined: 55028/55028 (0.1s)
+UNIT-MATCH vpu_fifo:d16w48 stream simulator 55028/55028 defined (5518 masked: empty=5513, pre-reset=3, uninit=2; allo==rtl on 77) cycle=order-only (build 0.3s, run 0.1s)
+== systemc d16w48 trace exit 0
+RTL vpu_fifo:d16w48: 20182 cycles in 10 traces, 55028 defined slots, RTL vs reference on defined: 55028/55028 (0.1s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+UNIT-MATCH vpu_fifo:d16w48 trace systemc 55028/55028 defined (5518 masked: empty=5513, pre-reset=3, uninit=2; allo==rtl on 5514) cycle=per-iteration, time unchecked (build 0.2s, run 5.1s)
+== systemc d16w48 ported exit 0
+RTL vpu_fifo:d16w48: 20182 cycles in 10 traces, 55028 defined slots, RTL vs reference on defined: 55028/55028 (0.1s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+UNIT-MATCH vpu_fifo:d16w48 ported systemc 55028/55028 defined (5518 masked: empty=5513, pre-reset=3, uninit=2; allo==rtl on 5514) cycle=per-iteration, time unchecked (build 0.4s, run 5.2s)
+== systemc d16w48 stream exit 0
+RTL vpu_fifo:d16w48: 20182 cycles in 10 traces, 55028 defined slots, RTL vs reference on defined: 55028/55028 (0.1s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+UNIT-MATCH vpu_fifo:d16w48 stream systemc 55028/55028 defined (5518 masked: empty=5513, pre-reset=3, uninit=2; allo==rtl on 77) cycle=per-iteration, time unchecked (build 0.3s, run 5.2s)

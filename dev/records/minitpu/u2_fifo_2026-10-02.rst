@@ -1,0 +1,504 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+###########################################################################
+U2: ``vpu_fifo`` and the MXU output FIFO across every tool column
+###########################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-02.** zhang-21, branch ``u2-fifo``
+   from ``origin/u1-pilot`` at ``bf0e60ab``. Bindings: a private copy of
+   ``wt-u1``'s build (``ldd`` resolves ``libAlloMLIRAggregateCAPI`` inside the
+   worktree). MiniTPU at ``b3ba0a4d``, read only. Verilator 5.052, Catapult
+   2024.2 (``nangate-45nm_beh``), DC W-2024.09 (FreePDK45, the U1 flow,
+   ``dc_u1.tcl`` byte-identical), RTLGen ``allo-rtlgen`` @ ``13b55a63``, AMC
+   ``fe60c121``. Nothing under ``allo/`` or ``mlir/`` changed: every defect
+   below is recorded with a repro and a proposed fix only. Owner's decisions
+   in force: undefined behaviour masked and counted; single-call traces
+   (D-11); latency from the backend manifest, checked on the RTL (D-10).
+
+The second U2 unit after the ``vpu_regfile`` pilot
+(``u2_regfile_2026-10-02.rst``, the template this record follows). The
+instances are ``w32d4`` (the module defaults; 32 b x 4), ``input`` (the MXU
+input FIFO, ``mxu.sv:97``: 257 b x 4) and ``output`` (the MXU output FIFO,
+``mxu.sv:154``: 64 b x 16, one per lane), plus one probe instance ``d16w48``
+(48 b x 16: the output FIFO's depth at a width csim reads back, S8 below).
+
+Reproduce (``source examples/minitpu/harness/env-zhang21.sh`` first)::
+
+   $ALLO_PYTHON -m examples.minitpu.harness.check vpu_fifo --inst w32d4 \
+       --variant trace --backend simulator --backend systemc   # any VARIANTS key / instance
+   $ALLO_PYTHON dev/records/minitpu/u2_fifo_2026-10-02/scripts/flags_only.py w32d4   # stream_raw
+   dev/records/minitpu/u2_fifo_2026-10-02/scripts/run_csyn.sh wire_part_w32_3p33 wire 32 3.33 \
+       --partition fifo_0:mem                                   # Catapult (n = 64, II = 1)
+   $ALLO_PYTHON dev/records/minitpu/u2_fifo_2026-10-02/scripts/cmp_trace.py <prj> --inst w32d4
+   $ALLO_PYTHON dev/records/minitpu/u2_fifo_2026-10-02/repros.py        # B7, S8, S9, M3
+
+RTLGen and AMC scripts are in ``rtlgen/`` and ``amc/`` beside this file and
+run in those tools' own environments (``env.sh`` in each);
+``rtlgen/trace_io.py`` (Allo env) dumps the trace with MiniTPU's responses
+and compares their outputs. DC: ``scripts/dc/run_dc.sh`` and ``dc_runs.txt``.
+
+The probe question
+==================
+
+Allo's FIFO primitive is ``Stream[T, depth]``. Is MiniTPU's ``vpu_fifo``
+(push / pop / full / empty / head visible without a pop / count; a reset
+that clears only the pointers) expressible **as** a Stream with its ports,
+or only as a ``trace``/``ported`` kernel over an explicit ring? The short
+answer, with the evidence below:
+
+* **A Stream is a link, not a unit.** Its "ports" are the valid/ready
+  handshake a backend owns and schedules; ``vpu_fifo``'s ports are *data*
+  (``push_i``, ``pop_i``, ``pop_data_o``, ``empty_o``, ``full_o``) driven by
+  a state machine. So the unit is expressible as a Stream only *inside* one
+  kernel (a self-FIFO: both ends in the same kernel) behind an adapter --
+  and even then only functionally.
+* With a **head-register adapter** (``stream``: ``Stream[W, d-1]`` + one
+  register, because a Stream has no peek), the simulator and SystemC csim
+  are **bit-exact** with the RTL on every defined slot of every trace,
+  illegal ones included, once one RTL quirk is special-cased (push and pop
+  together on an empty FIFO lose the word in the RTL; a Stream cannot lose
+  it: M3). Capacity is exactly ``depth`` on both backends.
+* Without the adapter (``stream_raw``) the head-visible slots are
+  unreachable (no peek: H6 confirmed), and ``try_put`` is wrong on both
+  backends in two different ways (B7, S9).
+* **Catapult cannot schedule the self-FIFO at all** (SCHD-30, "even with
+  unlimited resources", with or without pipelining, with or without the
+  reset drain, with or without the head register: the emitter's self-FIFO
+  lowering puts a Connections ``Pop``/``Push`` and its synchronous occupancy
+  counter into a chained feedback path). So today the Stream primitive is
+  **not a route to RTL for a FIFO unit**; the explicit ring (``wire``) is,
+  and matches the RTL per cycle on all three instances at a uniform +1 edge.
+* RTLGen and AMC see only the explicit ring (their frontends have no Stream
+  of this kind); RTLGen makes the right thing of it (4 registers, a
+  combinational read mux, II = 1), AMC's pipelined schedule is wrong (A1).
+
+What "cycle" means in each column is as in the regfile record: the
+simulator checks order only; csim checks values per iteration; Catapult RTL
+is compared per clock against MiniTPU's RTL under the harness ``trace``
+shape; RTLGen and AMC give per-iteration values and a cycle count.
+
+The command trace is Phase 0's joined end to end: ``w32d4`` 80,092 cycles in
+10 traces (213,166 defined slots, 27,110 masked: ``empty`` 27,105,
+``pre-reset`` 3, ``uninit`` 2); ``output`` 80,240 cycles in 12 traces
+(219,756 defined, 20,964 masked); ``input`` 20,092 cycles (53,862 defined,
+6,414 masked); ``d16w48`` 55,028 defined. The illegal traces (overflow,
+underflow, push+pop on empty, random-any) are in: the reference is exact
+there too, so the flags are *defined* on every cycle after the first reset.
+
+Variants (``examples/minitpu/units/vpu_fifo.py``)
+=================================================
+
+All take one array per RTL input port (``rst_ni`` included: the pointer reset
+is part of the unit) and return one per output port. ``make(n, w)``; the depth
+is ``DEPTH_OF[w]``.
+
+==================  ===================================================================================
+variant             expression (plan id)
+==================  ===================================================================================
+``trace``           F2 "bits": one kernel, the ``.sv`` transcribed: local ring ``mem: W[d]``, ``rd``/``wr``/
+                    ``cnt`` as ``int32`` (B4), outputs of cycle ``t`` from the state it starts in, then
+                    the RTL's update rules, illegal commands included
+``ported``          R3 shape: a ``@df.unit`` with ``trace``'s body and 4 + 3 lockstep ``Stream`` ports
+``wire``            ``trace``'s body with ``Wire`` ports, unit kernel ``fifo_0`` (the Catapult shape)
+``wire_np``         Catapult probe: ``wire`` with the RTL's pointer widths (``UInt(2)``/``UInt(3)``) to
+                    price B4's ``int32`` pointers in area; not run on the simulator (B4)
+``stream``          F1: ``Stream[W, d-1]`` self-FIFO + a head register (the first-word-fall-through
+                    adapter); reset drains the stream; H12 special-cased
+``stream_raw``      F1 as worded: ``Stream[W, d]`` alone; ``pop_data`` only on the pop's cycle; push
+                    guarded by ``full()`` (a ``try_put`` hits B7 and S9)
+``stream_nodrain``  Catapult probe: ``stream`` without the reset drain loop
+==================  ===================================================================================
+
+Results
+=======
+
+.. list-table::
+   :header-rows: 1
+   :widths: 12 11 20 20 37
+
+   * - variant
+     - instance
+     - Allo simulator
+     - SystemC csim
+     - notes
+   * - ``trace``
+     - w32d4
+     - **match** 213,166/213,166
+     - **match** 213,166/213,166
+     - first time (H1), with the regfile's B4/S6 workarounds already in
+   * -
+     - output (64x16)
+     - **match** 219,756/219,756
+     - **finding** 160,478/219,756
+     - csim: every ``pop_data`` slot wrong from the first word >= 2^63 (S8); the flags match
+   * -
+     - d16w48 (probe)
+     - **match** 55,028/55,028
+     - **match** 55,028/55,028
+     - the output FIFO's depth is fine in csim; only its width is not
+   * -
+     - input (257x4)
+     - **blocked** (B6: no dtype)
+     - **blocked** (S7: ``KeyError 'ui257'`` class)
+     - as the regfile at 256 b (H8); refused up front by ``_args`` instead of corrupting the heap
+   * - ``ported``
+     - w32d4 / output / d16w48
+     - **match** all three
+     - **match** w32d4, d16w48; **finding** output (S8)
+     - C9 again: a unit factory per ``(n, w)``
+   * - ``stream``
+     - w32d4 / output / d16w48
+     - **match** all three
+     - **match** w32d4, d16w48; **finding** output (S8)
+     - the Stream + head adapter is bit-exact on illegal traces too (one special case, M3)
+   * - ``stream_raw``
+     - w32d4
+     - **finding** 176,457/213,166
+     - **finding** 176,457/213,166 (identical)
+     - no peek (H6): ``pop_data`` on the 48,428 non-pop defined slots is unreachable; flags-only:
+       ``empty`` 76,248/80,091, ``full`` 79,710/80,091, pop-cycle data 19,030/20,633 -- every miss
+       follows a push+pop-on-empty (M3) or a reset with words inside (the drain is not a pointer
+       clear) on the illegal traces
+   * - ``wire``
+     - w32d4 / output
+     - **blocked** (``Wire``: LLVM translation fails, not refused)
+     - **finding** 150,379/213,166 and 146,159/219,756
+     - csim's src/sink are not cycle-locked to ``fifo_0`` (limitation 22, as the regfile); the
+       unit kernel itself is exact in RTL (next table)
+
+Catapult (``wire``, ``synth_top=fifo_0``, ``s.pipeline("fifo_0:_")``, n = 64):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 14 24 32
+
+   * - build
+     - csyn
+     - per-cycle vs MiniTPU RTL
+     - measured timing / manifest
+   * - w32d4, 3.33 ns, no partition
+     - ok, 49 s, II=1
+     - **213,166/213,166** at +1 edge
+     - every probe 2 edges (MiniTPU 1); ``latency.json`` ``latency 2, ii 1, scheduled, wire``:
+       **LATENCY-MATCH** at the harness count
+   * - w32d4, 3.33 ns, ``s.partition(mem, Complete)``
+     - ok, 38 s
+     - **213,166/213,166**
+     - identical RTL report: a 4-entry array is mapped to registers either way
+   * - w32d4, 2.0 ns, partition
+     - ok, 46 s
+     - **213,166/213,166**
+     - same (+1 edge)
+   * - w32d4 ``wire_np`` (narrow pointers), 3.33 ns
+     - ok, 47 s
+     - **213,166/213,166**
+     - same; area score 1,509 vs 1,804 (below)
+   * - output 64x16, 3.33 ns, with and without partition
+     - ok, 41 / 42 s
+     - **219,756/219,756**
+     - same (+1 edge); the 16-entry array is registers either way
+   * - input 257x4, 3.33 ns, partition
+     - ok after the S7 TB hand-patch (``hand_patches.diff``)
+     - **53,862/53,862**
+     - same (+1 edge); manifest 2 / 1 / scheduled
+   * - ``stream`` (whole region, self-FIFO ``AlloFifoC<ac_int<32,false>,3>``), pipelined
+     - **SCHD-30**
+     - --
+     - "could not schedule partition ``/top/fifo_0/run`` even with unlimited resources": chained
+       feedback through ``head`` and ``v7_deq.Pop()`` (kernel.cpp 551/617) and the ``while`` drain
+   * - ``stream``, not pipelined
+     - **SCHD-30**
+     - --
+     - the same
+   * - ``stream_nodrain``, pipelined
+     - **SCHD-30**
+     - --
+     - feedback on ``head`` alone: the drain loop is not the cause
+   * - ``stream_raw``, pipelined
+     - **SCHD-30**
+     - --
+     - feedback on the self-FIFO's synchronous counter ``v7_cnt`` (kernel.cpp 529): the
+       self-FIFO itself is the cause (C1)
+
+The +1 edge is the regfile's G2 again: MiniTPU's outputs are combinational
+from the registered state (visible after the edge that captured the command);
+Catapult registers them (one edge later). The relative timing (push to
+``empty``, push to ``pop_data``, last push to ``full``, pop to next
+``pop_data``) is 1 : 1 : 1 : 1 in both, so the order of events is preserved.
+D-10's manifest reports the same 2 that the harness measures, with
+``status: scheduled`` and ``port_style: wire``.
+
+Same-flow area and timing (DC W-2024.09, FreePDK45, ``dc_u1.tcl``; every design meets its clock):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 36 10 14 12 12 16
+
+   * - design
+     - clock
+     - area (um^2)
+     - comb
+     - seq
+     - slack (ns)
+   * - MiniTPU 32x4
+     - 3.33 / 2.0
+     - 790.0
+     - 159.6
+     - 630.4
+     - 2.62 / 1.29
+   * - MiniTPU 32x4 + output registers (``mtpu_fifo_oreg.sv``)
+     - 3.33 / 2.0
+     - 943.8
+     - 159.6
+     - 784.2
+     - 2.67 / 1.34
+   * - Catapult ``wire`` 32x4 (``int32`` pointers), 3.33 / 2.0
+     - 3.33 / 2.0
+     - **1,905.6 / 1,965.2** (+102 % / +108 % vs oreg)
+     - 620.8 / 680.4
+     - 1,284.8
+     - 0.04 / 0.00
+   * - Catapult ``wire_np`` 32x4 (RTL pointer widths)
+     - 3.33
+     - **1,554.2** (+65 % vs oreg)
+     - 423.7
+     - 1,130.5
+     - 2.35
+   * - MiniTPU 64x16 / + oreg
+     - 3.33
+     - 5,823.0 / 6,121.5
+     - 1,057.9
+     - 4,765.1 / 5,063.6
+     - 2.25 / 2.32
+   * - Catapult ``wire`` 64x16
+     - 3.33
+     - **9,741.5** (+59 % vs oreg)
+     - 3,272.3
+     - 6,469.1
+     - 0.03
+   * - MiniTPU 257x4 / + oreg
+     - 3.33
+     - 5,675.6 / 6,846.3
+     - 975.4
+     - 4,700.2 / 5,871.4
+     - 2.23 / 2.25
+   * - Catapult ``wire`` 257x4
+     - 3.33
+     - **11,679.5** (+71 % vs oreg)
+     - 3,212.7
+     - 8,466.8
+     - 0.09
+
+Like for like is MiniTPU plus output registers. Catapult's overhead is a
+third pointer/count width (B4's ``int32`` costs 351 um^2 of the 962 at
+32x4: ``wire_np`` recovers it), a registered copy of every input Wire, and a
+read mux built from registers rather than LUTRAM (an FPGA property MiniTPU
+relies on; in ASIC both are flops). Catapult's slack is near zero at both
+clocks (it schedules to the clock it is given); MiniTPU's is 2.2-2.7 ns.
+
+RTLGen (``trace`` transcribed, ``rtlgen/fifo_rtlgen.py``, 4,096 cycles):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 25 45
+
+   * - build
+     - vs MiniTPU (defined)
+     - cycles / structure
+   * - as written
+     - **11,212/11,212**
+     - 4,097 cycles (**II=1**): ``mem`` is 4 registers with a **combinational** read mux
+       (``pop_data`` is asynchronous, as in the RTL) and a registered write
+   * - ``partition("mem", Complete)``
+     - **11,212/11,212**
+     - identical netlist (comments aside): RTLGen had already made registers of a 4-entry array
+
+AMC (``trace`` through AMC's vendored frontend, ``amc/fifo_amc.py``, 4,096 cycles):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 25 45
+
+   * - build
+     - vs MiniTPU (defined)
+     - cycles / structure
+   * - as written, ``llvm`` and ``amc``
+     - **11,212/11,212** (both)
+     - 16,392 cycles (4 per iteration)
+   * - ``s.pipeline(t)``
+     - **finding A1**: 9,467/11,212 -- flags exact, ``pop_data`` wrong on 1,745/3,022
+     - 12,299 cycles (**II=3**). ``amcMemory0`` declares ``(w, r, w)`` ports on ``4xi32``,
+       all ``dyn (1)``. From the first fill ``mem[rd]`` returns a *later* word: cycle 4 reads
+       the second pushed word where ``rd = 0`` holds the first (``logs``: the first 12 cycles)
+   * - ``s.partition(mem, complete)`` + pipeline
+     - **finding A1**: 9,467/11,212 (identical)
+     - 12,299 cycles: the partition changes nothing, so it is the schedule, not the RAM model
+
+Findings
+========
+
+Each has a minimal repro in ``u2_fifo_2026-10-02/repros.py`` (output in
+``logs/repros.txt``) unless noted. The regfile's B4, B5, S6, S7, B6 all
+recur and are not re-counted.
+
+**B7 (simulator, bug, silent).** A ``try_put`` whose result is not used is
+dropped: ``junk: uint1 = s.try_put(x)`` pushes nothing, ``empty()`` stays 1
+after four of them; with the result used the same code works. csim is right
+in both forms. The simulator's stream lowering (``allo/backend/simulator.py``
+``StreamTryPutOp``) must be reached through the result's uses; an unused
+result lets a canonicalizer erase the op as pure. *Proposed fix:* mark the
+try ops as having memory effects (they are side-effecting on the FIFO), or
+refuse an unused ``try_put``.
+
+**S8 (SystemC csim, bug, silent).** A 64-bit port value >= 2^63 reads back
+as ``0x7fffffffffffffff`` **and so does every value after it on that port**:
+the testbench parses ``input<k>.data`` with ``std::ifstream >> long long``
+(``kernel.cpp``: ``_f >> _v; ch.Push((ac_int<64,false>)_v)``); overflow
+stores ``LLONG_MAX`` and sets ``failbit``, which sticks. Repro: ``[1, 2^63-1,
+2^63, 3] -> [1, 2^63-1, 2^63-1, 2^63-1]``. The MXU output FIFO is 64 b wide,
+so every csim cell of the ``output`` instance is this finding (the flags
+match, ``pop_data`` does not). *Proposed fix:* parse through ``unsigned long
+long`` (and ``to_uint64()`` on the way out), together with S7's word-split
+format for anything wider.
+
+**S9 (SystemC emitter, bug, silent).** A self-FIFO's ``full()`` reads a
+synchronous occupancy counter (``<stream>_cnt``, ``EmitSystemC.cpp``
+``emitStreamFull``) that ``try_put`` advances **even when the put is
+refused**: after the first refused push the counter is ``depth + 1`` and
+``full()`` (``cnt == depth``) is never true again. Repro: six ``try_put`` into
+``Stream[int32, 4]`` give ``full = [0,0,0,1,0,0]`` (simulator ``[0,0,0,1,1,1]``).
+*Proposed fix:* advance the counter under the ``PushNB`` result.
+
+**C1 (Catapult + emitter, blocked; bug by D-1).** The self-FIFO lowering
+(one kernel both ends of a ``Stream``, realised as an ``AlloFifoC`` bound as a
+self-loop at the top with ``_enq``/``_deq`` Connections ports and the
+``_cnt`` counter) is unschedulable in Catapult inside any loop that puts and
+gets conditionally: SCHD-30 "even with unlimited resources", four variants,
+with and without pipelining. csim accepts the same code and is bit-exact
+(``stream``). The emitter does not refuse the construct for csyn. *Proposed
+fix:* either lower a self-FIFO to an in-kernel ring (the ``trace`` body:
+registers + pointers, which Catapult schedules at II=1), or refuse it under
+``mode="csyn"`` naming the kernel.
+
+**M3 (semantic mismatch): the Stream cannot lose a word.** Push and pop
+together on an empty FIFO: the RTL moves both pointers and loses the pushed
+word (Phase 0, H12); a Stream, popped first (nothing: it is empty) and then
+pushed, keeps it, on both backends. A Stream-based unit can only be
+bit-exact on that illegal command by special-casing it (``stream`` does; the
+slot itself is masked, but the state after it is not). The same holds for a
+reset with words inside: the RTL clears pointers, a Stream must be drained,
+and ``stream_raw``'s remaining misses are those two.
+
+**A1 (AMC, bug).** The pipelined schedule (II=3) of the ``trace`` kernel is
+wrong: the flags (``cnt``) are exact, ``pop_data = mem[rd]`` is not from the
+first fill on (first example cycle 4 of ``fill-full-passthrough-drain``).
+The unpipelined build is exact at 4 cycles/iteration; the complete partition
+gives the identical wrong result. Not reduced further here (AMC's own
+scripts in ``amc/``).
+
+**H6 (missing abstraction): no peek.** ``pop_data`` is the head word,
+visible on every non-empty cycle without a pop. ``Stream`` has
+``get``/``try_get``/``empty``/``full`` and no ``peek``, so the port needs a
+head register beside the stream (``stream``); a ``Stream[W, k]`` plus the
+head holds ``k + 1`` words, so the variant uses ``k = d - 1``. A ``peek()``
+(Connections' FWFT ``deq.dat`` is exactly that) would make the adapter
+unnecessary.
+
+**H7 (semantic mismatch, recorded): overflow has three behaviours.** The
+RTL drops the push (``output`` ``overflow`` trace: 3 of 19 pushes); the
+assembler refuses it in program order; Allo: a blocking ``put`` *stalls*
+(a deadlock in a single kernel), ``try_put`` *refuses* and returns 0, and the
+explicit ring (``trace``) *drops* like the RTL. Only the explicit model can
+be asked to behave like the hardware.
+
+**Minor.**
+
+* ``write_latency_manifest(project, top, declared=)`` takes a dict per
+  kernel; an int raises ``TypeError``. The csyn path of ``emit_csyn.py`` does
+  not write ``latency.json`` by itself (``hls.py:1514`` does it in the
+  Catapult platform's own build); the manifests here were written after the
+  fact and checked (``logs/latency_manifests.txt``).
+* The harness ``probe_trace`` reports 2 for Catapult on both samplings
+  (pre/post); the "L=1" of ``cmp_trace.py`` is MiniTPU-relative. Same fact.
+* ``stream``'s ``allo==rtl`` on the masked slots is 1,608/27,110 (the head
+  register holds the popped word, not the RTL's stale ``mem[rd_ptr]``): the
+  masked-slot agreement is a property of the model, not of correctness.
+
+Hypotheses (plan section 4) that apply to the FIFO
+==================================================
+
+.. list-table::
+   :header-rows: 1
+   :widths: 8 18 74
+
+   * - #
+     - verdict
+     - evidence
+   * - H1
+     - **confirmed** for F2
+     - ``trace`` matched first time on the simulator, csim (w32d4) and RTLGen; the B4/S6
+       workarounds were carried over from the regfile, not rediscovered
+   * - H4
+     - **confirmed for Catapult, refuted for RTLGen**
+     - Catapult: +1 edge on every output. RTLGen: a combinational read mux on registers --
+       ``pop_data`` *is* asynchronous there (port timing not observable, values and II=1 are)
+   * - H6
+     - **confirmed**
+     - no peek (``stream_raw`` 176,457/213,166 identical on both backends); pass-through on
+       full is "pop, then push" in program order; csim flag timing: S9's counter drift
+   * - H7
+     - **confirmed**, four behaviours
+     - drop (RTL, ``trace``), refuse (asm; ``try_put``), stall (``put``)
+   * - H8
+     - **confirmed** at 257 b
+     - B6 (refused by ``_args``), S7 (csim; Catapult TB hand-patch); Catapult RTL matches
+   * - H9
+     - **confirmed** (C9)
+     - ``ported`` needs a unit factory per ``(n, w)``; four instances = four modules
+   * - H12
+     - **confirmed** (Phase 0); consequence M3
+     - a Stream cannot reproduce the lost word without a special case
+   * - H13
+     - not run
+     - no bf16-typed variant (owner: NaN/zero do not matter here)
+
+What the owner must decide
+==========================
+
+1. **The Stream is not the FIFO unit.** Accept that MiniTPU's FIFOs are
+   expressed as the explicit ring (``trace`` for verdicts, ``ported`` for
+   composition, ``wire`` for Catapult) and that ``Stream`` stays the
+   inter-kernel link? *[provisional: yes -- every column that reaches RTL
+   needs the ring; the ``stream`` variant stays as the probe that shows the
+   primitive's capacity and flags are right in simulation]*
+2. **C1**: refuse the self-FIFO under csyn (D-1) now, and lower it to a ring
+   later? *[refuse now]*
+3. **B7, S8, S9**: fix order. *[S8 first (silent, hits every 64 b port), then
+   B7 (silent), S9 with the C1 decision]*
+4. **A ``peek()`` on Stream** (H6): add it (Connections has it for free;
+   the simulator's ring too) so an FWFT port needs no head register?
+   *[proposal only; not needed if 1 holds]*
+5. **Pointer widths** (``wire_np``): once B4 is fixed, the shared body can
+   use the RTL's widths and recover 18 % of Catapult's area at 32x4.
+   *[follows B4]*
+6. **AMC A1**: report upstream with ``amc/fifo_amc.py``; not an Allo defect.
+
+Files
+=====
+
+* ``examples/minitpu/units/vpu_fifo.py``: the variants, ``WIDTH``/``DEPTH_OF``,
+  the ``d16w48`` probe instance.
+* ``u2_fifo_2026-10-02/scripts/``: ``emit_csyn.py`` (the regfile's),
+  ``run_csyn.sh``, ``cmp_trace.py`` (FIFO ports), ``flags_only.py``,
+  ``run_check.sh``, ``repro_tryput.py``, ``dc/`` (``run_dc.sh``,
+  ``dc_runs.txt``, ``dc_u1.tcl``, ``mtpu_fifo_oreg.sv``, ``mtpu_fifo_*.sv``).
+* ``repros.py``, ``logs/`` (verdict lines per variant x backend x instance,
+  ``cmp_wire.txt``, ``latency_manifests.txt``, ``repros.txt``), ``catapult/``
+  (``run.tcl``, ``csyn.log.gz``, ``rtl.rpt.gz``, ``cycle.rpt``,
+  ``latency.json``, ``hand_patches.diff``), ``dc/`` (area/qor/reference/
+  timing/wall per run), ``rtlgen/`` (script, ``env.sh``, ``trace_io.py``,
+  the two ``.sv``, run log), ``amc/`` (script, ``env.sh``, run log, the
+  allocations).
