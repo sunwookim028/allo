@@ -1,0 +1,14 @@
+[Allo] Environment ready
+== building mlir/build (incremental)
+   allo -> /work/shared/users/phd/sk3463/allo/allo/__init__.py
+== gen_isa.py --check (the ISA spec and both its consumers)
+  ISA OK: the spec, its 2 generated artefacts and all 9 consumers agree
+== lift_units.py --check (units_isa.py against what ip/ composes to)
+  UNITS OK: units_isa.py is byte-identical to what ip/ composes to
+== bench_isa.py (published functional setup)
+  ALL EXACT
+== stress_isa.py (correctness gate)
+  STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)
+== act_compile.py --gate (every mapping the search accepts, verified)
+ACT GATE OK: 12/12 problems, every encodable mapping verified
+REPRODUCED (functional only)

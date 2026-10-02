@@ -1,0 +1,25 @@
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+[02:12:22] Compiling with g++ ...
+[02:12:30] Running simulation ...
+CASE gemm 4x4x4 full seed=101 -> gemm 4x4x4 full seed=101: wrong=0/16 clobbered_outside=4057 7.8s
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+[02:12:30] Compiling with g++ ...
+[02:12:37] Running simulation ...
+CASE gemm 4x4x4 full seed=101 flat -> gemm 4x4x4 full seed=101 flat: wrong=0/16 clobbered_outside=4057 7.3s
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+[02:12:37] Compiling with g++ ...
+[02:12:45] Running simulation ...
+CASE gemm 4x4x4 corner seed=102 -> gemm 4x4x4 corner seed=102: wrong=0/16 clobbered_outside=4065 7.8s
+SYSTEMC CSIM OK

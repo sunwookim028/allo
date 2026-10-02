@@ -1,0 +1,14 @@
+/opt/siemens/catapult/2024.2/Mgc_home/shared/lib/Linux/gcc-10.3.0-64/libsystemc.so: undefined reference to `std::__cxx11::basic_stringstream<char, std::char_traits<char>, std::allocator<char> >::basic_stringstream()@GLIBCXX_3.4.26'
+collect2: error: ld returned 1 exit status
+[02:13:21] Compiling with g++ ...
+Traceback (most recent call last):
+  File "/work/shared/users/phd/sk3463/allo/examples/tinytpu/systemc_csim.py", line 58, in <module>
+    main()
+  File "/work/shared/users/phd/sk3463/allo/examples/tinytpu/systemc_csim.py", line 48, in main
+    got = stress_isa.execute(mod, prog, A, B, C0)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/work/shared/users/phd/sk3463/allo/examples/tinytpu/stress_isa.py", line 162, in execute
+    mod(imem, A.reshape(-1), B.reshape(-1), C)
+  File "/work/shared/users/phd/sk3463/allo/allo/backend/hls.py", line 1148, in __call__
+    raise RuntimeError(
+RuntimeError: Failed to compile with g++. Check if g++ is installed and ac_types headers are correct.
