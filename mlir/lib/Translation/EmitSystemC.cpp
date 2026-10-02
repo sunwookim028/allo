@@ -3868,60 +3868,68 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         os << mi.chan << "_mem." << (sfx + 1) << "(" << mi.chan << sfx << ");\n";
       }
     }
-    indent(); os << "SC_THREAD(src); sensitive << clk.posedge_event(); "
-                    "async_reset_signal_is(rst, false);\n";
-    indent(); os << "SC_THREAD(snk); sensitive << clk.posedge_event(); "
-                    "async_reset_signal_is(rst, false);\n";
+    // ONE thread per boundary stream, never one thread for all of them. A single
+    // src() that pushed all of input 0 and then all of input 1 deadlocked any
+    // kernel that pops its inputs interleaved (a[i] + b[i]): Combinational
+    // channels hold no data, so src blocks on input 0's second Push while the
+    // kernel blocks on input 1's first Pop. One snk() draining output 0 before
+    // output 1 deadlocks the mirror case. With a thread per channel the testbench
+    // accepts every order the kernel can produce or consume in, so a tb hang
+    // means the DESIGN deadlocks, not the testbench.
+    for (auto &a : ioArrays) {
+      if (a.dir != 'i' && a.dir != 'o')
+        continue;
+      indent();
+      os << "SC_THREAD(" << (a.dir == 'i' ? "src_" : "snk_") << a.member
+         << "); sensitive << clk.posedge_event(); "
+            "async_reset_signal_is(rst, false);\n";
+    }
     reduceIndent();
     indent(); os << "}\n";
-    // src: drive each INPUT port from input<k>.data (written by hls.py from A)
-    indent(); os << "void src() {\n";
-    addIndent();
-    for (auto &a : ioArrays)
-      if (a.dir == 'i') { indent(); os << "ch_" << a.member << ".ResetWrite();\n"; }
-    indent(); os << "wait();\n";
-    for (auto &a : ioArrays)
-      if (a.dir == 'i') {
-        indent();
-        // Wide read temp so a char-width element (int8_t/uint8_t) parses as an
-        // integer, not a single character (see the memory-port preload note).
-        bool isF = (a.ctype == "half" || a.ctype == "double" ||
-                    a.ctype == "ac::bfloat16" ||
-                    a.ctype.find("ieee_float") != std::string::npos);
-        std::string rt = isF ? a.ctype : std::string("long long");
-        os << "{ std::ifstream _f(\"input" << a.fileIdx << ".data\"); " << rt
-           << " _v; for (int f = 0; f < " << a.total << "; ++f) { _f >> _v; ch_"
-           << a.member << ".Push((" << a.ctype << ")_v); } }\n";
-      }
-    reduceIndent();
-    indent(); os << "}\n";
-    // A stream OUTPUT (snk drains it) drives sc_stop; if there are only
+    // A stream OUTPUT (a snk drains it) drives sc_stop; if there are only
     // memory-port outputs, fall back to a time-based run (below).
-    bool hasStreamOut = false;
+    int numStreamOut = 0;
     for (auto &a : ioArrays)
       if (a.dir == 'o')
-        hasStreamOut = true;
+        ++numStreamOut;
+    bool hasStreamOut = numStreamOut > 0;
     int64_t maxTotal = 1;
     for (auto &a : ioArrays)
       maxTotal = std::max(maxTotal, a.total);
     for (auto &m : memArrays)
       maxTotal = std::max(maxTotal, m.total);
-
-    // snk: write each OUTPUT port to output<k>.data (read back into B by hls.py)
-    indent(); os << "void snk() {\n";
-    addIndent();
-    for (auto &a : ioArrays)
-      if (a.dir == 'o') { indent(); os << "ch_" << a.member << ".ResetRead();\n"; }
-    indent(); os << "wait();\n";
-    for (auto &a : ioArrays)
-      if (a.dir == 'o') {
+    if (hasStreamOut) {
+      indent(); os << "int _snk_done = 0;  // stream sinks drained; the last one sc_stop()s\n";
+    }
+    for (auto &a : ioArrays) {
+      bool isF = (a.ctype == "half" || a.ctype == "double" ||
+                  a.ctype == "ac::bfloat16" ||
+                  a.ctype.find("ieee_float") != std::string::npos);
+      if (a.dir == 'i') {
+        // src_<port>: drive one INPUT port from input<k>.data (written by hls.py)
+        indent(); os << "void src_" << a.member << "() {\n";
+        addIndent();
+        indent(); os << "ch_" << a.member << ".ResetWrite();\n";
+        indent(); os << "wait();\n";
+        indent();
+        // Wide read temp so a char-width element (int8_t/uint8_t) parses as an
+        // integer, not a single character (see the memory-port preload note).
+        std::string rt = isF ? a.ctype : std::string("long long");
+        os << "{ std::ifstream _f(\"input" << a.fileIdx << ".data\"); " << rt
+           << " _v; for (int f = 0; f < " << a.total << "; ++f) { _f >> _v; ch_"
+           << a.member << ".Push((" << a.ctype << ")_v); } }\n";
+        reduceIndent();
+        indent(); os << "}\n";
+      } else if (a.dir == 'o') {
+        // snk_<port>: write one OUTPUT port to output<k>.data (read back by hls.py)
+        indent(); os << "void snk_" << a.member << "() {\n";
+        addIndent();
+        indent(); os << "ch_" << a.member << ".ResetRead();\n";
+        indent(); os << "wait();\n";
         indent();
         // Symmetric to the input read: cast a char-width element to a wide int so
         // operator<< prints its NUMERIC value, not a character; floats keep full
         // round-trippable precision.
-        bool isF = (a.ctype == "half" || a.ctype == "double" ||
-                    a.ctype == "ac::bfloat16" ||
-                    a.ctype.find("ieee_float") != std::string::npos);
         if (isF)
           os << "{ std::ofstream _f(\"output" << a.fileIdx
              << ".data\"); for (int f = 0; f < " << a.total
@@ -3932,10 +3940,11 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
              << ".data\"); for (int f = 0; f < " << a.total
              << "; ++f) _f << (long long)(ch_" << a.member
              << ".Pop()) << \"\\n\"; }\n";
+        indent(); os << "if (++_snk_done == " << numStreamOut << ") sc_stop();\n";
+        reduceIndent();
+        indent(); os << "}\n";
       }
-    if (hasStreamOut) { indent(); os << "sc_stop();\n"; }
-    reduceIndent();
-    indent(); os << "}\n";
+    }
     reduceIndent();
     os << "};\n\n";
 
@@ -3984,7 +3993,22 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
     // former free-running body, over-accumulated `both` outputs.
     indent(); os << "t.rst = 1;\n";
     if (hasStreamOut) {
-      indent(); os << "sc_start();\n";
+      // Bounded, so a deadlocked design FAILS instead of spinning forever (an
+      // unbounded sc_start() keeps ticking the clock with nothing to do). Same
+      // cap as the memory-output path below; -DALLO_TB_MAX_CYCLES=N overrides.
+      int64_t capCycles = maxTotal * 2000 + 200000;
+      indent(); os << "#ifndef ALLO_TB_MAX_CYCLES\n";
+      indent(); os << "#define ALLO_TB_MAX_CYCLES " << capCycles << "LL\n";
+      indent(); os << "#endif\n";
+      indent(); os << "sc_start((double)ALLO_TB_MAX_CYCLES, SC_NS);\n";
+      indent();
+      os << "if (sc_core::sc_get_status() != sc_core::SC_STOPPED) {\n";
+      indent();
+      os << "  std::cerr << \"TB DEADLOCK: stream outputs not drained after \" "
+            "<< ALLO_TB_MAX_CYCLES << \" cycles (\" << t._snk_done << \" of "
+         << numStreamOut << " sinks done)\" << std::endl;\n";
+      indent(); os << "  return 1;\n";
+      indent(); os << "}\n";
     } else {
       // Poll the DUT's hardware `done` port (AND of all kernels' completion) --
       // valid in BOTH csim and RTL cosim, unlike the C-side __allo_done counter

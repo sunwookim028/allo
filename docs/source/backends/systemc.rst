@@ -266,3 +266,15 @@ one design per bug (it skips without ``MGC_HOME`` and ``SYSTEMC_HOME``).
   overload was global; ``ac::bfloat16`` lives in ``ac``. It is now emitted in
   ``namespace ac``. ``ac_ieee_float`` (f16, f32) is a global template, so its
   global overloads were found; ``double`` uses SystemC's own.
+- **The testbench deadlocked with two or more boundary streams** (same unit):
+  one ``src()`` thread pushed all of input 0 before any of input 1, and one
+  ``snk()`` drained all of output 0 before output 1, over ``Combinational``
+  channels that hold no data. A kernel computing ``a[i] + b[i]`` blocked on its
+  first pop of ``b`` while ``src`` blocked on its second push of ``a``: no
+  output, and the csim spun forever. The testbench now runs one ``SC_THREAD`` per
+  boundary stream (``src_<port>``/``snk_<port>``), so it accepts any order the
+  kernel can consume or produce in, and the last sink calls ``sc_stop()``. The
+  run is bounded too: after ``ALLO_TB_MAX_CYCLES`` cycles (default ``2000 x``
+  the largest array ``+ 200000``; override with ``-D``) an undrained output
+  prints ``TB DEADLOCK`` and exits 1, so a hang in csim now means the design
+  deadlocks, and says so.
