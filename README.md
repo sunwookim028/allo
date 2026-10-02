@@ -176,6 +176,29 @@ not a commitment. Harness work goes into the method-agnostic core first.
   - `torch==2.14.0` CPU, for the ACT flow.
 - MiniTPU is cloned there by its owner, at the pinned commit.
 
+**D-9 (2026-10-02). The ladder is a probe of the tools.** *Amends D-7.*
+- The main product of each unit is what it exposes in each tool: the Allo
+  simulator, the programming model and its passes, the SystemC emitter and
+  Catapult, RTLGen, AMC. Matching the RTL stays the goal of each unit, but a
+  unit is done when every tool has been tried on it and every difference is
+  explained and triaged, not only when it matches.
+- Each unit fills one row of a matrix: one column per tool, each cell *match*,
+  *finding*, *blocked* or *n/a*. A finding is classed as a tool **bug**, a
+  **missing abstraction**, a **workaround** (it works only by distorting the
+  unit) or a **semantic mismatch** (the tools disagree on what the unit means).
+  The matrix is evidence (`dev/records/minitpu/`); defects go to issues (D-2).
+- The owner is in the loop at three points per unit: how the unit is expressed
+  in Allo, before coding; triage of the filled matrix (fix now, record, or
+  research); and any change to the programming model or to passes, which
+  becomes a D-n entry before code. Mechanical work does not wait.
+- Expect more research and design iterations in this phase than in M0. Work
+  is split across parallel agents by tool track; one session integrates and
+  is the only writer to `main`. Feature code goes on a branch in a worktree
+  and merges after review.
+- When the owner is away, the agent decides from these entries, records each
+  call as *provisional* with its reason, and keeps going. Changes to the
+  programming model or passes stay proposals until reviewed.
+
 ## Milestones
 
 Each milestone passes on **one acceptance check** and names the tools it uses

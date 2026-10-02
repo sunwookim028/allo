@@ -984,8 +984,12 @@ class TypeInferer(ASTVisitor):
         assert len(node.comparators) == 1, "Only support one comparator for now"
         rhs = visit_stmt(ctx, node.comparators[0])
         typing_rule = get_typing_rule(type(node.ops[0]), ctx.typing_rule_set)
-        operand_type = typing_rule(lhs.dtype, rhs.dtype)
-        node.dtype = operand_type
+        # Both operands are cast to this common type before comparing; the
+        # builder picks the predicate's signedness from it.
+        node.operand_dtype = typing_rule(lhs.dtype, rhs.dtype)
+        # A comparison yields an i1, so its own type is uint1, not the
+        # operand type (else `r: uint1 = a == b` emits trunci i1 -> i1).
+        node.dtype = uint1
         node.shape = tuple()
         return node
 
