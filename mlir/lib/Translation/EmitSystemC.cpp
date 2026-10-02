@@ -3421,16 +3421,26 @@ inline std::istream &operator>>(std::istream &is, ac_ieee_float<binary32> &h) {
 }
 // tb/Connections waveform trace of a float (trace its raw bit pattern). Needed
 // because Connections/sc_signal ports templated on these types call sc_trace.
+// Those calls are unqualified and made from INSIDE namespaces sc_core and
+// Connections, so an overload is found only by argument-dependent lookup: it
+// must live in the namespace of the float type itself. ac_ieee_float is a
+// global class template (associated namespace: the global one), so its
+// overloads are global; ac::bfloat16 lives in namespace ac, so its overload
+// must too -- a global one is never found ("no matching function for call to
+// sc_trace(sc_trace_file*&, const ac::bfloat16&, ...)"). double needs none:
+// sc_core has its own. The inner calls name sc_core:: so they cannot recurse.
 inline void sc_trace(sc_core::sc_trace_file *tf, const half &h, const std::string &n) {
-  sc_trace(tf, (unsigned short)_fbits(h), n);
+  sc_core::sc_trace(tf, (unsigned short)_fbits(h), n);
 }
+namespace ac {
 inline void sc_trace(sc_core::sc_trace_file *tf, const ac::bfloat16 &h,
                      const std::string &n) {
-  sc_trace(tf, (unsigned short)_fbits(h), n);
+  sc_core::sc_trace(tf, (unsigned short)_fbits(h), n);
 }
+} // namespace ac
 inline void sc_trace(sc_core::sc_trace_file *tf, const ac_ieee_float<binary32> &h,
                      const std::string &n) {
-  sc_trace(tf, (unsigned)_fbits(h), n);
+  sc_core::sc_trace(tf, (unsigned)_fbits(h), n);
 }
 // Make ac_ieee_float<Format> a valid Connections channel/Combinational payload.
 // (bf16 needs NOTHING here: ac::bfloat16 already has one --
