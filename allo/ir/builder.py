@@ -1068,14 +1068,21 @@ class ASTTransformer(ASTBuilder):
                 rhs,
                 (
                     allo_d.StreamConstructOp,
-                    allo_d.StreamGetOp,
                     allo_d.WireConstructOp,
-                    allo_d.WireGetOp,
                     allo_d.ChannelConstructOp,
-                    allo_d.ChannelGetOp,
                 ),
             ):
                 pass
+            elif isinstance(
+                rhs, (allo_d.StreamGetOp, allo_d.WireGetOp, allo_d.ChannelGetOp)
+            ):
+                # A scalar get yields the link's element type; `x: int32 =
+                # s.get()` on a Stream[UInt(5)] must widen it, or the store
+                # of an i5 into an i32 memref fails verification.
+                if len(value.shape) == 0 and len(target.shape) == 0:
+                    rhs = ASTTransformer.build_cast_op(
+                        ctx, rhs, value.dtype, target.dtype
+                    )
             else:
                 # dtype cast & broadcast
                 # for some OpView (e.g., linalg.transpose), op.result return a OpResultList
