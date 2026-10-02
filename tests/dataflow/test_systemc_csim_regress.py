@@ -66,3 +66,35 @@ def test_float_stream_compiles_and_runs(T):
     b = np.zeros(N, dtype=_NP[T])
     _csim(_square_stream(T, N), a, b)
     np.testing.assert_array_equal(b.astype(np.float32), (a * a).astype(np.float32))
+
+
+def _two_in_two_out(N):
+    @df.region()
+    def top(A: int32[N], B: int32[N], C: int32[N], D: int32[N]):
+        @df.kernel(mapping=[1], args=[A, B, C, D])
+        def k(a: int32[N], b: int32[N], c: int32[N], d: int32[N]):
+            for i in range(N):
+                x: int32 = a[i]
+                y: int32 = b[i]
+                c[i] = x + y
+                d[i] = x - y
+
+    return top
+
+
+@needs_csim
+def test_testbench_feeds_streams_independently():
+    """Bug 2: two input streams popped interleaved, two outputs pushed interleaved.
+
+    The testbench pushed all of input 0 before any of input 1 (and drained all of
+    output 0 before output 1) from one thread, over channels that hold no data:
+    the csim hung after one element. One thread per stream now.
+    """
+    N = 64
+    a = np.arange(N, dtype=np.int32) * 3
+    b = np.arange(N, dtype=np.int32) - 7
+    c = np.zeros(N, dtype=np.int32)
+    d = np.zeros(N, dtype=np.int32)
+    _csim(_two_in_two_out(N), a, b, c, d)
+    np.testing.assert_array_equal(c, a + b)
+    np.testing.assert_array_equal(d, a - b)
