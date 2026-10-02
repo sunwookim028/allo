@@ -328,3 +328,11 @@ one design per bug (it skips without ``MGC_HOME`` and ``SYSTEMC_HOME``).
   were ambiguous with the library's. Checked by hand: the ``bf16_add`` native unit
   passes ``go analyze`` and ``go compile`` unpatched (Catapult 2024.2,
   2026-10-02).
+- **A kernel whose links are all ``Wire``\ s failed synthesis** (C2, same
+  record): ``CIN-123 Loop 'while' in thread 'run' must have a wait``. A
+  steady-state kernel's synthesized ``while (1)`` relied on its Connections
+  handshake for the cycle boundary and emitted its ``wait()`` for csim only; a
+  ``Wire`` is a plain ``sc_signal`` and has no handshake. A loop body with no
+  stream or channel op now gets its ``wait()`` under synthesis too (valid_only
+  channel helpers already wait). Checked by hand: the ``bf16_add`` Wire variant
+  passes ``go analyze`` and ``go compile`` unpatched.
