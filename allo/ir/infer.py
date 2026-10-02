@@ -4,6 +4,7 @@
 
 import ast
 import copy
+import inspect
 import os
 import warnings
 import sympy
@@ -42,7 +43,12 @@ from ..utils import (
     construct_kernel_name,
 )
 from ..memory import DTensor, Layout
-from .utils import parse_ast, get_func_id_from_param_types, resolve_generic_types
+from .utils import (
+    parse_ast,
+    get_func_id_from_param_types,
+    resolve_generic_types,
+    callee_global_vars,
+)
 from .units import bind_ports, expand_region_units, is_region, is_unit_instance
 
 
@@ -661,6 +667,7 @@ class TypeInferer(ASTVisitor):
             value.dtype = target_dtype
         elif (
             isinstance(value, ast.Name)
+            and not ctx.is_local(value.id)  # a parameter or local shadows it (C4)
             and value.id in ctx.global_vars
             and isinstance(ctx.global_vars[value.id], np.ndarray)
         ):
@@ -675,8 +682,13 @@ class TypeInferer(ASTVisitor):
         elif isinstance(value, ast.Subscript) and isinstance(value.value, ast.Name):
             # Handle slicing of a constant numpy array, e.g., np_array[pid]
             array_name = value.value.id
-            if array_name in ctx.global_vars and isinstance(
-                ctx.global_vars[array_name], np.ndarray
+            # A parameter or local of the same name shadows the global array,
+            # and a slice that reads a local is not a constant (C4).
+            if (
+                not ctx.is_local(array_name)
+                and not ctx.names_local(value.slice)
+                and array_name in ctx.global_vars
+                and isinstance(ctx.global_vars[array_name], np.ndarray)
             ):
                 assert target_shape is not None and target_dtype is not None
                 np_array = ctx.global_vars[array_name]
@@ -984,8 +996,12 @@ class TypeInferer(ASTVisitor):
         assert len(node.comparators) == 1, "Only support one comparator for now"
         rhs = visit_stmt(ctx, node.comparators[0])
         typing_rule = get_typing_rule(type(node.ops[0]), ctx.typing_rule_set)
-        operand_type = typing_rule(lhs.dtype, rhs.dtype)
-        node.dtype = operand_type
+        # Both operands are cast to this common type before comparing; the
+        # builder picks the predicate's signedness from it.
+        node.operand_dtype = typing_rule(lhs.dtype, rhs.dtype)
+        # A comparison yields an i1, so its own type is uint1, not the
+        # operand type (else `r: uint1 = a == b` emits trunci i1 -> i1).
+        node.dtype = uint1
         node.shape = tuple()
         return node
 
@@ -1382,8 +1398,9 @@ class TypeInferer(ASTVisitor):
                 ctx, node=node, op_name=fn_name, new_args=new_args
             )
 
-        # User-defined subfunction
-        func = ctx.global_vars[obj_name]
+        # User-defined subfunction. A Python function is the object the call
+        # names (``lib.f`` is ``lib.f``, not whatever ``f`` is in scope).
+        func = obj if inspect.isfunction(obj) else ctx.global_vars[obj_name]
         if isinstance(func, ast.FunctionDef):
             # Has already been defined in the top-level scope
             stmts = [func]
@@ -1393,6 +1410,11 @@ class TypeInferer(ASTVisitor):
             tree = parse_ast(func, verbose=ctx.verbose)
             # Create a new context to avoid name collision
             func_ctx = ctx.copy()
+            if inspect.isfunction(func):
+                # Its free names resolve in its own module and closure (C3).
+                func_ctx.global_vars = callee_global_vars(
+                    ctx.global_vars, func, ctx.top_py_globals
+                )
             stmts = visit_stmts(func_ctx, tree.body)
             # Attach type-inferenced tree to the top-level AST
             node.tree = tree

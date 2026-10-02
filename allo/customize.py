@@ -1584,6 +1584,10 @@ def customize(
         typing_rule_set=typing_rule_set,
         verbose=verbose,
     )
+    top_py_globals = (
+        inspect.unwrap(fn).__globals__ if isinstance(fn, Callable) else None
+    )
+    ctx_type_inf.top_py_globals = top_py_globals
     try:
         tree = TypeInferer()(ctx_type_inf, tree)
     except NetlistError:
@@ -1614,6 +1618,7 @@ def customize(
         enable_tensor=enable_tensor,
         verbose=verbose,
     )
+    ctx.top_py_globals = top_py_globals
     try:
         module = ASTTransformer()(ctx, tree, file_name)
     # pylint: disable=broad-exception-caught
