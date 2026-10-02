@@ -1,0 +1,508 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+#####################################################################
+U2 Phase 0: the trace harness, the storage units' RTL, port conflicts
+#####################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-02.** zhang-21, branch ``u2-phase0``
+   (from ``u1-pilot`` at ``1b79b2b8``). MiniTPU at
+   ``b3ba0a4d4fb69d39091c55f5f00d1f237082a4f1``, read only. Verilator 5.052
+   (conda-forge), g++ 13.3.1 (gcc-toolset-13), numpy 2.4.0. This is the RTL
+   side only. No Allo expression of a U2 unit exists yet: that waits for the
+   owner's choice at checkpoint 1 of ``u2_plan_2026-10-02.rst``. Nothing under
+   ``allo/`` or ``mlir/`` changed.
+
+This is Phase 0 of the U2 plan: the work that can start before the owner's
+review. It covers the ``trace`` shape, the RTL characterization of the four
+U2 units against reference models, the tb seeding, and the port-conflict
+oracle table of plan section 2c(i).
+
+Reproduce (run ``source examples/minitpu/harness/env-zhang21.sh`` first)::
+
+   $ALLO_PYTHON -m examples.minitpu.harness.tests.test_trace         # the shape itself, ~10 s
+   $ALLO_PYTHON -m examples.minitpu.harness.characterize \
+       vpu_regfile vpu_word_array vpu_fifo                           # ~15 s warm, ~3 min cold
+
+The output of the second command is in ``u2_phase0_2026-10-02/characterize.log``.
+
+Files:
+
+* ``harness/rtl.py``: the ``trace`` shape, with ``run_trace``,
+  ``probe_trace``, ``pack`` and ``unpack``.
+* ``harness/ref.py``: the trace references ``vpu_regfile_trace``,
+  ``vpu_word_array_trace`` and ``vpu_fifo_trace``.
+* ``harness/traces.py``: the trace builder and the random helpers.
+* ``harness/vcd_seed.py``: tb to VCD to trace.
+* ``harness/characterize.py``: the trace branch.
+* ``harness/tests/``: a hand-written ``trace_tiny.sv`` and its test.
+* ``units/vpu_regfile.py``, ``units/vpu_word_array.py`` and ``units/vpu_fifo.py``,
+  each with ``VARIANTS = {}``.
+
+U1 regression after the ``rtl.py`` change: ``characterize`` gives REF-MATCH
+and LATENCY-OK for all six U1 units (bf16_add_pipe, bf16_mul, bf16_mul_pipe,
+mul_acc24, acc24_add_pipe, alu), with the same counts as
+``u1_rtl_characterization``. ``check.py bf16_add --backend simulator`` gives
+the same lines as ``u1_integration/summary.txt``: ``bits`` UNIT-MATCH, and
+``native`` UNIT-DIFF 250955/251936 with the known NaN-sign and ``(+0)+(-0)``
+causes.
+
+The ``trace`` shape
+===================
+
+A stateful unit is a function from a *command trace* (every input port, reset
+included, once per cycle) to a *response trace* (every output once per cycle).
+``run_trace(unit, cmd, seed)`` takes ``{port: values}`` and returns
+``{port: uint64[n, nwords]}``.
+
+* **Sampling.** Cycle ``t`` runs in this order:
+
+  1. drive row ``t`` with the clock low and ``eval()``;
+  2. sample the ``"pre"`` outputs;
+  3. take rising edge ``t + 1``;
+  4. sample the ``"post"`` outputs.
+
+  An output spec is ``(port, width, "pre" | "post")``. Asynchronous reads and
+  flags are ``"pre"``, so a same-cycle read and write shows the old value.
+  Registered reads are ``"post"``. A port of latency ``L`` edges shows a
+  cycle-``t`` command in row ``t + L`` (pre) or ``t + L - 1`` (post), which
+  matches U1's edge count.
+* **Wide ports.** A port is ``ceil(w/64)`` little-endian ``uint64`` words in
+  the raw files. The C++ driver copies them into and out of Verilator's
+  ``VlWide`` (32-bit ``EData`` words) through overloaded ``setp``/``getp``.
+  A port of 64 bits or fewer stays a scalar. Tested at 33, 64, 100, 256,
+  257 and 1024 b.
+* **Undefined state.** A trace build adds ``--x-initial unique``, and every run
+  sets ``randReset(2)`` and ``randSeed(seed)``. ``characterize`` runs every
+  trace with two seeds and requires every slot the reference calls defined to
+  be **seed-invariant**. This catches a reference that calls something defined
+  when the RTL leaves it open. The plan's [I] "confirm the flag's effect on
+  unpacked memories" is **confirmed**: every ``uninit`` read moved with the
+  seed, including the 4096 x 1024 b VMEM and the FIFO ``mem``.
+* **Masks.** A reference returns ``(resp, reason, events)``. ``reason[port][t]``
+  is ``""`` on a defined slot. Otherwise it names the cause, and the slot still
+  holds the reference's guess of what the simulation model does. The census
+  reports, per reason, the slot count, how many slots the guess matched, and
+  how many moved with the seed. The census is evidence for the quirks (H12)
+  without making them part of the contract.
+* **Assertions.** With ``assertions=True`` the model is built with
+  ``--assert`` and ``errorLimit(2^30)``, and the context time is the cycle.
+  ``last_asserts`` lists every firing as ``(cycle, message)``. A trace tagged
+  legal must fire none.
+* **Probes.** ``probe_trace(unit, cmd, port, event)`` counts the edges from
+  the command issued in cycle ``event`` to the first row where ``port`` moves.
+  It uses no reference.
+* **Reset.** Reset is an ordinary command port, so a trace resets mid-stream.
+  ``reset=True`` keeps U1's 4-cycle prologue.
+* **Mutation check.** A write-first mutant of the regfile reference gave
+  REF-DIFF on the first directed trace, so the comparison can fail.
+
+Results
+=======
+
+Every instance gives **REF-MATCH** on every defined slot, **seed-stable**,
+**LATENCY-OK** on every probe, and **TB-REPLAY** equal on every seeded trace.
+Every trace tagged legal fires no assertion.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 8 12 14 12 32
+
+   * - unit:instance
+     - traces
+     - cycles
+     - defined slots (all match)
+     - masked
+     - assertions fired (illegal traces only)
+   * - ``vpu_regfile:w16``
+     - 9
+     - 60,261
+     - 180,299
+     - 484
+     - 0 (the module has none)
+   * - ``vpu_regfile:w256``
+     - 8
+     - 15,249
+     - 45,195
+     - 552
+     - 0
+   * - ``vpu_word_array:narrow`` (64 b x 8, 3/2)
+     - 14
+     - 80,609
+     - 67,670
+     - 93,548
+     - 0 (none in the module; see conflict row 9)
+   * - ``vpu_word_array:narrow_rl2``
+     - 14
+     - 80,510
+     - 68,262
+     - 92,758
+     - 0
+   * - ``vpu_word_array:full`` (1024 b x 4096, 3/2)
+     - 15
+     - 12,690
+     - 7,881
+     - 17,499
+     - 0
+   * - ``vpu_word_array:full_rl2``
+     - 15
+     - 12,591
+     - 7,810
+     - 17,372
+     - 0
+   * - ``vpu_fifo:w32d4``
+     - 10
+     - 80,092
+     - 213,138
+     - 27,138
+     - 16,331 = overflows + underflows, exactly
+   * - ``vpu_fifo:input`` (257 b x 4)
+     - 10
+     - 20,092
+     - 53,834
+     - 6,442
+     - 4,041, the same identity
+   * - ``vpu_fifo:output`` (64 b x 16)
+     - 12
+     - 80,240
+     - 219,722
+     - 20,998
+     - 13,429, the same identity
+   * - ``vpu_fifo:input_dim2`` (33 b x 4, seed only)
+     - 11
+     - 80,121
+     - 213,585
+     - 26,778
+     - 16,688, the same identity
+
+The VMEM mask share is high because ``rdata`` is masked on every cycle that
+holds no read, and on every write cycle (see below).
+
+Latency, declared vs measured (step probes)
+-------------------------------------------
+
+.. list-table::
+   :header-rows: 1
+
+   * - unit
+     - port
+     - declared (source)
+     - measured
+   * - ``vpu_regfile`` (w16, w256)
+     - read A, B, C
+     - 0 (``vpu_regfile.sv:29``, "Three async reads")
+     - 0, 0, 0
+   * -
+     - write to read A, B, C
+     - 1 ("one sync write")
+     - 1, 1, 1
+   * - ``vpu_word_array`` (all 4)
+     - compute read
+     - 3 (``vpu_pkg.sv:58``); 2 in the ``_rl2`` instances
+     - 3; 2
+   * -
+     - DMA read
+     - 2 (``vpu_pkg.sv:59``)
+     - 2
+   * -
+     - write to read, all 4 port pairs
+     - 1
+     - 1
+   * - ``vpu_fifo`` (all 4)
+     - push to ``empty_o``; push to ``pop_data_o`` (fall-through); last push to
+       ``full_o``; pop to next ``pop_data_o``
+     - 1 each (registered state, combinational outputs)
+     - 1, 1, 1, 1
+
+The reference models (``harness/ref.py``)
+-----------------------------------------
+
+**``vpu_regfile``.** A read returns the entry as it was before the cycle's
+write (old value on a same-cycle read and write), and a write is visible one
+cycle later. ``rst_ni`` does nothing: the directed ``reset-keeps`` trace
+writes, holds reset 4 cycles, and reads the data back; a write under reset
+lands. The only undefined slot is ``uninit``. Port C behaves like A and B.
+
+**``vpu_word_array``** (the simulation model). An enabled port reads the word
+as it was before the cycle, and the read leaves the pipe ``L`` edges later.
+Writes are visible one cycle later from either port. The undefined slots, and
+what the census measured for each:
+
+* ``no read`` (``en`` low ``L`` cycles earlier). The pipe holds its last read:
+  where the held word was defined, the guess matched every slot.
+* ``write cycle`` (a same-port read-during-write). The guess is the old word,
+  and it matched every slot whose old word was defined. **H12, simulation
+  half: confirmed.** The XPM ``no_change`` half, where the output holds, needs
+  an XPM simulation and is **not run** here.
+* ``collision`` (a read of a word the other port writes in the same cycle).
+  It returned the old word on every slot.
+* ``ww collision`` (both ports write one word). It is masked until the word
+  is rewritten. Measured: the **DMA write wins** in every case: 699 + 653
+  slots (narrow), 75 + 75 slots (full). This is because the DMA
+  ``always_ff`` comes after the compute one, so it is an artefact of the
+  model's block order.
+* ``uninit``.
+
+**``vpu_fifo``.** Update rules:
+
+* A push is taken if the FIFO is not full, or if it is full and a pop comes
+  in the same cycle (pass-through).
+* A pop is taken if the FIFO is not empty, or if it is empty and a push comes
+  in the same cycle.
+* A push on full with no pop is dropped, and the overflow assertion fires.
+* A pop on empty with no push is ignored, and the underflow assertion fires.
+
+Reset clears the pointers and the count, not ``mem``. The flags are defined
+after the first reset, illegal traces included, so the reference is
+bit-exact there too: this is F2's "bit-exact on illegal traces". The
+``pop_data_o`` slots while empty matched the stale-entry guess in all
+80,889 slots.
+
+**H12 (FIFO half): confirmed.** A push and a pop on an empty FIFO move both
+pointers, the count stays 0, ``pop_data`` that cycle is the stale
+``mem[rd_ptr]``, and the pushed word is lost. **No assertion fires**: the
+underflow assertion ``vpu_fifo.sv:40`` excludes ``push_i``. Counted: 2,785,
+672, 2,195 and 2,645 events across the four instances, with 0 firings.
+
+Seeds from MiniTPU's tbs
+------------------------
+
+``vcd_seed.extract`` builds the tb **unchanged** under ``verilator --binary
+--timing --trace``. The only addition is a wrapper module holding
+``$dumpfile``/``$dumpvars``. The tb must print ``PASS``. Its DUT ports are
+sampled just before each rising edge, and one final row holds the values at
+the end of the run.
+
+.. list-table::
+   :header-rows: 1
+
+   * - tb
+     - instance
+     - cycles
+     - REF-MATCH
+     - TB-REPLAY
+   * - ``tb_vpu_alu_regfile``
+     - ``vpu_regfile:w16``
+     - 12
+     - 27/27
+     - 27/27
+   * - ``tb_vpu_word_array`` (``READ_LATENCY = 2``)
+     - ``vpu_word_array:full_rl2``
+     - 81
+     - 5/5
+     - 5/5
+   * - the same trace at the production 3
+     - ``vpu_word_array:full``
+     - 81
+     - 5/5
+     - n/a
+   * - ``tb_mxu_single_port`` lane 0 / lane 1 output FIFO
+     - ``vpu_fifo:output``
+     - 29
+     - 58/58, 57/57
+     - 58/58, 57/57
+   * - ``tb_mxu_single_port`` input FIFO (DIM = 2, so 33 b)
+     - ``vpu_fifo:input_dim2``
+     - 29
+     - 62/62
+     - 62/62
+
+Port-conflict table (plan 2c, tier i)
+=====================================
+
+Sources: ``board_package/asm.py``; ``src/core/vpu/vpu.sv``;
+``src/core/sequencer/sequencer.sv``; ``vpu_vmem_simd.sv``; ``vpu_fifo.sv``;
+``mxu.sv``. Every RTL assertion cited sits inside `` `ifndef SYNTHESIS``.
+
+``schedule()`` works in three steps:
+
+1. It runs the refusals first (``asm.py:1482-1487``).
+2. It raises delays through ``_Timeline`` (``asm.py:1334-1394``).
+3. It checks ``_check_writeback_port`` last (``asm.py:1506``).
+
+In the table, "asm" means a refusal, not a delay. "demo" names a trace in this
+record that shows the RTL outcome.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 4 22 18 14 20 22
+
+   * - #
+     - conflict
+     - asm
+     - schedule()
+     - RTL assertion (simulation only)
+     - silent hardware outcome
+   * - 1
+     - port C: ``vst`` and ``vmatload``/``vmatpush`` in one bundle
+     - **refuses**, ``_check_port_c_exclusive`` ``asm.py:1053-1062``
+     - --
+     - ``sequencer.sv:427-430`` (``vpu.sv:375`` misses a same-bundle pair)
+     - the matrix wins the mux (``vpu.sv:430-431``) and the ``vst`` stores
+       the matrix's VREG
+   * - 2
+     - port C: ``vst`` while a stream still reads
+     - no
+     - **delays** (``port_c_free``, ``asm.py:1361-1365``)
+     - ``vpu.sv:375-376``
+     - as row 1
+   * - 3
+     - two writes to one VREG in one bundle
+     - **refuses**, ``_check_bundle_writes`` ``asm.py:1403-1408``
+     - --
+     - ``sequencer.sv:569``
+     - the write that lands later wins
+   * - 4
+     - two write-back sources in one cycle, same bundle
+     - **refuses**, ``asm.py:1409-1418``
+     - --
+     - ``sequencer.sv:567``; ``vpu.sv:370`` ``$onehot0``
+     - address, mask and data are **OR-ed** (``vpu.sv:290-304``, ``354-362``)
+   * - 5
+     - the same, across bundles
+     - only the post-schedule ``_check_writeback_port`` (``asm.py:959-978``);
+       no test reaches it
+     - **delays** (``first_free_write``, ``asm.py:1371-1376``)
+     - ``sequencer.sv:415``; ``vpu.sv:370``
+     - as row 4
+   * - 6-8
+     - RAW; WAW; a write to a VREG a matrix stream still reads
+     - no
+     - **delays** (``asm.py:1351``, ``1353``, ``1355``)
+     - ``sequencer.sv:411``, ``571``; ``vpu.sv:394``
+     - RAW reads the old value (demo: ``vpu_regfile`` ``wr-offsets-*``,
+       offset 0)
+   * - 9
+     - VMEM compute vs DMA, one word, one cycle, either writing
+     - **no rule**. asm cannot see DMA beat timing.
+       ``tools/check_vmem_ownership.py`` checks only in-flight descriptors.
+     - no
+     - ``vpu_vmem_simd.sv:121-131``, and only there
+     - undefined on URAM. Sim model (demo: ``vpu_word_array`` ``ww-collision``,
+       ``wr-same-cycle-*``, ``random-any-*``): the reader gets the old word,
+       and on a write-write the DMA write lands
+   * - 10
+     - VMEM, both ports read one word
+     - no (legal)
+     - no
+     - none (legal)
+     - defined (demo: ``both-read-one-word``)
+   * - 11
+     - VMEM same-port read-during-write
+     - cannot arise from asm (one MEM op per bundle)
+     - --
+     - none
+     - sim: old word (demo: ``rdw-same-port``); XPM ``no_change``: holds
+   * - 12
+     - MXU output FIFO overflow (more than 64 rows per lane outstanding)
+     - **refuses**, ``_check_matrix_fifo`` ``asm.py:934-956``, **in program
+       order** (finding 1)
+     - --
+     - ``vpu_fifo.sv:38-39``; ``full`` is never read (``mxu.sv:44-47``)
+     - the push is **dropped** (demo: ``vpu_fifo:output`` ``overflow``: 3 of
+       19 pushes dropped, 3 overflow assertions)
+   * - 13
+     - ``vmatpop`` with nothing pushed
+     - **no**: the count clamps at 0 (``asm.py:945``); measured, accepted
+     - waits only for a pending push
+     - the FIFO underflow assertion cannot fire, because the pop is gated by
+       ``output_valid`` (``mxu.sv:109-110``)
+     - the pop engine stays armed and writes later, on some later push's
+       result
+   * - 14
+     - MXU input FIFO overflow/underflow
+     - no (structurally avoided)
+     - engine spacing (``asm.py:1358``)
+     - ``mxu_matrix_ctrl.sv:93``; ``mxu_stream_engine.sv:99``
+     - depth 4, drained every cycle (``mxu.sv:111``)
+   * - 15
+     - ``vpu_fifo`` push and pop together on empty
+     - n/a
+     - n/a
+     - **none** (``vpu_fifo.sv:40`` excludes ``push_i``)
+     - the word is lost and ``pop_data`` is stale (demo:
+       ``push+pop-on-empty``; 0 firings in 8,297 events)
+
+Refusal tests: ``board_package/tests/test_asm.py`` is ``unittest`` with **39**
+``assertRaises``/``assertRaisesRegex`` and no ``pytest.raises``, as the plan
+says. Of these:
+
+* 3 cover port C (``:161``, ``:168``, and a subtest at ``:471``);
+* 3 cover bundle writes (``:124``, ``:136``, a subtest);
+* 3 cover the output FIFO (``:211``, ``:383``, a subtest);
+* the rest are SREG gap, loop and encoding refusals.
+
+None reaches ``_check_writeback_port``'s cross-bundle message, or rows 9, 13
+or 15.
+
+``tb_port_exclusivity``: 29 cases from ``docs/isa_slots.json``. 26 are legal
+co-issue, which must co-issue and halt clean. 2 are illegal port-C pairs (#22
+and #23), which must abort with ``sequencer.sv:427``'s message. 1 is the
+descriptor plus C-op issue case. It tests no write-port, VMEM or FIFO
+conflict.
+
+Findings
+========
+
+1. **asm's output-FIFO rule ignores loop trip counts** (MiniTPU, tier i).
+   ``_check_matrix_fifo`` counts ``vmatpush``/``vmatpop`` in static program
+   order. Measured: ``schedule()`` refuses 17 straight-line ``vmatpush``, but
+   **accepts** ``loop.begin 17 { vmatpush }`` followed by 17 ``vmatpop`` (21
+   bundles). 17 groups against a 16-entry FIFO drop one at the RTL; see the
+   ``vpu_fifo:output`` ``overflow`` trace. The plan lists the rule
+   as a refusal without this limit.
+2. **``vmatpop`` with nothing pushed is neither refused nor asserted.**
+   Measured as accepted (2 bundles). The plan's conflict list does not
+   mention it.
+3. **H12 FIFO half confirmed, and stronger than the plan says**: a push and a
+   pop on empty loses the word with **no** assertion, which contradicts
+   ``vpu_fifo.sv:5`` ("simulation asserts"). Neither MXU instance can reach
+   it (rows 13 and 14), so it is latent.
+4. **H12 VMEM half: the simulation side is confirmed** (old word on a
+   same-port read-during-write). The XPM ``no_change`` side is unmeasured. On
+   a write-write collision the sim model's DMA write wins, which is a
+   block-order artefact.
+5. **``tb_vpu_word_array`` does not pin the read latency.** It samples
+   ``compute_rdata`` ``READ_LATENCY + 1`` edges after issue, and the pipe
+   holds while ``en`` is low. Replaying its trace with ``READ_LATENCY`` set to
+   1, 2 or 3 gives the word the tb checks; 4 does not. So the plan's "run at
+   both values" passes trivially at 3. This trace harness's step probe is what
+   pins 3 and 2. The tb also shows the DMA side reading word 512 **once** for
+   its four beat reads (``vpu_dma_group`` keeps it), so it has 5 defined read
+   slots in 81 cycles.
+6. **``vpu.sv:291`` folds ``reduce_fire | lane_reduce_fire`` into one bit** of
+   the 6-bit ``wb_source_valid``. ``vpu.sv:370``'s ``$onehot0`` cannot see a
+   ``vreduce`` (13) and a ``vlanered`` (9) issued 4 cycles apart landing
+   together. ``sequencer.sv:415``'s reservation check and asm's calendar still
+   cover it. ``asm.py:977``'s message says "six writeback sources", but
+   ``wb_addr`` ORs seven.
+7. **Doc and code drift in MiniTPU** (cited lines are off by 1 to 4):
+   ``UNITS.md:132-134``, ``:435``, ``:439`` and ``:154-158`` against
+   ``vpu.sv``/``vpu_regfile.sv``. ``UNITS.md:770`` names
+   ``mxu_input_ctrl.sv``, which does not exist. ``asm.py:978``,
+   ``ISA_AND_INTERFACES.md:33`` and ``test_asm.py:180`` still describe
+   multi-beat pops, but a pop is one beat at +3 (``asm.py:713``).
+8. **Plan corrections.**
+
+   * ``test_asm.py``'s refusals are ``assertRaises``, not ``pytest.raises``
+     (the count of 39 is right).
+   * Every refused conflict lives in ``vpu.sv``/``sequencer.sv``, as the plan
+     says. At unit level only the FIFO's own assertions fire, so the tier-ii
+     Allo parity check stays a composition question.
+   * The plan's [I] on ``--x-initial unique`` and unpacked memories is
+     confirmed.
+   * The plan's "push 4 rows" in ``tb_mxu_single_port`` is **one** FIFO push
+     per lane: the gather packs the 4 rows into one 64-bit entry.
+
+Not done in Phase 0
+===================
+
+* No Allo expression (checkpoint 1).
+* XPM ``no_change`` behaviour (Vivado xsim with the XPM library).
+* A trace through ``vpu_vmem_simd`` that fires its collision assertion.
+* The ``vpu.sv`` port-C and write-back muxes as a composite unit (plan Q4).
+* MiniTPU's ``run_verilator_unit_suite.sh`` itself was not run. Its build
+  directory lives inside the read-only clone. The three tbs were each built
+  unchanged, with a dump-only wrapper, and passed.
