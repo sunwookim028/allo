@@ -352,3 +352,12 @@ one design per bug (it skips without ``MGC_HOME`` and ``SYSTEMC_HOME``).
   'ui24'``. The data-file reader knew only 8-, 16-, 32- and 64-bit integers. An
   ``i<N>``/``ui<N>`` of any width up to 64 now reads into the smallest numpy
   container (``ui24`` -> ``uint32``), as the simulator's argument path accepts it.
+- **An array written and read back did not compile** (S6, the MiniTPU
+  multiplier units): ``c[i] = a[i] + 1; c[i] = c[i] * 256`` failed g++ with
+  ``'v1' was not declared``. ``c`` was classified read+write *and* sequentially
+  streamable, so it got neither a stream port (pure in/out only) nor a memory
+  port (non-streamable only). A stream moves each element once, one way, so an
+  array with both a load and a store site, or with two of either, is no longer
+  streamable and takes the memory-port path (an in-place ``c[i] = c[i] + a[i]``
+  too). A read+write array that still has no port form is refused with an
+  error instead of emitted.
