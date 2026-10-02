@@ -508,7 +508,15 @@ solution file add "$sfd/kernel.cpp" -type C++
     out_str += f"""
 # Set top-level design function
 directive set -DESIGN_HIERARCHY {design_top}
-
+"""
+    # README D-14: the design holds unreset storage (`@ Stateful(reset=False)`),
+    # written by a clock-edge SC_METHOD with no reset action. Without this
+    # Catapult resets every register it builds -- including that storage
+    # (u2_comb_wire_impl_2026-10-02.rst F3 form c: `if ( rst ) mem_k <= 0`).
+    # With it, a register is reset only when the reset action sets it.
+    if configs.get("unreset_storage"):
+        out_str += "directive set -RESET_CLEARS_ALL_REGS no\n"
+    out_str += f"""
 # Set clock constraints
 directive set -CLOCKS {{clk {{-CLOCK_PERIOD {clock_period_str}}}}}
 
@@ -1121,13 +1129,29 @@ def comb_ports_of(kernel_cpp):
     return out
 
 
+def unreset_storage_in(kernel_cpp):
+    """``{kernel module: [storage, ...]}`` of the unreset storage (README D-14,
+    ``@ Stateful(reset=False)``) in an emitted ``kernel.cpp``: the SystemC
+    emitter writes ``// allo unreset storage: <global> ...`` inside every
+    SC_MODULE that holds some."""
+    out = {}
+    for m in re.finditer(r"SC_MODULE\((\w+)\) \{(.*?)\n\};", kernel_cpp, flags=re.S):
+        names = re.search(r"// allo unreset storage:((?: \w+)+)", m.group(2))
+        if names:
+            out[m.group(1)] = names.group(1).split()
+    return out
+
+
 def write_latency_manifest(project_path, top, declared=None):
     """Write ``<project>/latency.json`` for a finished Catapult run; return it.
 
     A port the emitter drives from an ``SC_METHOD`` (``Wire[T, comb]``, D-13)
     is reported under ``ports`` as ``"comb"``: it has no latency number, and
     ``0`` would be a number the harness could consume. The unit's ``latency``
-    stays the clocked thread's (the write path).
+    stays the clocked thread's (the write path). Storage declared
+    ``@ Stateful(reset=False)`` (D-14) is reported under ``storage`` as
+    ``"unreset"``: its contents survive reset, so a consumer must treat them as
+    undefined until written.
     """
     import json
 
@@ -1141,12 +1165,18 @@ def write_latency_manifest(project_path, top, declared=None):
     kernel_cpp = os.path.join(project_path, "kernel.cpp")
     if os.path.exists(kernel_cpp):
         with open(kernel_cpp, "r", encoding="utf-8", errors="replace") as f:
-            comb = comb_ports_of(f.read())
+            text = f.read()
+        comb = comb_ports_of(text)
         for kern, ports in comb.items():
             u = man["units"].setdefault(
                 kern, {"process": f"/{kern}/run", "latency": None, "ii": None, "status": "unknown"}
             )
             u["ports"] = {p: "comb" for p in ports}
+        for kern, names in unreset_storage_in(text).items():
+            u = man["units"].setdefault(
+                kern, {"process": f"/{kern}/run", "latency": None, "ii": None, "status": "unknown"}
+            )
+            u["storage"] = {g: "unreset" for g in names}
     with open(os.path.join(project_path, LATENCY_MANIFEST), "w", encoding="utf-8") as f:
         json.dump(man, f, indent=1, sort_keys=True)
     return man

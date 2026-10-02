@@ -376,10 +376,25 @@ private:
     Block *body = nullptr;                  // the iteration block the cones live in
   };
   CombPlan comb;
-  enum class CombMode { Normal, Thread, Method } combMode = CombMode::Normal;
+  // README D-14: storage declared `@ Stateful(reset=False)` (`allo.unreset` on the
+  // global). It is signal storage like comb storage, but its stores leave the
+  // thread for a clock-edge SC_METHOD (`wr`) with no reset action -- the only
+  // writer Catapult leaves unreset (u2_comb_wire_impl_2026-10-02.rst, F3 form f).
+  struct UnresetPlan {
+    llvm::SmallVector<std::string, 2> globals; // unreset globals this kernel touches
+    llvm::DenseSet<Operation *> wrSet;         // ops the `wr` method emits
+    Block *body = nullptr;                     // the iteration block holding the stores
+  };
+  UnresetPlan unrst;
+  enum class CombMode { Normal, Thread, Method, WriteMethod } combMode = CombMode::Normal;
   bool planComb(func::FuncOp func);
+  bool planUnreset(func::FuncOp func);
+  void unresetThreadDead();
   bool isCombStorage(Value memref);
   bool isCombStorageGlobal(memref::GlobalOp g);
+  bool isUnresetGlobal(memref::GlobalOp g) {
+    return llvm::is_contained(unrst.globals, g.getSymName().str());
+  }
   bool skipOp(Operation *op) override;
   void emitCombStorageLoad(Value result, bool isUnsigned, Value memref,
                            llvm::function_ref<void()> emitIdx);
@@ -1633,6 +1648,10 @@ bool SystemCModuleEmitter::isCombStorageGlobal(memref::GlobalOp g) {  // new (Sy
 }
 
 bool SystemCModuleEmitter::isCombStorage(Value memref) {  // new (SystemC-only)
+  // Unreset storage (D-14) is signal storage too, comb ports or not.
+  if (auto gg = memref.getDefiningOp<memref::GetGlobalOp>())
+    if (llvm::is_contained(unrst.globals, gg.getName().str()))
+      return true;
   if (comb.outPorts.empty())
     return false;
   if (llvm::is_contained(comb.storageAllocs, memref))
@@ -1650,6 +1669,8 @@ bool SystemCModuleEmitter::skipOp(Operation *op) {  // override (base emitter)
     return comb.threadDead.count(op) > 0;
   case CombMode::Method:
     return comb.coneSet.count(op) == 0;
+  case CombMode::WriteMethod:
+    return unrst.wrSet.count(op) == 0;
   }
   return false;
 }
@@ -1973,14 +1994,292 @@ bool SystemCModuleEmitter::planComb(func::FuncOp func) {  // new (SystemC-only)
   return true;
 }
 
+//===----------------------------------------------------------------------===//
+// Unreset storage (README D-14, `@ Stateful(reset=False)`)
+//
+// Measured by hand first (u2_comb_wire_impl_2026-10-02.rst, F3): Catapult
+// refuses a signal an SC_THREAD writes unless its reset action sets it (CIN-233;
+// no directive exempts it, forms b/e), and a thread cannot be reset-less
+// (CIN-194). A signal written by a clock-edge SC_METHOD has no reset action to
+// satisfy, and under `-RESET_CLEARS_ALL_REGS no` its flops come out plain (form
+// f: MiniTPU's area to the um^2). So, for a kernel that stores to unreset
+// storage:
+//
+//  1. The storage is `sc_signal<T> name[N]` (as comb storage), never written in
+//     the reset action.
+//  2. Every store to it, with its cone (address, data, and the conditions of
+//     the ifs it sits under), is re-emitted in `void wr()`, registered as
+//     `SC_METHOD(wr); sensitive << clk.pos();`. The thread drops the stores and
+//     whatever only they needed.
+//  3. THE RULE (refused at build, naming the storage). `wr` runs at EVERY clock
+//     edge -- under reset, before the kernel's first iteration and after its
+//     last -- so it may compute only what is a function of this cycle's inputs:
+//       - the kernel is Wire-only: every argument a Wire, no stream, channel or
+//         memory-port op (only then is one iteration one clock cycle);
+//       - each store sits in the iteration block (the kernel-level loop body),
+//         under nothing but ifs: no inner loop;
+//       - its address, data and conditions read only Wire inputs, constants,
+//         pure arithmetic and scalar iteration temporaries written unconditionally
+//         earlier in the iteration -- no storage load (of this or any array), no
+//         induction variable, nothing loop-carried;
+//       - the thread reads the storage only before the iteration's stores (a
+//         signal reads the old value until the next edge).
+//  The thread keeps everything else; reset storage and every other kernel are
+//  emitted as before. run.tcl gets `-RESET_CLEARS_ALL_REGS no` (hls.py, from
+//  the `// allo unreset storage:` marker this emitter writes).
+//===----------------------------------------------------------------------===//
+
+bool SystemCModuleEmitter::planUnreset(func::FuncOp func) {  // new (SystemC-only)
+  unrst = UnresetPlan();
+  auto mod = func->getParentOfType<ModuleOp>();
+  SmallVector<Operation *, 4> stores;
+  func.walk([&](memref::GetGlobalOp gg) {
+    auto g = mod.lookupSymbol<memref::GlobalOp>(gg.getName());
+    if (!g || !g->hasAttr("allo.unreset") || !isStatefulGlobal(g) || g->hasAttr("constant"))
+      return;
+    if (!llvm::is_contained(unrst.globals, gg.getName().str()))
+      unrst.globals.push_back(gg.getName().str());
+    for (auto *u : gg.getResult().getUsers())
+      if (combStoreTarget(u) == gg.getResult())
+        stores.push_back(u);
+  });
+  if (unrst.globals.empty() || stores.empty())
+    return true;
+  // The user's name for the storage: the `from`/`to` of any access to it.
+  auto varName = [&](Value m) {
+    for (auto *u : m.getUsers())
+      for (const char *k : {"to", "from"})
+        if (auto n = u->getAttrOfType<StringAttr>(k))
+          return n.getValue().str();
+    return combArrayName(m);
+  };
+  auto userName = [&](Operation *st) { return varName(combStoreTarget(st)); };
+  auto refuse = [&](Operation *at, const std::string &nm, const std::string &why) {
+    at->emitError("unreset storage `") << nm << "` (" << func.getName() << "): " << why
+        << " (README D-14: its write is a clock-edge process with no reset action)";
+    return false;
+  };
+  // Wire-only kernel.
+  for (auto arg : llvm::enumerate(func.getArguments()))
+    if (!llvm::isa<WireType>(arg.value().getType()))
+      return refuse(stores.front(), userName(stores.front()),
+                    "the kernel has a non-Wire argument (" +
+                        combPortName(func, arg.value()) +
+                        "); the write runs at every clock edge, which matches the "
+                        "kernel's iterations only when every port is a Wire");
+  {
+    Operation *bad = nullptr;
+    func.walk([&](Operation *o) {
+      if (!bad && llvm::isa<StreamGetOp, StreamTryGetOp, ChannelGetOp, ChannelTryGetOp,
+                            StreamPutOp, StreamTryPutOp, ChannelPutOp, ChannelTryPutOp>(o))
+        bad = o;
+    });
+    if (bad)
+      return refuse(bad, userName(stores.front()),
+                    "the kernel uses a stream or channel; the write runs at every clock "
+                    "edge, which matches the kernel's iterations only in a Wire-only kernel");
+  }
+  Block &entry = func.front();
+  auto isIterationBlock = [&](Block *b) {
+    if (b == &entry)
+      return true;
+    auto fo = llvm::dyn_cast_or_null<affine::AffineForOp>(b->getParentOp());
+    return fo && fo->getBlock() == &entry;
+  };
+  for (Operation *st : stores) {
+    std::string nm = userName(st);
+    // The iteration block, reached through ifs only.
+    SmallVector<Operation *, 4> ifs;
+    Operation *top = st;
+    while (top && !isIterationBlock(top->getBlock())) {
+      Operation *p = top->getParentOp();
+      if (!p || p == func.getOperation())
+        break;
+      if (!llvm::isa<scf::IfOp, affine::AffineIfOp>(p))
+        return refuse(st, nm, "a store to it is inside a loop within the iteration; "
+                      "the clock-edge write holds one iteration's stores, under ifs only");
+      ifs.push_back(p);
+      top = p;
+    }
+    if (!top || !isIterationBlock(top->getBlock()))
+      return refuse(st, nm, "a store to it is not in the kernel's iteration block");
+    Block *b = top->getBlock();
+    if (unrst.body && unrst.body != b)
+      return refuse(st, nm, "its stores are in different loops");
+    unrst.body = b;
+    unrst.wrSet.insert(st);
+    for (Operation *f : ifs) {
+      unrst.wrSet.insert(f);
+      for (Region &r : f->getRegions())
+        for (Block &blk : r)
+          if (!blk.empty())
+            unrst.wrSet.insert(blk.getTerminator());
+    }
+    // Backward cone of the address, the data and the conditions.
+    SmallVector<Value, 16> work;
+    for (Value o : st->getOperands())
+      if (o != combStoreTarget(st))
+        work.push_back(o);
+    for (Operation *f : ifs)
+      for (Value o : f->getOperands())
+        work.push_back(o);
+    while (!work.empty()) {
+      Value v = work.pop_back_val();
+      if (auto ba = llvm::dyn_cast<BlockArgument>(v)) {
+        if (ba.getOwner() != &entry)
+          return refuse(st, nm, "its write depends on the loop induction variable, "
+                        "which a clock-edge process cannot see");
+        if (streamDir(func, ba.getArgNumber()) != 'i')
+          return refuse(st, nm, "its write reads " + combPortName(func, ba) +
+                        ", which is not a Wire input");
+        continue;
+      }
+      Operation *d = v.getDefiningOp();
+      if (llvm::isa<arith::ConstantOp>(d))
+        continue;
+      if (unrst.wrSet.count(d))
+        continue;
+      Operation *dTop = b->findAncestorOpInBlock(*d);
+      if (!dTop)
+        return refuse(st, nm, "its write reads something computed outside the iteration "
+                      "(loop-carried or clocked state)");
+      if (d->getNumRegions() != 0)
+        return refuse(st, nm, "its write reads a value that comes out of control flow");
+      if (auto wg = llvm::dyn_cast<WireGetOp>(d)) {
+        unrst.wrSet.insert(d);
+        work.push_back(wg->getOperand(0));
+        continue;
+      }
+      if (Value m = combLoadTarget(d)) {
+        auto alloc = m.getDefiningOp<memref::AllocOp>();
+        if (!alloc || alloc->getBlock() != b ||
+            llvm::cast<MemRefType>(m.getType()).getRank() != 0)
+          return refuse(st, nm, "its write reads " + combArrayName(m) +
+                        "; the address, data and enable of a clock-edge write may read "
+                        "only Wire inputs, constants and scalar iteration temporaries, "
+                        "not storage");
+        Operation *reaching = nullptr;
+        bool conditional = false;
+        for (auto &o : *b) {
+          if (&o == dTop)
+            break;
+          if (combStoreTarget(&o) == m)
+            reaching = &o;
+          else if (o.getNumRegions())
+            o.walk([&](Operation *w) {
+              if (combStoreTarget(w) == m)
+                conditional = true;
+            });
+        }
+        if (conditional)
+          return refuse(st, nm, "its write reads temporary " + combArrayName(m) +
+                        ", which is written under a condition in the iteration");
+        if (!reaching)
+          return refuse(st, nm, "its write reads temporary " + combArrayName(m) +
+                        " before it is written in the iteration");
+        unrst.wrSet.insert(d);
+        unrst.wrSet.insert(reaching);
+        unrst.wrSet.insert(alloc);
+        work.push_back(reaching->getOperand(0)); // the value stored
+        continue;
+      }
+      if (combStoreTarget(d) || llvm::isa<memref::AllocOp, memref::GetGlobalOp>(d))
+        return refuse(st, nm, "its write depends on a memory operation the clock-edge "
+                      "process cannot follow");
+      unrst.wrSet.insert(d);
+      for (auto o : d->getOperands())
+        work.push_back(o);
+    }
+  }
+  // The thread's (and the cones') reads of the storage come before its stores.
+  {
+    llvm::SmallPtrSet<Value, 4> written;
+    Operation *badAt = nullptr;
+    Value badMem;
+    unrst.body->walk<WalkOrder::PreOrder>([&](Operation *w) {
+      if (badAt)
+        return;
+      if (Value m = combLoadTarget(w)) {
+        if (written.count(m))
+          badAt = w, badMem = m;
+      } else if (Value m = combStoreTarget(w)) {
+        if (auto gg = m.getDefiningOp<memref::GetGlobalOp>())
+          if (llvm::is_contained(unrst.globals, gg.getName().str()))
+            written.insert(m);
+      }
+    });
+    if (badAt)
+      return refuse(badAt, varName(badMem),
+                    "it is read after a store to it in the same iteration; signal storage "
+                    "returns the old value until the next edge. Read first, then store");
+  }
+  return true;
+}
+
+// Thread-side dead code for the moved stores (D-14), run after planComb: the
+// stores to unreset storage leave the thread, then whatever only they needed
+// (the ifs they emptied, their temporaries, their wire reads).
+void SystemCModuleEmitter::unresetThreadDead() {  // new (SystemC-only)
+  if (unrst.wrSet.empty())
+    return;
+  SmallVector<Operation *, 32> cand; // pre-order over the iteration block
+  unrst.body->walk<WalkOrder::PreOrder>([&](Operation *o) {
+    if (unrst.wrSet.count(o) || comb.coneSet.count(o))
+      cand.push_back(o);
+  });
+  for (Operation *o : cand)
+    if (Value m = combStoreTarget(o))
+      if (auto gg = m.getDefiningOp<memref::GetGlobalOp>())
+        if (llvm::is_contained(unrst.globals, gg.getName().str()))
+          comb.threadDead.insert(o);
+  bool changed = true;
+  while (changed) {
+    changed = false;
+    for (auto it = cand.rbegin(); it != cand.rend(); ++it) {
+      Operation *o = *it;
+      if (comb.threadDead.count(o))
+        continue;
+      bool dead = true;
+      if (o->hasTrait<OpTrait::IsTerminator>()) {
+        dead = comb.threadDead.count(o->getParentOp()) > 0;
+      } else if (o->getNumRegions()) {
+        for (Region &r : o->getRegions())
+          for (Block &blk : r)
+            for (Operation &in : blk)
+              if (!in.hasTrait<OpTrait::IsTerminator>() && !comb.threadDead.count(&in))
+                dead = false;
+        for (auto r : o->getResults())
+          if (!r.use_empty())
+            dead = false;
+      } else if (Value m = combStoreTarget(o)) {
+        for (auto *u : m.getUsers())
+          if (combLoadTarget(u) == m && !comb.threadDead.count(u))
+            dead = false;
+      } else {
+        for (auto r : o->getResults())
+          for (auto *u : r.getUsers())
+            if (!comb.threadDead.count(u))
+              dead = false;
+      }
+      if (dead) {
+        comb.threadDead.insert(o);
+        changed = true;
+      }
+    }
+  }
+}
+
 void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (SystemC-only)
   auto name = func.getName();
   // README D-13: classify the declared combinational outputs first; a refused
   // cone stops emission here rather than producing a registered port.
-  if (!planComb(func)) {
+  // README D-14: unreset storage's stores move to a clock-edge method; refused
+  // here (naming the storage) when they cannot be separated from the thread.
+  if (!planUnreset(func) || !planComb(func)) {
     state.encounteredError = true;
     return;
   }
+  unresetThreadDead();
   os << "SC_MODULE(" << name << ") {\n";
   addIndent();
 
@@ -2205,16 +2504,20 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
     auto at = llvm::cast<ShapedType>(g.getType());
     fixUnsignedType(g, g->hasAttr("unsigned"));
     indent();
-    if (isCombStorageGlobal(g)) {
+    if (isCombStorageGlobal(g) || isUnresetGlobal(g)) {
       // Read by a comb cone (D-13): signal storage, flattened, shared by the
       // thread (writes) and the SC_METHOD (reads). Catapult CIN-197 refuses a
-      // plain member here.
+      // plain member here. Unreset storage (D-14) is the same signal storage,
+      // written by the clock-edge `wr` method and never by the reset action.
       int64_t total = 1;
       for (auto &s : at.getShape())
         total *= s;
       os << "sc_signal< "
          << getStreamPayloadTypeName(at.getElementType(), g->hasAttr("unsigned"))
-         << " > " << g.getSymName() << "[" << total << "];  // @ Stateful, comb storage\n";
+         << " > " << g.getSymName() << "[" << total << "];  // "
+         << (isUnresetGlobal(g) ? "@ Stateful(reset=False), unreset signal storage (D-14)"
+                                : "@ Stateful, comb storage")
+         << "\n";
       continue;
     }
     emitStatefulGlobalElementType(at.getElementType());
@@ -2287,6 +2590,25 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
     indent(); os << "// allo comb ports:";
     for (Value p : comb.outPorts)
       os << " " << getName(p);
+    os << "\n";
+  }
+  if (!unrst.wrSet.empty()) {
+    // The unreset storage's writer (D-14): a clock-edge method with no reset
+    // action (Catapult CIN-233 binds only a thread's). dont_initialize keeps
+    // csim from running it once at time 0, which the RTL flop never does.
+    reserveName("wr");
+    indent(); os << "SC_METHOD(wr);\n";
+    indent(); os << "sensitive << clk.pos();\n";
+    os << "#ifndef __SYNTHESIS__\n";
+    indent(); os << "dont_initialize();\n";
+    os << "#endif\n";
+  }
+  if (!unrst.globals.empty()) {
+    // Read by run.tcl generation (-RESET_CLEARS_ALL_REGS no) and the latency
+    // manifest (allo/backend/catapult.py).
+    indent(); os << "// allo unreset storage:";
+    for (auto &gname : unrst.globals)
+      os << " " << gname;
     os << "\n";
   }
   reduceIndent();
@@ -2420,7 +2742,11 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
     // so the attribute is a splat and one loop nest resets the whole array. Emitting an
     // assignment per element instead would put thousands of statements in the reset
     // action of any sizeable buffer.
-    if (isCombStorageGlobal(g)) {
+    if (isUnresetGlobal(g)) {
+      // Unreset storage (D-14): no reset action; its contents survive reset.
+      indent();
+      os << "// " << g.getSymName() << ": @ Stateful(reset=False), not reset (D-14)\n";
+    } else if (isCombStorageGlobal(g)) {
       // Signal storage (D-13): flattened, written in the reset action (CIN-233).
       int64_t total = 1;
       for (auto &s : at.getShape())
@@ -2547,7 +2873,8 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
   // (C[i]+=... re-accumulates every pass). Running once is correct for both, and
   // lets the tb read memory outputs after a real completion instead of guessing a
   // settle time. The idle `while(1) wait()` keeps the clocked thread alive.
-  combMode = comb.outPorts.empty() ? CombMode::Normal : CombMode::Thread;
+  combMode = (comb.outPorts.empty() && unrst.wrSet.empty()) ? CombMode::Normal
+                                                             : CombMode::Thread;
   emitBlock(func.front()); // put/get now emit .Push()/.Pop()
   combMode = CombMode::Normal;
   indent(); os << "done.write(true);  // RTL-observable completion (see the done port)\n";
@@ -2574,6 +2901,26 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
     addIndent();
     combMode = CombMode::Method;
     emitBlock(*comb.body);
+    combMode = CombMode::Normal;
+    reduceIndent();
+    indent(); os << "}\n";
+    state.nameTable = savedNames;
+  }
+
+  if (!unrst.wrSet.empty()) {
+    // The unreset storage's writer (D-14): the iteration's stores to it and
+    // their cones, at every clock edge, with no reset action.
+    auto savedNames = state.nameTable;
+    for (Operation *o : unrst.wrSet)
+      for (auto r : o->getResults())
+        state.nameTable.erase(r);
+    indent(); os << "void wr() {  // clock-edge write, no reset action (D-14):";
+    for (auto &gname : unrst.globals)
+      os << " " << gname;
+    os << "\n";
+    addIndent();
+    combMode = CombMode::WriteMethod;
+    emitBlock(*unrst.body);
     combMode = CombMode::Normal;
     reduceIndent();
     indent(); os << "}\n";

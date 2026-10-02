@@ -168,6 +168,19 @@ def run_process(cmd, pattern=None):
     return out.decode("utf-8")
 
 
+def unreset_storage_of(module):
+    """User names of the ``@ Stateful(reset=False)`` globals (README D-14) in
+    ``module``: the ``memref.global`` ops carrying ``allo.unreset``."""
+    names = []
+    for op in module.body.operations:
+        if op.operation.name == "memref.global" and "allo.unreset" in op.attributes:
+            sym = op.attributes["sym_name"].value
+            var = op.attributes["allo.unreset"]
+            var = var.value if hasattr(var, "value") else sym
+            names.append(f"`{var}` ({sym})")
+    return names
+
+
 def codegen_tcl(top, configs):
     out_str = """# Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
@@ -430,6 +443,20 @@ class HLSModule:
                     'target="systemc" for wire/channel, or Stream for other '
                     "HLS backends."
                 )
+            # README D-14: unreset storage (`@ Stateful(reset=False)`) is a
+            # declaration only the SystemC flow lowers (a clock-edge write with
+            # no reset action). Every other HLS backend refuses it, naming the
+            # storage, instead of building a reset (or unmeasured) register.
+            if platform != "systemc":
+                unreset = unreset_storage_of(self.module)
+                if unreset:
+                    raise NotImplementedError(
+                        f"unreset storage {', '.join(unreset)} "
+                        "(`@ Stateful(reset=False)`, README D-14) is only lowered by "
+                        f'the SystemC backend (target="systemc"), not "{platform}": '
+                        "this backend has no measured form that leaves storage "
+                        "unreset. Use target=\"systemc\", or declare it `@ Stateful`."
+                    )
             if platform == "systemc":
                 systemc.stamp_arg_dirs(self.module)
             # fix: num_output_args
@@ -516,6 +543,10 @@ class HLSModule:
 
         buf.seek(0)
         self.hls_code = buf.read()
+        # README D-14: the emitter marks every kernel that holds unreset storage;
+        # run.tcl then tells Catapult not to add a reset to every register.
+        if platform == "systemc" and "// allo unreset storage:" in self.hls_code:
+            configs["unreset_storage"] = True
         if project is not None:
             assert mode is not None, "mode must be specified when project is specified"
             os.makedirs(project, exist_ok=True)
@@ -1540,6 +1571,11 @@ class HLSModule:
                         + (
                             f" comb ports {sorted(u['ports'])}"
                             if u.get("ports")
+                            else ""
+                        )
+                        + (
+                            f" unreset storage {sorted(u['storage'])}"
+                            if u.get("storage")
                             else ""
                         )
                     )

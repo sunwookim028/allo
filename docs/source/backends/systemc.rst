@@ -211,7 +211,8 @@ the kernel as the form measured in ``dev/records/minitpu/u2_comb_read_2026-10-02
   the reset action (CIN-233), so the storage is **zeroed by reset**. That is a
   recorded deviation (MiniTPU's register file is never reset): it costs
   ``DFFR_X1`` in place of ``DFF_X1`` -- +10.7 % area on the w16 register file,
-  all of it in the reset flops. A plain member array cannot feed a combinational
+  all of it in the reset flops. Declaring the storage ``@ Stateful(reset=False)``
+  removes it (next section). A plain member array cannot feed a combinational
   process (CIN-197), which is why the storage changes form.
 - **One ``SC_METHOD(comb)`` per kernel** holds every comb port's cone: the put and,
   backwards from its value, ``Wire`` input reads, storage loads, the iteration's
@@ -250,6 +251,63 @@ defined slot at read latency 0 and write visible after 1 edge, w16
 (4,463 um^2 at w16). In csim a ``Wire`` link is still not cycle-locked
 (:ref:`limitation-22`): the recorded ports agree with the reference at a constant
 offset, one cycle less than the thread form (+3/+2/+2 against +4/+3/+3).
+
+Unreset storage: ``@ Stateful(reset=False)``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Storage is reset by default. Storage whose contents must survive reset (only the
+unit's control is reset) -- MiniTPU's register file and FIFO contents -- is
+declared (README D-14; *declared, never inferred*):
+
+.. code-block:: python
+
+   mem: UInt(16)[32] @ Stateful(reset=False)   # contents undefined until written
+
+The global carries ``allo.unreset = "mem"``. Catapult refuses a signal an
+``SC_THREAD`` writes unless the reset action sets it (CIN-233, no directive exempts
+it), and a thread cannot be reset-less (CIN-194); a signal written by a clock-edge
+``SC_METHOD`` has no reset action to satisfy
+(``dev/records/minitpu/u2_comb_wire_impl_2026-10-02.rst``, F3). So, for a kernel that
+stores to unreset storage:
+
+- **The storage is signal storage** (``sc_signal<T> mem[N]``, as comb storage) and
+  the reset action does not touch it.
+- **Its stores move to ``SC_METHOD(wr); sensitive << clk.pos();``** with their cone
+  (address, data, and the conditions of the ``if``\ s they sit under). The thread
+  drops them and whatever only they needed. ``dont_initialize()`` (csim only) keeps
+  the method from running once at time 0, which the flop never does.
+- **``run.tcl`` gets ``directive set -RESET_CLEARS_ALL_REGS no``** whenever the
+  emitted code holds unreset storage (the ``// allo unreset storage:`` marker).
+  Without it Catapult adds a reset to every register, the storage included (F3
+  form c). With it, a register is reset only when a reset action sets it: the
+  kernel's FSM and ``done`` flag still are.
+- **The rule** (refused at build, naming the storage: ``unreset storage `mem`
+  (rf_0): ...``). ``wr`` runs at *every* clock edge -- under reset, before the
+  kernel's first iteration and after its last -- so it may compute only what is a
+  function of this cycle's inputs. The writing kernel is **Wire-only** (every
+  argument a ``Wire``, no stream or channel op: only then is one iteration one
+  clock cycle); each store is in the iteration block under nothing but ``if``\ s
+  (no inner loop); its address, data and conditions read only ``Wire`` inputs,
+  constants, arithmetic and scalar iteration temporaries written unconditionally
+  earlier in the iteration -- **no storage load** (so no read-modify-write), no
+  induction variable, nothing loop-carried; and the iteration reads the storage
+  only before its stores (signal storage reads old until the next edge). Comb reads
+  of it (D-13) are unchanged.
+- **Other backends refuse it**, naming the storage: Vitis and the Catapult C++ flow
+  raise ``NotImplementedError`` (no measured unreset form; Vitis' default
+  ``config_rtl -reset control`` may well leave a static array unreset, but that is
+  unmeasured). **The simulator treats it as ordinary storage** (initial value, then
+  writes); harness verdicts mask pre-write contents as undefined.
+- **``latency.json``** adds ``"storage": {"__stateful_rf_0_mem_1": "unreset"}`` to
+  the kernel's entry. ``latency``/``ii`` are still the thread's loop; the write is
+  visible one edge after it is presented, by construction.
+
+Measured (the ``comb_unreset`` variant of ``examples/minitpu/units/vpu_regfile.py``,
+``dev/records/minitpu/u2_unreset_impl_2026-10-02.rst``): 0 ``if ( rst )`` on the
+storage, all 512 storage flops ``DFF_X1``, bit-exact against MiniTPU at read 0 /
+write -> read 1 (w16 180,780/180,780, w256 45,744/45,744); DC 4,033.9 um^2 at w16
+against MiniTPU's 4,021.7 -- the difference is the kernel's two reset control
+flops (FSM state and ``done``), which the hand form of F3 did not have.
 
 Configuration
 ~~~~~~~~~~~~~
