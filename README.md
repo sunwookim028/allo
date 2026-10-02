@@ -61,6 +61,22 @@ the modelling abstractions. The legality-check discovery runs are a case study.
   programs give bit-exact results, and its resources are reported beside
   MiniTPU's. The Allo version may add interlocks; that is a recorded deviation.
 
+**Principles.**
+- **Co-design needs timing and power across an array of architectures.** A
+  flow that reports cycles for one design cannot support co-design decisions.
+  Power is still absent on TinyTPU.
+- **Two architectures are worth most where they disagree.** TinyTPU (int8, wide
+  accumulator file) and MiniTPU (BF16, no accumulator file) are aligned only to
+  probe the toolchain, never to make their numbers comparable. Their
+  disagreement is itself a finding: an int8 machine that accumulates narrow has
+  an overflow problem, not a rounding problem.
+- **Generality is judged against named targets: Groq's LPU and OpenAI's
+  Jalapeño.** An abstraction counts when it moves one of their mechanisms
+  (adder-tree reduction, M down to 1, NUMA slice memory, explicit placement,
+  two networks) from impossible to expressible (`docs/source/designs/ip_gaps.rst`).
+- **Agent-authored extensions count even when small or rediscovered.** A
+  rediscovery reached without being told is a valid result.
+
 **Threads.**
 
 | thread | holds today | next |

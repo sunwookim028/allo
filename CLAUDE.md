@@ -5,7 +5,27 @@
 
 **Direction, decisions (D-n), milestones and their status live in `README.md`;
 defects stay in the fork's GitHub issues.** Read the README's Decisions before
-proposing work. Fork knowledge lives in the Sphinx docs (`docs/source/`, published at
+proposing work.
+
+## Working rules (from the project owner)
+
+- **This is the Allo project, not a paper.** Talk in terms of identity, claims,
+  threads, milestones and quality. `docs/source/paper.rst` is one thread's
+  write-up, not the organising document.
+- **Direction, decisions and milestones go in README sections.** Don't create
+  docs pages or GitHub milestones for them. Every milestone names its pass
+  check and the tools it uses, fixes, integrates and upgrades. Review the
+  milestones with the owner before starting the next one.
+- **Settle before building:** layout, integration status, design target and
+  flow maturity are written down on `main` before design work starts (D-6).
+- **MiniTPU is the owner's design** (`~/core/minitpu`, pinned in
+  `dev/toolchains.rst`). It is built and validated unit by unit (D-7), never as a
+  single-shot full core.
+- **Pin every external dependency** by commit, version or checksum, stand-ins
+  included, in the same commit that adds it (`dev/toolchains.rst`).
+- **Commit messages follow upstream:** `[Tag][Tag] Imperative summary`.
+- **Durable knowledge goes into tracked files** (README, this file, the Sphinx
+  docs, `dev/records/`), not into an agent's private memory. Fork knowledge lives in the Sphinx docs (`docs/source/`, published at
 https://sunwookim028.github.io/allo/), not in Markdown notes. Read the page
 before working in its area; when you learn something worth keeping, add it to
 the page, not to a new `.md` file. The fork-only pages:
