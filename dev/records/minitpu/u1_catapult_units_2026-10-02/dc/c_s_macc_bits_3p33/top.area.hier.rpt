@@ -1,0 +1,53 @@
+ 
+****************************************
+Report : area
+Design : top
+Version: W-2024.09
+Date   : Fri Oct  2 04:41:15 2026
+****************************************
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                           93
+Number of nets:                           633
+Number of cells:                          521
+Number of combinational cells:            410
+Number of sequential cells:                97
+Number of macros/black boxes:               0
+Number of buf/inv:                         75
+Number of references:                      31
+
+Combinational area:                569.772003
+Buf/Inv area:                       40.964000
+Noncombinational area:             509.390016
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                  1079.162019
+Total area:                 undefined
+
+Hierarchical area distribution
+------------------------------
+
+                                  Global cell area          Local cell area
+                                  ------------------  --------------------------- 
+Hierarchical cell                 Absolute   Percent  Combi-    Noncombi-  Black-
+                                  Total      Total    national  national   boxes   Design
+--------------------------------  ---------  -------  --------  ---------  ------  ----------------------------
+top                               1079.1620    100.0  569.7720   489.4400  0.0000  top
+u0/clk_gate_mul_0_run_inst/l_S_i_0_i_i_22_0_sva_reg
+                                     3.9900      0.4    0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_mul_0_0
+u0/clk_gate_mul_0_run_inst/l_S_i_0_i_stage_0_1_reg
+                                     3.9900      0.4    0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_mul_0_3
+u0/clk_gate_mul_0_run_inst/mul_0_run_v0_Pop_mioi_inst/mul_0_run_v0_Pop_mioi_v0_Pop_mio_wait_dp_inst/v0_Pop_mioi_idat_bfwt_reg
+                                     3.9900      0.4    0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_mul_0_4
+u0/clk_gate_mul_0_run_inst/mul_0_run_v1_Pop_mioi_inst/mul_0_run_v1_Pop_mioi_v1_Pop_mio_wait_dp_inst/v1_Pop_mioi_idat_bfwt_reg
+                                     3.9900      0.4    0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_mul_0_5
+u0/clk_gate_mul_0_run_inst/v2_Push_mioi_idat_14_1_reg
+                                     3.9900      0.4    0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_mul_0_1
+--------------------------------  ---------  -------  --------  ---------  ------  ----------------------------
+Total                                                 569.7720   509.3900  0.0000
+
+1

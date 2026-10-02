@@ -1,0 +1,12 @@
+--- mulpipe_bitspipe_2p0_io2.prj/run.tcl.emitted	2026-10-02 04:03:24.856300630 -0400
++++ mulpipe_bitspipe_2p0_io2.prj/run.tcl	2026-10-02 04:03:24.860300526 -0400
+@@ -28,6 +28,9 @@
+ go compile
+ 
+ solution library add ccs_sample_mem
++go architect
++cycle set {v2.Push()} -from {v0.Pop()} -equal 2  ;# [hand-patch: declared latency]
++cycle set {v2.Push()} -from {v1.Pop()} -equal 2  ;# [hand-patch: declared latency]
+ go assembly
+ go extract
+ 

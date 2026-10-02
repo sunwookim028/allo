@@ -1,0 +1,71 @@
+ 
+****************************************
+Report : area
+Design : alu_0
+Version: W-2024.09
+Date   : Fri Oct  2 04:40:15 2026
+****************************************
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                          123
+Number of nets:                          2643
+Number of cells:                         2435
+Number of combinational cells:           2122
+Number of sequential cells:               298
+Number of macros/black boxes:               0
+Number of buf/inv:                        323
+Number of references:                      50
+
+Combinational area:               2380.434009
+Buf/Inv area:                      181.678001
+Noncombinational area:            1566.740049
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                  3947.174057
+Total area:                 undefined
+
+Hierarchical area distribution
+------------------------------
+
+                                  Global cell area          Local cell area
+                                  ------------------  ---------------------------- 
+Hierarchical cell                 Absolute   Percent  Combi-     Noncombi-  Black-
+                                  Total      Total    national   national   boxes   Design
+--------------------------------  ---------  -------  ---------  ---------  ------  ---------------------------------
+alu_0                             3947.1741    100.0  2380.4340  1510.8800  0.0000  alu_0
+alu_0_run_inst/clk_gate_add_bits_else_1_else_else_else_slc_while_v494_14_0_1_itm_2_reg
+                                     3.9900      0.1     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_alu_0_run_9
+alu_0_run_inst/clk_gate_add_bits_else_1_else_else_else_unequal_tmp_1_1_reg
+                                     3.9900      0.1     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_alu_0_run_11
+alu_0_run_inst/clk_gate_add_bits_else_1_else_else_slc_while_v493_14_0_1_itm_1_reg
+                                     3.9900      0.1     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_alu_0_run_12
+alu_0_run_inst/clk_gate_add_bits_else_1_else_else_slc_while_v493_14_0_1_itm_2_reg
+                                     3.9900      0.1     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_alu_0_run_10
+alu_0_run_inst/clk_gate_add_bits_exp_large_7_0_1_lpi_dfm_reg
+                                     3.9900      0.1     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_alu_0_run_6
+alu_0_run_inst/clk_gate_add_bits_exp_result_lpi_1_dfm_1_7_0_reg
+                                     3.9900      0.1     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_alu_0_run_7
+alu_0_run_inst/clk_gate_add_bits_mant_large_15_9_1_lpi_dfm_0_reg
+                                     3.9900      0.1     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_alu_0_run_5
+alu_0_run_inst/clk_gate_add_bits_v104_qr_1_lpi_dfm_17_9_reg
+                                     3.9900      0.1     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_alu_0_run_8
+alu_0_run_inst/clk_gate_add_bits_v115_1_sva_reg
+                                     3.9900      0.1     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_alu_0_run_1
+alu_0_run_inst/clk_gate_mul_bits_v293_15_0_1_sva_0_reg
+                                     3.9900      0.1     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_alu_0_run_4
+alu_0_run_inst/clk_gate_mul_bits_v293_15_0_1_sva_14_8_reg
+                                     3.9900      0.1     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_alu_0_run_3
+alu_0_run_inst/clk_gate_reg_v487_ftd_3_0_reg
+                                     3.9900      0.1     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_alu_0_run_13
+alu_0_run_inst/clk_gate_while_v493_1_sva_14_0_reg
+                                     3.9900      0.1     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_alu_0_run_0
+alu_0_run_inst/clk_gate_while_v530_or_1_svs_2_reg
+                                     3.9900      0.1     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_alu_0_run_2
+--------------------------------  ---------  -------  ---------  ---------  ------  ---------------------------------
+Total                                                 2380.4340  1566.7400  0.0000
+
+1

@@ -94,6 +94,15 @@ in what Allo can say.
     (C1, C2, C11), a ``@df.unit``'s sizes freeze at decoration (C9), and a
     reused function's schedule does not travel with it (C10). *[proposals,
     with item 8, for the U3 composition design review]*
+12. **Catapult track, all U1 units** (``u1_catapult_units_2026-10-02/``).
+    Every ``bits`` variant is bit-exact in Catapult RTL against MiniTPU on
+    the full stimulus at II=1, with no hand-patch to the emitted SystemC
+    (the pilot's two emitter bugs and S4 are fixed). The declared latency is
+    met on all three pipelined units through Connections ports (item 8's I/O
+    constraint). Same-flow DC: Catapult's RTL is 0.96-1.72x MiniTPU's area.
+    New: a ``Wire``-port unit's latency **cannot be pinned** (N2), and
+    latency 0 is refused (N3). *[amend item 8's proposal: Catapult honours
+    ``latency=`` on Connections ports and refuses it on Wire ports]*
 
 ``vpu_bf16_add`` (pilot)
 ------------------------
@@ -278,7 +287,22 @@ every ``a`` against every corner). Evidence for every row:
    * - SystemC csim, ``bits``
      - **match** 6,019,104/6,019,104 (30 s)
      -
-   * - Catapult, RTLGen, AMC
+   * - Catapult RTL, ``bits``
+     - **match** 6,019,104/6,019,104 in Verilator, II=1, Stream and Wire ports,
+       2.0 and 3.33 ns, with no hand-patch to the emitted SystemC. Latency:
+       declared 0 is **refused** (I/O constraint ``-equal 0``: SCHD-30, a
+       ``Push`` cannot chain after a ``Pop``; N3); unpinned 2, pinned 1.
+       Same-flow DC at 3.33 ns, Wire ports against MiniTPU plus an output
+       register: **790.8 vs 508.9** um^2 (1.55x; 46 vs 16 flops)
+     - ``u1_catapult_units_2026-10-02/README.md``. The latency is
+       **finding, semantic mismatch** (N3: no zero-latency unit on
+       Connections ports; triage item 4)
+   * - Catapult RTL, ``native``
+     - **finding, semantic mismatch**: 5,011,890, the same vectors as csim
+       (flush rules, NaN). Equal to IEEE on all 6,019,104; NaN is ``0x7fc0``
+       with sign ``a ^ b``, where ``+`` gives ``0x7fff`` (N5)
+     - Same record
+   * - RTLGen, AMC
      - not tried
      - out of this session's scope
 
@@ -321,6 +345,16 @@ one in Allo at all: on the simulator and SystemC side **it does not** (L1-L3).
        a pipeline register
      - ``u1_mul/latency_probe.py``. A declared latency can be checked only on
        RTL a tool wrote from Allo (Catapult track)
+   * - Catapult RTL, ``bits_pipe``
+     - **match** 6,019,104/6,019,104 **at latency 2, II=1**, 2.0 and 3.33 ns:
+       Stream ports with the hand-added I/O constraint ``-equal 2`` (unpinned:
+       3 at 2.0 ns, 1 at 3.33 ns, L2); backpressure loses nothing. Wire ports:
+       2 with the loop constraint ``-equal 2``, but ``-equal 3``/``4`` still
+       give 2 (**finding, missing abstraction** N2: a Wire unit's latency
+       cannot be pinned). DC at 3.33 ns, Wire against ``vpu_bf16_mul_pipe``:
+       **681.0 vs 711.8** um^2 (0.96x)
+     - ``u1_catapult_units_2026-10-02/README.md``. ``native``: 5,011,890, as
+       ``vpu_bf16_mul``
 
 ``mxu_bf16_mul_acc24``
 ----------------------
@@ -358,7 +392,19 @@ one in Allo at all: on the simulator and SystemC side **it does not** (L1-L3).
        ``UInt(24)``, **finding, bug** S5: csim runs, then reading the output
        raises ``KeyError: 'ui24'`` (``np_supported_types``)
      - ``u1_mul/repros.py s5``
-   * - Catapult, RTLGen, AMC
+   * - Catapult RTL, ``bits``
+     - **match** 6,019,104/6,019,104, II=1, latency 1 (Stream and Wire, 2.0
+       and 3.33 ns); declared 0 is not reachable (N3). DC at 3.33 ns, Wire
+       against MiniTPU plus an output register: **562.6 vs 517.1** um^2
+       (1.09x)
+     - ``u1_catapult_units_2026-10-02/README.md``
+   * - Catapult RTL, ``native`` (as written)
+     - **finding, semantic mismatch**: 4,941,087, the same as csim's
+       ``native_bitext``. S4 is fixed, so the unit synthesizes as written. The
+       31 float32-subnormal double roundings (W1) are in the RTL (6,019,073 vs
+       IEEE acc24), hidden by MiniTPU's flush
+     - Same record
+   * - RTLGen, AMC
      - not tried
      - out of this session's scope
 
@@ -408,6 +454,16 @@ Evidence: ``u1_pipe_2026-10-02.rst``.
        infeasible loop constraint is refused (SCHD-3) (**L4**). ``cycle set
        <loop> -equal 3`` is not latency (measured 2)
      - ``emit_csyn.py --io``, ``cmp_rtl.py``
+   * - Catapult RTL, ``bits`` at 2.0 / 3.33 ns, and DC (Catapult track)
+     - **match** 352,116/352,116 **at latency 3, II=1** at both clocks:
+       Stream ports with I/O constraint ``-equal 3``, and Wire ports with the
+       loop constraint ``-equal 3`` (unpinned 2: it works here by coincidence,
+       N2). ``rtl.rpt`` slack is -0.33 to -1.96 ns, but DC closes the same
+       RTL (**finding** N4). DC at 3.33 ns, Wire against
+       ``mxu_acc24_add_pipe``: **2448.0 vs 1424.4** um^2 (**1.72x**, comb
+       1.9x; hypothesis: the M5/B1 workarounds in the text, N7). ``native``:
+       349,935, csim's vectors, V1 (NaN -> 0) now in RTL
+     - ``u1_catapult_units_2026-10-02/README.md``
    * - Catapult RTL, ``staged``
      - **finding, missing abstraction** (L1): latency **5** at 5.0 ns, II=1
        (unrolled), not 3: stage kernels are not register stages
@@ -476,6 +532,20 @@ before more units are composed; proposals 2-3 in the record]*
      - ``u1_alu/catapult/``. csyn only; not simulated as RTL, no DC. The
        RTL's own form is the cheaper one to write, and Allo keeps whichever
        is written.
+   * - Catapult RTL, ``bits`` (+ unroll), Verilator and DC
+     - **match** 5,079,552/5,079,552 **at latency 3, II=1** on Stream ports
+       with I/O constraint ``-equal 3``, at 2.0 and 3.33 ns (unpinned: 3 and
+       2); backpressure loses nothing. Wire ports: 3 at 2.0 ns, but **2 at
+       3.33 ns whatever the loop constraint** (3, 4, 5; **finding, missing
+       abstraction** N2). DC at 3.33 ns, Wire (latency 2) against
+       ``vpu_alu``: **2826.3 vs 2394.0** um^2 (1.18x). At 2.0 ns, latency 3:
+       3947.2 vs 2612.9 (1.51x)
+     - ``u1_catapult_units_2026-10-02/README.md``. ``rtl.rpt`` slack about
+       -1.4 ns, but DC closes it (N4)
+   * - Catapult RTL, ``native``
+     - **finding, bug + semantic mismatch**: 5,064,720, csim's exact classes,
+       including **C8 in RTL** (``std::max``/``min``: 2,516 MAX/MIN vectors)
+     - Same record
    * - RTLGen, AMC
      - **not tried**
      - Out of this session's scope.

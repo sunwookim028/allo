@@ -1,0 +1,26 @@
+mul_bits_2p0 bf16_mul bits --pipeline mul_0:i --clock 2.0
+mul_bits_3p33 bf16_mul bits --pipeline mul_0:i --clock 3.33
+mul_native_2p0 bf16_mul native --pipeline mul_0:i --clock 2.0
+mul_native_3p33 bf16_mul native --pipeline mul_0:i --clock 3.33
+mul_bits_3p33_io0 bf16_mul bits --pipeline mul_0:i --clock 3.33 --io-all 0
+mulpipe_bitspipe_2p0_io2 bf16_mul_pipe bits_pipe --pipeline mul_0:i --clock 2.0 --io-all 2
+mulpipe_bitspipe_3p33_io2 bf16_mul_pipe bits_pipe --pipeline mul_0:i --clock 3.33 --io-all 2
+mulpipe_native_2p0_io2 bf16_mul_pipe native --pipeline mul_0:i --clock 2.0 --io-all 2
+mulpipe_native_3p33_io2 bf16_mul_pipe native --pipeline mul_0:i --clock 3.33 --io-all 2
+macc_bits_2p0 mul_acc24 bits --pipeline mul_0:i --clock 2.0
+macc_bits_3p33 mul_acc24 bits --pipeline mul_0:i --clock 3.33
+macc_native_3p33 mul_acc24 native --pipeline mul_0:i --clock 3.33
+macc_native_2p0 mul_acc24 native --pipeline mul_0:i --clock 2.0
+acc24_bits_2p0_io3 acc24_add_pipe bits --unroll leading_zeros19:offset --pipeline add_0:i --clock 2.0 --io-all 3
+acc24_bits_3p33_io3 acc24_add_pipe bits --unroll leading_zeros19:offset --pipeline add_0:i --clock 3.33 --io-all 3
+acc24_native_2p0_io3 acc24_add_pipe native --pipeline add_0:i --clock 2.0 --io-all 3
+acc24_native_3p33_io3 acc24_add_pipe native --pipeline add_0:i --clock 3.33 --io-all 3
+alu_bits_2p0_io3 alu bits --unroll leading_zeros17:offset --pipeline alu_0:i --clock 2.0 --io-all 3
+alu_bits_3p33_io3 alu bits --unroll leading_zeros17:offset --pipeline alu_0:i --clock 3.33 --io-all 3
+alu_native_2p0_io3 alu native --pipeline alu_0:i --clock 2.0 --io-all 3
+alu_native_3p33_io3 alu native --pipeline alu_0:i --clock 3.33 --io-all 3
+mulpipe_bitspipe_2p0 bf16_mul_pipe bits_pipe --pipeline mul_0:i --clock 2.0
+mulpipe_bitspipe_3p33 bf16_mul_pipe bits_pipe --pipeline mul_0:i --clock 3.33
+alu_bits_2p0 alu bits --unroll leading_zeros17:offset --pipeline alu_0:i --clock 2.0
+alu_bits_3p33 alu bits --unroll leading_zeros17:offset --pipeline alu_0:i --clock 3.33
+mul_bits_3p33_io1 bf16_mul bits --pipeline mul_0:i --clock 3.33 --io-all 1
