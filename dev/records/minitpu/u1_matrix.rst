@@ -33,8 +33,14 @@ zhang-21; MiniTPU at ``b3ba0a4d``; harness on branch ``u1-pilot``.
        M1-M3 (missing abstractions: bit concatenation, reduction-OR, ``[lo:hi)``
        slices against SV's ``[hi:lo]``), M4-M5 (latent semantic mismatches:
        expression widths sized bottom-up; shifts by >= width)
-     - ``u1_bf16_add_bits_2026-10-02.rst``. B1 confirmed independently; fix
-       and impact check on branch ``core-uint-compare`` (held for review).
+     - ``u1_bf16_add_bits_2026-10-02.rst``. B1 confirmed independently. Fixed
+       with B2 and a third bug in the same function (B3: every signed
+       ``Fixed`` compare took unsigned predicates) on branch
+       ``core-uint-compare`` (``716c7baf``, 17 new tests, 12 fail on main):
+       no gate, test or TinyTPU emission changes against ``main``. Upstream
+       has the same code. Held for the owner's review
+       (``dev/records/limitations/uint_compare_2026-10-02.rst`` on that
+       branch).
        Everything else in the RTL transcribed directly, including the nested
        ``leading_zeros17`` function.
    * - SystemC csim, ``native``
