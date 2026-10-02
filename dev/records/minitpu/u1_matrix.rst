@@ -55,6 +55,16 @@ in what Allo can say.
 7. **Report AMC's silent miscompiles** (A5 ``a or b or c`` drops ``c``; A7 a
    two-scalar loop exits with the wrong one) to AMC's author? *[yes, after the
    owner's go-ahead]*
+8. **A pipelined leaf** (``vpu_bf16_mul_pipe``, U1 multipliers). In Allo it
+   is the comb unit: the simulator is untimed, ``s.pipeline`` gives II not
+   depth, and a ``Stream`` between stage kernels is a FIFO, not a register
+   (in csim it halves throughput at depth 1). Add a register/latency form
+   (``Reg[T]``, ``delay``, or ``latency=`` on a kernel or unit), or accept
+   "latency not expressible" as a recorded deviation like item 4?
+   *[recorded deviation for U1; the proposal goes with item 4 to U3]*
+9. **Two more SystemC bugs from the multipliers** (S4: ``bf16 -> f32``
+   widening does not compile; S5: a ``UInt(24)`` port cannot be read back).
+   *[fix on ``systemc-u1-fixes`` with a regression test each]*
 
 ``vpu_bf16_add`` (pilot)
 ------------------------
@@ -154,6 +164,125 @@ in what Allo can say.
        ``u1_bf16_add_amc/repros.py``. These are AMC defects, to file with
        AMC (D-2) after triage. Also T1: at a 3.333 ns target AMC's delay
        model misses by 1.24 ns
+
+``vpu_bf16_mul``
+----------------
+
+6,019,104 vectors (``bf16_mul.stimulus()``: corners crossed, ties, random,
+every ``a`` against every corner). Evidence for every row:
+``u1_mul_2026-10-02.rst``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 40 42
+
+   * - Tool
+     - Cell
+     - Evidence / note
+   * - Allo simulator, ``native``
+     - **finding, semantic mismatch**: 5,011,918 match; the 1,007,186 others
+       are the RTL's rules: flush-to-zero on input and output (603,316) and
+       NaN always ``+0x7FC0`` (403,870). Outside NaN the simulator is IEEE bit
+       for bit
+     - N2: ``bfloat16`` has no flush-to-zero mode. N1: the simulator keeps
+       the NaN operand's sign and gives ``Inf x 0`` the x86 ``-NaN``
+   * - Allo simulator, ``bits``
+     - **match** 6,019,104/6,019,104, no workaround (the RTL's exponent is
+       ``logic signed``, so B1 cannot apply)
+     - ``units/bf16_mul.py``; M1 (concat as slice stores) and M3 only
+   * - SystemC csim, ``native``
+     - **finding, semantic mismatch** x2: 5,011,890 match; same flush classes
+       as the simulator; NaN sign is ``a ^ b`` (``ac::bfloat16``), so **the
+       simulator and csim disagree on 403,397** of the 1,067,862 NaN/Inf pairs
+       of the same Allo program
+     - N1 (``u1_mul/repros.py n1``). The NaN a bf16 op returns depends on the
+       op and the backend; the simulator is no stand-in for csim on NaNs
+   * - SystemC csim, ``bits``
+     - **match** 6,019,104/6,019,104 (30 s)
+     -
+   * - Catapult, RTLGen, AMC
+     - not tried
+     - out of this session's scope
+
+``vpu_bf16_mul_pipe``
+---------------------
+
+Same function as ``vpu_bf16_mul``, two register banks, latency 2 (RTL
+measured 2). The question was whether a pipelined unit differs from the comb
+one in Allo at all: on the simulator and SystemC side **it does not** (L1-L3).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 40 42
+
+   * - Tool
+     - Cell
+     - Evidence / note
+   * - Allo simulator / SystemC, ``native``, ``bits``
+     - as ``vpu_bf16_mul`` (the same Allo programs) + **finding, missing
+       abstraction** L1: latency is not expressible. The simulator is
+       untimed; ``s.pipeline`` states II, not depth; no primitive says
+       "register here" or "latency 2"
+     - Recorded deviation for U1, as triage item 4 (latency 0) -- here
+       latency 2
+   * - Allo simulator, ``bits_pipe`` (the pipe's own stage-2 text)
+     - **match** 6,019,104, **after the B1 workaround** at a new site:
+       ``exp_sum_s2 <= exp_bias_s2`` on ``logic [8:0]``; without the spare bit
+       1,229,630 vectors are wrong. The comb module's text needs none: the two
+       RTL forms of one unit differ in whether Allo computes them right
+     - ``units/bf16_mul_pipe.py``
+   * - SystemC csim, ``bits_pipe``
+     - **match** 6,019,104
+     -
+   * - Allo simulator / SystemC, ``stages`` (two kernels, one ``Stream`` per
+       ``*_s1_q`` register)
+     - **match** 6,019,104 on both (317 s / 137 s) + **finding, semantic
+       mismatch** L2: in csim a depth-1 Stream is not a register -- latency
+       4 and **II 2** (depth 2: II 1); comb, pipe and ``s.pipeline``'d comb
+       all take 2 cycles in csim. **Missing abstraction** L3: no link type is
+       a pipeline register
+     - ``u1_mul/latency_probe.py``. A declared latency can be checked only on
+       RTL a tool wrote from Allo (Catapult track)
+
+``mxu_bf16_mul_acc24``
+----------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 40 42
+
+   * - Tool
+     - Cell
+     - Evidence / note
+   * - Allo simulator, ``native``
+     - **finding, workaround + semantic mismatch**: no acc24 type, so a
+       ``float32`` product + bitcast + RNE to 15 bits in a ``uint32`` (W1,
+       missing abstraction). 4,668,187 match; the 1,350,917 others are flush
+       (674,119) and NaN (676,798; float32 also keeps the payload). W1
+       double-rounds float32 subnormals: 31 vectors off IEEE acc24 by an ulp,
+       invisible here only because the RTL flushes them
+     - ``units/mul_acc24.py``; ``u1_mul_2026-10-02.rst`` (W1, N1, N2)
+   * - Allo simulator, ``bits``
+     - **match** 6,019,104/6,019,104, no workaround (compares are against
+       literals)
+     - The ``UInt(24)`` port works in the simulator; committed with ``uint32``
+       for S5
+   * - SystemC csim, ``native``
+     - **finding, bug** S4 (emitter): ``bf16 -> f32`` is emitted as
+       copy-initialisation of ``ac_ieee_float<binary32>`` from
+       ``ac::bfloat16``, whose constructor is ``explicit``; g++ refuses.
+       With the widening done on bit patterns (``native_bitext``,
+       **workaround**): 4,941,087 match, same flush classes, NaN 403,898
+     - Fix proposed: emit ``T v = T(x);`` for ``ExtFOp``/``TruncFOp``
+       between ac floats (``EmitVivadoHLS.cpp:2613`` ``emitCast``)
+   * - SystemC csim, ``bits``
+     - **match** 6,019,104/6,019,104 (34 s) with a ``uint32`` port; with
+       ``UInt(24)``, **finding, bug** S5: csim runs, then reading the output
+       raises ``KeyError: 'ui24'`` (``np_supported_types``)
+     - ``u1_mul/repros.py s5``
+   * - Catapult, RTLGen, AMC
+     - not tried
+     - out of this session's scope
 
 Environment findings met on the way
 -----------------------------------

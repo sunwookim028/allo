@@ -1,0 +1,363 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+####################################################################################
+U1 Record: the multipliers (``vpu_bf16_mul``, ``vpu_bf16_mul_pipe``, ``mul_acc24``)
+####################################################################################
+
+.. note::
+
+   **Dated measurement record**, 2026-10-02. zhang-21, branch ``u1-mul`` off
+   ``u1-pilot`` (``bb3bc24c``), worktree ``scratch/wt-u1-mul`` with
+   ``mlir/build`` linked to ``scratch/wt-sc-fix/mlir/build`` (the SystemC
+   emitter fixes ``u1-pilot`` carries; the B1 core fix is **not** in it).
+   ``source examples/minitpu/harness/env-zhang21.sh`` (conda ``allo``,
+   ``OMP_NUM_THREADS=8``, Catapult 2024.2 SystemC and g++ 10.3 for csim).
+   Oracle: MiniTPU ``b3ba0a4d`` under Verilator 5.052. Stimulus:
+   ``bf16_mul.stimulus()`` = ``binary_bf16()`` + ``bf16_sweep_a()``,
+   **6,019,104** pairs (every ``a`` crossed with the 44 corners, both orders).
+
+Variants are in ``examples/minitpu/units/{bf16_mul,bf16_mul_pipe,mul_acc24}.py``;
+the RTL's deviations from IEEE are those measured in
+``u1_rtl_characterization_2026-10-02.rst`` (subnormal operands and products
+below ``2^-126`` flushed to signed zero; every NaN ``+0x7FC0`` /
+``+0x7FC000``; acc24 exact, no rounding).
+
+Results
+=======
+
+.. code-block:: text
+
+   $ $ALLO_PYTHON -m examples.minitpu.harness.check <unit> --backend simulator --backend systemc
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 16 12 52
+
+   * - unit
+     - variant
+     - backend
+     - verdict (of 6,019,104)
+   * - ``bf16_mul``
+     - ``native``
+     - simulator
+     - UNIT-DIFF 5,011,918; all 1,007,186 explained (below)
+   * -
+     -
+     - systemc
+     - UNIT-DIFF 5,011,890; all 1,007,214 explained
+   * -
+     - ``bits``
+     - simulator
+     - **UNIT-MATCH**, no workaround needed
+   * -
+     -
+     - systemc
+     - **UNIT-MATCH** (30 s)
+   * - ``bf16_mul_pipe``
+     - ``native``, ``bits``
+     - both
+     - as ``bf16_mul`` (same Allo programs; latency 2 is not checked, L1)
+   * -
+     - ``bits_pipe``
+     - simulator
+     - **UNIT-MATCH** after the B1 workaround (4,789,474 without it)
+   * -
+     -
+     - systemc
+     - **UNIT-MATCH**
+   * -
+     - ``stages``
+     - simulator
+     - **UNIT-MATCH** (317 s: the stream threads cost 3000x the one-kernel form)
+   * -
+     -
+     - systemc
+     - **UNIT-MATCH** (137 s)
+   * - ``mul_acc24``
+     - ``native``
+     - simulator
+     - UNIT-DIFF 4,668,187; all 1,350,917 explained
+   * -
+     -
+     - systemc
+     - **UNIT-FAIL**: g++ rejects the emitted bf16 -> f32 widening (S4)
+   * -
+     - ``native_bitext``
+     - simulator
+     - as ``native`` (identical counts)
+   * -
+     -
+     - systemc
+     - UNIT-DIFF 4,941,087; all 1,078,017 explained
+   * -
+     - ``bits``
+     - simulator
+     - **UNIT-MATCH**
+   * -
+     -
+     - systemc
+     - **UNIT-MATCH** (34 s)
+
+``native`` differences by ``EXPLAIN`` rule
+------------------------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 52 12 12 12 12
+
+   * - rule (first match wins)
+     - mul sim
+     - mul SystemC
+     - acc24 sim
+     - acc24 SystemC
+   * - Inf x 0: Allo a negative NaN, RTL ``+NaN``
+     - 24
+     - 12
+     - 24
+     - 12
+   * - NaN operand: Allo keeps a sign (and, f32, a payload), RTL ``+NaN``
+     - 403,846
+     - 403,886
+     - 676,774
+     - 403,886
+   * - subnormal operand flushed, IEEE a subnormal product
+     - 36,401
+     - 36,401
+     - 70,862
+     - 70,862
+   * - subnormal operand flushed, IEEE a normal product
+     - 514,904
+     - 514,904
+     - 514,840
+     - 514,840
+   * - product < ``2^-126`` flushed, IEEE a subnormal
+     - 51,958
+     - 51,958
+     - 88,417
+     - 88,417
+   * - product < ``2^-126`` flushed, IEEE rounds up to ``2^-126``
+     - 53
+     - 53
+     - --
+     - --
+   * - unexplained
+     - 0
+     - 0
+     - 0
+     - 0
+
+``acc24 SystemC`` is ``native_bitext``. Outside NaN, the simulator's
+``native`` is IEEE bit for bit: ``bf16_mul`` 6,019,104/6,019,104 against
+``ref.ieee_bf16_mul``; ``mul_acc24`` 6,019,073/6,019,104 against
+``ref.ieee_bf16_mul_acc24`` (W1). The flush classes have the same counts in both
+backends: ``ac_std_float`` has gradual underflow too.
+
+What the results say
+====================
+
+* **Both multipliers are expressible bit-exactly in Allo on both backends**,
+  as integer-field transcriptions of the ``.sv``. The comb ``vpu_bf16_mul``
+  needed no workaround at all: it computes the exponent as ``logic signed
+  [10:0]``, so its compares are signed and B1 never applies. ``mul_acc24``
+  compares only against literals, which B1 does not touch either.
+* **Allo's float types cannot state either multiplier.** ``bfloat16`` has IEEE
+  gradual underflow and no flush-to-zero mode; there is no acc24 type at all.
+  1.0 M (mul) and 1.35 M (acc24) of 6.0 M vectors differ, all by the RTL's
+  named rules (semantic mismatch, as for ``bf16_add``; the owner's triage
+  item 3 now has a flush-to-zero rule as well as NaN/zero rules).
+* **The pipelined unit is the comb unit, to Allo.** See L1-L3.
+
+Findings
+========
+
+Classes are README D-9's. B1, M1-M5 and S1-S3 are in
+``u1_bf16_add_bits_2026-10-02.rst``; only new ones, or new evidence, here.
+Repros: ``dev/records/minitpu/u1_mul/repros.py {s4,s5,n1}`` and
+``dev/records/minitpu/u1_mul/latency_probe.py``.
+
+B1 (again). The pipe's 9-bit unsigned exponent compare -- **bug**, new site
+---------------------------------------------------------------------------
+
+``vpu_bf16_mul_pipe`` stage 2 says ``exp_sum_s2 <= exp_bias_s2`` on two
+``logic [8:0]``. Transcribed as ``UInt(9) <= UInt(9)`` it is a signed
+``cmpi sle``, so every ``exp_sum_s2 >= 256`` (both exponents large) reads as
+negative and the product is flushed to zero: **1,229,630 / 6,019,104** wrong
+(``3f80*7f00: allo 0000 rtl 7f00``). Workaround: compare 10-bit copies
+(``sum10``/``bias10``), marked ``(B1)`` in ``bits_pipe`` and ``stages``. The
+other compare at that site, ``exp_sum_s2 >= exp_bias_s2 + 255``, is safe:
+the literal widens the right side to a signed ``Int(33)`` (M4's bottom-up
+widths, here helping). Same function in the comb module, no B1: the two RTL
+forms of one unit differ in whether Allo computes them right.
+
+N1. NaN sign: simulator and SystemC disagree on one Allo program -- **semantic mismatch** (between backends)
+------------------------------------------------------------------------------------------------------------
+
+``c = a * b`` on ``bfloat16``: the simulator (LLVM on x86) gives a NaN the
+sign of the NaN operand, and ``Inf x 0`` the x86 default NaN ``0xFFC0``;
+SystemC's ``ac::bfloat16`` gives every NaN the sign ``a ^ b``. Over the
+1,067,862 distinct stimulus pairs with a NaN or Inf operand the two backends
+differ on **403,397**. In float32 (``mul_acc24`` native) the simulator also
+keeps the operand's payload (``7f81 -> 7fc100``), ``ac_ieee_float<binary32>``
+does not (272,888 more differences in that class). MiniTPU gives ``+0x7FC0``
+always. For ``bf16_add`` the pilot saw a third encoding (``ac_std_float``
+``0x7FFF``) -- so the NaN a bf16 op returns depends on the operation and the
+backend, and the simulator is no stand-in for csim on NaNs.
+
+.. code-block:: text
+
+   a*b for a=[7fc0 ffc0 7f80 0000], b=[bf80 3f80 0000 ff80]
+   simulator  7fc0 ffc0 ffc0 ffc0
+   systemc    ffc0 ffc0 7fc0 ffc0
+   MiniTPU    7fc0 7fc0 7fc0 7fc0
+
+N2. No flush-to-zero float -- **missing abstraction** (semantic mismatch with the RTL)
+--------------------------------------------------------------------------------------
+
+Both multipliers flush subnormal operands and products below ``2^-126``; Allo's
+``bfloat16`` and ``float32`` are IEEE with gradual underflow in both backends,
+with no attribute or mode to change that. 603,316 (mul) and 674,119 (acc24)
+vectors, the four flush rows above. Only ``bits`` matches. Proposal: fold into
+triage item 3(b), a float type's *policy* (NaN encoding, signed-zero rule,
+denormal mode) as part of the type, since every machine has its own.
+
+W1. acc24 through float32 and bitcasts -- **workaround** (missing abstraction: no custom float format)
+------------------------------------------------------------------------------------------------------
+
+``native`` multiplies in ``float32``, bitcasts to ``uint32``, rounds to 15
+fraction bits by adding ``0x7F + lsb`` and returns ``bits >> 8`` in a
+``uint32``: the shape of ``microarch.py``'s ``acc24`` and
+``test_acc24_emulation_via_bitcast``. It is exact where the product is a
+float32 normal, but where it is a float32 subnormal the product is rounded
+twice (float32, then acc24): **31** vectors differ from IEEE acc24 by one
+acc24 ulp (``105b*a99f: allo 800008 ieee 800009``). All 31 are below
+``2^-126``, which the RTL flushes, so the RTL comparison does not see them
+(20 of them round to zero and so even agree with the RTL: the flush row has
+88,417 here against IEEE's 88,437) -- the emulation is wrong only where this
+RTL happens not to care. A
+``Float(e=8, m=15)`` (or ``ac_std_float<24,8>``-like) type would remove it.
+
+S4. SystemC emitter: ``bf16 -> f32`` widening does not compile -- **bug**
+-------------------------------------------------------------------------
+
+``av: float32 = a[i]`` with ``a: bfloat16[n]`` (an ``arith.extf``) is emitted
+as copy-initialisation, ``ac_ieee_float<binary32> v4 = v3;`` with ``v3`` an
+``ac::bfloat16``. The converting constructor is ``explicit``, so g++ rejects
+it ("conversion from 'ac::bfloat16' to non-scalar type
+'ac_ieee_float<binary32>' requested"). Every float-widening kernel with a bf16
+input fails csim (``test_acc24_emulation_via_bitcast`` has the same widening;
+it runs on the simulator only). Checked with Catapult's g++ 10.3 on a 6-line C++ file:
+``ac_ieee_float<binary32> f(b);`` compiles and gives ``1.5`` for ``1.5``.
+*Proposed fix:* ``VhlsModuleEmitter::emitCast``
+(``mlir/lib/Translation/EmitVivadoHLS.cpp:2613``), which the Catapult and
+SystemC emitters inherit, emits ``T v = x;``; for ``ExtFOp``/``TruncFOp``
+between two ``ac`` float types the SystemC emitter should emit
+``T v = T(x);``. ``TruncFOp`` (f32 -> bf16) is probably the same; not
+checked. *Workaround* (variant ``native_bitext``): widen on bit patterns,
+``ab: uint16 = a[i].bitcast(); aw: uint32 = ab; au: uint32 = aw << 16; av:
+float32 = au.bitcast()``. That needs M4's explicit widening before the
+shift.
+
+S5. SystemC csim cannot read back a ``UInt(24)`` port -- **bug** (runner)
+-------------------------------------------------------------------------
+
+``mul_acc24``'s natural port is ``UInt(24)[n]``. The simulator accepts it
+with a numpy ``uint32`` array and the ``bits`` variant matches with it; SystemC
+csim compiles and runs, then ``read_tensor_from_file`` (``allo/backend/vitis.py:496``)
+raises ``KeyError: 'ui24'`` because ``allo.utils.np_supported_types`` has only
+power-of-two widths. The committed variants use ``uint32`` ports (bits 31:24
+zero), a mild distortion of the interface. *Proposed fix:* map ``ui<N>``/``i<N>``
+to the smallest numpy container, as the simulator's argument path already does.
+
+L1. No way to state a unit's latency -- **missing abstraction**
+---------------------------------------------------------------
+
+``vpu_bf16_mul_pipe`` is ``vpu_bf16_mul`` with two register banks (latency 2,
+II 1). In Allo:
+
+* the **simulator** is untimed: the comb and pipe forms are the same program
+  and give the same 6,019,104 results; the harness's ``latency=2`` on the pipe
+  rows is the RTL's, not checked on the Allo side;
+* ``s.pipeline("mul_0:i")`` states an **initiation interval**, not a depth;
+  the depth is the HLS tool's choice (Catapult gave ``bf16_add`` latency 2 at
+  2.0 ns and 1 at 3.33 ns, ``u1_bf16_add_catapult_2026-10-02``). It does not
+  change csim timing (L2);
+* there is no primitive for "register here" or "this unit's latency is 2"
+  (``allo/customize.py`` has ``pipeline(axis, initiation_interval, rewind,
+  style)`` and nothing with latency). So a pipelined leaf can be written only
+  as its function plus a schedule hint; the latency the rest of MiniTPU relies
+  on (``vpu_alu`` aligns the multiplier with ``vpu_bf16_add_pipe``) is not in
+  the Allo program.
+
+For U1 the pipe is therefore **the comb unit's verdicts plus a recorded
+deviation (latency not expressible)**, the same call as triage item 4 for
+latency 0.
+
+L2. A Stream split at the register boundary is not a register -- **semantic mismatch** (csim timing)
+----------------------------------------------------------------------------------------------------
+
+``stages`` puts each ``*_s1_q`` register on its own ``Stream[T, 1]`` between
+kernel ``s1`` (the DSP product) and kernel ``s2`` (normalize, round,
+specials). Functionally it is exact on both backends. In time
+(``latency_probe.py``: testbench push/pop stamped with ``sc_time_stamp()``,
+1 ns clock, n = 8), measured as cycles from inputs accepted to output popped:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Allo program
+     - csim latency
+     - csim II
+     - RTL
+   * - ``bf16_mul.bits``
+     - 2
+     - 1
+     - comb: 0
+   * - ``bf16_mul.bits`` + ``s.pipeline("mul_0:i")``
+     - 2
+     - 1
+     -
+   * - ``bf16_mul_pipe.bits_pipe``
+     - 2
+     - 1
+     - pipe: 2, II 1
+   * - ``stages`` (depth-1 Streams)
+     - 4, then growing
+     - **2**
+     -
+   * - ``stages(depth=2)``
+     - 4
+     - 1
+     -
+
+So csim's timing is a property of the threads' ``wait()``\ s and the
+Connections buffers, not of the unit: comb and pipe both take 2 cycles, a
+``s.pipeline`` changes nothing, and a stream hop adds 2 cycles. A depth-1
+Stream, the obvious way to write "one register", **halves the throughput**: a
+handshaked one-place buffer cannot accept while full, and a pipeline register
+always can. Depth 2 restores II 1. Neither Allo backend can therefore check a
+declared latency; only RTL that a tool wrote from the Allo program can (the
+Catapult track).
+
+L3. Nothing in Allo is a pipeline register -- **missing abstraction**
+---------------------------------------------------------------------
+
+``Stream`` is a FIFO (L2), ``Channel`` a handshake with no storage, ``Wire``
+"zero storage and zero alignment" (``docs/source/backends/systemc.rst``,
+limitation 22); ``Wire``/``Channel`` are SystemC-only (that page: every
+other target raises ``NotImplementedError``; not re-tried here). None of them is "a register clocked every cycle,
+no handshake", which is what ``vpu_bf16_mul_pipe``'s ``*_s1_q`` and the
+MXU's PE registers are. *Proposal* (for the owner, with item 4): a
+``Reg[T]``/``delay(x, k)`` link or a ``latency=`` on ``@df.kernel``/
+``@df.unit`` that the simulator can ignore, the SystemC emitter can lower to
+registered ``sc_signal``\ s, and an RTL comparison can hold the tool to.
+
+What worked as written
+======================
+
+``UInt(8) * UInt(8)`` gives ``UInt(16)`` (no truncation of the DSP product);
+``Int(11)`` locals carry the RTL's ``logic signed [10:0]`` exponent including
+the ``- 126`` from an unsigned sum; four-term ``or`` conditions; slices of a
+signed ``Int(11)`` (``exp_final[0:8]``); ``a[i].bitcast()`` on a ``bfloat16``
+array element; a closure variable as a Stream depth (``Stream[T, depth]``);
+a ``UInt(24)`` port in the simulator.

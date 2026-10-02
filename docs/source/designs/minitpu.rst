@@ -744,3 +744,18 @@ Allo's simulator (``native``) matches the RTL on the other 250,955 vectors, and
 differs on exactly those 981: it keeps the NaN sign and gives ``+0``, as IEEE
 does. Whether a unit model should state the RTL's NaN and zero rules, and how
 Allo would let it, is an open question for the U1 review.
+
+The multipliers as measured, 2026-10-02
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``vpu_bf16_mul``, ``vpu_bf16_mul_pipe`` and ``mxu_bf16_mul_acc24`` over
+6,019,104 vectors (``dev/records/minitpu/u1_mul_2026-10-02.rst``). The
+``bits`` transcriptions match the RTL bit for bit in the simulator and in
+SystemC csim. ``native`` cannot: both units flush subnormals, on input and on
+output, and Allo's ``bfloat16``/``float32`` have gradual underflow with no
+flush-to-zero mode; there is no acc24 type, so ``mul_acc24``'s ``native`` is
+``float32`` plus bitcasts. On NaNs the two Allo backends disagree with each
+other on one program (the simulator keeps the NaN operand's sign, csim's
+``ac::bfloat16`` gives ``a ^ b``). The pipelined multiplier is, to Allo, the
+combinational one: the simulator is untimed, ``s.pipeline`` sets II and not
+depth, and a ``Stream`` between two stage kernels is a FIFO, not a register.
