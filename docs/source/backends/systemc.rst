@@ -301,3 +301,11 @@ one design per bug (it skips without ``MGC_HOME`` and ``SYSTEMC_HOME``).
   (2.3.2 and later); not under ``__SYNTHESIS__``, and not under Xcelium's own
   SystemC (``NCSC``), so **the testbench side of an RTL cosim still has this
   defect** -- a cosim mismatch on a signed zero is the testbench's, not the RTL's.
+- **Any region with a ``uint16`` port did not compile** (the ``bf16_add``
+  ``bits`` variant, S1 in ``dev/records/minitpu/u1_bf16_add_bits_2026-10-02.rst``).
+  A link's sign is not in its MLIR type (signless ``i16``); the emitter recovered
+  it from an ``unsigned`` attribute on the defining op or on a user. A kernel's
+  write port has only stores, which carry none, and a region's ports have no
+  tagged user at all, so both emitted as signed ``ac_int`` and could not bind to
+  the unsigned read port. A function argument's sign is now read from the
+  function's ``itypes``, as the HLS emitters do.

@@ -18,7 +18,7 @@ import numpy as np
 import pytest
 
 import allo.dataflow as df
-from allo.ir.types import bfloat16, float16, float32, int32, Stream
+from allo.ir.types import bfloat16, float16, float32, int32, uint16, UInt, Stream
 
 needs_csim = pytest.mark.skipif(
     not (os.environ.get("MGC_HOME") and os.environ.get("SYSTEMC_HOME")),
@@ -178,3 +178,29 @@ def test_signed_zero_survives_a_signal(T, reverse):
     _csim(_copy(T, len(a), reverse), a, b)
     got = b.view(bits.dtype)
     assert [hex(x) for x in got] == [hex(x) for x in bits]
+
+
+def _uint_copy(N):
+    @df.region()
+    def top(A: uint16[N], C: uint16[N]):
+        @df.kernel(mapping=[1], args=[A, C])
+        def k(a: uint16[N], c: uint16[N]):
+            for i in range(N):
+                c[i] = a[i]
+
+    return top
+
+
+@needs_csim
+def test_uint_ports_compile_and_run():
+    """S1: a UInt port's sign comes from the function's ``itypes``.
+
+    A kernel's write port (stores carry no ``unsigned`` attr) and every region
+    port (no tagged user at all) emitted as signed ``ac_int``, so binding them
+    to the unsigned read port failed g++ for any ``uint16`` region.
+    """
+    N = 8
+    a = np.array([0, 1, 0x7FFF, 0x8000, 0xFFFF, 0x1234, 0xBEEF, 0x8001], dtype=np.uint16)
+    c = np.zeros(N, dtype=np.uint16)
+    _csim(_uint_copy(N), a, c)
+    np.testing.assert_array_equal(c, a)
