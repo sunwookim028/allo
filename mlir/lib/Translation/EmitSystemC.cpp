@@ -905,11 +905,18 @@ bool SystemCModuleEmitter::isSeqStreamable(Value v) {  // new (SystemC-only)
     // Reject re-reads/re-writes: an identity a[iv] under an OUTER loop touches
     // each element more than once, which a stream (one element per handshake)
     // cannot reproduce. A 1-D single-pass scan sits inside exactly ONE loop.
+    // And it sits DIRECTLY in that loop: an access under an `if` (or any other
+    // region op) runs on some iterations only, so its Pop()/Push() would skip
+    // elements and the stream would fall out of step with the loop -- silently
+    // wrong values. Such an array takes the memory-port path instead.
     unsigned loops = 0;
     for (Operation *p = op->getParentOp();
-         p && !llvm::isa<func::FuncOp>(p); p = p->getParentOp())
+         p && !llvm::isa<func::FuncOp>(p); p = p->getParentOp()) {
       if (llvm::isa<affine::AffineForOp>(p))
         loops++;
+      else
+        return false; // conditional (scf.if/affine.if) or a non-affine loop
+    }
     if (loops != 1)
       return false;
   }
