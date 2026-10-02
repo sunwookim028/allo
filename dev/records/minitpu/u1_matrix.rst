@@ -24,15 +24,29 @@ zhang-21; MiniTPU at ``b3ba0a4d``; harness on branch ``u1-pilot``.
        ladder"). Allo's ``bfloat16`` has IEEE semantics with no way to state
        a unit's own NaN/zero rules.
    * - Allo simulator, ``bits``
-     - in progress (branch ``u1-bits``)
-     -
+     - **match** 251,936/251,936, **after a workaround for a core bug**:
+       **finding, bug B1** -- every ``<``/``<=``/``>``/``>=`` between unsigned
+       integers is lowered as a *signed* ``arith.cmpi`` (``allo/ir/builder.py``
+       picks the predicate from the MLIR type string, which is signless), so
+       ``uint8`` ``200 > 100`` is 0 in the simulator and LLVM backend but 1 in
+       HLS C++. Also B2 (bug: comparison typed as its operands, not ``uint1``),
+       M1-M3 (missing abstractions: bit concatenation, reduction-OR, ``[lo:hi)``
+       slices against SV's ``[hi:lo]``), M4-M5 (latent semantic mismatches:
+       expression widths sized bottom-up; shifts by >= width)
+     - ``u1_bf16_add_bits_2026-10-02.rst``. B1 confirmed independently; fix
+       and impact check on branch ``core-uint-compare`` (held for review).
+       Everything else in the RTL transcribed directly, including the nested
+       ``leading_zeros17`` function.
    * - SystemC csim, ``native``
      - **finding, bug** x3 (emitter): the ``ac::bfloat16`` ``sc_trace``
        overload is in the global namespace, invisible to ADL, so any bf16
        Connections port fails to compile; the testbench feeds all of input 0
        before input 1 from one thread, so any unit with two interleaved
        streamed inputs deadlocks (0 outputs, even at n=200); float values
-       cross the testbench as decimal text (``nan``/``inf``)
+       cross the testbench as decimal text (``nan``/``inf``). For ``bits``
+       (``uint16`` ports): S1, unsigned ports emitted as signed ``ac_int`` (any
+       ``uint16`` region fails to compile); S2, a nested function returning
+       ``UInt`` gets a signed result buffer
      - Fixes on branch ``systemc-u1-fixes``. The existing bf16 test only
        checked emission, so the compile error was never seen.
    * - Catapult csyn / RTL
