@@ -1,0 +1,91 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : rf_0
+Version: W-2024.09
+Date   : Fri Oct  2 13:54:38 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: rf_0_run_inst/v23_svs_reg
+              (rising edge-triggered flip-flop clocked by ideal_clock)
+  Endpoint: rf_0_run_inst/v24_reg[191]
+            (rising edge-triggered flip-flop clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  rf_0               5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                                       Fanout     Trans      Incr       Path
+  ------------------------------------------------------------------------------------
+  clock ideal_clock (rise edge)                                     0.00       0.00
+  clock network delay (ideal)                                       0.00       0.00
+  rf_0_run_inst/v23_svs_reg/CK (DFFR_X1)                  0.00      0.00       0.00 r
+  rf_0_run_inst/v23_svs_reg/Q (DFFR_X1)                   0.01      0.10       0.10 r
+  rf_0_run_inst/v23_svs (net)                   2                   0.00       0.10 r
+  rf_0_run_inst/U1878/A2 (NAND2_X1)                       0.01      0.01       0.12 r
+  rf_0_run_inst/U1878/ZN (NAND2_X1)                       0.01      0.02       0.14 f
+  rf_0_run_inst/n9 (net)                        2                   0.00       0.14 f
+  rf_0_run_inst/U1887/A2 (NOR2_X1)                        0.01      0.01       0.15 f
+  rf_0_run_inst/U1887/ZN (NOR2_X1)                        0.09      0.11       0.26 r
+  rf_0_run_inst/n47 (net)                       8                   0.00       0.26 r
+  rf_0_run_inst/U1955/A1 (NAND2_X1)                       0.09      0.02       0.28 r
+  rf_0_run_inst/U1955/ZN (NAND2_X1)                       0.09      0.14       0.42 f
+  rf_0_run_inst/n186 (net)                     20                   0.00       0.42 f
+  rf_0_run_inst/U16/A (CLKBUF_X1)                         0.09      0.02       0.44 f
+  rf_0_run_inst/U16/Z (CLKBUF_X1)                         0.11      0.18       0.61 f
+  rf_0_run_inst/n185 (net)                     20                   0.00       0.61 f
+  rf_0_run_inst/U43/A (CLKBUF_X2)                         0.11      0.02       0.64 f
+  rf_0_run_inst/U43/Z (CLKBUF_X2)                         0.06      0.12       0.75 f
+  rf_0_run_inst/n179 (net)                     20                   0.00       0.75 f
+  rf_0_run_inst/U10/A (CLKBUF_X1)                         0.06      0.02       0.77 f
+  rf_0_run_inst/U10/Z (CLKBUF_X1)                         0.11      0.17       0.94 f
+  rf_0_run_inst/n184 (net)                     20                   0.00       0.94 f
+  rf_0_run_inst/U4632/A (BUF_X1)                          0.11      0.02       0.96 f
+  rf_0_run_inst/U4632/Z (BUF_X1)                          0.05      0.12       1.08 f
+  rf_0_run_inst/n180 (net)                     18                   0.00       1.08 f
+  rf_0_run_inst/U4826/S (MUX2_X1)                         0.05      0.03       1.11 f
+  rf_0_run_inst/U4826/Z (MUX2_X1)                         0.01      0.07       1.18 f
+  rf_0_run_inst/mem_11_sva_dfm_mx1[191] (net)
+                                                4                   0.00       1.18 f
+  rf_0_run_inst/U12700/B (MUX2_X1)                        0.01      0.01       1.19 f
+  rf_0_run_inst/U12700/Z (MUX2_X1)                        0.01      0.06       1.25 f
+  rf_0_run_inst/n2685 (net)                     1                   0.00       1.25 f
+  rf_0_run_inst/U12713/B (MUX2_X1)                        0.01      0.01       1.26 f
+  rf_0_run_inst/U12713/Z (MUX2_X1)                        0.01      0.06       1.32 f
+  rf_0_run_inst/n2698 (net)                     1                   0.00       1.32 f
+  rf_0_run_inst/U12720/A (MUX2_X1)                        0.01      0.01       1.32 f
+  rf_0_run_inst/U12720/Z (MUX2_X1)                        0.01      0.06       1.38 f
+  rf_0_run_inst/n2705 (net)                     1                   0.00       1.38 f
+  rf_0_run_inst/U12723/B (MUX2_X1)                        0.01      0.01       1.39 f
+  rf_0_run_inst/U12723/Z (MUX2_X1)                        0.01      0.06       1.45 f
+  rf_0_run_inst/n2708 (net)                     1                   0.00       1.45 f
+  rf_0_run_inst/U12725/A (MUX2_X1)                        0.01      0.01       1.46 f
+  rf_0_run_inst/U12725/Z (MUX2_X1)                        0.01      0.06       1.51 f
+  rf_0_run_inst/N1188 (net)                     1                   0.00       1.51 f
+  rf_0_run_inst/v24_reg[191]/D (DFFR_X1)                  0.01      0.01       1.52 f
+  data arrival time                                                            1.52
+
+  clock ideal_clock (rise edge)                                     3.33       3.33
+  clock network delay (ideal)                                       0.00       3.33
+  rf_0_run_inst/v24_reg[191]/CK (DFFR_X1)                           0.00       3.33 r
+  library setup time                                               -0.04       3.29
+  data required time                                                           3.29
+  ------------------------------------------------------------------------------------
+  data required time                                                           3.29
+  data arrival time                                                           -1.52
+  ------------------------------------------------------------------------------------
+  slack (MET)                                                                  1.76
+
+
+1

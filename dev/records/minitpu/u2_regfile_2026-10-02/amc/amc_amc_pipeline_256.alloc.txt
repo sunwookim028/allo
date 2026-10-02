@@ -1,0 +1,104 @@
+module {
+  amc.memory @mem0() -> !amc.port<256xi8, static rw(1, 1)> {
+    %0 = amc.alloc on bram : !amc.ram<256xi8>
+    %1 = amc.create_port(%0 : !amc.ram<256xi8>) : !amc.port<256xi8, static rw(1, 1)>
+    amc.expose %1 : !amc.port<256xi8, static rw(1, 1)>
+  }
+  amc.memory @mem1() -> !amc.port<256xi8, static rw(1, 1)> {
+    %0 = amc.alloc on bram : !amc.ram<256xi8>
+    %1 = amc.create_port(%0 : !amc.ram<256xi8>) : !amc.port<256xi8, static rw(1, 1)>
+    amc.expose %1 : !amc.port<256xi8, static rw(1, 1)>
+  }
+  amc.memory @mem2() -> !amc.port<256xi8, static rw(1, 1)> {
+    %0 = amc.alloc on bram : !amc.ram<256xi8>
+    %1 = amc.create_port(%0 : !amc.ram<256xi8>) : !amc.port<256xi8, static rw(1, 1)>
+    amc.expose %1 : !amc.port<256xi8, static rw(1, 1)>
+  }
+  amc.memory @mem3() -> !amc.port<256xi8, static rw(1, 1)> {
+    %0 = amc.alloc on bram : !amc.ram<256xi8>
+    %1 = amc.create_port(%0 : !amc.ram<256xi8>) : !amc.port<256xi8, static rw(1, 1)>
+    amc.expose %1 : !amc.port<256xi8, static rw(1, 1)>
+  }
+  amc.memory @mem4() -> !amc.port<256xi16, static rw(1, 1)> {
+    %0 = amc.alloc on bram : !amc.ram<256xi16>
+    %1 = amc.create_port(%0 : !amc.ram<256xi16>) : !amc.port<256xi16, static rw(1, 1)>
+    amc.expose %1 : !amc.port<256xi16, static rw(1, 1)>
+  }
+  amc.memory @mem5() -> !amc.port<256xi8, static rw(1, 1)> {
+    %0 = amc.alloc on bram : !amc.ram<256xi8>
+    %1 = amc.create_port(%0 : !amc.ram<256xi8>) : !amc.port<256xi8, static rw(1, 1)>
+    amc.expose %1 : !amc.port<256xi8, static rw(1, 1)>
+  }
+  amc.memory @mem6() -> !amc.port<256xi16, static rw(1, 1)> {
+    %0 = amc.alloc on bram : !amc.ram<256xi16>
+    %1 = amc.create_port(%0 : !amc.ram<256xi16>) : !amc.port<256xi16, static rw(1, 1)>
+    amc.expose %1 : !amc.port<256xi16, static rw(1, 1)>
+  }
+  amc.memory @mem7() -> !amc.port<256xi16, static rw(1, 1)> {
+    %0 = amc.alloc on bram : !amc.ram<256xi16>
+    %1 = amc.create_port(%0 : !amc.ram<256xi16>) : !amc.port<256xi16, static rw(1, 1)>
+    amc.expose %1 : !amc.port<256xi16, static rw(1, 1)>
+  }
+  amc.memory @mem8() -> !amc.port<256xi16, static rw(1, 1)> {
+    %0 = amc.alloc on bram : !amc.ram<256xi16>
+    %1 = amc.create_port(%0 : !amc.ram<256xi16>) : !amc.port<256xi16, static rw(1, 1)>
+    amc.expose %1 : !amc.port<256xi16, static rw(1, 1)>
+  }
+  amc.memory @amcMemory0() -> (!amc.port<32xi16, dyn w(1)>, !amc.port<32xi16, dyn r(1)>, !amc.port<32xi16, dyn r(1)>, !amc.port<32xi16, dyn r(1)>, !amc.port<32xi16, dyn w(1)>) {
+    %0 = amc.alloc : !amc.ram<32xi16>
+    %1 = amc.create_port(%0 : !amc.ram<32xi16>) : !amc.port<32xi16, dyn w(1)>
+    %2 = amc.create_port(%0 : !amc.ram<32xi16>) : !amc.port<32xi16, dyn r(1)>
+    %3 = amc.create_port(%0 : !amc.ram<32xi16>) : !amc.port<32xi16, dyn r(1)>
+    %4 = amc.create_port(%0 : !amc.ram<32xi16>) : !amc.port<32xi16, dyn r(1)>
+    %5 = amc.create_port(%0 : !amc.ram<32xi16>) : !amc.port<32xi16, dyn w(1)>
+    amc.expose %1, %2, %3, %4, %5 : !amc.port<32xi16, dyn w(1)>, !amc.port<32xi16, dyn r(1)>, !amc.port<32xi16, dyn r(1)>, !amc.port<32xi16, dyn r(1)>, !amc.port<32xi16, dyn w(1)>
+  }
+  func.func @rf(%arg0: !amc.memory_ref<@mem0>, %arg1: !amc.memory_ref<@mem1>, %arg2: !amc.memory_ref<@mem2>, %arg3: !amc.memory_ref<@mem3>, %arg4: !amc.memory_ref<@mem4>, %arg5: !amc.memory_ref<@mem5>, %arg6: !amc.memory_ref<@mem6>, %arg7: !amc.memory_ref<@mem7>, %arg8: !amc.memory_ref<@mem8>) attributes {itypes = "uuuuuuuuu", otypes = "", top} {
+    %c0_i16 = arith.constant 0 : i16
+    %c0_i32 = arith.constant 0 : i32
+    %0 = amc.expand_ref(%arg8 : !amc.memory_ref<@mem8>) : !amc.port<256xi16, static rw(1, 1)>
+    %1 = amc.expand_ref(%arg7 : !amc.memory_ref<@mem7>) : !amc.port<256xi16, static rw(1, 1)>
+    %2 = amc.expand_ref(%arg6 : !amc.memory_ref<@mem6>) : !amc.port<256xi16, static rw(1, 1)>
+    %3 = amc.expand_ref(%arg5 : !amc.memory_ref<@mem5>) : !amc.port<256xi8, static rw(1, 1)>
+    %4 = amc.expand_ref(%arg4 : !amc.memory_ref<@mem4>) : !amc.port<256xi16, static rw(1, 1)>
+    %5 = amc.expand_ref(%arg3 : !amc.memory_ref<@mem3>) : !amc.port<256xi8, static rw(1, 1)>
+    %6 = amc.expand_ref(%arg2 : !amc.memory_ref<@mem2>) : !amc.port<256xi8, static rw(1, 1)>
+    %7 = amc.expand_ref(%arg1 : !amc.memory_ref<@mem1>) : !amc.port<256xi8, static rw(1, 1)>
+    %8 = amc.expand_ref(%arg0 : !amc.memory_ref<@mem0>) : !amc.port<256xi8, static rw(1, 1)>
+    %9:5 = amc.instance "amcMemory0_inst" @amcMemory0() : !amc.port<32xi16, dyn w(1)>, !amc.port<32xi16, dyn r(1)>, !amc.port<32xi16, dyn r(1)>, !amc.port<32xi16, dyn r(1)>, !amc.port<32xi16, dyn w(1)>
+    affine.for %arg9 = 0 to 32 {
+      amc.affine_store %c0_i16, %9#0[%arg9] : !amc.port<32xi16, dyn w(1)>
+    } {hls.pipeline}
+    affine.for %arg9 = 0 to 256 {
+      %10 = amc.affine_load %8[%arg9] : !amc.port<256xi8, static rw(1, 1)>
+      %11 = arith.extui %10 : i8 to i32
+      %12 = amc.affine_load %7[%arg9] : !amc.port<256xi8, static rw(1, 1)>
+      %13 = arith.extui %12 : i8 to i32
+      %14 = amc.affine_load %6[%arg9] : !amc.port<256xi8, static rw(1, 1)>
+      %15 = arith.extui %14 : i8 to i32
+      %16 = arith.index_cast %11 : i32 to index
+      %17 = amc.load %9#1[%16 : index] : !amc.port<32xi16, dyn r(1)>
+      amc.affine_store %17, %2[%arg9] : !amc.port<256xi16, static rw(1, 1)>
+      %18 = arith.index_cast %13 : i32 to index
+      %19 = amc.load %9#2[%18 : index] : !amc.port<32xi16, dyn r(1)>
+      amc.affine_store %19, %1[%arg9] : !amc.port<256xi16, static rw(1, 1)>
+      %20 = arith.index_cast %15 : i32 to index
+      %21 = amc.load %9#3[%20 : index] : !amc.port<32xi16, dyn r(1)>
+      amc.affine_store %21, %0[%arg9] : !amc.port<256xi16, static rw(1, 1)>
+      %22 = amc.affine_load %5[%arg9] : !amc.port<256xi8, static rw(1, 1)>
+      %23 = arith.extui %22 : i8 to i32
+      %24 = amc.affine_load %4[%arg9] : !amc.port<256xi16, static rw(1, 1)>
+      %25 = amc.affine_load %3[%arg9] : !amc.port<256xi8, static rw(1, 1)>
+      %26 = arith.extui %25 : i8 to i32
+      %27 = arith.cmpi ne, %26, %c0_i32 : i32
+      %28:2 = scf.if %27 -> (i32, i16) {
+        %29 = arith.index_cast %23 : i32 to index
+        amc.store %24, %9#4[%29 : index] : !amc.port<32xi16, dyn w(1)>
+        scf.yield %23, %24 : i32, i16
+      } else {
+        scf.yield %23, %24 : i32, i16
+      }
+    } {hls.pipeline, loop_name = "t", op_name = "S_t_0"}
+    return
+  }
+}

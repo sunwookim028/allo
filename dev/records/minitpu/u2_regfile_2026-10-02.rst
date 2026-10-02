@@ -1,0 +1,471 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+###########################################################
+U2 pilot: ``vpu_regfile`` across every tool column
+###########################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-02.** zhang-21, branch ``u2-regfile``
+   (``origin/u1-with-core-fixes`` at ``fd076a86`` + ``origin/u2-phase0``
+   (``aba49aff``) + ``origin/u1-pilot`` (``bc7399b6``, for the Catapult
+   scripts); no conflicts). Bindings: a private copy of ``wt-combo``'s build
+   of ``fd076a86`` (``ldd`` resolves ``libAlloMLIRAggregateCAPI`` inside the
+   worktree). MiniTPU at ``b3ba0a4d``, read only. Verilator 5.052, Catapult
+   2024.2 (``nangate-45nm_beh``), DC W-2024.09 (FreePDK45, the U1 flow,
+   ``dc_u1.tcl`` byte-identical), RTLGen ``allo-rtlgen`` @ ``13b55a63``, AMC
+   ``fe60c121``. Nothing under ``allo/`` or ``mlir/`` changed: every core or
+   emitter defect below is recorded with a repro and a proposed fix only.
+
+This is the owner-approved pilot of U2 (README D-9): one storage unit through
+every column before the rest of U2. The product is the findings; matching the
+RTL is the goal.
+
+Reproduce (``source examples/minitpu/harness/env-zhang21.sh`` first)::
+
+   $ALLO_PYTHON -m examples.minitpu.harness.check vpu_regfile --variant trace \
+       --backend simulator --backend systemc                  # any VARIANTS key
+   $ALLO_PYTHON dev/records/minitpu/u2_regfile_2026-10-02/scripts/emit_csyn.py \
+       vpu_regfile wire <prj> --n 64 --pipeline rf_0:_ --synth-top rf_0 \
+       --clock 3.33 --partition rf_0:mem [--width 256]        # Catapult
+   $ALLO_PYTHON dev/records/minitpu/u2_regfile_2026-10-02/scripts/cmp_trace.py <prj> [--inst w256]
+   $ALLO_PYTHON dev/records/minitpu/u2_regfile_2026-10-02/repros.py   # every finding, ~3 min
+
+RTLGen and AMC scripts are in ``rtlgen/`` and ``amc/`` beside this file and
+run in those tools' own environments (``u1_bf16_add_rtlgen/env.sh``,
+``u1_bf16_add_amc/env.sh``); ``rtlgen/trace_io.py`` (Allo env) dumps the
+trace with MiniTPU's responses and compares their outputs.
+
+What "cycle" means in each column
+=================================
+
+The command trace is the U2 Phase 0 one: every ``traces("w16")`` trace and
+the ``tb_vpu_alu_regfile`` seed **joined end to end** (60,261 cycles; w256:
+15,249). Joining matters for the mask census: the regfile is never reset, so
+after the first trace every register is written and only **3** slots are
+undefined (``uninit``), against 484 when each trace runs from power-on
+(Phase 0). The responses are compared on the 180,780 defined slots (w256:
+45,744).
+
+* **Allo simulator**: untimed. Cycle ``t`` is iteration ``t`` of the unit's
+  loop, so the check is an *order* check: the three reads of ``t`` see every
+  write before ``t`` and not the write of ``t``. That is exactly the RTL's
+  "read old on same-cycle write, write visible next cycle".
+* **SystemC csim**: values per iteration; the time a value appears is not
+  checked (the arrays become Connections streams; csim cycles are the
+  handshakes', ``u1_pipe``).
+* **Catapult RTL** (``wire`` variant, Wire ports = plain ``sc_in``/``sc_out``):
+  driven per clock by the harness ``trace`` shape with MiniTPU's own command
+  trace, and compared per clock. Read latency and write visibility are
+  measured on the RTL (step probes, and the output offset at which every
+  defined slot agrees).
+* **RTLGen / AMC**: array ports (``A_rd0_*``), so per-iteration values and a
+  total cycle count; the port timing of one access is not observable.
+
+Variants (``examples/minitpu/units/vpu_regfile.py``)
+====================================================
+
+All take one array per RTL input port (``UInt(5)`` addresses, ``UInt(W)``
+data, ``uint1`` we) and return one per read port, from the same trace.
+
+=================  =======================================================================================
+variant            expression (plan id)
+=================  =======================================================================================
+``trace``          R1: one kernel, kernel-local ``mem: UInt(W)[32]``; per iteration 3 reads then the write
+``trace_raw``      ``trace`` as first written, without the B4/S6 workarounds (evidence only)
+``stateful``       R2: ``mem @ Stateful``; the trace fed in 1,024-cycle chunks over calls of one module
+``ported``         R3: ``@df.unit`` with 6 command + 3 response ``Stream`` ports, lockstep; driver/sink kernels
+``shared``         R4: region-scope ``@ Stateful`` regfile, 3 reader kernels + 1 writer kernel, nothing else
+``shared_sync``    R4 + explicit per-cycle order: token streams reader->writer ("read t done") and back
+``annotated``      R5: ``trace`` + ``@ Memory(resource="LUTRAM", storage_type="RAM_1WNR", latency=0, depth=32)``
+``wire``           ``trace``'s body with ``Wire`` ports, unit kernel ``rf_0`` (the Catapult port shape)
+=================  =======================================================================================
+
+R6 (port-server kernels) was not built: R4 with ``shared_sync`` already is the
+"one kernel per physical port" shape, and the conflict probe it was for (plan
+2c ii) has nothing to probe in this unit (one write port by construction;
+H11 below).
+
+Results (w16 unless marked)
+===========================
+
+.. list-table::
+   :header-rows: 1
+   :widths: 13 22 22 43
+
+   * - variant
+     - Allo simulator
+     - SystemC csim
+     - notes
+   * - ``trace``
+     - **match** 180,780/180,780
+     - **match** 180,780/180,780
+     - after workarounds B4 (sim) and S6 (csim); as first written (``trace_raw``) the simulator
+       matched **by accident** (B4: out-of-bounds aliasing) and csim gave 1,266/180,780 (S6)
+   * - ``stateful``
+     - **match** 180,780/180,780
+     - **finding** 170,093/180,780
+     - csim re-runs a fresh process per call and resets ``@ Stateful``: the 10,687 misses
+       are reads, after a chunk boundary, of registers written in an earlier chunk (semantic
+       mismatch M1)
+   * - ``ported``
+     - **match** 180,780/180,780
+     - **match** 180,780/180,780
+     - needed B5's two-step widen; C9 again (unit factory per ``(n, w)``)
+   * - ``shared``
+     - **finding** 8,502/180,780 (two runs, identical)
+     - **refused**
+     - simulator: the readers ran before the writer and read the initializer; no refusal, no
+       diagnostic (M2). SystemC: "stateful variable ... is used by 4 kernels" (D-1 honoured)
+   * - ``shared_sync``
+     - **match** 180,780/180,780
+     - **refused**
+     - the simulator honours region-scope sharing once the order is in streams; SystemC refuses
+       sharing regardless of the order (no way to say "one memory, 4 ports": gap G1)
+   * - ``annotated``
+     - **match** (annotation ignored)
+     - **match** (annotation dropped)
+     - H3: ``latency``/``depth`` never reach the IR; SystemC emission byte-identical to ``trace``
+   * - ``wire``
+     - **blocked**: ``missing LLVMTranslationDialectInterface ... func.func``
+     - **finding** values right, per-port skew +4/+3/+3 cycles, tail slots lost
+     - csim's src/sink kernels are not cycle-locked to ``rf_0`` (limitation 22); the unit
+       kernel itself is exact in RTL (next table)
+
+Catapult (``wire``, ``synth_top=rf_0``, ``s.pipeline("rf_0:_")``):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 26 16 26 32
+
+   * - build
+     - csyn
+     - per-cycle vs MiniTPU RTL
+     - measured timing
+   * - no partition, 3.33 / 2.0 ns
+     - **SCHD-30** (both)
+     - --
+     - ``mem`` mapped to ``ccs_ram_sync_1R1W``: 3 reads + 1 write cannot meet II=1 (H5)
+   * - ``s.partition(mem, Complete)``, 3.33 ns
+     - ok, 43 s, II=1, latency 2
+     - **180,780/180,780**
+     - read **1** edge (MiniTPU 0); write->read **2** (MiniTPU 1): a uniform one-edge shift
+   * - same, 2.0 ns
+     - ok, 40 s
+     - **180,780/180,780**
+     - same (1 / 2)
+   * - same, **w256**, 3.33 ns
+     - ok after a TB hand-patch (S7)
+     - **45,744/45,744**
+     - same (1 / 2)
+
+The emitter honours Allo's ``s.partition`` here: it emits
+``#pragma hls_resource mem_rsc variables="mem" map_to_module="[Register]"``,
+and Catapult obeys it (CIN-341). No hand-patch to ``kernel.cpp`` for w16.
+
+Same-flow area and timing (DC W-2024.09, FreePDK45, ``dc_u1.tcl`` unchanged; all close):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 13 13 13 13 14
+
+   * - design
+     - clock
+     - area (um^2)
+     - comb
+     - seq
+     - slack (ns)
+   * - MiniTPU ``vpu_regfile`` (async reads)
+     - 2.0 / 3.33
+     - 4,021.7
+     - 1,578.7
+     - 2,442.9
+     - 1.47 / 2.80
+   * - MiniTPU + 3 output registers (``mtpu_rf_oreg.sv``)
+     - 2.0 / 3.33
+     - 4,238.7
+     - 1,578.7
+     - 2,660.0
+     - 1.48 / 2.81
+   * - Catapult ``wire`` + partition
+     - 2.0 / 3.33
+     - **5,865.3** (+38 % vs oreg)
+     - 2,626.8
+     - 3,238.6
+     - 1.17 / 2.50
+   * - MiniTPU w256 (``mtpu_rf256``) / + oreg
+     - 3.33
+     - 82,738.8 / 86,211.7
+     - 45,566.9
+     - 37,171.9 / 40,644.8
+     - 1.95 / 2.12
+   * - Catapult w256 ``wire`` + partition
+     - 3.33
+     - **110,805.2** (+29 % vs oreg)
+     - 61,601.9
+     - 49,203.4
+     - 1.76
+
+Like for like is MiniTPU plus output registers (Catapult's port shape at
+read latency 1). Catapult's extra area is combinational (+66 % at w16) and
+sequential (+22 %): its input registers and the read mux tree. In ASIC both
+designs are flops; MiniTPU's ``ram_style = "distributed"`` LUTRAM is an FPGA
+property.
+
+RTLGen (R1 transcribed to its frontend, ``rtlgen/rf_rtlgen.py``; one cosim of
+the whole trace, ``timeout`` raised):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 25 45
+
+   * - build
+     - vs MiniTPU (defined)
+     - cycles / structure
+   * - as written
+     - **180,780/180,780**
+     - 180,784 cycles (**II=3**). ``mem`` becomes **two** registered-read 1R1W copies, every write
+       sent to both (a write-broadcast replica, chosen by RTLGen itself); the conditional store
+       became a read-modify-write (``we ? wd : old``), which costs a read port
+   * - ``partition("mem", Complete)``
+     - **180,780/180,780**
+     - 60,262 cycles (**II=1**), 32 registers
+   * - ``Stateful``, 8 chunks of 8,192
+     - 179,534/180,780
+     - every ``cosim()`` re-instantiates the RTL: state does not persist across calls (M1 again)
+
+AMC (R1 through AMC's vendored frontend, ``amc/rf_amc.py``):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 25 45
+
+   * - build
+     - vs MiniTPU (defined)
+     - cycles / structure
+   * - as written, ``llvm`` and ``amc``
+     - **180,780/180,780** (both)
+     - ~4.1 cycles/iteration (1,059 for 256)
+   * - ``s.pipeline(t)``
+     - **180,780/180,780**
+     - 180,821 cycles (**II=3**). The allocator declares ``amcMemory0`` with **5 logical ports**
+       ``(w, r, r, r, w)``, each ``dyn ... (1)`` (registered, latency 1), and implements **2
+       physical** (``p0`` rw, ``p1`` r) -- time-multiplexed, neither refused nor replicated
+   * - ``s.partition(mem, complete)`` + pipeline
+     - **blocked**
+     - ``problem is infeasible``, then ``'amc.memory' op amc-to-hw: exposed read port produced
+       no rd_data signal``; ``lower_loopschedule_to_fsm failed``
+
+256-bit instance (H8): the simulator accepts a ``uint64`` array for
+``UInt(256)`` with a warning, then corrupts the heap (``malloc_consolidate():
+invalid chunk size``, hang; B6); an object array is refused (``dtype('O') is
+not in list``). SystemC csim builds and fails reading back: ``KeyError
+'ui256'`` (the S5 class). Catapult needed S7's TB hand-patch, then matched.
+RTLGen and AMC were not tried at 256 b.
+
+Findings
+========
+
+Each has a minimal repro in ``u2_regfile_2026-10-02/repros.py`` (output in
+``logs/repros.txt``) unless noted.
+
+**B4 (Allo core, bug, silent; high).** An unsigned array index is
+sign-extended on the simulator/LLVM path: ``allo/ir/builder.py:569`` maps
+``(UInt, Index)`` to ``arith.IndexCastOp`` (signed) instead of
+``IndexCastUIOp``. ``mem[ra[t]]`` with ``UInt(5)`` 20 reads ``mem[-12]``; a
+``uint8`` index of 200 reads ``mem[-56]``. Repro: ``uint8 [1,200,255,128] ->
+[1,1,0,0]``. The regfile ``trace`` variant *matched* as written, because 16..31
+alias 32 distinct out-of-bounds words consistently; the same expression on a
+region-scope global segfaulted (``shared_sync``). The HLS C++ emitters are not
+affected (``ap_uint`` index). *Proposed fix:* ``IndexCastUIOp`` for
+``(UInt, Index)`` and ``(Index, UInt)``, with the B1 tests' pattern. Same
+family as B1 (signedness read off a signless type); anything indexing by an
+unsigned value at or above half its range is wrong in the simulator today.
+
+**B5 (Allo core, bug, loud).** ``x: int32 = s.get()`` on a
+``Stream[UInt(5)]`` stores the ``i5`` into an ``i32`` memref with no cast;
+the verifier refuses (``'affine.store' op value to store must have the same
+type``). Workaround: ``a5: UInt(5) = s.get(); a: int32 = a5``.
+
+**S6 (SystemC emitter, bug, silent).** An argument array read under a
+condition becomes a conditional ``Pop()`` on the Connections stream the
+array is turned into, so the stream falls out of step with the loop:
+``if we[t]: mem[wa[t]] = wd[t]`` pops ``wa``/``wd`` only when ``we``.
+``trace_raw`` csim: 1,266/180,780. Repro (6 elements): simulator
+``[10,10,10,13,13,15]``, csim ``[10,10,10,11,11,12]``. *Proposed fix:* the
+stream conversion must refuse (or hoist) an argument access that is not
+executed exactly once per iteration, as e238e410 refuses a written-and-read
+array.
+
+**B6 (simulator, bug, silent corruption).** A numpy array narrower than the
+kernel's element type (``uint64`` for ``UInt(256)``) is accepted with an
+``Input type mismatch`` *warning* and read past its end (repro: SIGABRT at
+n=4; at the regfile: heap corruption and a hang). *Proposed fix:* refuse a
+narrower dtype (D-1), and say how to pass > 64-bit elements -- today there is
+no way to (H8).
+
+**S7 (SystemC emitter, bug, loud).** The emitted csim testbench reads and
+writes every port through ``long long``: at 256 b Catapult refuses the
+``kernel.cpp`` it is given (``no suitable conversion function from
+ap_uint<256> to long long``, CRD-413), because the TB is in the file it
+compiles even when ``synth_top`` is the unit; csim fails at read-back
+(``KeyError 'ui256'``, S5's class). Hand-patch for Catapult:
+``catapult/wire_part_w256_n64_3p33/hand_patches.diff`` (``.to_int64()``; the
+TB is not synthesized). *Proposed fix:* wide ports through a word-split file
+format, and the TB under ``#ifndef __SYNTHESIS__``.
+
+**M1 (semantic mismatch): ``@ Stateful`` across calls.** The simulator keeps
+a Stateful across calls of one module (the documented contract). SystemC csim
+starts a new process per call and runs the reset action, so the state is
+reinitialised (``stateful`` csim 170,093/180,780); RTLGen's ``cosim()``
+re-instantiates the RTL per call (179,534/180,780). In RTL the contract is
+"between resets" -- which no column can test across calls today.
+
+**M2 (semantic mismatch, simulator): shared Stateful without order.**
+``shared`` gives 8,502/180,780 with no diagnostic: four kernels share the
+array and nothing orders them, so the readers finish before the writer
+starts (deterministic in two runs, not guaranteed). The RTL's order is the
+clock; Allo can state it only as explicit token streams (``shared_sync``,
+which matches). SystemC refuses both, correctly.
+
+**G1 (missing abstraction): one memory, several ports.** The regfile is
+expressible only as *one kernel that owns the array* (``trace``/``ported``/
+``wire``). "One memory, three read ports and one write port, used by
+different state machines" -- the shape U2 is about -- is refused by SystemC
+(region Stateful and region-argument sharing both), refused by ``compose``,
+honoured unordered by the simulator (M2), and nowhere can a port count or a
+port latency be stated. RTLGen and AMC each *infer* ports (RTLGen: a
+write-broadcast replica; AMC: 5 logical ports on 2 physical) but neither
+lets the user state them. This is the plan's "``compose`` declares memory
+ports" item; the regfile is its first concrete case.
+
+**G2 (missing abstraction): asynchronous read (H4).** No generated RTL can
+read in the cycle of the request. Catapult: read latency 1, write->read 2,
+measured, on both clocks and both widths -- a uniform one-edge shift, so the
+relative order (read old on same-cycle write; write visible next) is
+preserved. RTLGen and AMC: registered reads (``mem_c0_rd0_reg``; ``r(1)``).
+The ``Wire`` port shape does not help: a ``sc_in`` read is not a schedulable
+op (U1 N2).
+
+**H5/W1 (workaround): complete partition.** Catapult's default mapping of a
+32-entry array is a 1R1W sync RAM, which cannot serve 3 reads + 1 write per
+iteration (SCHD-30). Allo's own ``s.partition(..., Complete)`` fixes it, and
+the emitter translates it into a Catapult directive -- the correct D-1
+behaviour for that directive. The same partition gives RTLGen II=1 and
+blocks AMC.
+
+**D-1 sweep of ``Memory(...)`` (H3, bug by D-1).** ``Memory(latency=0,
+depth=32)`` never reaches the IR (``memref<32xi16, 52 : i32>`` carries only
+resource x 16 + storage). SystemC/Catapult drops the whole annotation
+(``kernel.cpp`` and ``run.tcl`` byte-identical with and without it). Vitis
+keeps resource and storage only (``#pragma HLS bind_storage variable=mem
+type=ram_1wnr impl=lutram``, no ``latency=``). Nothing refuses.
+
+**Minor.**
+
+* The simulator does not refuse ``Wire``: the build reaches LLVM translation
+  and stops with ``missing LLVMTranslationDialectInterface registration ...
+  func.func`` (loud, but not a refusal naming the construct).
+* The simulator aborts or segfaults *at exit* after some runs (``ported``,
+  ``annotated``): the known OMP-at-exit pitfall; results were complete.
+* Catapult builds into ``Catapult_1/`` when a previous failed run left
+  ``Catapult/``; scripts that hard-code ``Catapult/<top>.v1`` read stale or
+  missing RTL.
+
+Hypotheses (plan section 4) that apply to the regfile
+======================================================
+
+.. list-table::
+   :header-rows: 1
+   :widths: 8 18 74
+
+   * - #
+     - verdict
+     - evidence
+   * - H1
+     - **refuted** as stated
+     - Every column matches in the end (simulator, csim, Catapult RTL at L=1, RTLGen, AMC),
+       but not first time: three workarounds (B4, B5, S6), and the simulator's first "match"
+       was an accident of B4
+   * - H2
+     - **refuted for SystemC**; confirmed for the simulator
+     - SystemC refuses region-scope sharing (since ``a7b6d0ca``, 2026-08-16) and mixed
+       region-argument sharing; the "silent replica" no longer exists. Simulator: unordered and
+       silent (M2). Vitis and ``compose`` not re-run (refusals verified by source in the plan)
+   * - H3
+     - **confirmed**
+     - see the D-1 sweep above
+   * - H4
+     - **confirmed**
+     - G2: Catapult measured read 1 / write->read 2; RTLGen and AMC registered reads
+   * - H5
+     - **confirmed** (SCHD-30); "area far above" **refuted**
+     - partition gives II=1 at +38 % (w16) / +29 % (w256) over MiniTPU + output registers
+   * - H8
+     - **confirmed** at 256 b
+     - B6 (simulator), S7 (csim and Catapult TB); Catapult RTL itself fine
+   * - H9
+     - **confirmed** (C9)
+     - ``ported`` needs a unit factory per ``(n, w)``; Stateful naming not exercised (one instance)
+   * - H10
+     - **partly confirmed**
+     - AMC declares 3 read ports + 2 write ports, all registered, and implements 2 physical
+       ports at II=3; it neither refuses nor replicates; partition is blocked
+   * - H11
+     - n/a for this unit
+     - one write port by construction; the refused conflicts are ``vpu.sv``'s (plan 2c)
+   * - H13
+     - not run
+     - owner: NaN/zero do not matter here
+   * - H14
+     - not reproduced
+     - no variant reads back its own output element
+
+What the owner must decide before the rest of U2
+================================================
+
+1. **B4 now.** One line in ``builder.py``, silent, and it touches every
+   unsigned index at or above half its range in the simulator -- U1 units,
+   TinyTPU and MiniTPU programs included. *[fix on a ``core-*`` branch with
+   tests, check TinyTPU gates and U1 verdicts unchanged, as for B1]*
+2. **S6, B5, B6, S7.** *[S6 refusal in the emitter first (silent); B6 refusal
+   in the simulator; B5 and S7 with their tests]*
+3. **Async read = latency 1 (triage 4 extended to ports).** Catapult measured
+   a uniform one-edge shift that keeps the read/write order. Accept as a
+   recorded deviation, so ``vpu_regfile``'s Catapult cell is "match at L=1"?
+   *[yes; the ports' declared latency becomes part of the latency proposal,
+   triage 8]*
+4. **Stateful across calls (M1).** Define it: persists until reset, and
+   csim/cosim reset per call, or csim/cosim keep one process across calls?
+   *[for U2 verdicts, single-call variants only (``trace``, ``ported``,
+   ``wire``); M1 to limitations]*
+5. **Memory ports (G1, plan Q8).** U2's remaining shared-memory units
+   (``vpu_word_array``'s two ports) hit the same wall. Approve drafting the
+   D-n for "``compose`` declares memory ports", with RTLGen's write-broadcast
+   replica as the SystemC lowering for N read ports?
+6. **``Memory(latency=, depth=)``.** Refuse the fields a backend drops (D-1),
+   or implement them (SystemC: Catapult ``-STAGE_REPLICATION``/latency
+   directives)? *[refuse now; implement with item 5]*
+7. **Expressions for the rest of U2.** *[R1 ``trace`` as reference, R3
+   ``ported`` for the composition track, ``wire`` + partition for Catapult;
+   ``stateful`` and ``shared`` stay as probes, not verdict variants]*
+8. **Joined traces.** One joined trace masks 3 slots instead of 484. Keep
+   joined (one build per column, as here), or run the power-on traces
+   separately for the undefined-slot census? *[joined for verdicts; Phase 0
+   keeps the census]*
+
+Files
+=====
+
+* ``examples/minitpu/units/vpu_regfile.py``: the variants.
+* ``examples/minitpu/harness/check.py``: the ``trace``-shape path
+  (``check_trace``: joined traces, defined-slot compare, masked census).
+* ``u2_regfile_2026-10-02/scripts/``: ``emit_csyn.py`` (U1's, plus
+  ``--partition``, ``--width``, ``--pre-tcl``), ``cmp_trace.py``,
+  ``run_check.sh``, ``wire_csim_offset.py``, ``w256_probe.py``, ``dc/``
+  (``run_dc.sh``, ``dc_runs.txt``, ``mtpu_rf_oreg.sv``, ``mtpu_rf256.sv``).
+* ``logs/`` (verdict lines per variant x backend), ``catapult/``
+  (``run.tcl``, ``csyn.log.gz``, ``rtl.rpt.gz``, ``cycle.rpt``,
+  ``cmp_*.txt``), ``dc/`` (area/timing/qor/reference), ``rtlgen/``,
+  ``amc/`` (scripts, run logs, the allocation and ``amcMemory0_impl.sv``).

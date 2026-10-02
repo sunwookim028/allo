@@ -16,9 +16,63 @@ Declared latencies (``vpu_regfile.sv`` comment "Three async reads, one sync
 write"; ``REGISTER_FILE.md``): read 0 edges on every port; write visible to a
 read 1 edge later.
 
-No Allo variant yet: the expression waits for the owner (U2 plan,
-checkpoint 1).
+Allo variants (U2 pilot, ``dev/records/minitpu/u2_regfile_2026-10-02.rst``).
+Every variant is driven by the SAME per-cycle command trace as the RTL: one
+array per input port, one element per cycle, and returns one array per read
+port, one element per cycle. Addresses are ``UInt(5)``, data ``UInt(W)``,
+``we`` ``uint1`` -- the RTL's port widths. "Cycle ``t``" is iteration ``t`` of
+the unit's loop: on the simulator it is only an order (reads of iteration
+``t`` before its write, before iteration ``t + 1``); in SystemC csim and
+Catapult RTL a cycle is whatever the schedule makes of an iteration, which
+``check.py`` does not measure and the Catapult track measures on the RTL.
+
+``trace`` (plan R1)
+    One kernel, a kernel-local ``mem: UInt(W)[32]``. Per iteration: the three
+    reads, *then* the write. A same-cycle read and write of one VREG reads the
+    old value by program order.
+``stateful`` (R2)
+    ``trace`` with ``mem`` declared ``@ Stateful``, and the trace fed in
+    chunks of ``CHUNK`` cycles over successive calls of one built module.
+``ported`` (R3)
+    A ``@df.unit`` whose six command ports and three response ports are
+    ``Stream``\ s, one token per port per cycle (lockstep), between a driver
+    kernel that replays the trace and a sink that records it.
+``shared`` (R4, as the plan words it)
+    A region-scope ``@ Stateful`` regfile, one kernel per physical port: three
+    reader kernels and one writer kernel, with no other link between them.
+    Nothing orders a read of cycle ``t`` against the write of cycle ``t - 1``.
+``shared_sync`` (R4 + an ordering the RTL gets from the clock)
+    ``shared`` with token streams that make the per-cycle order explicit:
+    each reader signals "read ``t`` done" to the writer; the writer, after
+    all three, writes and signals "write ``t`` done" to each reader.
+``annotated`` (R5)
+    ``trace`` with ``mem @ Memory(resource="LUTRAM", storage_type="RAM_1WNR",
+    latency=0, depth=32)``: the D-1 sweep (which backend honours, refuses or
+    drops each field).
+``wire`` (Catapult port shape)
+    ``trace``'s body with every port a ``Wire`` (``sc_in``/``sc_out``): the
+    port shape of MiniTPU's module. SystemC only. Synthesized with
+    ``s.partition("rf_0:mem")`` (complete) -- without it Catapult maps ``mem``
+    to a 1R1W RAM and fails SCHD-30 at II=1.
+``trace_raw``
+    ``trace`` as first written (no workarounds); evidence only.
+
+Workarounds every variant carries (``u2_regfile_2026-10-02.rst``):
+
+* **B4**: an unsigned index is sign-extended on the simulator/LLVM path, so
+  every address is widened to ``int32`` before it indexes ``mem``.
+* **B5**: ``x: int32 = s.get()`` on a ``UInt(5)`` stream does not cast, so
+  stream addresses are read into a ``UInt(5)`` first, then widened.
+* **S6**: the SystemC emitter turns an argument array read under ``if`` into
+  a conditional stream ``Pop()``, so ``waddr``/``wdata`` are read
+  unconditionally and only the store is under ``if we``.
 """
+
+import numpy as np
+
+import allo.dataflow as df
+from allo.ir.types import Stateful, Stream, UInt, Wire, int32, uint1
+from allo.memory import Memory
 
 from examples.minitpu.harness import ref, rtl
 from examples.minitpu.harness.traces import Trace, concat, hot_addr, rng_for, word
@@ -44,7 +98,9 @@ INSTANCES = {"w16": _unit(16), "w256": _unit(256)}
 WIDTH = {"w16": 16, "w256": 256}
 DEFAULT = "w16"
 RTL = INSTANCES[DEFAULT]
-VARIANTS = {}
+CMD = ("raddr_a_i", "raddr_b_i", "raddr_c_i", "waddr_i", "wdata_i", "we_i")
+RESP = ("rdata_a_o", "rdata_b_o", "rdata_c_o")
+CHUNK = 1024  # ``stateful``: cycles per call
 LATENCY_SOURCE = "vpu_regfile.sv:29 comment (\"Three async reads, one sync write\")"
 
 
@@ -152,3 +208,382 @@ def seeds():
         dut="i_rf", clk="clk_i", unit=INSTANCES["w16"],
     )
     return [("tb_vpu_alu_regfile", "w16", cmd, seen, True)]
+
+
+# ---------------------------------------------------------------------------
+# Allo variants. Each ``make(n, w)`` returns a region over per-port arrays of
+# n cycles; each runner takes the built module and a command trace (``CMD``
+# columns as integer arrays) and returns ``{resp port: object array of ints}``.
+# ---------------------------------------------------------------------------
+
+A5 = UInt(5)
+
+
+def _np(w):
+    return np.uint16 if w <= 16 else np.uint32 if w <= 32 else np.uint64
+
+
+def _args(cmd, n, w):
+    """The trace as the region's input arrays (narrow dtypes: the simulator
+    checks the element width), plus zeroed outputs."""
+    ins = [np.asarray(cmd[p][:n], dtype=np.uint8) for p in CMD[:4]]
+    ins.append(np.asarray([int(x) for x in cmd["wdata_i"][:n]], dtype=_np(w)))
+    ins.append(np.asarray(cmd["we_i"][:n], dtype=np.uint8))
+    outs = [np.zeros(n, dtype=_np(w)) for _ in RESP]
+    return ins, outs
+
+
+def _run_flat(mod, cmd, n, w):
+    ins, outs = _args(cmd, n, w)
+    mod(*ins, *outs)
+    return {p: o for p, o in zip(RESP, outs)}
+
+
+def trace(n, w=16):
+    W = UInt(w)
+
+    @df.region()
+    def top(RA: A5[n], RB: A5[n], RC: A5[n], WA: A5[n], WD: W[n], WE: uint1[n],
+            QA: W[n], QB: W[n], QC: W[n]):
+        @df.kernel(mapping=[1], args=[RA, RB, RC, WA, WD, WE, QA, QB, QC])
+        def rf(ra: A5[n], rb: A5[n], rc: A5[n], wa: A5[n], wd: W[n], we: uint1[n],
+               qa: W[n], qb: W[n], qc: W[n]):
+            mem: W[32]
+            for t in range(n):
+                ia: int32 = ra[t]  # B4 workaround: widen before indexing
+                qa[t] = mem[ia]
+                ib: int32 = rb[t]  # B4 workaround: widen before indexing
+                qb[t] = mem[ib]
+                ic: int32 = rc[t]  # B4 workaround: widen before indexing
+                qc[t] = mem[ic]
+                iw: int32 = wa[t]  # S6 workaround: every port read unconditional
+                dw: W = wd[t]
+                if we[t]:
+                    mem[iw] = dw
+
+    return top
+
+
+def trace_raw(n, w=16):
+    """``trace`` as first written: indexes ``mem`` by the ``UInt(5)`` port
+    value directly. Evidence for B4 (an unsigned index is sign-extended on
+    the simulator/LLVM path): kept, not used for verdicts."""
+    W = UInt(w)
+
+    @df.region()
+    def top(RA: A5[n], RB: A5[n], RC: A5[n], WA: A5[n], WD: W[n], WE: uint1[n],
+            QA: W[n], QB: W[n], QC: W[n]):
+        @df.kernel(mapping=[1], args=[RA, RB, RC, WA, WD, WE, QA, QB, QC])
+        def rf(ra: A5[n], rb: A5[n], rc: A5[n], wa: A5[n], wd: W[n], we: uint1[n],
+               qa: W[n], qb: W[n], qc: W[n]):
+            mem: W[32]
+            for t in range(n):
+                qa[t] = mem[ra[t]]
+                qb[t] = mem[rb[t]]
+                qc[t] = mem[rc[t]]
+                if we[t]:
+                    mem[wa[t]] = wd[t]
+
+    return top
+
+
+def annotated(n, w=16):
+    W = UInt(w)
+
+    @df.region()
+    def top(RA: A5[n], RB: A5[n], RC: A5[n], WA: A5[n], WD: W[n], WE: uint1[n],
+            QA: W[n], QB: W[n], QC: W[n]):
+        @df.kernel(mapping=[1], args=[RA, RB, RC, WA, WD, WE, QA, QB, QC])
+        def rf(ra: A5[n], rb: A5[n], rc: A5[n], wa: A5[n], wd: W[n], we: uint1[n],
+               qa: W[n], qb: W[n], qc: W[n]):
+            mem: W[32] @ Memory(resource="LUTRAM", storage_type="RAM_1WNR", latency=0, depth=32)
+            for t in range(n):
+                ia: int32 = ra[t]  # B4 workaround: widen before indexing
+                qa[t] = mem[ia]
+                ib: int32 = rb[t]  # B4 workaround: widen before indexing
+                qb[t] = mem[ib]
+                ic: int32 = rc[t]  # B4 workaround: widen before indexing
+                qc[t] = mem[ic]
+                iw: int32 = wa[t]  # S6 workaround: every port read unconditional
+                dw: W = wd[t]
+                if we[t]:
+                    mem[iw] = dw
+
+    return top
+
+
+def stateful(n, w=16):
+    """Built for ``CHUNK`` cycles whatever ``n``; ``_run_chunked`` calls it
+    ``ceil(n / CHUNK)`` times."""
+    W = UInt(w)
+    c = CHUNK
+
+    @df.region()
+    def top(RA: A5[c], RB: A5[c], RC: A5[c], WA: A5[c], WD: W[c], WE: uint1[c],
+            QA: W[c], QB: W[c], QC: W[c]):
+        @df.kernel(mapping=[1], args=[RA, RB, RC, WA, WD, WE, QA, QB, QC])
+        def rf(ra: A5[c], rb: A5[c], rc: A5[c], wa: A5[c], wd: W[c], we: uint1[c],
+               qa: W[c], qb: W[c], qc: W[c]):
+            mem: W[32] @ Stateful = 0
+            for t in range(c):
+                ia: int32 = ra[t]  # B4 workaround: widen before indexing
+                qa[t] = mem[ia]
+                ib: int32 = rb[t]  # B4 workaround: widen before indexing
+                qb[t] = mem[ib]
+                ic: int32 = rc[t]  # B4 workaround: widen before indexing
+                qc[t] = mem[ic]
+                iw: int32 = wa[t]  # S6 workaround: every port read unconditional
+                dw: W = wd[t]
+                if we[t]:
+                    mem[iw] = dw
+
+    return top
+
+
+def _run_chunked(mod, cmd, n, w):
+    """Pads the trace with idle cycles (``we = 0``) to whole chunks; the
+    padding writes nothing, so it changes no defined slot."""
+    k = -(-n // CHUNK)
+    pad = {p: list(cmd[p][:n]) + [0] * (k * CHUNK - n) for p in CMD}
+    res = {p: [] for p in RESP}
+    for j in range(k):
+        part = {p: pad[p][j * CHUNK:(j + 1) * CHUNK] for p in CMD}
+        got = _run_flat(mod, part, CHUNK, w)
+        for p in RESP:
+            res[p].append(got[p])
+    return {p: np.concatenate(v)[:n] for p, v in res.items()}
+
+
+def _port_unit(n, w):
+    """C9: a unit's trip count and widths freeze at ``@df.unit``, so the unit
+    is decorated inside a factory per (n, w)."""
+    W = UInt(w)
+
+    @df.unit()
+    def regfile(ra: Stream[UInt(5), 2], rb: Stream[UInt(5), 2], rc: Stream[UInt(5), 2],
+                wa: Stream[UInt(5), 2], wd: Stream[UInt(w), 2], we: Stream[uint1, 2],
+                qa: Stream[UInt(w), 2], qb: Stream[UInt(w), 2], qc: Stream[UInt(w), 2]):
+        mem: W[32]
+        for t in range(n):
+            a5: UInt(5) = ra.get()
+            a: int32 = a5  # B4 workaround; B5: not in one step
+            b5: UInt(5) = rb.get()
+            b: int32 = b5  # B4 workaround; B5: not in one step
+            c5: UInt(5) = rc.get()
+            c: int32 = c5  # B4 workaround; B5: not in one step
+            x5: UInt(5) = wa.get()
+            x: int32 = x5  # B4 workaround; B5: not in one step
+            d: UInt(w) = wd.get()
+            e: uint1 = we.get()
+            qa.put(mem[a])
+            qb.put(mem[b])
+            qc.put(mem[c])
+            if e:
+                mem[x] = d
+
+    return regfile
+
+
+def ported(n, w=16):
+    W = UInt(w)
+    rf = _port_unit(n, w)
+
+    @df.region()
+    def top(RA: A5[n], RB: A5[n], RC: A5[n], WA: A5[n], WD: W[n], WE: uint1[n],
+            QA: W[n], QB: W[n], QC: W[n]):
+        s_ra: Stream[UInt(5), 2]
+        s_rb: Stream[UInt(5), 2]
+        s_rc: Stream[UInt(5), 2]
+        s_wa: Stream[UInt(5), 2]
+        s_wd: Stream[UInt(w), 2]
+        s_we: Stream[uint1, 2]
+        s_qa: Stream[UInt(w), 2]
+        s_qb: Stream[UInt(w), 2]
+        s_qc: Stream[UInt(w), 2]
+
+        @df.kernel(mapping=[1], args=[RA, RB, RC, WA, WD, WE])
+        def drive(ra: A5[n], rb: A5[n], rc: A5[n], wa: A5[n], wd: W[n], we: uint1[n]):
+            for t in range(n):
+                s_ra.put(ra[t])
+                s_rb.put(rb[t])
+                s_rc.put(rc[t])
+                s_wa.put(wa[t])
+                s_wd.put(wd[t])
+                s_we.put(we[t])
+
+        rf(ra=s_ra, rb=s_rb, rc=s_rc, wa=s_wa, wd=s_wd, we=s_we, qa=s_qa, qb=s_qb, qc=s_qc)
+
+        @df.kernel(mapping=[1], args=[QA, QB, QC])
+        def sink(qa: W[n], qb: W[n], qc: W[n]):
+            for t in range(n):
+                qa[t] = s_qa.get()
+                qb[t] = s_qb.get()
+                qc[t] = s_qc.get()
+
+    return top
+
+
+def shared(n, w=16):
+    W = UInt(w)
+
+    @df.region()
+    def top(RA: A5[n], RB: A5[n], RC: A5[n], WA: A5[n], WD: W[n], WE: uint1[n],
+            QA: W[n], QB: W[n], QC: W[n]):
+        mem: W[32] @ Stateful = 0  # region scope: one regfile, four port kernels
+
+        @df.kernel(mapping=[1], args=[RA, QA])
+        def port_a(ra: A5[n], qa: W[n]):
+            for t in range(n):
+                ia: int32 = ra[t]  # B4 workaround: widen before indexing
+                qa[t] = mem[ia]
+
+        @df.kernel(mapping=[1], args=[RB, QB])
+        def port_b(rb: A5[n], qb: W[n]):
+            for t in range(n):
+                ib: int32 = rb[t]  # B4 workaround: widen before indexing
+                qb[t] = mem[ib]
+
+        @df.kernel(mapping=[1], args=[RC, QC])
+        def port_c(rc: A5[n], qc: W[n]):
+            for t in range(n):
+                ic: int32 = rc[t]  # B4 workaround: widen before indexing
+                qc[t] = mem[ic]
+
+        @df.kernel(mapping=[1], args=[WA, WD, WE])
+        def port_w(wa: A5[n], wd: W[n], we: uint1[n]):
+            for t in range(n):
+                iw: int32 = wa[t]  # S6 workaround: every port read unconditional
+                dw: W = wd[t]
+                if we[t]:
+                    mem[iw] = dw
+
+    return top
+
+
+def shared_sync(n, w=16):
+    W = UInt(w)
+
+    @df.region()
+    def top(RA: A5[n], RB: A5[n], RC: A5[n], WA: A5[n], WD: W[n], WE: uint1[n],
+            QA: W[n], QB: W[n], QC: W[n]):
+        mem: W[32] @ Stateful = 0
+        rd_a: Stream[uint1, 2]  # reader -> writer: "read of cycle t done"
+        rd_b: Stream[uint1, 2]
+        rd_c: Stream[uint1, 2]
+        wr_a: Stream[uint1, 2]  # writer -> reader: "write of cycle t done"
+        wr_b: Stream[uint1, 2]
+        wr_c: Stream[uint1, 2]
+
+        @df.kernel(mapping=[1], args=[RA, QA])
+        def port_a(ra: A5[n], qa: W[n]):
+            for t in range(n):
+                if t > 0:
+                    wr_a.get()
+                ia: int32 = ra[t]  # B4 workaround: widen before indexing
+                qa[t] = mem[ia]
+                rd_a.put(1)
+
+        @df.kernel(mapping=[1], args=[RB, QB])
+        def port_b(rb: A5[n], qb: W[n]):
+            for t in range(n):
+                if t > 0:
+                    wr_b.get()
+                ib: int32 = rb[t]  # B4 workaround: widen before indexing
+                qb[t] = mem[ib]
+                rd_b.put(1)
+
+        @df.kernel(mapping=[1], args=[RC, QC])
+        def port_c(rc: A5[n], qc: W[n]):
+            for t in range(n):
+                if t > 0:
+                    wr_c.get()
+                ic: int32 = rc[t]  # B4 workaround: widen before indexing
+                qc[t] = mem[ic]
+                rd_c.put(1)
+
+        @df.kernel(mapping=[1], args=[WA, WD, WE])
+        def port_w(wa: A5[n], wd: W[n], we: uint1[n]):
+            for t in range(n):
+                rd_a.get()
+                rd_b.get()
+                rd_c.get()
+                iw: int32 = wa[t]  # S6 workaround: every port read unconditional
+                dw: W = wd[t]
+                if we[t]:
+                    mem[iw] = dw
+                if t < n - 1:
+                    wr_a.put(1)
+                    wr_b.put(1)
+                    wr_c.put(1)
+
+    return top
+
+
+def wire(n, w=16):
+    """SystemC/Catapult port shape: the unit kernel ``rf`` has only ``Wire``
+    ports (``synth_top="rf_0"``); ``src``/``sink`` replay and record."""
+    W = UInt(w)
+
+    @df.region()
+    def top(RA: A5[n], RB: A5[n], RC: A5[n], WA: A5[n], WD: W[n], WE: uint1[n],
+            QA: W[n], QB: W[n], QC: W[n]):
+        w_ra: Wire[UInt(5)]
+        w_rb: Wire[UInt(5)]
+        w_rc: Wire[UInt(5)]
+        w_wa: Wire[UInt(5)]
+        w_wd: Wire[UInt(w)]
+        w_we: Wire[uint1]
+        w_qa: Wire[UInt(w)]
+        w_qb: Wire[UInt(w)]
+        w_qc: Wire[UInt(w)]
+
+        @df.kernel(mapping=[1], args=[RA, RB, RC, WA, WD, WE])
+        def src(ra: A5[n], rb: A5[n], rc: A5[n], wa: A5[n], wd: W[n], we: uint1[n]):
+            for t in range(n):
+                w_ra.put(ra[t])
+                w_rb.put(rb[t])
+                w_rc.put(rc[t])
+                w_wa.put(wa[t])
+                w_wd.put(wd[t])
+                w_we.put(we[t])
+
+        @df.kernel(mapping=[1], args=[])
+        def rf():
+            mem: W[32]
+            for _ in range(n):
+                a5: UInt(5) = w_ra.get()
+                a: int32 = a5  # B4 workaround; B5: not in one step
+                b5: UInt(5) = w_rb.get()
+                b: int32 = b5  # B4 workaround; B5: not in one step
+                c5: UInt(5) = w_rc.get()
+                c: int32 = c5  # B4 workaround; B5: not in one step
+                x5: UInt(5) = w_wa.get()
+                x: int32 = x5  # B4 workaround; B5: not in one step
+                d: UInt(w) = w_wd.get()
+                e: uint1 = w_we.get()
+                w_qa.put(mem[a])
+                w_qb.put(mem[b])
+                w_qc.put(mem[c])
+                if e:
+                    mem[x] = d
+
+        @df.kernel(mapping=[1], args=[QA, QB, QC])
+        def sink(qa: W[n], qb: W[n], qc: W[n]):
+            for t in range(n):
+                qa[t] = w_qa.get()
+                qb[t] = w_qb.get()
+                qc[t] = w_qc.get()
+
+    return top
+
+
+VARIANTS = {
+    "trace": (trace, _run_flat),
+    "trace_raw": (trace_raw, _run_flat),
+    "stateful": (stateful, _run_chunked),
+    "ported": (ported, _run_flat),
+    "shared": (shared, _run_flat),
+    "shared_sync": (shared_sync, _run_flat),
+    "annotated": (annotated, _run_flat),
+    "wire": (wire, _run_flat),
+}

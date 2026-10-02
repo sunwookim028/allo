@@ -1,0 +1,8 @@
+BUILD-OK sim
+RUN-FAIL sim object ValueError dtype('O') is not in list
+malloc_consolidate(): invalid chunk size
+sim rc=124
+BUILD-OK sc
+RUN-FAIL sc object KeyError 'ui256'
+RUN-FAIL sc uint64 KeyError 'ui256'
+sc rc=0

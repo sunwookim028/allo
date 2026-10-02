@@ -1,0 +1,27 @@
+ 
+****************************************
+Report : reference
+Design : mtpu_rf_oreg
+Version: W-2024.09
+Date   : Fri Oct  2 13:36:37 2026
+****************************************
+
+Attributes:
+    b - black box (unknown)
+   bo - allows boundary optimization
+    d - dont_touch
+   mo - map_only
+    h - hierarchical
+    n - noncombinational
+    r - removable
+    s - synthetic operator
+    u - contains unmapped logic
+
+Reference          Library       Unit Area   Count    Total Area   Attributes
+-----------------------------------------------------------------------------
+DFF_X1             NangateOpenCellLibrary
+                                  4.522000      48    217.055992  n
+vpu_regfile_00000010           4021.653959       1   4021.653959  b, h, n
+-----------------------------------------------------------------------------
+Total 2 references                                   4238.709951
+1

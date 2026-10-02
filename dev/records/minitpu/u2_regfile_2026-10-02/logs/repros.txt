@@ -1,0 +1,10 @@
+REPRO B4: uint8 idx [1,200,255,128] -> [1, 1, 0, 0] (want same); UInt(5) idx [1,20,31,16] -> [1, 26975, 0, 29535]; IR: ['%2 = arith.index_cast %1 : i5 to index']
+REPRO B5: MLIRError: error: unknown: 'affine.store' op value to store must have the same type as memref element type
+REPRO S6: simulator [10, 10, 10, 13, 13, 15] systemc [10, 10, 10, 11, 11, 12]; pops: ['int32_t v3 = v0.Pop();\t// L7', 'int32_t v5 = v1.Pop();\t// L10', '{ std::ofstream _f("output0.data"); for (int f = 0; f < 6; ++f) _f << (long long)(ch_v9.Pop()) << "\\n"; }']
+REPRO B6: exit -6, no line; tail: ibc_start_main (/lib64/libc.so.6+0x3a86c)
+#13 0x00000000005c5a09 _start (/work/shared/users/phd/sk3463/envs/miniconda3/envs/allo/bin/python3.12+0x5c5a09)
+PLEASE submit a bug report to https://github.com/llvm/llvm-project/issues/ and include the crash backtrace and instructions to reproduce the bug.
+
+REPRO H3: IR memref space 52; 'latency' in IR: False; vhls: ['#pragma HLS bind_storage variable=mem type=ram_1wnr impl=lutram']
+REPRO H2: refused: RuntimeError
+loc("-":1:1): error: stateful variable `__stateful_top_mem_1` is used by 2 kernels. A region-scope `@ Stateful` shared between kernels is shared mutable state between concurrent hardware modules; the SystemC backend cannot express it (each kernel would get a private copy and silently disagree). Give each kernel its own `@ Stateful` variable, or pass the state between them over a Stream/Channel so the ordering is explicit. NOTE: passing it as a region argument does NOT work either -- the memory-port path REPLICATES a shared array (one AlloMem per client, writes summed at readout), which reproduces this same failure.

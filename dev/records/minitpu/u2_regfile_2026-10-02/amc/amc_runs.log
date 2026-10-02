@@ -1,0 +1,23 @@
+RAN llvm none N=60261 0.1s
+RAN amc none N=60261 18.6s
+LoopBand(['S_t_0'])
+RAN amc pipeline N=256 13.9s
+RAN amc none N=256 13.4s
+   rpt {'name': 'rf', 'hash': '371761f12e83311f9d9237ded63cf59b8587108f1631f5a689996bb076795c4d', 'time': '10/02/2026, 13:32:24', 'version': {'verilator': 'Verilator 5.052 2026-09-05 rev conda-forge build'}, 'cycles': 1059}
+   attrs ['_build_fsm_mem_specs', '_call', '_locate_hdl_dir', '_write_num_transactions', 'amcAllocation', 'amcDir', 'axiBundles', 'dataDir', 'dump_allocation', 'dump_schedule', 'dump_verilog', 'fsmMemSpecs', 'fsmModule', 'fsmScalarSpecs', 'fsmVerilog', 'get_resource_estimates', 'get_rpt', 'hash', 'in_types', 'init_rpt', 'intermediate_module', 'last_batch_cycles', 'loopSchedule', 'module', 'out_types', 'rpt', 'run_batch', 'run_streaming', 'testEnv', 'top_func_name']
+RAN amc pipeline N=256 12.8s
+   rpt {'name': 'rf', 'hash': '20bacac95271869cf59b6def7418b885b8ba983f30b703db486d8e5359f5c909', 'time': '10/02/2026, 13:32:39', 'version': {'verilator': 'Verilator 5.052 2026-09-05 rev conda-forge build'}, 'cycles': 806}
+   attrs ['_build_fsm_mem_specs', '_call', '_locate_hdl_dir', '_write_num_transactions', 'amcAllocation', 'amcDir', 'axiBundles', 'dataDir', 'dump_allocation', 'dump_schedule', 'dump_verilog', 'fsmMemSpecs', 'fsmModule', 'fsmScalarSpecs', 'fsmVerilog', 'get_resource_estimates', 'get_rpt', 'hash', 'in_types', 'init_rpt', 'intermediate_module', 'last_batch_cycles', 'loopSchedule', 'module', 'out_types', 'rpt', 'run_batch', 'run_streaming', 'testEnv', 'top_func_name']
+RAN amc none N=256 12.6s
+   rpt {'name': 'rf', 'hash': '371761f12e83311f9d9237ded63cf59b8587108f1631f5a689996bb076795c4d', 'time': '10/02/2026, 13:36:51', 'version': {'verilator': 'Verilator 5.052 2026-09-05 rev conda-forge build'}, 'cycles': 1059}
+RAN amc pipeline N=256 12.8s
+   rpt {'name': 'rf', 'hash': '20bacac95271869cf59b6def7418b885b8ba983f30b703db486d8e5359f5c909', 'time': '10/02/2026, 13:37:05', 'version': {'verilator': 'Verilator 5.052 2026-09-05 rev conda-forge build'}, 'cycles': 806}
+FAIL amc part N=256: AttributeError: 'str' object has no attribute 'path'
+AttributeError: 'str' object has no attribute 'path'
+loc("-":8:5): error: problem is infeasible
+loc("-":6:14): error: 'amc.memory' op amc-to-hw: exposed read port produced no rd_data signal
+FAIL amc part N=256: RuntimeError: lower_loopschedule_to_fsm failed
+    raise RuntimeError("lower_loopschedule_to_fsm failed")
+RuntimeError: lower_loopschedule_to_fsm failed
+RAN amc pipeline N=60261 17.9s
+   rpt {'name': 'rf', 'hash': '4329d66f58221d66b488e00ae1ebc0a3c22f96a88c8a19cb80e089b400b846e1', 'time': '10/02/2026, 13:54:59', 'version': {'verilator': 'Verilator 5.052 2026-09-05 rev conda-forge build'}, 'cycles': 180821}

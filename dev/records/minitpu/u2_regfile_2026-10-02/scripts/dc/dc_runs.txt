@@ -1,0 +1,10 @@
+m_rf_2p0 vpu_regfile clk_i 2.0 $M/vpu/vpu_pkg.sv $M/vpu/vpu_regfile.sv
+m_rf_3p33 vpu_regfile clk_i 3.33 $M/vpu/vpu_pkg.sv $M/vpu/vpu_regfile.sv
+m_rf_oreg_2p0 mtpu_rf_oreg clk 2.0 $M/vpu/vpu_pkg.sv $M/vpu/vpu_regfile.sv $R/mtpu_rf_oreg.sv
+m_rf_oreg_3p33 mtpu_rf_oreg clk 3.33 $M/vpu/vpu_pkg.sv $M/vpu/vpu_regfile.sv $R/mtpu_rf_oreg.sv
+c_w_rf_part_2p0 rf_0 clk 2.0 $S/wire_part_n64_2p0.prj/build/Catapult/rf_0.v1/concat_rtl.v
+c_w_rf_part_3p33 rf_0 clk 3.33 $S/wire_part_n64_3p33.prj/build/Catapult/rf_0.v1/concat_rtl.v
+# $M = MiniTPU src/core, $R = this dir, $S = scratch/u2rf/cat (Catapult projects)
+m_rf256_3p33 mtpu_rf256 clk 3.33 $M/vpu/vpu_pkg.sv $M/vpu/vpu_regfile.sv $R/mtpu_rf256.sv
+m_rf256_oreg_3p33 mtpu_rf256_oreg clk 3.33 $M/vpu/vpu_pkg.sv $M/vpu/vpu_regfile.sv $R/mtpu_rf_oreg.sv $R/mtpu_rf256.sv
+c_w_rf256_part_3p33 rf_0 clk 3.33 $S/wire_part_w256_n64_3p33.prj/build/Catapult/rf_0.v1/concat_rtl.v

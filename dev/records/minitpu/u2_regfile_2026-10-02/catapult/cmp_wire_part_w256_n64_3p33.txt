@@ -1,0 +1,7 @@
+RTL-TRACE vpu_regfile:w256 wire_part_w256_n64_3p33: defined 45744/45744 at measured read latency L=1 (MiniTPU 0); 3 masked; first-3000 hits by L {0: 1692, 1: 8997, 2: 1693, 3: 1660, 4: 1480, 5: 1383, 6: 1284, 7: 1209}; 15249 cycles; 14.7s
+    PROBE read a: MiniTPU 0; Catapult pre-sampled 1, post-sampled 1
+    PROBE write -> read a: MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+    PROBE read b: MiniTPU 0; Catapult pre-sampled 1, post-sampled 1
+    PROBE write -> read b: MiniTPU 1; Catapult pre-sampled 2, post-sampled 2
+    PROBE read c: MiniTPU 0; Catapult pre-sampled 1, post-sampled 1
+    PROBE write -> read c: MiniTPU 1; Catapult pre-sampled 2, post-sampled 2

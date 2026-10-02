@@ -1,0 +1,79 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : mtpu_rf256_oreg
+Version: W-2024.09
+Date   : Fri Oct  2 13:53:14 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: ra[0] (input port clocked by ideal_clock)
+  Endpoint: u/qa_reg[250]
+            (rising edge-triggered flip-flop clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  mtpu_rf256_oreg    5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                        Fanout     Trans      Incr       Path
+  ---------------------------------------------------------------------
+  clock ideal_clock (rise edge)                      0.00       0.00
+  clock network delay (ideal)                        0.00       0.00
+  input external delay                               0.00       0.00 f
+  ra[0] (in)                               0.02      0.02       0.02 f
+  ra[0] (net)                   20                   0.00       0.02 f
+  u/ra[0] (mtpu_rf_oreg_WIDTH256)                    0.00       0.02 f
+  u/ra[0] (net)                                      0.00       0.02 f
+  u/U4031/A (CLKBUF_X1)                    0.02      0.02       0.03 f
+  u/U4031/Z (CLKBUF_X1)                    0.11      0.15       0.18 f
+  u/n4045 (net)                 20                   0.00       0.18 f
+  u/U4059/A (CLKBUF_X1)                    0.11      0.02       0.20 f
+  u/U4059/Z (CLKBUF_X1)                    0.11      0.18       0.38 f
+  u/n3951 (net)                 20                   0.00       0.38 f
+  u/U4060/A (CLKBUF_X1)                    0.11      0.02       0.40 f
+  u/U4060/Z (CLKBUF_X1)                    0.11      0.18       0.57 f
+  u/n4046 (net)                 20                   0.00       0.57 f
+  u/U4300/A (CLKBUF_X1)                    0.11      0.02       0.59 f
+  u/U4300/Z (CLKBUF_X1)                    0.11      0.18       0.78 f
+  u/n3993 (net)                 20                   0.00       0.78 f
+  u/U4376/S (MUX2_X1)                      0.11      0.03       0.81 f
+  u/U4376/Z (MUX2_X1)                      0.01      0.09       0.89 f
+  u/n3877 (net)                  1                   0.00       0.89 f
+  u/U4377/B (MUX2_X1)                      0.01      0.01       0.90 f
+  u/U4377/Z (MUX2_X1)                      0.01      0.06       0.96 f
+  u/n3879 (net)                  1                   0.00       0.96 f
+  u/U4378/B (MUX2_X1)                      0.01      0.01       0.97 f
+  u/U4378/Z (MUX2_X1)                      0.01      0.06       1.03 f
+  u/n3881 (net)                  1                   0.00       1.03 f
+  u/U4379/B (MUX2_X1)                      0.01      0.01       1.03 f
+  u/U4379/Z (MUX2_X1)                      0.01      0.06       1.09 f
+  u/n3883 (net)                  1                   0.00       1.09 f
+  u/U4380/B (MUX2_X1)                      0.01      0.01       1.10 f
+  u/U4380/Z (MUX2_X1)                      0.01      0.06       1.16 f
+  u/da[250] (net)                1                   0.00       1.16 f
+  u/qa_reg[250]/D (DFF_X1)                 0.01      0.01       1.17 f
+  data arrival time                                             1.17
+
+  clock ideal_clock (rise edge)                      3.33       3.33
+  clock network delay (ideal)                        0.00       3.33
+  u/qa_reg[250]/CK (DFF_X1)                          0.00       3.33 r
+  library setup time                                -0.04       3.29
+  data required time                                            3.29
+  ---------------------------------------------------------------------
+  data required time                                            3.29
+  data arrival time                                            -1.17
+  ---------------------------------------------------------------------
+  slack (MET)                                                   2.12
+
+
+1

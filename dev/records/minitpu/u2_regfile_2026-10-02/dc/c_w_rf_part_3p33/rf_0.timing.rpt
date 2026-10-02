@@ -1,0 +1,72 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : rf_0
+Version: W-2024.09
+Date   : Fri Oct  2 13:36:39 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: rf_0_run_inst/while_v37_sva_reg[1]
+              (rising edge-triggered flip-flop clocked by ideal_clock)
+  Endpoint: rf_0_run_inst/v24_reg[1]
+            (rising edge-triggered flip-flop clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  rf_0               5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                                       Fanout     Trans      Incr       Path
+  ------------------------------------------------------------------------------------
+  clock ideal_clock (rise edge)                                     0.00       0.00
+  clock network delay (ideal)                                       0.00       0.00
+  rf_0_run_inst/while_v37_sva_reg[1]/CK (DFFR_X1)         0.00      0.00       0.00 r
+  rf_0_run_inst/while_v37_sva_reg[1]/Q (DFFR_X1)          0.03      0.12       0.12 r
+  rf_0_run_inst/while_v37_sva[1] (net)          3                   0.00       0.12 r
+  rf_0_run_inst/U82/A1 (NAND2_X1)                         0.03      0.02       0.13 r
+  rf_0_run_inst/U82/ZN (NAND2_X1)                         0.01      0.02       0.16 f
+  rf_0_run_inst/n6 (net)                        2                   0.00       0.16 f
+  rf_0_run_inst/U127/A2 (NOR2_X1)                         0.01      0.01       0.17 f
+  rf_0_run_inst/U127/ZN (NOR2_X1)                         0.10      0.12       0.29 r
+  rf_0_run_inst/n1157 (net)                     9                   0.00       0.29 r
+  rf_0_run_inst/U136/A2 (NAND2_X1)                        0.10      0.02       0.31 r
+  rf_0_run_inst/U136/ZN (NAND2_X1)                        0.08      0.12       0.43 f
+  rf_0_run_inst/n1189 (net)                    17                   0.00       0.43 f
+  rf_0_run_inst/U759/S (MUX2_X1)                          0.08      0.03       0.46 f
+  rf_0_run_inst/U759/Z (MUX2_X1)                          0.02      0.09       0.55 f
+  rf_0_run_inst/mem_26_sva_dfm_mx1[1] (net)     4                   0.00       0.55 f
+  rf_0_run_inst/U1376/B2 (AOI22_X1)                       0.02      0.02       0.57 f
+  rf_0_run_inst/U1376/ZN (AOI22_X1)                       0.03      0.05       0.62 r
+  rf_0_run_inst/n766 (net)                      1                   0.00       0.62 r
+  rf_0_run_inst/U1378/A3 (NAND4_X1)                       0.03      0.01       0.63 r
+  rf_0_run_inst/U1378/ZN (NAND4_X1)                       0.02      0.03       0.66 f
+  rf_0_run_inst/n774 (net)                      1                   0.00       0.66 f
+  rf_0_run_inst/U1384/A3 (OR4_X1)                         0.02      0.01       0.67 f
+  rf_0_run_inst/U1384/ZN (OR4_X1)                         0.02      0.11       0.78 f
+  rf_0_run_inst/n1243 (net)                     1                   0.00       0.78 f
+  rf_0_run_inst/v24_reg[1]/D (DFFR_X1)                    0.02      0.01       0.79 f
+  data arrival time                                                            0.79
+
+  clock ideal_clock (rise edge)                                     3.33       3.33
+  clock network delay (ideal)                                       0.00       3.33
+  rf_0_run_inst/v24_reg[1]/CK (DFFR_X1)                             0.00       3.33 r
+  library setup time                                               -0.04       3.29
+  data required time                                                           3.29
+  ------------------------------------------------------------------------------------
+  data required time                                                           3.29
+  data arrival time                                                           -0.79
+  ------------------------------------------------------------------------------------
+  slack (MET)                                                                  2.50
+
+
+1

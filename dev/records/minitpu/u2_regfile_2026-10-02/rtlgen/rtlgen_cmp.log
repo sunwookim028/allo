@@ -1,0 +1,17 @@
+MATCH rtlgen-got_trace_part_8192x1: 24573/24573 defined over the first 8192 cycles (3 masked)
+MATCH rtlgen-got_stateful_4096x1: 12285/12285 defined over the first 4096 cycles (3 masked)
+    e.g. qb cycle 8195: got 0 rtl 609
+    e.g. qc cycle 8192: got 0 rtl a4f3
+    e.g. qc cycle 8198: got 0 rtl b675
+DIFF  rtlgen-stateful_part-8192x8: 179534/180780 defined over the first 60261 cycles (3 masked)
+    e.g. qa cycle 8192: got 0 rtl 7519
+Traceback (most recent call last):
+  File "/work/shared/users/phd/sk3463/scratch/u2rf/rtlgen/trace_io.py", line 28, in <module>
+    d, g = np.load(sys.argv[2]), np.load(sys.argv[3])
+Traceback (most recent call last):
+  File "/work/shared/users/phd/sk3463/scratch/u2rf/rtlgen/trace_io.py", line 28, in <module>
+    d, g = np.load(sys.argv[2]), np.load(sys.argv[3])
+MATCH amc/got_llvm_none_256: 765/765 defined over the first 256 cycles (3 masked)
+MATCH amc/got_amc_none_256: 765/765 defined over the first 256 cycles (3 masked)
+MATCH rtlgen/got_trace_part_60261x1: 180780/180780 defined over the first 60261 cycles (3 masked)
+MATCH rtlgen/got_trace_60261x1: 180780/180780 defined over the first 60261 cycles (3 masked)

@@ -1,0 +1,110 @@
+ 
+****************************************
+Report : reference
+Design : vpu_regfile
+Version: W-2024.09
+Date   : Fri Oct  2 13:36:37 2026
+****************************************
+
+Attributes:
+    b - black box (unknown)
+   bo - allows boundary optimization
+    d - dont_touch
+   mo - map_only
+    h - hierarchical
+    n - noncombinational
+    r - removable
+    s - synthetic operator
+    u - contains unmapped logic
+
+Reference          Library       Unit Area   Count    Total Area   Attributes
+-----------------------------------------------------------------------------
+AOI22_X1           NangateOpenCellLibrary
+                                  1.330000     768   1021.440033  
+BUF_X1             NangateOpenCellLibrary
+                                  0.798000      16     12.768000  
+DFF_X1             NangateOpenCellLibrary
+                                  4.522000     512   2315.263916  n
+INV_X1             NangateOpenCellLibrary
+                                  0.532000      17      9.044000  
+NAND2_X1           NangateOpenCellLibrary
+                                  0.798000      12      9.576000  
+NAND3_X1           NangateOpenCellLibrary
+                                  1.064000      30     31.920000  
+NAND4_X1           NangateOpenCellLibrary
+                                  1.330000     192    255.360008  
+NOR2_X1            NangateOpenCellLibrary
+                                  0.798000      35     27.929999  
+NOR2_X2            NangateOpenCellLibrary
+                                  1.330000      96    127.680004  
+OR2_X1             NangateOpenCellLibrary
+                                  1.064000       6      6.384000  
+OR4_X1             NangateOpenCellLibrary
+                                  1.596000      48     76.607998  
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_0
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_1
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_2
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_3
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_4
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_5
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_6
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_7
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_8
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_9
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_10
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_11
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_12
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_13
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_14
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_15
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_16
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_17
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_18
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_19
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_20
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_21
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_22
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_23
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_24
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_25
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_26
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_27
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_28
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_29
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_30
+                                  3.990000       1      3.990000  b, h
+SNPS_CLOCK_GATE_HIGH_vpu_regfile_31
+                                  3.990000       1      3.990000  b, h
+-----------------------------------------------------------------------------
+Total 43 references                                  4021.653959
+1

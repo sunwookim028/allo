@@ -1,0 +1,68 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : vpu_regfile
+Version: W-2024.09
+Date   : Fri Oct  2 13:36:37 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: raddr_a_i[0]
+              (input port clocked by ideal_clock)
+  Endpoint: rdata_a_o[15]
+            (output port clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  vpu_regfile        5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                        Fanout     Trans      Incr       Path
+  ---------------------------------------------------------------------
+  clock ideal_clock (rise edge)                      0.00       0.00
+  clock network delay (ideal)                        0.00       0.00
+  input external delay                               0.00       0.00 r
+  raddr_a_i[0] (in)                        0.01      0.01       0.01 r
+  raddr_a_i[0] (net)             3                   0.00       0.01 r
+  U1326/A (INV_X1)                         0.01      0.02       0.02 r
+  U1326/ZN (INV_X1)                        0.01      0.01       0.03 f
+  n1144 (net)                    2                   0.00       0.03 f
+  U1333/A2 (NAND2_X1)                      0.01      0.01       0.05 f
+  U1333/ZN (NAND2_X1)                      0.08      0.08       0.13 r
+  n1145 (net)                    8                   0.00       0.13 r
+  U1222/A2 (NOR2_X2)                       0.08      0.04       0.17 r
+  U1222/ZN (NOR2_X2)                       0.03      0.05       0.22 f
+  n2213 (net)                   16                   0.00       0.22 f
+  U1336/B2 (AOI22_X1)                      0.03      0.02       0.25 f
+  U1336/ZN (AOI22_X1)                      0.03      0.06       0.30 r
+  n1147 (net)                    1                   0.00       0.30 r
+  U1338/A3 (NAND4_X1)                      0.03      0.01       0.31 r
+  U1338/ZN (NAND4_X1)                      0.02      0.03       0.35 f
+  n1164 (net)                    1                   0.00       0.35 f
+  U1345/A3 (OR4_X1)                        0.02      0.01       0.35 f
+  U1345/ZN (OR4_X1)                        0.02      0.13       0.48 f
+  rdata_a_o[15] (net)            1                   0.00       0.48 f
+  rdata_a_o[15] (out)                      0.02      0.05       0.53 f
+  data arrival time                                             0.53
+
+  clock ideal_clock (rise edge)                      2.00       2.00
+  clock network delay (ideal)                        0.00       2.00
+  output external delay                              0.00       2.00
+  data required time                                            2.00
+  ---------------------------------------------------------------------
+  data required time                                            2.00
+  data arrival time                                            -0.53
+  ---------------------------------------------------------------------
+  slack (MET)                                                   1.47
+
+
+1

@@ -1,0 +1,82 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : mtpu_rf256
+Version: W-2024.09
+Date   : Fri Oct  2 13:53:09 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: ra[0] (input port clocked by ideal_clock)
+  Endpoint: qa[136] (output port clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  mtpu_rf256         5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                                       Fanout     Trans      Incr       Path
+  ------------------------------------------------------------------------------------
+  clock ideal_clock (rise edge)                                     0.00       0.00
+  clock network delay (ideal)                                       0.00       0.00
+  input external delay                                              0.00       0.00 f
+  ra[0] (in)                                              0.02      0.02       0.02 f
+  ra[0] (net)                                  16                   0.00       0.02 f
+  u/raddr_a_i[0] (vpu_regfile_WIDTH256)                             0.00       0.02 f
+  u/raddr_a_i[0] (net)                                              0.00       0.02 f
+  u/U12/A (CLKBUF_X1)                                     0.02      0.01       0.03 f
+  u/U12/Z (CLKBUF_X1)                                     0.09      0.13       0.16 f
+  u/n17920 (net)                               20                   0.00       0.16 f
+  u/U17046/A (CLKBUF_X1)                                  0.09      0.02       0.18 f
+  u/U17046/Z (CLKBUF_X1)                                  0.11      0.17       0.35 f
+  u/n16731 (net)                               20                   0.00       0.35 f
+  u/U17274/A (CLKBUF_X1)                                  0.11      0.02       0.37 f
+  u/U17274/Z (CLKBUF_X1)                                  0.10      0.17       0.54 f
+  u/n17893 (net)                               20                   0.00       0.54 f
+  u/U17275/A (CLKBUF_X1)                                  0.10      0.02       0.56 f
+  u/U17275/Z (CLKBUF_X1)                                  0.11      0.18       0.74 f
+  u/n17892 (net)                               20                   0.00       0.74 f
+  u/U17276/A (CLKBUF_X1)                                  0.11      0.02       0.75 f
+  u/U17276/Z (CLKBUF_X1)                                  0.11      0.19       0.94 f
+  u/n17889 (net)                               20                   0.00       0.94 f
+  u/U17298/S (MUX2_X1)                                    0.11      0.03       0.97 f
+  u/U17298/Z (MUX2_X1)                                    0.01      0.09       1.06 f
+  u/n16450 (net)                                1                   0.00       1.06 f
+  u/U17299/B (MUX2_X1)                                    0.01      0.01       1.07 f
+  u/U17299/Z (MUX2_X1)                                    0.01      0.06       1.12 f
+  u/n16452 (net)                                1                   0.00       1.12 f
+  u/U17300/B (MUX2_X1)                                    0.01      0.01       1.13 f
+  u/U17300/Z (MUX2_X1)                                    0.01      0.06       1.19 f
+  u/n16461 (net)                                1                   0.00       1.19 f
+  u/U17308/A (MUX2_X1)                                    0.01      0.01       1.20 f
+  u/U17308/Z (MUX2_X1)                                    0.01      0.06       1.26 f
+  u/n16462 (net)                                1                   0.00       1.26 f
+  u/U17309/B (MUX2_X1)                                    0.01      0.01       1.26 f
+  u/U17309/Z (MUX2_X1)                                    0.02      0.07       1.34 f
+  u/rdata_a_o[136] (net)                        1                   0.00       1.34 f
+  u/rdata_a_o[136] (vpu_regfile_WIDTH256)                           0.00       1.34 f
+  qa[136] (net)                                                     0.00       1.34 f
+  qa[136] (out)                                           0.02      0.05       1.38 f
+  data arrival time                                                            1.38
+
+  clock ideal_clock (rise edge)                                     3.33       3.33
+  clock network delay (ideal)                                       0.00       3.33
+  output external delay                                             0.00       3.33
+  data required time                                                           3.33
+  ------------------------------------------------------------------------------------
+  data required time                                                           3.33
+  data arrival time                                                           -1.38
+  ------------------------------------------------------------------------------------
+  slack (MET)                                                                  1.95
+
+
+1
