@@ -256,6 +256,18 @@ backend, and one `Stateful` has one kernel.**
   is not): a recorded deviation, reported as the reset-flop share of
   sequential area, unless an unreset form proves well supported.
 
+**D-14 (2026-10-02). Unreset storage is declared, never inferred.**
+- Storage is reset by default. `Stateful(..., reset=False)` declares storage
+  whose contents survive reset (only its control is reset), as MiniTPU's
+  register file and FIFO contents are.
+- SystemC lowers it to a clock-edge write process with no reset action and
+  `-RESET_CLEARS_ALL_REGS no` for Catapult. Measured at U2 on `vpu_regfile`:
+  0 reset flops, bit-exact, DC area 4,021.9 um^2 against MiniTPU's 4,021.7
+  (`dev/records/minitpu/u2_comb_wire_impl_2026-10-02.rst`, F3).
+- A backend that cannot leave storage unreset refuses, naming the storage.
+  The simulator treats it as ordinary storage; harness verdicts mask its
+  pre-write contents as undefined (as for MiniTPU's).
+
 ## Milestones
 
 Each milestone passes on **one acceptance check** and names the tools it uses

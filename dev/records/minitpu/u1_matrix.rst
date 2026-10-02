@@ -129,6 +129,23 @@ the FIFOs, ``u2_word_array_2026-10-02.rst``, ``u2_fifo_2026-10-02.rst``):
   Stream-typed in the netlist, so a ``Wire[T, comb]`` *unit* port is still
   refused; the marker lives on region-scope links until U3.
 
+**Checkpoint 8, 2026-10-02:**
+
+- Unreset storage: **explicit marker**, README D-14
+  (``Stateful(..., reset=False)``); implementation on ``backend-unreset``.
+- Composed MXU FIFOs measured (``u3_fifo_composed_2026-10-02.rst``): peek is
+  **not** demanded (both consumers pop in the cycle the head is first
+  visible, cited and traced); a two-kernel ``Stream`` schedules in Catapult
+  at II=1, ``pop_data`` exact on every pop, area **below** MiniTPU's FIFO +
+  output register on all three instances and 32-54 % below the ring. Its
+  push-to-pop is 3 cycles against MiniTPU's 1 (to the latency contract at
+  U3), and the output FIFO must use ``try_put`` (its overflow is a drop).
+  Recommendation for U3: Streams for the MXU FIFOs, the ring stays the
+  standalone-verdict unit.
+- Fix batch ``core-uint-index`` (``18b4fcf8``, 12 fixes: B4-B7, S6-S9, C1,
+  C-W1, F5) and ``core-stateful`` (D-11) held for review; ``latency-manifest-
+  fix`` (C-M1) merged here.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
