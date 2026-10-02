@@ -291,3 +291,13 @@ one design per bug (it skips without ``MGC_HOME`` and ``SYSTEMC_HOME``).
   holds for f16, bf16, f32 and f64, for stream and memory ports; integers are
   unchanged. Memory read-out merges replicas by OR-ing bits instead of summing
   floats, and ``_fbits`` no longer sign-extends a negative 16-bit float.
+- **csim flipped the sign of zeros on a signal** (found while testing the
+  previous fix). ``sc_signal::write()`` and ``update()`` drop a write whose value
+  ``==`` the current one, and IEEE says ``+0 == -0``: a ``-0`` written after a
+  ``+0``, or the reverse, never reached the reader of a Connections channel or a
+  memory pin. An RTL wire carries the sign bit, so csim and RTL disagreed. The
+  header now specializes both members for each float payload (bf16, f16, f32,
+  f64) and writer policy to compare bits. It applies to the OSCI kernel only
+  (2.3.2 and later); not under ``__SYNTHESIS__``, and not under Xcelium's own
+  SystemC (``NCSC``), so **the testbench side of an RTL cosim still has this
+  defect** -- a cosim mismatch on a signed zero is the testbench's, not the RTL's.
