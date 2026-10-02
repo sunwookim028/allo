@@ -44,6 +44,9 @@ from .catapult import (
     codegen_tcl as codegen_tcl_catapult,
     codegen_host as codegen_host_catapult,
     parse_catapult_report,
+    write_latency_manifest,
+    catapult_failure_cause,
+    io_latency_tcl,
     parse_catapult_hierarchical_report,
     resolve_ppa_testbench,
     assert_power_measured,
@@ -761,6 +764,35 @@ class HLSModule:
             if hasattr(self, "host_code") and self.host_code:
                 with open(f"{project}/host.cpp", "w", encoding="utf-8") as outfile:
                     outfile.write(self.host_code)
+            # configs["latency"] = {<kernel module>: L}: pin each kernel's
+            # port-to-port latency with Catapult's I/O cycle constraint (the
+            # only form measured to mean latency: u1_pipe_2026-10-02.rst L4).
+            # io_latency_tcl refuses what Catapult cannot honour (Wire ports,
+            # L < 1) instead of dropping it (README D-1).
+            if (
+                platform == "systemc"
+                and configs.get("latency")
+                and mode in {"csyn", "ppa", "cosim"}
+            ):
+                pins = {}
+                for kern, lat in configs["latency"].items():
+                    if f"SC_MODULE({kern})" not in self.hls_code and (
+                        f"SC_MODULE({kern}_0)" in self.hls_code
+                    ):
+                        kern = f"{kern}_0"
+                    pins[kern] = lat
+                lines = io_latency_tcl(self.hls_code, pins)
+                with open(f"{project}/run.tcl", "r", encoding="utf-8") as f:
+                    tcl = f.read()
+                assert tcl.count("go assembly\n") == 1, "run.tcl layout changed"
+                tcl = tcl.replace(
+                    "go assembly\n",
+                    "go architect\n"
+                    + "".join(x + "\n" for x in lines)
+                    + "go assembly\n",
+                )
+                with open(f"{project}/run.tcl", "w", encoding="utf-8") as f:
+                    f.write(tcl)
             if len(ext_libs) > 0:
                 for lib in ext_libs:
                     # Update kernel.cpp
@@ -880,6 +912,19 @@ class HLSModule:
                 # The RTL now exists, so the architectural manifest can be
                 # joined to it. No-op unless `configs["asic_manifest"]` asked.
                 asic_manifest.emit_final(self.project, self.configs, "vitis")
+                # Latency manifest (allo/backend/vitis.py), beside Catapult's.
+                _sol = os.path.join(self.project, "out.prj", "solution1")
+                if os.path.isdir(_sol):
+                    import json as _json
+                    from .vitis import vitis_latency_manifest
+
+                    _man = vitis_latency_manifest(_sol)
+                    with open(
+                        os.path.join(self.project, "latency.json"),
+                        "w",
+                        encoding="utf-8",
+                    ) as _f:
+                        _json.dump(_man, _f, indent=1, sort_keys=True)
                 return
             # Use Makefile (sw_emu, hw_emu, hw)
             assert "XDEVICE" in os.environ, "Please set XDEVICE in your environment"
@@ -1450,12 +1495,35 @@ class HLSModule:
                     process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
                 process.wait()
                 if process.returncode != 0:
+                    cause = catapult_failure_cause(self.project)
                     raise RuntimeError(
                         f"Failed to synthesize the design with Catapult HLS in {self.mode} mode"
+                        + ("".join("\n  " + e for e in cause) if cause else "")
                     )
                 print(
                     f"[{time.strftime('%H:%M:%S', time.gmtime())}] Catapult HLS synthesis completed successfully"
                 )
+                # The latency manifest: each kernel's scheduled latency and II, read
+                # back from the solution (allo/backend/catapult.py). A declared
+                # latency that the schedule does not show is an error, not a note.
+                sol_top = self.configs.get("synth_top") or self.top_func_name
+                declared = {}
+                for kern, lat in (self.configs.get("latency") or {}).items():
+                    declared[kern] = lat
+                    declared[f"{kern}_0"] = lat
+                man = write_latency_manifest(self.project, sol_top, declared=declared)
+                for kern, u in sorted(man["units"].items()):
+                    print(
+                        f"[latency] {kern}: latency={u['latency']} ii={u['ii']} "
+                        f"{u['status']}"
+                        + (f" ({u['reason']})" if u.get("reason") else "")
+                    )
+                    if "declared" in u and u["latency"] != u["declared"]:
+                        raise RuntimeError(
+                            f"{kern}: declared latency {u['declared']}, scheduled "
+                            f"{u['latency']} ({u['status']}); see "
+                            f"{self.project}/latency.json"
+                        )
 
                 if self.mode == "ppa":
                     print(

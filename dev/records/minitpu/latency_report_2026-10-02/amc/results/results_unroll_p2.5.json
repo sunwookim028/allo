@@ -1,0 +1,70 @@
+[
+ {
+  "sched": "unroll",
+  "period_ns": 2.5,
+  "N": 16,
+  "match": 16,
+  "cycles": 21,
+  "report_pipeline": [
+   [
+    "1",
+    "16",
+    "5"
+   ]
+  ],
+  "report_at_offsets": [
+   0,
+   1,
+   2,
+   3,
+   4
+  ],
+  "report_ops": [
+   "at",
+   "await",
+   "frame",
+   "func_sequential",
+   "handle",
+   "iter_arg_update",
+   "launch",
+   "pipeline",
+   "return",
+   "terminator",
+   "yield"
+  ]
+ },
+ {
+  "sched": "unroll",
+  "period_ns": 2.5,
+  "N": 64,
+  "match": 64,
+  "cycles": 69,
+  "report_pipeline": [
+   [
+    "1",
+    "64",
+    "5"
+   ]
+  ],
+  "report_at_offsets": [
+   0,
+   1,
+   2,
+   3,
+   4
+  ],
+  "report_ops": [
+   "at",
+   "await",
+   "frame",
+   "func_sequential",
+   "handle",
+   "iter_arg_update",
+   "launch",
+   "pipeline",
+   "return",
+   "terminator",
+   "yield"
+  ]
+ }
+]

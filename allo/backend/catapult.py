@@ -841,6 +841,333 @@ def parse_catapult_report(project_path, top):
     return res
 
 
+# ---------------------------------------------------------------------------
+# Latency manifest: what Catapult scheduled, per kernel, in machine-readable form
+# ---------------------------------------------------------------------------
+#
+# WHY: a unit's latency is the scheduler's choice (it follows the clock, not the
+# source: dev/records/minitpu/u1_pipe_2026-10-02.rst L2), and cycle.rpt's
+# process "Latency" column is -1 for a free-running SC_THREAD (every region-top
+# Connections kernel). The schedule itself is exact, though: Catapult writes
+# every operation's c-step to <sol>/cycle_set.tcl, so for a pipelined kernel the
+# port-to-port latency is the Push c-step minus the Pop c-step. That number was
+# checked against Verilator-measured RTL on every historical U1 build
+# (dev/records/minitpu/latency_report_2026-10-02.rst). What it cannot see is a
+# rolled loop that Catapult merged INTO the pipelined loop (u1_pipe L5): the
+# loop's issue is still "II=1" while each vector takes up to K iterations. That
+# case is detected (cycle.rpt iterations != the loop's LOOP-2 trip count, or a
+# rolled loop missing from cycle.rpt's loop table) and reported as unreliable,
+# never as a number.
+
+LATENCY_MANIFEST = "latency.json"
+_IO_OP = re.compile(
+    r"^(?P<loop>.*)/(?P<port>\w+)\.(?P<op>Pop|Push|PopNB|PushNB)\(\)(#\d+)?$"
+)
+_CSTEPS = re.compile(r"^directive set (\S+) CSTEPS_FROM \{(.*)\}\s*$")
+
+
+def _fixed_width_table(lines, start):
+    """Rows of a cycle.rpt table whose header is lines[start] and dashes next."""
+    dashes = lines[start + 1]
+    spans = [(m.start(), m.end()) for m in re.finditer(r"-+", dashes)]
+    rows = []
+    for line in lines[start + 2 :]:
+        if not line.strip():
+            break
+        cells = []
+        for i, (a, _) in enumerate(spans):
+            b = spans[i + 1][0] if i + 1 < len(spans) else len(line) + 1
+            cells.append(line[a:b])
+        rows.append(cells)
+    return rows
+
+
+def _int_or_none(s):
+    s = s.strip().strip("()")
+    try:
+        return int(s)
+    except ValueError:
+        return None
+
+
+def parse_catapult_schedule(sol_dir, log_path=None):
+    """Raw schedule facts from a Catapult solution directory.
+
+    Returns ``{"clock_period_ns", "processes": {proc: {...}}, "loops": [...],
+    "io_ops": [...], "log": {...}}``. Reads ``cycle.rpt`` (process and loop
+    tables), ``cycle_set.tcl`` (every op's c-step) and, when given, the Catapult
+    log (LOOP-2 trip bounds, LOOP-4 rolled loops, SCHD-43 pipelining).
+    """
+    out = {
+        "clock_period_ns": None,
+        "processes": {},
+        "loops": [],
+        "io_ops": [],
+        "log": {},
+    }
+    rpt = os.path.join(sol_dir, "cycle.rpt")
+    if os.path.exists(rpt):
+        with open(rpt, "r", encoding="utf-8", errors="replace") as f:
+            lines = f.read().splitlines()
+        for i, line in enumerate(lines):
+            s = line.strip()
+            if s.startswith("Process") and "Real Operation(s) count" in s:
+                for c in _fixed_width_table(lines, i):
+                    name = c[0].strip()
+                    if name.startswith("/"):
+                        out["processes"][name] = {
+                            "latency": _int_or_none(c[2]),
+                            "throughput": _int_or_none(c[3]),
+                            "ii": _int_or_none(c[5]) if len(c) > 5 else None,
+                        }
+            elif s.startswith("Clock Signal") and out["clock_period_ns"] is None:
+                for c in _fixed_width_table(lines, i):
+                    try:
+                        out["clock_period_ns"] = float(c[2])
+                    except (ValueError, IndexError):
+                        pass
+                    break
+            elif s.startswith("Process") and "C-Steps" in s and "Iterations" in s:
+                for c in _fixed_width_table(lines, i):
+                    loop_cell = c[1]
+                    out["loops"].append(
+                        {
+                            "process": c[0].strip(),
+                            "loop": loop_cell.strip(),
+                            "depth": len(loop_cell) - len(loop_cell.lstrip()),
+                            "iterations": _int_or_none(c[2]),
+                            "c_steps": _int_or_none(c[3]),
+                            "ii": _int_or_none(c[7]) if len(c) > 7 else None,
+                        }
+                    )
+    cst = os.path.join(sol_dir, "cycle_set.tcl")
+    if os.path.exists(cst):
+        with open(cst, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                m = _CSTEPS.match(line.strip())
+                if not m:
+                    continue
+                path, cons = m.group(1), m.group(2)
+                io = _IO_OP.match(path)
+                rel = re.search(r"\{\.\. == (-?\d+)\}", cons)
+                if io and rel:
+                    out["io_ops"].append(
+                        {
+                            "loop_path": io.group("loop"),
+                            "port": io.group("port"),
+                            "op": io.group("op"),
+                            "cstep": int(rel.group(1)),
+                        }
+                    )
+    if log_path and os.path.exists(log_path):
+        with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+            log = f.read()
+        # LOOP-2 is printed before pipelining (the source trip count) and again
+        # after it (trip + pipeline fill); the smallest is the source's.
+        trip = {}
+        for m in re.finditer(
+            r"Loop '(\S+)' iterated at most (\d+) times\. \(LOOP-2\)", log
+        ):
+            k = m.group(1).split("/")[-1]
+            trip[k] = min(trip.get(k, int(m.group(2))), int(m.group(2)))
+        out["log"] = {
+            "trip": trip,
+            "rolled": sorted(
+                {
+                    m.group(1)
+                    for m in re.finditer(
+                        r"Loop '(\S+)' is left rolled\. \(LOOP-4\)", log
+                    )
+                }
+            ),
+            "pipelined": {
+                m.group(1): int(m.group(2))
+                for m in re.finditer(
+                    r"Loop '(\S+)' is pipelined with initiation interval (\d+)", log
+                )
+            },
+            "errors": re.findall(r"^#?\s*(Error:.*)$", log, flags=re.M),
+        }
+    return out
+
+
+def catapult_latency_manifest(sol_dir, log_path=None, declared=None):
+    """Per-kernel achieved latency and II of one Catapult solution.
+
+    Latency is MiniTPU's count (``examples/minitpu/harness/rtl.py``): rising
+    edges from the one that accepts an input to the one after which the result
+    is visible, with every port ready (a declared latency is a no-stall
+    property). For a Connections kernel it is ``max(Push c-step) - min(Pop
+    c-step)`` inside the loop that does the I/O. For a ``Wire``-port kernel
+    (no Pop/Push ops; ``sc_in`` reads are not scheduled ops) it is cycle.rpt's
+    process latency, which is defined there because the process loop is the
+    I/O loop (u1_catapult_units N4: equal to the measured latency on 19/19).
+
+    ``status`` is ``scheduled`` when the number is the RTL's, ``unreliable``
+    with a ``reason`` when the schedule does not determine it (a rolled loop
+    merged into the I/O loop: the latency then depends on the data or on the
+    merged trip count), and ``unknown`` when there is nothing to read.
+    """
+    sch = parse_catapult_schedule(sol_dir, log_path)
+    log = sch["log"]
+    units = {}
+    procs = set(sch["processes"]) | {lp["process"] for lp in sch["loops"]}
+    for proc in sorted(procs):
+        parts = proc.strip("/").split("/")
+        if parts[-1] != "run" or len(parts) < 2:
+            continue  # Connections::Fifo / AlloMem helper processes
+        kernel = parts[-2]
+        if "Connections::" in proc or kernel.startswith("Allo"):
+            continue
+        ops = [o for o in sch["io_ops"] if o["loop_path"].startswith(proc + "/")]
+        loops = {lp["loop"]: lp for lp in sch["loops"] if lp["process"] == proc}
+        u = {"process": proc, "latency": None, "ii": None, "status": "unknown"}
+        reasons = []
+        if ops:
+            u["port_style"] = "connections"
+            io_loop = {o["loop_path"].split("/")[-1] for o in ops}
+            pops = [o["cstep"] for o in ops if o["op"].startswith("Pop")]
+            pushes = [o["cstep"] for o in ops if o["op"].startswith("Push")]
+            u["io"] = {f'{o["port"]}.{o["op"]}()': o["cstep"] for o in ops}
+            if len(io_loop) != 1:
+                reasons.append(f"I/O in several loops {sorted(io_loop)}")
+            name = sorted(io_loop)[0]
+            u["loop"] = name
+            lp = loops.get(name, {})
+            u["loop_c_steps"] = lp.get("c_steps")
+            u["iterations"] = lp.get("iterations")
+            u["ii"] = lp.get("ii") or (lp.get("c_steps") if lp else None)
+            if pops and pushes:
+                u["latency"] = max(pushes) - min(pops)
+            else:
+                reasons.append("no Pop or no Push in the I/O loop")
+            trip = log.get("trip", {}).get(name)
+            if trip and lp.get("iterations") and lp["iterations"] > trip:
+                k = lp["iterations"] / trip
+                reasons.append(
+                    f"loop {name} runs {lp['iterations']} iterations for a trip count "
+                    f"of {trip}: a rolled loop was merged into it, so each vector takes "
+                    f"up to {k:g} iterations (pipelined II is per iteration, not per vector)"
+                )
+                u["cycles_per_vector_max"] = k * (u["ii"] or 1)
+        else:
+            u["port_style"] = "wire"
+            p = sch["processes"].get(proc, {})
+            lat = p.get("latency")
+            u["latency"] = lat if lat is not None and lat >= 0 else None
+            u["ii"] = p.get("throughput")
+            main = [lp for lp in loops.values() if lp["loop"] == "while"]
+            if main:
+                u["loop"] = "while"
+                u["loop_c_steps"] = main[0]["c_steps"]
+                u["ii"] = main[0]["ii"] or u["ii"]
+            if u["latency"] is None:
+                reasons.append(f"cycle.rpt process latency {lat}")
+        # A rolled loop of this kernel that cycle.rpt does not list was merged
+        # into another loop (u1_pipe L5): the scheduled numbers do not hold.
+        merged = sorted(
+            {
+                r.rsplit("/", 1)[-1]
+                for r in log.get("rolled", [])
+                if f"/{kernel}/run/" in r
+                and r.rsplit("/", 1)[-1] not in loops
+                and r.rsplit("/", 1)[-1] not in ("while", "run:rlp")
+            }
+        )
+        if merged:
+            reasons.append(f"rolled loop(s) {merged} merged into the scheduled loop")
+        if reasons:
+            u["status"] = "unreliable"
+            u["reason"] = "; ".join(reasons)
+        elif u["latency"] is not None:
+            u["status"] = "scheduled"
+        if declared and kernel in declared:
+            u["declared"] = declared[kernel]
+        units[kernel] = u
+    return {
+        "tool": "catapult",
+        "solution": os.path.abspath(sol_dir),
+        "clock_period_ns": sch["clock_period_ns"],
+        "definition": (
+            "latency: rising edges from the input-accepting edge to the edge after "
+            "which the output is visible, no stall; ii: cycles between iterations "
+            "of the I/O loop"
+        ),
+        "units": units,
+    }
+
+
+def write_latency_manifest(project_path, top, declared=None):
+    """Write ``<project>/latency.json`` for a finished Catapult run; return it."""
+    import json
+
+    rpt_dir = os.path.join(project_path, "build")
+    if not os.path.isdir(os.path.join(rpt_dir, "Catapult")):
+        rpt_dir = project_path
+    sol_dir = os.path.join(rpt_dir, "Catapult", f"{top}.v1")
+    man = catapult_latency_manifest(
+        sol_dir, os.path.join(rpt_dir, "catapult.log"), declared=declared
+    )
+    with open(os.path.join(project_path, LATENCY_MANIFEST), "w", encoding="utf-8") as f:
+        json.dump(man, f, indent=1, sort_keys=True)
+    return man
+
+
+def catapult_failure_cause(project_path):
+    """The Error lines of a failed Catapult run (``mod()`` used to say only
+    "Failed to synthesize"; the SCHD cause was in catapult.log)."""
+    for d in (os.path.join(project_path, "build"), project_path):
+        p = os.path.join(d, "catapult.log")
+        if os.path.exists(p):
+            with open(p, "r", encoding="utf-8", errors="replace") as f:
+                errs = re.findall(r"^#?\s*(Error:.*)$", f.read(), flags=re.M)
+            return errs[:8]
+    return []
+
+
+def io_latency_tcl(kernel_cpp, io_latency):
+    """``cycle set`` lines pinning each kernel's port-to-port latency.
+
+    ``io_latency`` maps a kernel module name (``<kernel>_0``) to L. Every
+    (Out, In) pair of that module gets ``cycle set {<out>.Push()} -from
+    {<in>.Pop()} -equal L`` (u1_pipe L4: measured = declared for L = 1, 2, 3, 6;
+    Catapult refuses an infeasible L with SCHD-30/SCHD-3). Refused here, per
+    D-1, where Catapult cannot honour it: a kernel with no Connections ports
+    (``Wire``: an ``sc_in`` read is not a schedulable op, N2), and L < 1
+    (a Push cannot chain after a Pop in one c-step, N3/E1).
+    """
+    lines = []
+    for kern, lat in io_latency.items():
+        lat = int(lat)
+        if lat < 1:
+            raise ValueError(
+                f"latency={lat} on {kern}: Catapult cannot schedule a Push in the "
+                f"same c-step as a Pop on Connections ports (SCHD-30); the least "
+                f"is 1. A combinational unit is a different port shape, not L=0."
+            )
+        start = kernel_cpp.find(f"SC_MODULE({kern})")
+        if start < 0:
+            raise ValueError(
+                f"latency= names {kern}, which is not an emitted SC_MODULE"
+            )
+        blk = kernel_cpp[start : kernel_cpp.index("\n};", start)]
+        ins = re.findall(r"Connections::In< .+? > (\w+);", blk)
+        outs = re.findall(r"Connections::Out< .+? > (\w+);", blk)
+        if not ins or not outs:
+            raise ValueError(
+                f"latency={lat} on {kern}: it has no Connections In/Out pair "
+                f"(Wire ports?). Catapult cannot pin a Wire port's latency: an "
+                f"sc_in read is not a scheduled operation, so `cycle set` has no "
+                f"anchor (u1_catapult_units N2). Refusing rather than dropping it."
+            )
+        lines += [
+            f"cycle set {{{o}.Push()}} -from {{{i}.Pop()}} -equal {lat}  ;# latency={lat} on {kern}"
+            for o in outs
+            for i in ins
+        ]
+    return lines
+
+
 def parse_catapult_hierarchical_report(project_path, top):
     """Parse Catapult HLS area.rpt for per-module (hierarchical) PPA breakdown.
 
