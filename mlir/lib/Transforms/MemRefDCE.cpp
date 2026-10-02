@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h" // isOpTriviallyDead
 
 using namespace mlir;
 using namespace allo;
@@ -23,12 +24,24 @@ using namespace allo;
 namespace mlir {
 namespace allo {
 
+// An op with results that nobody reads is dead only if it has no side
+// effects, including inside its regions: the simulator lowers a `try_put` to
+// an `scf.if` whose result is the success flag and whose then-block pushes the
+// word, and `junk: uint1 = s.try_put(x)` left that flag unused -- erasing the
+// `if` by `use_empty()` alone dropped the push (MiniTPU U2 FIFO record, B7).
 void cleanUpUnusedOps(func::FuncOp &func) {
+  SmallVector<Operation *, 8> dead;
   func.walk([&](Operation *op) {
-    if (op->getNumResults() != 0 && op->use_empty()) {
-      op->erase();
-    }
+    if (op->getNumResults() == 0 || !op->use_empty())
+      return;
+    // Region-less ops keep the old rule (allo's struct ops carry no effect
+    // interface and must still be swept); an op with regions is dead only
+    // when MLIR says so, nested stores included.
+    if (op->getNumRegions() == 0 || isOpTriviallyDead(op))
+      dead.push_back(op);
   });
+  for (auto *op : dead)
+    op->erase();
 }
 
 void removeNeverLoadedMemRef(func::FuncOp &func) {
