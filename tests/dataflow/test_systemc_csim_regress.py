@@ -19,7 +19,7 @@ import numpy as np
 import pytest
 
 import allo.dataflow as df
-from allo.ir.types import bfloat16, float16, float32, float64, int32, uint16, UInt, Int, Stream, Wire
+from allo.ir.types import bfloat16, float16, float32, float64, int32, uint16, uint32, UInt, Int, Stream, Wire
 
 needs_csim = pytest.mark.skipif(
     not (os.environ.get("MGC_HOME") and os.environ.get("SYSTEMC_HOME")),
@@ -389,3 +389,46 @@ def test_odd_width_int_ports_round_trip():
     _csim(_odd_width(N), a, b, c, d)
     np.testing.assert_array_equal(c, a.astype(np.uint32) * 256)
     np.testing.assert_array_equal(d, b)
+
+
+def _write_then_read(N):
+    @df.region()
+    def top(A: uint32[N], C: uint32[N]):
+        @df.kernel(mapping=[1], args=[A, C])
+        def k(a: uint32[N], c: uint32[N]):
+            for i in range(N):
+                c[i] = a[i] + 1
+                c[i] = c[i] * 256
+
+    return top
+
+
+def _accumulate_in_place(N):
+    @df.region()
+    def top(A: int32[N], C: int32[N]):
+        @df.kernel(mapping=[1], args=[A, C])
+        def k(a: int32[N], c: int32[N]):
+            for i in range(N):
+                c[i] = c[i] + a[i]
+
+    return top
+
+
+@needs_csim
+def test_array_written_and_read_back_uses_a_memory_port():
+    """S6: an output array element written and then read back.
+
+    The array was classified 'both' AND sequentially streamable, so it got
+    neither a stream port (pure in/out only) nor a memory port (non-streamable
+    only), and the kernel named an undeclared port. An array with both a load
+    and a store site is not a stream; it takes the memory-port path.
+    """
+    N = 4
+    a = np.arange(N, dtype=np.uint32)
+    c = np.zeros(N, dtype=np.uint32)
+    _csim(_write_then_read(N), a, c)
+    np.testing.assert_array_equal(c, (a + 1) * 256)
+    a2 = np.array([1, -2, 30, 400], dtype=np.int32)
+    c2 = np.array([10, 20, -30, 40], dtype=np.int32)
+    _csim(_accumulate_in_place(N), a2, c2)
+    np.testing.assert_array_equal(c2, np.array([11, 18, 0, 440], dtype=np.int32))

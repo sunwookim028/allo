@@ -862,6 +862,21 @@ bool SystemCModuleEmitter::isSeqStreamable(Value v) {  // new (SystemC-only)
   auto mt = llvm::dyn_cast<MemRefType>(v.getType());
   if (!mt || mt.getRank() != 1)
     return false;
+  // A stream moves each element exactly once, one way: at most ONE load site
+  // and ONE store site, never both. An array written and then read back
+  // (`c[i] = ...; c[i] = c[i] * k`) or read twice has no stream form -- it was
+  // classified 'both' AND streamable, so it fell between the stream path
+  // (pure in/out only) and the memory path (non-streamable only), and the
+  // kernel used a port that was never declared ("'v1' was not declared").
+  unsigned loads = 0, stores = 0;
+  for (Operation *u : v.getUsers()) {
+    if (llvm::isa<affine::AffineLoadOp>(u))
+      ++loads;
+    else if (llvm::isa<affine::AffineStoreOp>(u))
+      ++stores;
+  }
+  if (loads > 1 || stores > 1 || (loads && stores))
+    return false;
   for (auto &use : v.getUses()) {
     Operation *op = use.getOwner();
     if (auto ld = llvm::dyn_cast<affine::AffineLoadOp>(op)) {
@@ -917,7 +932,16 @@ char SystemCModuleEmitter::memPortArgDir(Value v) {  // new (SystemC-only)
     return 0;
   if (forceMemPort(v))
     return d; // multi-driver boundary: forced off the stream path onto memory
-  return isSeqStreamable(v) ? 0 : d; // streamable -> handled by the stream path
+  if (!isSeqStreamable(v))
+    return d;
+  // streamable -> the stream path, which takes only pure in/out. A read+write
+  // array that still looks streamable would get NO port at all: refuse it
+  // rather than emit C++ that names an undeclared port (README D-1).
+  if (d == 'b')
+    emitError(barg.getOwner()->getParentOp(),
+              "SystemC: kernel array argument is both read and written but "
+              "classified as a sequential stream; it has no port form.");
+  return 0;
 }
 
 // A dataflow kernel's outermost bounded loop IS its steady-state loop: `for t in
