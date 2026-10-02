@@ -1,0 +1,398 @@
+U2 plan: storage with ports (input to the U1 review)
+====================================================
+
+2026-10-02, zhang-21. This is a read-only planning study. Nothing was built or run. Sources: README
+(D-1, D-7..D-9, the U2 row); ``origin/u1-pilot`` (``u1_matrix.rst``, ``minitpu.rst`` "The unit
+ladder", ``examples/minitpu/harness/``, ``microarch.py``); Allo ``main`` (docs, ``allo/compose.py``,
+``allo/memory.py``, ``EmitSystemC.cpp``, ``EmitVivadoHLS.cpp``); MiniTPU ``b3ba0a4``; AMC under
+``scratch/amc``.
+
+**[V]** means verified by reading source or a record. **[I]** means inferred and still to be tested.
+Nothing here is verified by a run.
+
+1. The four units
+-----------------
+
+Default geometry (``vpu_pkg.sv``): 16 lanes, 4 sublanes, 32 VREGs, VMEM 4096 words of 1024 b.
+VMEM read latency is 3 on the compute port and 2 on the DMA port.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 14 40 22 24
+
+   * - unit
+     - ports [V]
+     - reset [V]
+     - latencies to check [V from RTL text]
+   * - ``vpu_regfile``
+     - 3 reads, A/B/C: 5 b address in, ``WIDTH`` data out, **asynchronous**
+       (``assign rdata = mem[raddr]``). 1 write: ``waddr``/``wdata``/``we``, **synchronous**
+       (``always_ff``). ``WIDTH`` is 16 by default and 256 inside ``vpu_vreg_stripe``, which
+       holds 4 of them. Depth 32. LUTRAM.
+     - ``rst_ni`` is unused. Memory is never reset, so a read before any write is undefined.
+     - read: 0 cycles (combinational). A write at edge *t* is seen by a read in cycle *t+1*. A
+       read and a write to the same address in one cycle return the **old** value.
+   * - ``vpu_word_array``
+     - 2 symmetric ports, compute and DMA. Each has ``en``/``we``/``addr`` (12 b) and 1024 b
+       ``wdata``/``rdata``, whole words only. Reads are **registered**, through a pipe of depth
+       ``READ_LATENCY`` (3) or ``DMA_READ_LATENCY`` (2), both checked >= 1.
+     - None: the RAM has no reset, and ``rst_ni`` is unused.
+     - read: 3 (compute), 2 (DMA). Write visibility: 1. The simulation model reads the **old**
+       data on a same-port read-during-write. The ``SYNTHESIS`` branch (XPM, ``WRITE_MODE
+       no_change``) holds the output instead [V text; the behaviour difference is I]. A
+       same-word access by both ports in one cycle, with either writing, is **undefined**.
+   * - ``vpu_fifo``
+     - ``push``/``push_data`` (``WIDTH``) and ``pop``, with ``pop_data``/``empty``/``full`` out.
+       ``pop_data = mem[rd_ptr]`` is first-word-fall-through and asynchronous. ``DEPTH`` must
+       be a power of 2 and >= 2 (generate-scope ``$error``).
+     - The pointers and count are reset. ``mem`` is not.
+     - push to not-empty: 1 cycle. Flags: 1. Push and pop together when **full** is legal
+       (pass-through). Push and pop together when **empty** is not asserted, but the reader
+       gets the stale ``mem[rd_ptr]`` and the pushed word is lost [I, from reading the RTL;
+       verify in Phase 0]. Overflow and underflow are assertions in simulation only.
+   * - output FIFO
+     - Not a module of its own: ``vpu_fifo`` instantiated as ``i_output_fifo`` in
+       ``mxu.sv:154``, ``WIDTH = 4x16 = 64`` (one gathered group), ``DEPTH =
+       MXU_OUTPUT_FIFO_DEPTH/4 = 16``, one per lane (16). A gather register sits in front
+       (``gather_q``, ``gather_index_q``, ``pack_bf16``; ``mxu.sv:128-152``). The input FIFO is
+       ``vpu_fifo`` at width 257 and depth 4.
+     - as ``vpu_fifo``
+     - as ``vpu_fifo``. ``full`` is never read (``mxu.sv:44``). ``output_valid`` is the AND of
+       every lane's ``!empty``.
+
+*Proposed:* "the output FIFO" is ``vpu_fifo`` at (64, 16), with the gather kept for U3 (the
+MXU). ``vpu_dma_group`` is not in the U2 row, but ``tb_vpu_word_array`` drives VMEM only
+through it. Decision needed (Q5).
+
+**What "bit-exact at declared latency" means for a stateful unit.** The unit is a function from
+a *command trace* to a *response trace*. The command trace is one vector of every input port
+per cycle; the response trace is every output per cycle. It is not a vector map. The check has
+two halves:
+
+* **Function.** Per cycle, the response traces are equal on every *defined* slot. A read samples
+  memory as it was at issue, which fixes the ordering rules above. The undefined slots are
+  masked, and the count of each kind is reported:
+
+  * a read of an address never written;
+  * ``rdata`` on a cycle that holds no read;
+  * a VMEM cross-port collision;
+  * ``pop_data`` while empty;
+  * push and pop together on an empty FIFO.
+
+* **Latency.** Each port has the cycle offsets in the table above: read delivery, write
+  visibility, flag update. They are measured on the RTL by a step probe, as U1's
+  ``probe_latency`` does. On the Allo side they are checked only on RTL that Allo generated
+  (U1 triage 8).
+
+  The trace model lets the simulator check ordering, because iteration *k* is cycle *k*. U1
+  could not check that. The delivery delay is still an RTL-only property.
+
+**Port-conflict rules the assembler refuses, by unit** (``asm.py``; ``ISA_AND_INTERFACES.md``
+"What the assembler enforces") [V]:
+
+* **regfile, port C.** ``_check_port_c_exclusive`` refuses ``vst`` together with ``vmatload``
+  or ``vmatpush`` in one bundle. In the RTL the matrix read silently wins the mux
+  (``vpu.sv:430``).
+* **regfile, write port.** ``_check_bundle_writes`` refuses:
+
+  * two writes to one VREG in one bundle;
+  * two of a bundle's own writes on one write-port cycle (for example ``vld`` at +6 beside a
+    ``vmatpop``).
+
+  ``_check_writeback_port`` refuses a scheduled image that drives the port twice in one cycle.
+  On the board the writers are OR-ed (``vpu.sv:290``) and only simulation asserts
+  ``$onehot0``.
+
+  RAW, WAW, the write-port calendar across bundles, port C after a stream, and matrix reads are
+  *delays* that ``schedule()`` inserts. They are not refusals.
+* **output FIFO.** ``_check_matrix_fifo`` refuses more than 64 rows per lane outstanding,
+  counted in program order (4 per push, 4 per pop). The hardware drops the excess silently.
+* **VMEM, vpu_fifo in general.** **No assembler rule.** A compute/DMA collision on one word is
+  "not modelled". Only ``vpu_vmem_simd.sv:121`` asserts it, in simulation.
+
+**Consequence [V].** Every refused conflict lives in ``vpu.sv``'s muxes, not in a storage
+module. ``vpu_regfile`` has one write port by construction and cannot see a write collision.
+"Check the port conflicts the assembler refuses" therefore cannot be a unit-level differential
+check. Section 2c proposes what can replace it (Q4).
+
+2. Harness
+----------
+
+**2a. RTL side: a new ``trace`` shape in ``harness/rtl.py``.** The ``bare`` shape is closest:
+one input row per cycle, outputs after every edge. It needs five changes.
+
+1. **Pre-edge sampling.** Drive the row with ``clk`` low, ``eval()``, sample the outputs (the
+   asynchronous ``rdata``, ``pop_data``, ``empty``, ``full`` for cycle *t*), then the rising
+   edge. Sampling after the edge, as ``bare`` does, shows read-after-same-cycle-write, which is
+   the wrong semantics for the regfile.
+2. **Wide ports.** Port values are 256 and 1024 b, which are ``VlWide``. Use ``ceil(w/64)``
+   uint64 words per port in the raw files, and drop the single-``uint64`` assumption in
+   ``_wrapper``/``_execute``.
+3. **Reset.** Pulse it for the FIFO; it does nothing for the RAMs. Pin Verilator's
+   ``--x-initial unique`` and seed it, so a read of an unwritten entry differs from run to run.
+   The harness masks those reads; it does not trust zeros. [I: confirm the flag's effect on
+   unpacked memories]
+4. **Port specs** carry ``(name, width, role)``, where the role is ``cmd`` or ``resp``. The
+   ``defines`` list already allows narrow builds (``MINITPU_NUM_LANES=1`` gives 64 b VMEM
+   words; ``MINITPU_VMEM_ENTRIES_PER_LANE`` sets depth). Run narrow for iteration, and full width
+   once.
+5. **Masks.** ``harness/ref.py`` gains a trace reference per unit (numpy, the RTL semantics
+   above) returning ``(resp, defined_mask, reason)``. ``characterize.py`` gives ``REF-MATCH``
+   on the defined slots and an undefined-slot census by reason.
+   ``check.py`` prints ``UNIT-MATCH <unit> <variant> <backend> k/k defined (m masked: ...)``.
+
+**2b. Stimulus.** Traces are generated, not vectors.
+
+* **Constrained random.** Hot address sets force RAW distances 0..4 on every port pair, plus
+  full/empty edges and pass-through on the FIFO.
+* **Directed.** Every port pair colliding at every offset in −1..+L.
+* Each trace is tagged *legal* (it obeys the rules in section 1) or *illegal*. Illegal traces
+  are kept, so the census shows what each tool does there.
+
+**Seeding from MiniTPU's tb/** (D-7's second check). Run the three tbs under ``verilator
+--binary --trace``. Sample the DUT's ports at each negedge from the VCD to get a replayable
+trace, which keeps the scenario exact without hand transcription.
+
+* ``tb_vpu_alu_regfile`` (part of the 14-tb suite) gives write V0/V1, read, ALU write-back
+  V2. Ports A/B only. It drives a 32 b bus into a 16 b port; values fit.
+* ``tb_vpu_word_array`` gives DMA beat groups at addresses 0, 2049 and 4095, a regroup with
+  one beat changed at 37, and a word write then beat reads at 512. It runs with
+  ``READ_LATENCY = 2``, **not the production 3**, so run the trace at both values.
+* ``tb_mxu_single_port`` (DIM = 2) gives the output FIFO as push 4 rows, wait for valid, pop.
+* The suite has no standalone ``vpu_fifo`` tb, so its seeds come from that one.
+
+Then run the tbs unchanged as the second check: the RTL alone, as in U1.
+
+**2c. The conflict check.** It splits into three tiers.
+
+* **(i) Oracle table.** ``tb_port_exclusivity``'s 29 co-issue cases (``isa_slots.json``) and
+  the 39 ``pytest.raises`` refusals in ``board_package/tests/test_asm.py`` become a table of
+  {conflict, refused?, RTL outcome}.
+* **(ii) Allo refusal parity.** For each structural conflict, build the Allo composition in
+  which two clients bind one port in one *iteration*. Record whether Allo refuses it
+  statically, refuses it at run time, serialises it (``microarch.py``'s ``port_c`` does,
+  divergence 2), or computes garbage silently. Compare against the oracle. This is what U2 can
+  check today.
+* **(iii) Calendar rules** ("one write-port cycle across bundles") need time in the model. They
+  stay *not checkable* until a calendar-shaped port rule exists (README Threads, "next").
+  Record them as missing abstractions.
+
+3. Allo expression options, and the probe question each asks
+------------------------------------------------------------
+
+**What Allo can say today:**
+
+* **Arrays and Stateful.** Arrays are kernel-local. ``@ Stateful`` arrays are kernel- or
+  region-scope; region scope is documented as one buffer shared by every kernel
+  (``dataflow.py:732``).
+* **Schedule.** ``s.partition``.
+* **Memory annotation.** ``@ Memory(resource, storage_type=RAM_1WNR|RAM_T2P|..., latency,
+  depth)`` (``allo/memory.py``).
+* **Links.** ``Stream[T, D]`` with ``try_get``/``try_put``/``empty``/``full`` (fork-only).
+  ``Wire``/``Channel`` on SystemC only.
+* **Composition.** ``compose.Memory`` is a boundary ``m_axi`` array only. ``Architecture._check``
+  **refuses one memory addressed by two units** [V ``compose.py``]. ``Unit.arrays()`` sees
+  local arrays with read/write flags, but no port count.
+
+**Nothing states a port count or a port's timing.**
+
+Per-backend facts already in hand [V source unless marked]:
+
+* **Simulator.** Honours region-scope sharing across kernels (``microarch.py`` relies on it) but
+  is untimed, with OpenMP threads.
+* **Vitis.** Refuses a Stateful referenced by more than one function (``EmitVivadoHLS.cpp:3418-3445``,
+  with the measured Vitis 200-1014/979/780 limits).
+* **SystemC, region-scope Stateful.** Emitted as **a member of each kernel module**, reset in
+  the reset action (``EmitSystemC.cpp:1685-1712``). No refusal was found, so two clients
+  get two copies. [I: a silent replica; this is the strongest D-1 hypothesis]
+* **SystemC, boundary arrays.** Instanced per (call, operand) as ``AlloMemPins``: 1R1W,
+  **synchronous read** (``q`` on the next edge, the accessor waits twice). A *mixed* pure-reader
+  plus pure-writer replica is now **refused** (``EmitSystemC.cpp:~2805``). All-readers and
+  all-writers stay replicated by design.
+
+  The record for "SystemC gives two clients of one memory a replica each" is
+  ``limitations.rst`` "shared memory", issue #27 (and #11), ``catapult_systemc.rst``
+  "AlloMemPins", and ``examples/tinytpu/impact/probe_shared/`` (0 cycles on TinyTPU).
+* **``Memory(latency=, depth=)``** is accepted and **dropped by every backend**:
+  ``get_memory_space()`` encodes only resource x 16 + storage. ``storage_type`` reaches only
+  Vitis ``bind_storage``. That is a D-1 violation by construction; confirm with one emission.
+* **AMC** has the abstraction U2 is missing: ``!amc.port<shape, T, proto, rw, readLatency,
+  writeLatency> x count`` (``AmcTypes.td:131``), with ``amc.arbiter``, ``amc.duplicate``,
+  ``amc.merge``, ``amc.assemble``. Its RAM library is ``ram_{1r1rw,1r1w,1rw,1w,1w1rw,2rw,
+  2rw_rl2,2w}`` and ``rom_{1r,2r}``, **all registered-read** (``read_out <= mem[...]``). There
+  is no 3R1W and no asynchronous read.
+* **RTLGen** turns array arguments into numbered external ports (``A_rd0_*``, ``out_wr0_*``)
+  and has ``Stateful[T]``, ``bind_storage``, ``partition`` and ``assign-banks``. Its port count
+  and latency for a local array are unknown.
+
+**``vpu_regfile``.** Payloads are ``UInt(W)``: bits, not bf16. That keeps out C7 (a NaN payload
+lost through a ``phi bfloat``); one bf16-typed variant probes it on purpose.
+
+* **R1, ``trace``** (first, the reference expression). One kernel with a local ``mem:
+  UInt(W)[32]``. Each iteration is one cycle: three reads, *then* the write. Ordering is program
+  order. Probes: Catapult with 3 reads and 1 write per II = 1 iteration (registers and a mux by
+  itself? needs ``s.partition`` complete? SCHD-30?); area against MiniTPU's LUTRAM under the U1
+  DC flow; the asynchronous read becomes port latency >= 1 (triage 4).
+* **R2, ``stateful``.** As R1, but ``mem`` is ``@ Stateful`` and the trace is fed in chunks
+  across calls. Probes persistence and reset: SystemC resets Stateful to its initializer and
+  Vitis ``static`` does not, while the RTL never resets. A mismatch is visible only on reads
+  before writes, which are masked. It also probes triage 10's "Stateful globals named by
+  variable name" when two regfiles (``vreg_stripe``'s 4) are composed.
+* **R3, ``ported``.** A ``@df.unit`` whose ports are streams: three ``raddr`` in, three
+  ``rdata`` out, one write stream. It consumes one token per port per iteration (lockstep).
+  Probes stream ports as memory ports; ``Wire`` for the asynchronous read on SystemC (a
+  cycle-locked consumer: limitation 22); C9, a unit cannot be sized at instantiation, for
+  ``WIDTH`` 16 against 256.
+* **R4, ``shared``.** This is the U2 upgrade: an addressed memory shared by several state
+  machines. A region-scope ``@ Stateful`` array, three reader kernels and one writer kernel.
+
+  * Simulator: honoured but racy, with no cycle [I].
+  * Vitis: refused [V].
+  * SystemC: a replica per kernel, silent [I].
+  * compose: refused [V].
+
+  It reproduces "the SystemC replica" in its strongest form.
+* **R5, ``annotated``.** R4 or R1 with ``@ Memory(resource="LUTRAM", storage_type="RAM_1WNR",
+  latency=0)``. This is the D-1 sweep: which backend honours, refuses or drops each field.
+* **R6, ``servers``.** ``microarch.py``'s shape: one kernel per physical port serving request
+  and response streams over a shared Stateful. This is the shape a conflict probe (2c ii)
+  needs, because the port kernel is where two clients meet.
+
+**``vpu_word_array``.**
+
+* **W1.** One kernel serves both ports per iteration: reads sampled at issue, a
+  read-during-write returns the old value. The delivery delays (3/2) are left to the RTL check;
+  an Allo delay line would be an iteration shift (U1 L1).
+* **W2.** Two kernels on one shared Stateful. This is the true dual-port case and the canonical
+  "two clients, one memory": a replica on SystemC, refused on Vitis [V/I].
+* **W3.** ``storage_type="RAM_T2P", latency=3`` [dropped, see above].
+* **Width.** 1024 b is beyond numpy's 512 b (``DTypeWarning``) and S5-class port read-back (U1
+  ``UInt(24)`` gave ``KeyError 'ui24'``) is likely to recur. Probe ``UInt(1024)`` against
+  ``UInt(16)[64]`` lanes, and run narrowed first.
+
+**``vpu_fifo`` and the output FIFO.**
+
+* **F1, ``stream``.** The FIFO *is* a ``Stream[UInt(W), D]``. A driver kernel replays the
+  trace with ``try_put``/``try_get``/``empty``/``full``. Probes:
+
+  * capacity exactly D;
+  * flag timing;
+  * pass-through on full depends on whether the get precedes the put in program order;
+  * **no peek**, so a first-word-fall-through ``pop_data`` without a pop is not expressible
+    (a missing abstraction);
+  * on the C++ Catapult path ``full()`` is hard-wired false (#31); SystemC uses ``AlloFifoC``
+    when the flags are queried;
+  * U1 L2: in csim a depth-1 Stream is not a register (II 2), so time a depth-16 Stream too.
+* **F2, ``bits``.** The ``.sv`` transcribed: a local ring, ``rd``/``wr`` pointers and a count.
+  Bit-exact on illegal traces too. Probes B1 (the count compares are unsigned) and pointer
+  wrap at power-of-2 widths.
+* **F3, output FIFO.** ``Stream[UInt(64), 16][16]`` (16 lanes) at (64, 16). The overflow rule
+  is a ``Stream`` *blocking* where the RTL drops and asm refuses: three behaviours, recorded as
+  a semantic mismatch.
+
+**Proposal for "``compose`` declares memory ports"** (a D-n entry before code, D-9). Add
+``compose.Memory(local=True, ports=(Port("r", latency=0) * 3, Port("w", latency=1)))``,
+modelled on AMC's port type, plus a rule that counts each unit body's accesses per iteration
+against the declared ports. Every backend then honours, refuses or (for the simulator) records
+it as "untimed" (D-1). Sharing becomes "N units bind *distinct ports* of one memory", which
+replaces today's flat refusal. SystemC's fix is a **write-broadcast replica**: N read replicas
+with every write sent to all of them. That is how LUTRAM gives 3 asynchronous reads
+(``REGISTER_FILE.md`` §4), and it is what the per-client replica gets wrong.
+
+4. Predicted findings
+---------------------
+
+Columns: Sim = simulator, SC = SystemC csim, Cat = Catapult, RTLG = RTLGen, AMC.
+
+* **Y**: the cell applies; **opt**: optional; **probe**: an exploratory cell.
+* "per-cycle RTL" means a match is judged against the RTL's per-cycle response trace;
+  "mismatch" means a semantic mismatch is the predicted cell.
+* Vitis is an optional column: it holds the verified refusal and ``bind_storage``.
+
+===  =====  =====  =====  =====  =====  ==========================================================
+#    Sim    SC     Cat    RTLG   AMC    hypothesis
+===  =====  =====  =====  =====  =====  ==========================================================
+H1   Y      Y      RTL    Y      Y      R1/W1/F2 match on the defined slots first time (bit moves, no arithmetic)
+H2   Y      Y      Y      n/a    n/a    region-scope Stateful shared by >=2 kernels: SystemC silent replica (**bug**, D-1); Vitis refuses; simulator racy (**sem. mismatch**)
+H3   Y      Y      Y      opt    opt    ``Memory(latency, depth)`` dropped everywhere; ``storage_type`` dropped outside Vitis (**bug**, D-1)
+H4   unt.   unch.  Y      Y      Y      async read not expressible in any generated RTL: port latency >= 1 (**missing abstraction** = triage 4)
+H5   --     --     Y      --     --     Catapult 3R1W at II=1 on 32x256: needs complete partition or SCHD-30; area far above LUTRAM
+H6   Y      Y      Y      probe  n/a    FIFO via Stream: no peek; pass-through-on-full order-dependent; capacity/flag timing differ in csim (**sem. mismatch**)
+H7   Y      Y      --     --     --     output FIFO overflow: three behaviours (Allo blocks, RTL drops, asm refuses)
+H8   Y      Y      Y      probe  probe  1024 b words: numpy limit or S5 read-back bug (**bug**/**workaround**)
+H9   Y      Y      --     --     --     ``@df.unit`` frozen sizes (C9) and Stateful naming (triage 10) recur composing 4 regfiles / 3 FIFO sizes
+H10  --     --     --     --     Y      AMC declares ports (r x3, w) but has no 3R1W / async-read RAM: refuse or replicate; ``word_array`` -> ``ram_2rw``/``_rl2``, not 3/2
+H11  Y      Y      --     --     --     same-iteration port conflict (2c ii) never refused statically; R6 serialises, R4 races (**missing abstraction**: port rule, calendar)
+H12  RTL    --     --     --     --     RTL quirks: push+pop on empty returns stale data; ``word_array`` sim model read-old vs XPM no-change (MiniTPU **FYI**, not Allo)
+H13  Y      opt    --     --     --     a bf16-typed regfile/FIFO variant loses NaN payloads (C7, ``phi bfloat``)
+H14  --     Y      Y      --     --     U1's unconfirmed "kernel reads back its own output-port element -> g++ error" reproduces for R1-style read-modify-write
+===  =====  =====  =====  =====  =====  ==========================================================
+
+5. Order of work and agent split
+--------------------------------
+
+**Phase 0** (mechanical; it starts now, D-9). One agent, **A: harness and RTL**.
+
+* The ``trace`` shape and wide ports.
+* Trace references in ``ref.py``.
+* Step-probe latencies for every port, against the table in section 1.
+* VCD seeding of the three tbs.
+* The tbs run unchanged.
+* H12 confirmed or dropped.
+
+It is done when ``characterize`` gives ``REF-MATCH`` with an undefined census for all four
+units, narrow and full width. A small parallel agent, **E: the oracle**, builds the conflict
+table of 2c (i) from ``isa_slots.json``, ``tb_port_exclusivity`` and ``test_asm.py``.
+
+**Checkpoint 1 (owner):** choose the expressions per unit (R1..R6, W1..W3, F1..F3). The
+default: R1, R4, R5, W1, W2, F1, F2.
+
+**Phase 1.** **B: Allo, simulator and csim.** R1 and F2 come first, because they set the
+reference expression and need no new abstraction. Then the sharing probes R4/W2 (H2), R5 (H3)
+and F1 (H6/H7), and the conflict parity of 2c (ii).
+
+**Phase 2** (parallel once B has R1, W1 and F2):
+
+* **C: Catapult.** R1, F2 and narrowed W1 with the U1 I/O-cycle latency pin; DC area against
+  MiniTPU.
+* **D: RTLGen and AMC.** One agent for both, since both are open HLS. AMC gets a hand-written
+  ``amc.memory`` regfile as a probe of what the port type can say.
+
+**Phase 3.** The integrator fills the matrix (``u2_matrix.rst``), triage goes to the owner,
+and the D-n proposal for ``compose`` memory ports follows. One session writes to ``main``;
+feature code goes on ``u2-*`` branches from ``u1-pilot`` after the U1 merges.
+
+**Owner decisions needed before Phase 1:**
+
+* **Triage 1, 2, 10.** Merge ``core-uint-compare``, ``systemc-u1-fixes`` and ``core-scoping``
+  first, because U2 builds on all three: B1 for the FIFO counts, the SystemC port fixes, and
+  Stateful naming.
+* **Triage 4.** Accept "an asynchronous read becomes latency >= 1" as a recorded deviation for
+  every generated RTL? Otherwise no regfile cell can match.
+* **Triage 8.** Extend the latency proposal from kernels to *ports*: per-port read latency and
+  write visibility. The VMEM cells (3/2) need it.
+* **Triage 11 (C9).** Three FIFO sizes and two regfile widths will each need a module until
+  sizing at instantiation exists. Accept that workaround for U2?
+
+6. Open questions for the owner
+-------------------------------
+
+* **Q1.** Are undefined slots (uninitialised reads, VMEM collisions, pop on empty)
+  don't-cares to *mask*, or should the Allo unit *refuse* the traces that produce them (D-1
+  read strictly)?
+* **Q2.** Is a narrowed geometry (``NUM_LANES = 1``, small VMEM) an acceptable verdict
+  configuration, with full width run once as a probe?
+* **Q3.** Is "the output FIFO" ``vpu_fifo`` at (64, 16) alone, or with the ``mxu.sv`` gather
+  (``pack_bf16`` is arithmetic, so that would be U3)?
+* **Q4.** The conflict check: accept the three tiers of 2c (oracle; Allo refusal parity per
+  iteration; calendar rules recorded as not checkable), or build a composite RTL unit (the
+  ``vreg_stripe`` plus ``vpu.sv``'s port-C and write-back muxes, extracted), or defer to U4/U5?
+* **Q5.** Should ``vpu_dma_group`` join U2, since it is the only DMA route into VMEM and the tb
+  uses it, or wait for U4 (DMA)?
+* **Q6.** The asm has no VMEM collision rule. Do we hold Allo to the simulation assertion
+  (``vpu_vmem_simd.sv:121``) instead, and should MiniTPU's asm grow that rule? That is a change
+  to MiniTPU, which D-7 makes the owner's call.
+* **Q7.** Is the Vitis column in or out for U2? It is where the shared-Stateful refusal and
+  ``bind_storage`` are verified.
+* **Q8.** May the shared-memory upgrade replace ``compose``'s "one owner per memory" rule with
+  "one owner per *port*"? That changes the programming model, so it needs a D-n entry.
