@@ -1,0 +1,429 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+###########################################################
+U2: a combinational (same-cycle) read for ``vpu_regfile``
+###########################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-02.** zhang-21, branch
+   ``u2-comb-read`` (from ``origin/u1-pilot`` at ``bf0e60ab``); bindings a
+   private copy of ``wt-u1``'s build (``ldd`` resolves
+   ``libAlloMLIRAggregateCAPI`` inside the worktree). MiniTPU at
+   ``b3ba0a4d``, read only. Catapult 2024.2 (``nangate-45nm_beh``), DC
+   W-2024.09 (FreePDK45, the U1 flow, ``dc_u1.tcl`` byte-identical),
+   Verilator 5.052. Nothing under ``allo/`` or ``mlir/`` changed: the emitter
+   change is a hand patch on Allo's own emission, recorded as a proposal.
+   Scratch (Catapult and DC projects, not kept): ``scratch/u2cr/``.
+
+The U2 pilot (``u2_regfile_2026-10-02.rst``, G2) measured every generated
+RTL of the regfile at read latency 1 and write->read 2 against MiniTPU's 0
+and 1, and offered "async read = latency 1" as a recorded deviation. The
+owner chose instead to pursue a true combinational read. This record is
+that pursuit: which forms Catapult accepts, what each one measures, and
+what Allo's SystemC emitter would need.
+
+**Result.** Catapult produces RTL whose three read ports return *this*
+cycle's array contents (read latency 0 in the harness's edge count, write
+visible after 1 edge), **bit-exact on every defined slot** of the joined
+trace against ``vpu_regfile.sv`` (w16 180,780/180,780 at 2.0 and 3.33 ns;
+w256 45,744/45,744), from a SystemC module with **one clocked thread for
+the write and one ``SC_METHOD`` for the reads over an array of
+``sc_signal``**. Applied as a 121-line hand patch to Allo's own emission of
+the ``wire`` variant it gives the same result. DC same-flow area is 4,451
+um^2 against MiniTPU's 4,022 (+10.7 %; the pilot's latency-1 form was
++45.8 %). G2 is therefore amended: the missing abstraction is Allo's, not
+the tool's. Nothing in Allo expresses it today; the proposal is at the end.
+
+Reproduce (``source examples/minitpu/harness/env-zhang21.sh`` first; ``R`` is
+``dev/records/minitpu/u2_comb_read_2026-10-02``, ``S`` a scratch directory)::
+
+   # hand-written forms: copy kernel.cpp + run.tcl, run Catapult in build/
+   mkdir -p $S/d1/build && cp $R/catapult/d1_sigarr/{kernel.cpp,run.tcl} $S/d1/ && \
+       (cd $S/d1/build && catapult -shell -f ../run.tcl)
+   $ALLO_PYTHON $R/scripts/cmp_rf.py $S/d1/build/Catapult/rf_comb.v1/concat_sim_rtl.v \
+       --top rf_comb --ports ra,rb,rc,wa,wd,we:qa,qb,qc [--inst w256]
+   # Allo forms (b), (c) and the hand-patched emission (e)
+   $ALLO_PYTHON $R/scripts/emit_csyn.py vpu_regfile wire_stateful $S/b --n 64 \
+       --pipeline rf_0:_ --synth-top rf_0 --clock 3.33            # (b); --partition rf_0:mem crashes (F5)
+   $ALLO_PYTHON $R/scripts/emit_csyn.py vpu_regfile wire_scalars --module $R/scripts/rf_scalars.py \
+       $S/c --n 64 --pipeline rf_0:_ --synth-top rf_0 --clock 3.33   # (c)
+   $ALLO_PYTHON $R/scripts/emit_csyn.py vpu_regfile wire $S/e --n 64 --pipeline rf_0:_ \
+       --synth-top rf_0 --clock 3.33 --partition rf_0:mem --no-run && \
+       patch $S/e/kernel.cpp $R/catapult/e_wire_patch/hand_patches.diff && \
+       (cd $S/e && mkdir -p build && cd build && catapult -shell -f ../run.tcl)
+   $ALLO_PYTHON $R/scripts/cmp_rf.py $S/e/build/Catapult/rf_0.v1/concat_sim_rtl.v \
+       --top rf_0 --ports v18,v19,v20,v21,v22,v23:v24,v25,v26
+   $ALLO_PYTHON $R/scripts/csim_offset.py $S/e        # after the csim g++ build (compile_command)
+   $R/dc/run_dc.sh c_d1 rf_comb clk 3.33 $S/d1/build/Catapult/rf_comb.v1/concat_rtl.v
+
+What "latency" means here
+=========================
+
+The harness ``trace`` shape (``harness/rtl.py``): cycle ``t`` drives row
+``t`` with the clock low, ``eval()``, samples the outputs ("pre"), then the
+rising edge ``t + 1`` ("post"). ``cmp_rf.py`` measures the read latency as
+the output offset L at which the defined slots of the first 3,000 cycles
+agree: L = 0 is the "pre" sample of the same cycle -- an asynchronous read,
+MiniTPU's -- and L >= 1 the "post" sample of row ``t + L - 1``. Then every
+defined slot is compared at that L, and the regfile's own step probes
+(``units/vpu_regfile.py`` ``probes``) are run on both RTLs: MiniTPU reads
+at 0 and shows a write to a read 1 edge later.
+
+The forms
+=========
+
+All take MiniTPU's port list (3 x 5-bit read addresses, write address,
+data, ``we``; 3 data outputs); the generated module adds ``clk`` and an
+active-low ``rst``. ``w16`` unless marked. Catapult messages are verbatim
+from ``catapult/<form>/csyn.log.gz``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 5 27 20 22 26
+
+   * - id
+     - form
+     - Allo can express?
+     - Catapult
+     - measured (read / write->read; defined slots)
+   * - **d1**
+     - hand SystemC: ``sc_signal<T> mem[32]``; ``SC_THREAD(wr)`` does the write under
+       ``clk.pos()``; ``SC_METHOD(rd)`` sensitive to the three addresses and all 32
+       signals drives ``qa/qb/qc`` (``catapult/d1_sigarr/kernel.cpp``)
+     - **no** (no combinational process form; F2)
+     - ok, 27 s. RTL: ``rf_comb_comb`` (no clock: addresses + ``mem_0..31`` in, data out),
+       ``rf_comb_wr`` (32 x 16 b flops), top ``rf_comb(clk, rst, ra, rb, rc, wa, wd, we,
+       qa, qb, qc)``. Area score 4,203.1 (mux 1,309.5, reg 2,723.8), max delay 0.465 ns
+     - **0 / 1**, all three ports; **180,780/180,780** at 3.33 and at 2.0 ns
+       (``logs/cmp_d1_sigarr.txt``, ``cmp_d1_2p0.txt``)
+   * - d1 w256
+     - d1 at ``W = 256``
+     - no
+     - ok, 30 s; area score 64,642.0 (reg 43,581.4), max delay 0.522 ns
+     - **0 / 1**; **45,744/45,744** (``cmp_d1_w256.txt``)
+   * - d1-nr
+     - d1 with ``mem`` left unwritten in the reset action (MiniTPU never resets it)
+     - --
+     - **refused**: ``Error: kernel.cpp(40): 'mem(0)' must be set in reset action,
+       preserving state across reset is not supported (CIN-233)`` (x32). F3
+     - --
+   * - **d2**
+     - d1 with ``mem`` a plain member array (what Allo emits for ``@ Stateful``) read by the
+       ``SC_METHOD``
+     - (this is Allo's storage form)
+     - **refused**: ``Error: kernel.cpp(22): Combinational process 'rd' must be non-edge
+       sensitive to all inputs, not sensitive to 'mem' (CIN-197)``; ``Error: Compilation
+       aborted (CIN-5)``. F4
+     - --
+   * - **a1**
+     - Allo's one-thread shape (reads, port writes, ``wait()``) with the read mux a
+       function marked ``#pragma hls_design ccore`` + ``#pragma hls_ccore_type
+       combinational``; ``mem`` a plain array
+     - the pragma: no (hand)
+     - the CCORE is **inlined**, not built: ``Pragma 'hls_design<>' detected on routine
+       'rd_mux' (CIN-6)``, ``solution design set rd_mux -inline (HC-8)``, ``Inlining routine
+       'rd_mux' (CIN-14)``. Then **SCHD-30**: ``from operation MEMORYREAD
+       "rd_mux:read_mem(mem:rsc.@)" ... mapped to
+       "ccs_sample_mem.ccs_ram_sync_1R1W_rwport(1,16,5,32,32,16,5)"`` (the pilot's H5)
+     - --
+   * - a1b
+     - a1 + ``#pragma hls_resource ... map_to_module="[Register]"`` on ``mem``
+     - the map: yes (``s.partition``)
+     - ok, 32 s; ``MEM-74``; ``Final schedule of SEQUENTIAL '/rf_comb/wr': Latency = 1``;
+       area score 4,483.7
+     - **1 / 2**; 180,780/180,780 at L=1 (``cmp_a1b_thread_ccore_reg.txt``): the pilot's
+       result. F6
+   * - a2
+     - d1 with the ``SC_METHOD``'s mux as the same combinational CCORE
+     - no
+     - inlined as in a1; RTL identical to d1 (area score 4,203.1)
+     - **0 / 1**; 180,780/180,780 (``cmp_a2_method_ccore.txt``)
+   * - **b**
+     - Allo ``wire_stateful``: the ``wire`` variant with ``mem: W[32] @ Stateful = 0``
+       (``units/vpu_regfile.py``)
+     - **yes**
+     - emitted as a module member ``int16_t __stateful_rf_0_mem_1[32];  // @ Stateful``,
+       read before ``wait()`` in the thread. ``s.partition("rf_0:mem")`` **crashes Allo**
+       (F5). Without it **SCHD-30** (``MEMORYREAD
+       "while:v43:read_mem(__stateful_rf_0_mem_1:rsc.@)#1" ... mapped to
+       "ccs_sample_mem.ccs_ram_sync_1R1W_rwport(1,16,5,32,32,16,5)"``)
+     - --
+   * - b2
+     - b + the ``hls_resource [Register]`` pragma hand-patched onto the member
+     - the map: should be ``s.partition`` (F5)
+     - ok; ``Final schedule of SEQUENTIAL '/rf_0/run': Latency = 2, Area ... 5255.83
+       (CRAAS-12)``; area score 5,852.5
+     - **1 / 2**; 180,780/180,780 at L=1 (``cmp_b2_wire_stateful_regmap.txt``). A read
+       before ``wait()`` of a register array IS a combinational mux inside the thread, but
+       the ``sc_out`` it feeds is registered at the next edge: the port, not the mux, sets
+       the latency
+   * - **c**
+     - Allo ``wire_scalars``: 32 ``@ Stateful`` scalars and an if-chain mux per read port,
+       if-chain write (generated: ``scripts/rf_scalars.py``, 300 lines)
+     - **yes**
+     - ok, 58 s; ``Latency = 2``; area score 5,931.2 (the if-chains cost datapath: max
+       delay 1.06 ns against d1's 0.46)
+     - **1 / 2**; 180,780/180,780 at L=1 (``cmp_c_wire_scalars.txt``)
+   * - **e**
+     - Allo's emission of ``wire`` (``emit_csyn.py ... --partition rf_0:mem --no-run``) +
+       ``catapult/e_wire_patch/hand_patches.diff`` (121 lines, the proposal F2 applied by
+       hand: ``mem`` -> ``sc_signal`` array zeroed in the reset action; the three
+       ``v24/v25/v26.write(mem[..])`` cones moved into ``SC_METHOD(comb)``; the thread
+       keeps the write and its ``wait()``)
+     - the patch is what the emitter would need
+     - ok; RTL ``rf_0_comb`` + ``rf_0_run`` + ``rf_0``; area score 4,219.4; max delay 0.465
+     - **0 / 1**; **180,780/180,780** (``cmp_e_wire_patch.txt``). csim: compiles and runs
+       with the emitted TB (``logs/csim_offset.txt``): per-port skew +3/+2/+2 cycles
+       against the unpatched +4/+3/+3 -- the src/sink kernels are still not cycle-locked
+       (limitation 22), one cycle less of it
+
+Same-flow area and timing (DC W-2024.09, FreePDK45, ``dc_u1.tcl`` unchanged;
+MiniTPU and pilot rows from ``u2_regfile_2026-10-02.rst``):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 10 13 12 12 13
+
+   * - design
+     - clock
+     - area (um^2)
+     - comb
+     - seq
+     - slack (ns)
+   * - MiniTPU ``vpu_regfile`` (async reads, no reset of ``mem``)
+     - 2.0 / 3.33
+     - 4,021.7
+     - 1,578.7
+     - 2,442.9
+     - 1.47 / 2.80
+   * - MiniTPU + 3 output registers (the pilot's like-for-like at L=1)
+     - 2.0 / 3.33
+     - 4,238.7
+     - 1,578.7
+     - 2,660.0
+     - 1.48 / 2.81
+   * - pilot: Catapult ``wire`` + partition (L=1)
+     - 2.0 / 3.33
+     - 5,865.3
+     - 2,626.8
+     - 3,238.6
+     - 1.17 / 2.50
+   * - **d1: Catapult SC_METHOD read (L=0)**
+     - 2.0 / 3.33
+     - **4,451.2** (+10.7 % vs MiniTPU)
+     - 1,599.7
+     - 2,851.5
+     - 1.47 / 2.80
+   * - e: Allo emission + hand patch (L=0)
+     - 3.33
+     - 4,463.2 (+11.0 %)
+     - 1,601.1
+     - 2,862.2
+     - 2.80
+   * - MiniTPU w256 (``mtpu_rf256``)
+     - 3.33
+     - 82,738.8
+     - 45,566.9
+     - 37,171.9
+     - 1.95
+   * - pilot: Catapult w256 ``wire`` + partition (L=1)
+     - 3.33
+     - 110,805.2
+     - 61,601.9
+     - 49,203.4
+     - 1.76
+   * - d1 w256 (L=0)
+     - 3.33
+     - **67,071.1** (-18.9 % vs MiniTPU)
+     - 23,362.0
+     - 43,709.1
+     - 1.96
+
+Like for like is now MiniTPU itself. At w16 d1's combinational area equals
+MiniTPU's (+1.3 %: the same three 32:1 muxes); the sequential +16.7 % is
+the reset: MiniTPU's storage flops have no reset (``DFF_X1`` in
+``reference.rpt``), Catapult's are asynchronously reset (``DFFR_X1``, the
+cell DC maps CIN-233's reset action to), plus the thread's input registers.
+At w256 the generated design is **smaller** than MiniTPU's: DC builds
+Catapult's ``mgc_mux1hot`` read trees in 23,362 um^2 of logic where it
+infers MiniTPU's ``assign rdata = mem[raddr]`` in 45,567; the sequential
+side is again the reset flops (+17.6 %). Both close 3.33 ns with the same
+slack (1.96 / 1.95).
+
+Findings
+========
+
+**F1 (Catapult, match; amends G2).** A SystemC module with an ``SC_METHOD``
+over ``sc_signal`` storage synthesizes to a clockless read block
+(``rf_comb_comb``: addresses and the 32 register outputs in, data out; 0
+``posedge`` in it) beside a clocked write thread, and its ports behave as
+MiniTPU's: read 0, write->read 1, bit-exact on every defined slot at both
+widths and both clocks. G2's "no generated RTL can read in the cycle of
+the request" is wrong for Catapult; it is right for everything Allo emits
+today (every ``sc_out`` an ``SC_THREAD`` writes is registered at the next
+edge: b2, c, a1b, and the pilot, all L=1) and for RTLGen and AMC (below).
+
+**F2 (SystemC emitter, missing abstraction; the proposal).** Allo has no
+combinational process form. ``Wire`` ports are plain ``sc_in``/``sc_out``,
+but every kernel is one ``SC_THREAD`` with a ``wait()`` per iteration
+(``EmitSystemC.cpp:1785``, ``:1101``), so a ``Wire`` output is a register.
+The hand patch (``catapult/e_wire_patch/hand_patches.diff``) is exactly the
+emitter change, on the emitted names:
+
+1. **Storage read by the combinational cone becomes an array of
+   ``sc_signal<T>``** (``sc_signal< ac_int<16, false> > mem[32];`` as a module
+   member), accessed through ``.read()``/``.write()``, and **zeroed in the
+   reset action** (CIN-233; F3). A plain member array -- the current
+   ``@ Stateful`` emission -- is refused by Catapult for an ``SC_METHOD``
+   (CIN-197, d2). This also removes the pilot's H5 workaround: an
+   ``sc_signal`` array is registers by construction, so no
+   ``s.partition`` / ``hls_resource [Register]`` is needed (d1 has no
+   ``MEM-74`` and needs no map).
+2. **One ``SC_METHOD(comb)`` per kernel**, sensitive to the ``Wire`` inputs
+   it reads and to every storage signal, holding the ``Wire.put`` cones that
+   qualify; the ``SC_THREAD`` keeps the state updates, the other ``Wire``
+   reads and its ``wait()``.
+3. **The qualifying rule** (what the emitter would classify): a
+   ``w.put(e)`` whose cone contains only ``Wire.get()``\ s and loads of a
+   kernel-local or ``Stateful`` array, with **no store to that array
+   earlier in the same iteration** in program order. That is the
+   regfile's "reads then write" body; a write-first body would read new
+   data through a combinational path and must stay in the thread (or be
+   refused with the reason). The simulator's semantics do not change: it
+   already runs the body in that order.
+
+Expression options for the owner: (i) **automatic** -- apply the rule to
+every ``Wire``-port kernel, so the pilot's ``wire`` variant as written
+becomes L=0 (no new syntax; the risk is a silent latency change on
+existing Wire designs, so it should at least be reported in
+``latency.json``); (ii) **explicit** -- a marker on the output port or the
+kernel (``Wire[T, comb]`` or ``@df.kernel(comb=True)``), refused when the
+rule fails. Either keeps D-11: it is one kernel, one ``Stateful``. (ii) is
+the D-1-safe default. ``latency.json`` (D-10) then needs a rule for a port
+driven by an ``SC_METHOD``: ``port_style: wire-comb, latency: 0``, checked
+on the RTL as here (the CCORE case in ``latency_report_2026-10-02.rst``
+already asks for ``port_style: comb``).
+
+**F3 (Catapult, semantic mismatch, recorded).** Catapult requires every
+``sc_signal`` to be written in the reset action (CIN-233, d1-nr), so the
+generated storage is cleared by ``rst``; MiniTPU's is not ("never reset
+(would block LUTRAM inference)"). The trace comparison holds ``rst`` high
+on the generated side (as the pilot did), so the ``reset-keeps`` directed
+trace does not exercise this; it would differ. Cost: ``DFFR_X1`` instead of
+``DFF_X1`` on 512 flops (the +16.7 % sequential area). A storage without
+reset is not expressible in Catapult SystemC; ``ALLO_SYNC_RESET`` would
+only change the flop type.
+
+**F4 (Catapult, limit; shapes the proposal).** CIN-197: a combinational
+process may be sensitive only to signals and ports; a member variable
+written by a thread cannot feed it (d2). So any state an ``SC_METHOD``
+reads must be ``sc_signal``; the emitter's ``@ Stateful`` member form
+stays for state read only by its own thread.
+
+**F5 (Allo core, bug, loud).** ``s.partition("rf_0:mem", Complete)`` on a
+``@ Stateful`` array crashes: ``allo/ir/transform.py:161``
+``search_operations_recursive(op.else_block.operations)`` --
+``AttributeError: 'NoneType' object has no attribute 'operations'``
+(``find_buffer`` walks the kernel's ``scf.if`` without an else block; the
+``if we:`` store). Repro: ``emit_csyn.py vpu_regfile wire_stateful ...
+--partition rf_0:mem`` (``logs/b_partition_crash.txt``). *Proposed fix:*
+guard the else block (``if op.else_block is not None``) in
+``search_operations_recursive``; whether the global is then found is
+untested.
+
+**F6 (Catapult, info).** A ``#pragma hls_design ccore`` +
+``hls_ccore_type combinational`` function called from a SystemC process is
+inlined (HC-8, CIN-14), not built as a block; the clockless CCORE of
+``latency_report_2026-10-02.rst`` section C works only as the C++ top.
+Inside a SystemC design the process type, not a CCORE marker, decides the
+read latency (a1b = L=1, a2 = L=0, same mux function).
+
+**F7 (csim, limitation 22, unchanged in kind).** The patched kernel compiles
+and runs under the emitted testbench; the per-port skew against the
+reference drops by one cycle (+3/+2/+2 from +4/+3/+3) because the comb
+read no longer costs a delta of the thread. The src/sink kernels are still
+free-running threads.
+
+**RTLGen and AMC: no clockless read (checked once, from the code).**
+RTLGen adds ``clk``/``rst``/``start`` to every module unconditionally
+(``mlir/lib/allo/Microarch/Primitives.cpp:60-62``, ``kDone`` at ``:91``),
+drives ``done`` through the sibling composition of regions
+(``HWEmitter.cpp:643-655``), and its ``done`` is a latch of one cycle
+(``include/allo/Scheduling/LatencyModel.h:38``, ``kDoneLatchCycles = 1``).
+Its ``RegisterFile`` interface does read a fully partitioned *argument*
+"combinationally in any number at once" (``Primitives.cpp:84-89``), but
+that is the input side of a clocked module whose outputs are registered:
+the pilot measured ``mem_c0_rd0_reg``. AMC gives every top ``clk``/``rst``/
+``start`` and ``ready``/``done``
+(``circt/lib/Conversion/LoopScheduleToFSM/LoopScheduleToFSM.cpp:3682-3690``,
+``:8301-8322``) and registers every pipeline-stage output as a
+``seq::CompRegClockEnabledOp`` (``:10686-10697``). Neither has a process or
+port kind without a clock; both would refuse ``comb`` (D-10), as the
+latency report concluded.
+
+Classification (D-9)
+====================
+
+.. list-table::
+   :header-rows: 1
+   :widths: 10 22 68
+
+   * - id
+     - class
+     - one line
+   * - F1
+     - match (Catapult)
+     - SC_METHOD read + SC_THREAD write on ``sc_signal`` storage: read 0 / write->read 1,
+       bit-exact, both widths and clocks; +10.7 % area over MiniTPU
+   * - F2
+     - missing abstraction (SystemC emitter)
+     - no combinational process form; the hand patch is the proposal (storage as
+       ``sc_signal``, one ``SC_METHOD`` per kernel, the qualifying rule)
+   * - F3
+     - semantic mismatch (Catapult)
+     - storage is reset (CIN-233); MiniTPU's never is; not exercised by the comparison
+   * - F4
+     - limit (Catapult)
+     - a member array cannot feed an ``SC_METHOD`` (CIN-197)
+   * - F5
+     - bug, loud (Allo core)
+     - ``s.partition`` on a ``@ Stateful`` array crashes in ``find_buffer`` on an ``if``
+       without else
+   * - F6
+     - info (Catapult)
+     - a combinational CCORE inside a SystemC process is inlined; the process type decides
+       the latency
+   * - F7
+     - limitation 22 (csim)
+     - skew one cycle less, still present
+
+What the owner must decide
+==========================
+
+1. **Take form d1/e as the regfile's Catapult cell** (match at L=0, +10.7 %)
+   in place of the pilot's "match at L=1"? *[yes; the matrix row says so,
+   provisionally]*
+2. **F2's expression**: automatic rule or explicit marker? *[explicit, as a
+   D-n before code (D-9); the emitter work is the patch in
+   ``hand_patches.diff`` generalised to the rule]*
+3. **F3**: accept "Catapult storage is reset" as a recorded deviation of the
+   backend, with the ``reset-keeps`` trace excluded from Catapult verdicts
+   (it already is)? *[yes]*
+4. **F5**: fix with the B4/B5 batch on a ``core-*`` branch. *[yes]*
+
+Files
+=====
+
+* ``scripts/cmp_rf.py``: the per-cycle comparison with explicit port names
+  (the pilot's ``cmp_trace.py`` for hand-written modules);
+  ``scripts/emit_csyn.py`` (the pilot's + ``--module``);
+  ``scripts/rf_scalars.py`` (form c); ``scripts/csim_offset.py``.
+* ``examples/minitpu/units/vpu_regfile.py``: ``wire_stateful`` (form b).
+* ``catapult/<form>/``: ``kernel.cpp``, ``run.tcl``, ``csyn.log.gz``,
+  ``rtl.rpt.gz``, ``concat_rtl.v.gz``; ``e_wire_patch/hand_patches.diff``
+  and ``kernel.cpp.emitted`` (Allo's unpatched emission).
+* ``logs/``: ``cmp_<form>.txt``, ``csim_offset.txt``,
+  ``b_partition_crash.txt``.
+* ``dc/``: ``run_dc.sh`` (paths), per-run ``area`` and ``qor`` reports.

@@ -1,0 +1,1 @@
+RTL-TRACE vpu_regfile:w16 c_wire_scalars: defined 180780/180780 at measured read latency L=1 (MiniTPU 0); 3 masked; first-3000 hits by L {0: 1760, 1: 8997, 2: 1761, 3: 1649, 4: 1577, 5: 1451, 6: 1388, 7: 1232}; 60261 cycles; 0.7s

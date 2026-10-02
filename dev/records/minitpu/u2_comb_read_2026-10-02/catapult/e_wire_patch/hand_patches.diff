@@ -1,0 +1,121 @@
+--- wire_base/kernel.cpp	2026-10-02 14:09:13.018583640 -0400
++++ e_wire_patch/kernel.cpp	2026-10-02 14:16:11.495599128 -0400
+@@ -537,20 +537,59 @@
+   sc_out< ac_int<16, false> > v24;
+   sc_out< ac_int<16, false> > v25;
+   sc_out< ac_int<16, false> > v26;
++  // [hand-patch, comb read] the kernel-local array is storage shared by two processes:
++  // an array of sc_signal, zeroed in the reset action (Catapult CIN-233; MiniTPU never resets it)
++  sc_signal< ac_int<16, false> > mem[32];
+   SC_HAS_PROCESS(rf_0);
+   rf_0(sc_module_name n) : sc_module(n), done("done") {
+     SC_THREAD(run);
+     sensitive << clk.pos();
+     async_reset_signal_is(rst, false);
++    // [hand-patch, comb read] the Wire outputs that depend only on Wire inputs and the
++    // state read before the iteration's first state write become one SC_METHOD
++    SC_METHOD(comb);
++    sensitive << v18 << v19 << v20;
++    for (int i = 0; i < 32; i++) sensitive << mem[i];
++  }
++  void comb() {
++    ac_int<5, false> v27 = v18.read();	// L23
++    ac_int<5, false> a5;	// L24
++    a5 = v27;	// L25
++    ac_int<5, false> v28 = a5;	// L26
++    int32_t v29 = v28;	// L27
++    int32_t a;	// L28
++    a = v29;	// L29
++    ac_int<5, false> v30 = v19.read();	// L30
++    ac_int<5, false> b5;	// L31
++    b5 = v30;	// L32
++    ac_int<5, false> v31 = b5;	// L33
++    int32_t v32 = v31;	// L34
++    int32_t b;	// L35
++    b = v32;	// L36
++    ac_int<5, false> v33 = v20.read();	// L37
++    ac_int<5, false> c5;	// L38
++    c5 = v33;	// L39
++    ac_int<5, false> v34 = c5;	// L40
++    int32_t v35 = v34;	// L41
++    int32_t c;	// L42
++    c = v35;	// L43
++    int32_t v41 = a;	// L57
++    int v42 = v41;	// L58
++    uint16_t v43 = mem[v42].read();	// L59
++    v24.write(v43);	// L60
++    int32_t v44 = b;	// L61
++    int v45 = v44;	// L62
++    uint16_t v46 = mem[v45].read();	// L63
++    v25.write(v46);	// L64
++    int32_t v47 = c;	// L65
++    int v48 = v47;	// L66
++    uint16_t v49 = mem[v48].read();	// L67
++    v26.write(v49);	// L68
+   }
+   void run() {
+-    v24.write(0);
+-    v25.write(0);
+-    v26.write(0);
++    for (int i = 0; i < 32; i++) mem[i].write(0);  // [hand-patch, comb read] CIN-233
+     done.write(false);  // completion flag low until the pass finishes
+     wait();
+-    #pragma hls_resource mem_rsc variables="mem" map_to_module="[Register]"
+-    uint16_t mem[32];	// L21
+ #ifdef __SYNTHESIS__
+     done.write(true);  // steady-state: no completion, so assert on entry (the post-body write is unreachable here)
+     #pragma hls_pipeline_init_interval 1
+@@ -559,27 +598,6 @@
+     #pragma hls_pipeline_init_interval 1
+     l_steady: for (int t1 = 0; t1 < 64; t1 += 1) {
+ #endif
+-      ac_int<5, false> v27 = v18.read();	// L23
+-      ac_int<5, false> a5;	// L24
+-      a5 = v27;	// L25
+-      ac_int<5, false> v28 = a5;	// L26
+-      int32_t v29 = v28;	// L27
+-      int32_t a;	// L28
+-      a = v29;	// L29
+-      ac_int<5, false> v30 = v19.read();	// L30
+-      ac_int<5, false> b5;	// L31
+-      b5 = v30;	// L32
+-      ac_int<5, false> v31 = b5;	// L33
+-      int32_t v32 = v31;	// L34
+-      int32_t b;	// L35
+-      b = v32;	// L36
+-      ac_int<5, false> v33 = v20.read();	// L37
+-      ac_int<5, false> c5;	// L38
+-      c5 = v33;	// L39
+-      ac_int<5, false> v34 = c5;	// L40
+-      int32_t v35 = v34;	// L41
+-      int32_t c;	// L42
+-      c = v35;	// L43
+       ac_int<5, false> v36 = v21.read();	// L44
+       ac_int<5, false> x5;	// L45
+       x5 = v36;	// L46
+@@ -593,24 +611,12 @@
+       bool v40 = v23.read();	// L54
+       bool e;	// L55
+       e = v40;	// L56
+-      int32_t v41 = a;	// L57
+-      int v42 = v41;	// L58
+-      uint16_t v43 = mem[v42];	// L59
+-      v24.write(v43);	// L60
+-      int32_t v44 = b;	// L61
+-      int v45 = v44;	// L62
+-      uint16_t v46 = mem[v45];	// L63
+-      v25.write(v46);	// L64
+-      int32_t v47 = c;	// L65
+-      int v48 = v47;	// L66
+-      uint16_t v49 = mem[v48];	// L67
+-      v26.write(v49);	// L68
+       bool v50 = e;	// L69
+       if (v50) {	// L70
+         uint16_t v51 = d;	// L71
+         int32_t v52 = x;	// L72
+         int v53 = v52;	// L73
+-        mem[v53] = v51;	// L74
++        mem[v53].write(v51);	// L74
+       }
+       wait();  // no handshake in the body: the cycle boundary, in csim and synthesis
+     }

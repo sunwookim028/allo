@@ -100,6 +100,21 @@ decide before the rest of U2" in ``u2_regfile_2026-10-02.rst``. In short:
      - **finding, bug (D-1)** (H3): ``Memory(LUTRAM, RAM_1WNR, latency=0, depth=32)`` is
        dropped -- emission byte-identical to ``trace``; nothing refuses
      - ``repros.py`` H3. Vitis keeps resource/storage only; latency/depth never reach the IR.
+   * - Catapult, comb read (``u2-comb-read``)
+     - **match at read latency 0** (MiniTPU's): a SystemC module with one clocked write
+       thread and one ``SC_METHOD`` over ``sc_signal`` storage gives read 0 / write->read
+       1, **180,780/180,780** per cycle at 2.0 and 3.33 ns, w256 **45,744/45,744**; DC
+       4,451.2 um^2 vs MiniTPU 4,021.7 (+10.7 %; the L=1 form was +45.8 %). Reached as hand
+       SystemC (d1) and as a 121-line hand patch on Allo's own ``wire`` emission (e), so
+       **finding, missing abstraction F2** (amends G2: the gap is the emitter's, not the
+       tool's): no combinational process form; the patch is the proposal. Every Allo form
+       as emitted (``wire``, ``wire_stateful``, ``wire_scalars``, a CCORE mux in the thread)
+       stays at L=1: a thread's ``sc_out`` is a register. Also **semantic mismatch F3**
+       (Catapult resets the storage, CIN-233), **bug F5** (``s.partition`` on a
+       ``@ Stateful`` crashes), info F6 (a CCORE inside a SystemC process is inlined)
+     - ``u2_comb_read_2026-10-02.rst``; ``catapult/``, ``dc/``, ``logs/``;
+       ``scripts/cmp_rf.py``. Provisional: the cell supersedes the "match at L=1" row above
+       once the owner takes form e (decision 1 there).
    * - RTLGen
      - **match** 180,780/180,780 as written (II=3: RTLGen itself builds a two-copy
        write-broadcast replica of ``mem`` with registered reads) and with ``partition``
