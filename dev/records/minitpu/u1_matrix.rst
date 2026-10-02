@@ -72,6 +72,20 @@ in what Allo can say.
    widening does not compile; S5: a ``UInt(24)`` port cannot be read back).
    *[fix on ``systemc-u1-fixes`` with a regression test each]*
 
+10. **Front-end scoping miscompiles** (``vpu_alu``, ``u1_alu_2026-10-02.rst``;
+    both reproduced independently). C3: a function reused from another module
+    reads the *caller's* global of the same name (``K = 3`` in the engine's
+    module, ``K = 5`` in the caller's: Allo computes ``x * 5``). C4: a
+    module-level numpy array silently replaces a kernel parameter of the same
+    name. Neither raises. Every cross-module unit reuse -- which composition
+    from U3 on rests on -- is exposed. *[fix before U3, on review branch
+    ``core-scoping`` with the same impact check as item 1; in progress]*
+11. **ALU engines, by reuse.** All three compositions match the RTL bit for
+    bit, but function-level engine swapping works only by naming convention
+    (C1, C2, C11), a ``@df.unit``'s sizes freeze at decoration (C9), and a
+    reused function's schedule does not travel with it (C10). *[proposals,
+    with item 8, for the U3 composition design review]*
+
 ``vpu_bf16_add`` (pilot)
 ------------------------
 
