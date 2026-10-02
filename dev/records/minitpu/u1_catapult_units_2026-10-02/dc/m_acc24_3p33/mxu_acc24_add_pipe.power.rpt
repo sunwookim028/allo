@@ -1,0 +1,58 @@
+ 
+****************************************
+Report : power
+        -analysis_effort low
+Design : mxu_acc24_add_pipe
+Version: W-2024.09
+Date   : Fri Oct  2 04:40:22 2026
+****************************************
+
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+Design        Wire Load Model            Library
+------------------------------------------------
+mxu_acc24_add_pipe     5K_hvratio_1_1    NangateOpenCellLibrary
+
+
+Global Operating Voltage = 1.1  
+Power-specific unit information :
+    Voltage Units = 1V
+    Capacitance Units = 1.000000ff
+    Time Units = 1ns
+    Dynamic Power Units = 1uW    (derived from V,C,T units)
+    Leakage Power Units = 1nW
+
+
+Attributes
+----------
+i - Including register clock pin internal power
+
+
+  Cell Internal Power  = 233.2550 uW   (69%)
+  Net Switching Power  = 102.5297 uW   (31%)
+                         ---------
+Total Dynamic Power    = 335.7847 uW  (100%)
+
+Cell Leakage Power     =  30.9890 uW
+
+
+                 Internal         Switching           Leakage            Total
+Power Group      Power            Power               Power              Power   (   %    )  Attrs
+--------------------------------------------------------------------------------------------------
+io_pad             0.0000            0.0000            0.0000            0.0000  (   0.00%)
+memory             0.0000            0.0000            0.0000            0.0000  (   0.00%)
+black_box          0.0000            0.0000            0.0000            0.0000  (   0.00%)
+clock_network    115.9802            0.0000            0.0000          115.9802  (  31.62%)  i
+register          38.2747           21.6051        7.0893e+03           66.9692  (  18.26%)
+sequential         0.0000            0.0000            0.0000            0.0000  (   0.00%)
+combinational     79.0001           80.9246        2.3900e+04          183.8244  (  50.12%)
+--------------------------------------------------------------------------------------------------
+Total            233.2550 uW       102.5298 uW     3.0989e+04 nW       366.7738 uW
+1

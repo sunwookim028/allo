@@ -1,0 +1,27 @@
+mul_bits_3p33 bf16_mul
+mul_native_2p0 bf16_mul
+mul_native_3p33 bf16_mul
+mulpipe_bitspipe_2p0_io2 bf16_mul_pipe
+mulpipe_bitspipe_3p33_io2 bf16_mul_pipe
+mulpipe_native_2p0_io2 bf16_mul_pipe
+mulpipe_native_3p33_io2 bf16_mul_pipe
+macc_bits_2p0 mul_acc24
+macc_bits_3p33 mul_acc24
+macc_native_2p0 mul_acc24
+macc_native_3p33 mul_acc24
+acc24_bits_2p0_io3 acc24_add_pipe
+acc24_bits_3p33_io3 acc24_add_pipe
+acc24_native_2p0_io3 acc24_add_pipe
+acc24_native_3p33_io3 acc24_add_pipe
+alu_bits_2p0_io3 alu
+alu_bits_3p33_io3 alu
+alu_native_2p0_io3 alu
+alu_native_3p33_io3 alu
+mulpipe_bitspipe_2p0 bf16_mul_pipe
+mulpipe_bitspipe_3p33 bf16_mul_pipe
+alu_bits_2p0 alu
+alu_bits_3p33 alu
+mul_bits_3p33_io1 bf16_mul
+alu_bits_3p33_io3 alu --ready-period 3
+acc24_bits_3p33_io3 acc24_add_pipe --ready-period 3
+mulpipe_bitspipe_3p33_io2 bf16_mul_pipe --ready-period 3

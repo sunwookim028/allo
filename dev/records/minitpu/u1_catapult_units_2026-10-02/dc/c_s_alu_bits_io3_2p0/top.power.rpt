@@ -1,0 +1,58 @@
+ 
+****************************************
+Report : power
+        -analysis_effort low
+Design : top
+Version: W-2024.09
+Date   : Fri Oct  2 04:39:15 2026
+****************************************
+
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+Design        Wire Load Model            Library
+------------------------------------------------
+top                    5K_hvratio_1_1    NangateOpenCellLibrary
+
+
+Global Operating Voltage = 1.1  
+Power-specific unit information :
+    Voltage Units = 1V
+    Capacitance Units = 1.000000ff
+    Time Units = 1ns
+    Dynamic Power Units = 1uW    (derived from V,C,T units)
+    Leakage Power Units = 1nW
+
+
+Attributes
+----------
+i - Including register clock pin internal power
+
+
+  Cell Internal Power  = 498.4524 uW   (65%)
+  Net Switching Power  = 271.5524 uW   (35%)
+                         ---------
+Total Dynamic Power    = 770.0048 uW  (100%)
+
+Cell Leakage Power     =  73.9636 uW
+
+
+                 Internal         Switching           Leakage            Total
+Power Group      Power            Power               Power              Power   (   %    )  Attrs
+--------------------------------------------------------------------------------------------------
+io_pad             0.0000            0.0000            0.0000            0.0000  (   0.00%)
+memory             0.0000            0.0000            0.0000            0.0000  (   0.00%)
+black_box          0.0000            0.0000            0.0000            0.0000  (   0.00%)
+clock_network    238.6946           48.7341        1.2123e+03          288.6409  (  34.20%)  i
+register          69.0690            9.3243        2.6809e+04          105.2028  (  12.47%)
+sequential         0.0000            0.0000            0.0000            0.0000  (   0.00%)
+combinational    190.6889          213.4942        4.5942e+04          450.1253  (  53.33%)
+--------------------------------------------------------------------------------------------------
+Total            498.4525 uW       271.5526 uW     7.3964e+04 nW       843.9690 uW
+1

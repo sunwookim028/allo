@@ -1,0 +1,116 @@
+    bare: matches on the first 3000 vectors by latency {1: 1252, 2: 3000, 3: 1252, 4: 1050, 5: 867, 6: 785, 7: 758}
+RTL-CMP bf16_mul w_mul_bits_3p33: values 6019104/6019104 vs MiniTPU RTL; bare: measured latency 2 (declared 0); 8.7s (MiniTPU 0.9s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+    bare: matches on the first 3000 vectors by latency {1: 1252, 2: 3000, 3: 1252, 4: 1050, 5: 867, 6: 785, 7: 758}
+RTL-CMP bf16_mul w_mul_bits_2p0: values 6019104/6019104 vs MiniTPU RTL; bare: measured latency 2 (declared 0); 8.6s (MiniTPU 0.9s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+    bare: matches on the first 3000 vectors by latency {1: 2453, 2: 774, 3: 653, 4: 534, 5: 482, 6: 479, 7: 419}
+RTL-CMP bf16_mul w_mul_native_3p33: values 5011890/6019104 vs MiniTPU RTL; bare: measured latency 1 (declared 0); 8.7s (MiniTPU 0.9s)
+    vs IEEE reference (ieee_bf16_mul): 6019104/6019104 equal
+          12  Inf x 0: allo -0x7fc0, rtl +0x7fc0  e.g. 0/ff80: catapult ffc0 minitpu 7fc0, 7f80/8000: catapult ffc0 minitpu 7fc0
+      403886  NaN operand: allo -0x7fc0, rtl +0x7fc0  e.g. 0/ffc0: catapult ffc0 minitpu 7fc0, 0/ff81: catapult ffc0 minitpu 7fc0
+       36401  subnormal operand flushed: rtl signed 0, IEEE a subnormal product  e.g. 1/3f80: catapult 1 minitpu 0, 1/3f81: catapult 1 minitpu 0
+      514904  subnormal operand flushed: rtl signed 0, IEEE a normal product  e.g. 1/7f00: catapult 3c80 minitpu 0, 1/7f7e: catapult 3cfe minitpu 0
+       51958  product < 2^-126 flushed: rtl signed 0, IEEE a subnormal  e.g. 80/3c00: catapult 1 minitpu 0, 80/bc00: catapult 8001 minitpu 8000
+          53  product < 2^-126 flushed: rtl signed 0, IEEE rounds up to 2^-126  e.g. a0b7/1f33: catapult 8080 minitpu 8000, a63a/99b0: catapult 80 minitpu 0
+    bare: matches on the first 3000 vectors by latency {1: 3000, 2: 1240, 3: 1042, 4: 867, 5: 785, 6: 754, 7: 706}
+RTL-CMP mul_acc24 w_macc_bits_3p33: values 6019104/6019104 vs MiniTPU RTL; bare: measured latency 1 (declared 0); 8.5s (MiniTPU 0.9s)
+    vs IEEE reference (ieee_bf16_mul_acc24): 4941067/6019104 equal
+    bare: matches on the first 3000 vectors by latency {1: 3000, 2: 1240, 3: 1042, 4: 867, 5: 785, 6: 754, 7: 706}
+RTL-CMP mul_acc24 w_macc_bits_2p0: values 6019104/6019104 vs MiniTPU RTL; bare: measured latency 1 (declared 0); 8.5s (MiniTPU 0.9s)
+    vs IEEE reference (ieee_bf16_mul_acc24): 4941067/6019104 equal
+    bare: matches on the first 3000 vectors by latency {1: 2373, 2: 698, 3: 591, 4: 490, 5: 442, 6: 437, 7: 383}
+RTL-CMP mul_acc24 w_macc_native_3p33: values 4941087/6019104 vs MiniTPU RTL; bare: measured latency 1 (declared 0); 8.3s (MiniTPU 0.9s)
+    vs IEEE reference (ieee_bf16_mul_acc24): 6019073/6019104 equal
+          12  Inf x 0: allo NaN from the float32 multiply, rtl +0x7fc000  e.g. 0/ff80: catapult ffc000 minitpu 7fc000, 7f80/8000: catapult ffc000 minitpu 7fc000
+      403886  NaN operand: allo keeps its sign/payload, rtl +0x7fc000  e.g. 0/ffc0: catapult ffc000 minitpu 7fc000, 0/ff81: catapult ffc000 minitpu 7fc000
+       70862  subnormal operand flushed: rtl signed 0, IEEE an acc24 subnormal  e.g. 1/3f80: catapult 100 minitpu 0, 1/3f81: catapult 102 minitpu 0
+      514840  subnormal operand flushed: rtl signed 0, IEEE a normal product  e.g. 1/7f00: catapult 3c8000 minitpu 0, 1/7f7e: catapult 3cfe00 minitpu 0
+       88417  product < 2^-126 flushed: rtl signed 0, IEEE an acc24 subnormal  e.g. 80/3b80: catapult 80 minitpu 0, 80/3c00: catapult 100 minitpu 0
+    bare: matches on the first 3000 vectors by latency {1: 1252, 2: 3000, 3: 1252, 4: 1050, 5: 867, 6: 785, 7: 758}
+RTL-CMP bf16_mul_pipe w_mulpipe_bitspipe_3p33_l2: values 6019104/6019104 vs MiniTPU RTL; bare: measured latency 2 (declared 2); 8.4s (MiniTPU 1.3s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+    bare: matches on the first 3000 vectors by latency {1: 1252, 2: 3000, 3: 1252, 4: 1050, 5: 867, 6: 785, 7: 758}
+RTL-CMP bf16_mul_pipe w_mulpipe_bitspipe_2p0_l2: values 6019104/6019104 vs MiniTPU RTL; bare: measured latency 2 (declared 2); 8.4s (MiniTPU 1.2s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+    bare: matches on the first 3000 vectors by latency {1: 813, 2: 991, 3: 3000, 4: 990, 5: 812, 6: 674, 7: 623}
+RTL-CMP acc24_add_pipe w_acc24_bits_3p33_l3: values 352116/352116 vs MiniTPU RTL; bare: measured latency 3 (declared 3); 7.4s (MiniTPU 0.1s)
+    vs IEEE reference (ieee_acc24_add): 350572/352116 equal
+    bare: matches on the first 3000 vectors by latency {1: 813, 2: 991, 3: 3000, 4: 990, 5: 812, 6: 674, 7: 623}
+RTL-CMP acc24_add_pipe w_acc24_bits_2p0_l3: values 352116/352116 vs MiniTPU RTL; bare: measured latency 3 (declared 3); 7.3s (MiniTPU 0.1s)
+    vs IEEE reference (ieee_acc24_add): 350572/352116 equal
+    bare: matches on the first 3000 vectors by latency {1: 458, 2: 559, 3: 2471, 4: 556, 5: 455, 6: 398, 7: 351}
+RTL-CMP acc24_add_pipe w_acc24_native_3p33_l3: values 349935/352116 vs MiniTPU RTL; bare: measured latency 3 (declared 3); 7.3s (MiniTPU 0.1s)
+    vs IEEE reference (ieee_acc24_add): 349936/352116 equal
+        2067  NaN becomes a zero: ac_ieee_float's NaN is 0x7fffffff, and native's acc24 round carries its payload into the sign  e.g. 0/7fc000: catapult 800000 minitpu 7fc000, 0/7f8001: catapult 800000 minitpu 7fc000
+           1  (+0)+(-0) = -0 (IEEE RNE: +0)  e.g. 0/800000: catapult 0 minitpu 800000
+         113  double rounding: float32 add then acc24 round, one acc24 ulp off (divergence 5)  e.g. 3f8000/378001: catapult 3f8000 minitpu 3f8001, 400000/b78001: catapult 400000 minitpu 3fffff
+    bare: matches on the first 3000 vectors by latency {1: 886, 2: 3000, 3: 885, 4: 724, 5: 600, 6: 554, 7: 523}
+RTL-CMP alu w_alu_bits_3p33_l3: values 5079552/5079552 vs MiniTPU RTL; bare: measured latency 2 (declared 3); 9.7s (MiniTPU 1.7s)
+    vs IEEE reference (ieee_vpu_alu): 4120374/5079552 equal
+    bare: matches on the first 3000 vectors by latency {1: 725, 2: 886, 3: 3000, 4: 885, 5: 724, 6: 600, 7: 554}
+RTL-CMP alu w_alu_bits_2p0_l3: values 5079552/5079552 vs MiniTPU RTL; bare: measured latency 3 (declared 3); 9.9s (MiniTPU 1.5s)
+    vs IEEE reference (ieee_vpu_alu): 4120374/5079552 equal
+    bare: matches on the first 3000 vectors by latency {1: 385, 2: 470, 3: 2505, 4: 469, 5: 384, 6: 336, 7: 292}
+RTL-CMP alu w_alu_native_3p33_l3: values 5064720/5079552 vs MiniTPU RTL; bare: measured latency 3 (declared 3); 9.2s (MiniTPU 1.5s)
+    vs IEEE reference (ieee_vpu_alu): 4125119/5079552 equal
+        6249  ADD/SUB/MUL: NaN result is always +0x7fc0  e.g. 0/0/7fc0: catapult 7fff minitpu 7fc0, 0/0/7f81: catapult 7fff minitpu 7fc0
+           1  ADD: (+0)+(-0) = -0 (IEEE: +0)  e.g. 0/0/8000: catapult 0 minitpu 8000
+           1  SUB: (+0)-(+0) = -0 (IEEE: +0)  e.g. 1/0/0: catapult 0 minitpu 8000
+        1320  MUL: subnormal operand flushed to signed 0  e.g. 2/1/3f80: catapult 1 minitpu 0, 2/1/3f81: catapult 1 minitpu 0
+        4745  MUL: product < 2^-126 flushed to signed 0  e.g. 2/80/3c00: catapult 1 minitpu 0, 2/80/bc00: catapult 8001 minitpu 8000
+        2514  MAX/MIN: NaN ordered by bf16_gt key, payload kept (IEEE maximum: NaN)  e.g. 4/0/7fc0: catapult 0 minitpu 7fc0, 4/0/7f81: catapult 0 minitpu 7f81
+           2  MAX/MIN: rtl orders -0 < +0 by bf16_gt, allo returns either zero  e.g. 4/8000/0: catapult 8000 minitpu 0, 5/0/8000: catapult 0 minitpu 8000
+    bare: matches on the first 3000 vectors by latency {1: 886, 2: 3000, 3: 885, 4: 724, 5: 600, 6: 554, 7: 523}
+RTL-CMP alu w_alu_bits_3p33: values 5079552/5079552 vs MiniTPU RTL; bare: measured latency 2 (declared 3); 9.7s (MiniTPU 1.5s)
+    vs IEEE reference (ieee_vpu_alu): 4120374/5079552 equal
+CMP_DONE
+    bare: matches on the first 3000 vectors by latency {1: 3000, 2: 1252, 3: 1050, 4: 867, 5: 785, 6: 758, 7: 710}
+RTL-CMP bf16_mul w_mul_bits_3p33_l1: values 6019104/6019104 vs MiniTPU RTL; bare: measured latency 1 (declared 0); 8.8s (MiniTPU 0.9s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+    bare: matches on the first 3000 vectors by latency {1: 3000, 2: 1252, 3: 1050, 4: 867, 5: 785, 6: 758, 7: 710}
+RTL-CMP bf16_mul w_mul_bits_2p0_l1: values 6019104/6019104 vs MiniTPU RTL; bare: measured latency 1 (declared 0); 9.1s (MiniTPU 1.0s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+    bare: matches on the first 3000 vectors by latency {1: 886, 2: 3000, 3: 885, 4: 724, 5: 600, 6: 554, 7: 523}
+RTL-CMP alu w_alu_bits_3p33_l4: values 5079552/5079552 vs MiniTPU RTL; bare: measured latency 2 (declared 3); 9.9s (MiniTPU 1.5s)
+    vs IEEE reference (ieee_vpu_alu): 4120374/5079552 equal
+    bare: matches on the first 3000 vectors by latency {1: 886, 2: 3000, 3: 885, 4: 724, 5: 600, 6: 554, 7: 523}
+RTL-CMP alu w_alu_bits_3p33_l5: values 5079552/5079552 vs MiniTPU RTL; bare: measured latency 2 (declared 3); 9.5s (MiniTPU 1.5s)
+    vs IEEE reference (ieee_vpu_alu): 4120374/5079552 equal
+CMP_DONE
+    bare: matches on the first 3000 vectors by latency {1: 1252, 2: 3000, 3: 1252, 4: 1050, 5: 867, 6: 785, 7: 758}
+RTL-CMP bf16_mul_pipe wprobe_mulpipe_3p33_l3w2: values 6019104/6019104 vs MiniTPU RTL; bare: measured latency 2 (declared 2); 8.9s (MiniTPU 1.3s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+    bare: matches on the first 3000 vectors by latency {1: 1252, 2: 3000, 3: 1252, 4: 1050, 5: 867, 6: 785, 7: 758}
+RTL-CMP bf16_mul_pipe wprobe_mulpipe_3p33_l3w3: values 6019104/6019104 vs MiniTPU RTL; bare: measured latency 2 (declared 2); 8.7s (MiniTPU 1.2s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+    bare: matches on the first 3000 vectors by latency {1: 1252, 2: 3000, 3: 1252, 4: 1050, 5: 867, 6: 785, 7: 758}
+RTL-CMP bf16_mul_pipe wprobe_mulpipe_3p33_l4w3: values 6019104/6019104 vs MiniTPU RTL; bare: measured latency 2 (declared 2); 8.2s (MiniTPU 1.2s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+CMP_DONE
+    bare: matches on the first 3000 vectors by latency {1: 991, 2: 3000, 3: 990, 4: 812, 5: 674, 6: 623, 7: 586}
+RTL-CMP acc24_add_pipe wprobe_acc24_3p33: values 352116/352116 vs MiniTPU RTL; bare: measured latency 2 (declared 3); 7.3s (MiniTPU 0.1s)
+    vs IEEE reference (ieee_acc24_add): 350572/352116 equal
+    bare: matches on the first 3000 vectors by latency {1: 813, 2: 991, 3: 3000, 4: 990, 5: 812, 6: 674, 7: 623}
+RTL-CMP acc24_add_pipe wprobe_acc24_3p33_l3: values 352116/352116 vs MiniTPU RTL; bare: measured latency 3 (declared 3); 7.4s (MiniTPU 0.1s)
+    vs IEEE reference (ieee_acc24_add): 350572/352116 equal
+CMP_DONE
+    bare: matches on the first 3000 vectors by latency {1: 1252, 2: 3000, 3: 1252, 4: 1050, 5: 867, 6: 785, 7: 758}
+RTL-CMP bf16_mul_pipe wprobe_mulpipe_3p33_l2: values 6019104/6019104 vs MiniTPU RTL; bare: measured latency 2 (declared 2); 8.6s (MiniTPU 1.2s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+    bare: matches on the first 3000 vectors by latency {1: 1252, 2: 3000, 3: 1252, 4: 1050, 5: 867, 6: 785, 7: 758}
+RTL-CMP bf16_mul_pipe wprobe_mulpipe_3p33_l3: values 6019104/6019104 vs MiniTPU RTL; bare: measured latency 2 (declared 2); 8.8s (MiniTPU 1.2s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+    bare: matches on the first 3000 vectors by latency {1: 1252, 2: 3000, 3: 1252, 4: 1050, 5: 867, 6: 785, 7: 758}
+RTL-CMP bf16_mul_pipe wprobe_mulpipe_2p0_l2: values 6019104/6019104 vs MiniTPU RTL; bare: measured latency 2 (declared 2); 8.6s (MiniTPU 1.2s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+CMP_DONE
+    bare: matches on the first 3000 vectors by latency {1: 3000, 2: 1252, 3: 1050, 4: 867, 5: 785, 6: 758, 7: 710}
+    bare: output first equals vector 0's result after edge 1 (reset released before edge 1)
+RTL-CMP bf16_mul_pipe wprobe_mulpipe_3p33: values 6019104/6019104 vs MiniTPU RTL; bare: measured latency 1 (declared 2); 1.4s (MiniTPU 1.2s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+    bare: matches on the first 3000 vectors by latency {1: 1052, 2: 1252, 3: 3000, 4: 1252, 5: 1050, 6: 867, 7: 785}
+    bare: output first equals vector 0's result after edge 1 (reset released before edge 1)
+RTL-CMP bf16_mul_pipe wprobe_mulpipe_2p0: values 6019104/6019104 vs MiniTPU RTL; bare: measured latency 3 (declared 2); 1.5s (MiniTPU 1.4s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+CMP_DONE

@@ -1,0 +1,19 @@
+w_mul_bits_3p33 bf16_mul wire:bits --n 16 --synth-top mul_0 --pipeline mul_0:_ --clock 3.33
+w_mul_bits_2p0 bf16_mul wire:bits --n 16 --synth-top mul_0 --pipeline mul_0:_ --clock 2.0
+w_mul_native_3p33 bf16_mul wire:native --n 16 --synth-top mul_0 --pipeline mul_0:_ --clock 3.33
+w_macc_bits_3p33 mul_acc24 wire:bits --n 16 --synth-top mul_0 --pipeline mul_0:_ --clock 3.33
+w_macc_bits_2p0 mul_acc24 wire:bits --n 16 --synth-top mul_0 --pipeline mul_0:_ --clock 2.0
+w_macc_native_3p33 mul_acc24 wire:native --n 16 --synth-top mul_0 --pipeline mul_0:_ --clock 3.33
+w_mulpipe_bitspipe_3p33_l2 bf16_mul_pipe wire:bits_pipe --n 16 --synth-top mul_0 --pipeline mul_0:_ --clock 3.33 --tcl "cycle set /mul_0/run/while -equal 2"
+w_mulpipe_bitspipe_2p0_l2 bf16_mul_pipe wire:bits_pipe --n 16 --synth-top mul_0 --pipeline mul_0:_ --clock 2.0 --tcl "cycle set /mul_0/run/while -equal 2"
+w_acc24_bits_3p33_l3 acc24_add_pipe wire:bits --n 16 --synth-top add_0 --unroll leading_zeros19:offset --pipeline add_0:_ --clock 3.33 --tcl "cycle set /add_0/run/while -equal 3"
+w_acc24_bits_2p0_l3 acc24_add_pipe wire:bits --n 16 --synth-top add_0 --unroll leading_zeros19:offset --pipeline add_0:_ --clock 2.0 --tcl "cycle set /add_0/run/while -equal 3"
+w_acc24_native_3p33_l3 acc24_add_pipe wire:native --n 16 --synth-top add_0 --pipeline add_0:_ --clock 3.33 --tcl "cycle set /add_0/run/while -equal 3"
+w_alu_bits_3p33_l3 alu wire:bits --n 16 --synth-top alu_0 --unroll leading_zeros17:offset --pipeline alu_0:_ --clock 3.33 --tcl "cycle set /alu_0/run/while -equal 3"
+w_alu_bits_2p0_l3 alu wire:bits --n 16 --synth-top alu_0 --unroll leading_zeros17:offset --pipeline alu_0:_ --clock 2.0 --tcl "cycle set /alu_0/run/while -equal 3"
+w_alu_native_3p33_l3 alu wire:native --n 16 --synth-top alu_0 --pipeline alu_0:_ --clock 3.33 --tcl "cycle set /alu_0/run/while -equal 3"
+w_alu_bits_3p33 alu wire:bits --n 16 --synth-top alu_0 --unroll leading_zeros17:offset --pipeline alu_0:_ --clock 3.33
+w_mul_bits_3p33_l1 bf16_mul wire:bits --n 16 --synth-top mul_0 --pipeline mul_0:_ --clock 3.33 --tcl "cycle set /mul_0/run/while -equal 1"
+w_mul_bits_2p0_l1 bf16_mul wire:bits --n 16 --synth-top mul_0 --pipeline mul_0:_ --clock 2.0 --tcl "cycle set /mul_0/run/while -equal 1"
+w_alu_bits_3p33_l4 alu wire:bits --n 16 --synth-top alu_0 --unroll leading_zeros17:offset --pipeline alu_0:_ --clock 3.33 --tcl "cycle set /alu_0/run/while -equal 4"
+w_alu_bits_3p33_l5 alu wire:bits --n 16 --synth-top alu_0 --unroll leading_zeros17:offset --pipeline alu_0:_ --clock 3.33 --tcl "cycle set /alu_0/run/while -equal 5"

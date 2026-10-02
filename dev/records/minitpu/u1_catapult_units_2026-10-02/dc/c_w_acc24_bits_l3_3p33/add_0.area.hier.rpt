@@ -1,0 +1,51 @@
+ 
+****************************************
+Report : area
+Design : add_0
+Version: W-2024.09
+Date   : Fri Oct  2 04:42:20 2026
+****************************************
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                          115
+Number of nets:                          2150
+Number of cells:                         2043
+Number of combinational cells:           1929
+Number of sequential cells:               101
+Number of macros/black boxes:               0
+Number of buf/inv:                        338
+Number of references:                      36
+
+Combinational area:               1915.998000
+Buf/Inv area:                      181.146002
+Noncombinational area:             532.000017
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                  2447.998017
+Total area:                 undefined
+
+Hierarchical area distribution
+------------------------------
+
+                                  Global cell area          Local cell area
+                                  ------------------  ---------------------------- 
+Hierarchical cell                 Absolute   Percent  Combi-     Noncombi-  Black-
+                                  Total      Total    national   national   boxes   Design
+--------------------------------  ---------  -------  ---------  ---------  ------  --------------------------------
+add_0                             2447.9980    100.0  1915.9980   516.0400  0.0000  add_0
+add_0_run_inst/clk_gate_reg_v18_ftd_3_reg
+                                     3.9900      0.2     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_add_0_run_0
+add_0_run_inst/clk_gate_while_exp_large_7_0_1_lpi_dfm_reg
+                                     3.9900      0.2     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_add_0_run_1
+add_0_run_inst/clk_gate_while_v207_qr_4_0_1_lpi_dfm_reg
+                                     3.9900      0.2     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_add_0_run_2
+add_0_run_inst/clk_gate_while_while_and_12_itm_1_reg
+                                     3.9900      0.2     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_add_0_run_3
+--------------------------------  ---------  -------  ---------  ---------  ------  --------------------------------
+Total                                                 1915.9980   532.0000  0.0000
+
+1

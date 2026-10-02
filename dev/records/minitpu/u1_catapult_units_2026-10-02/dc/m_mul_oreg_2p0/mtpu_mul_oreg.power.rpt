@@ -1,0 +1,58 @@
+ 
+****************************************
+Report : power
+        -analysis_effort low
+Design : mtpu_mul_oreg
+Version: W-2024.09
+Date   : Fri Oct  2 04:38:00 2026
+****************************************
+
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+Design        Wire Load Model            Library
+------------------------------------------------
+mtpu_mul_oreg          5K_hvratio_1_1    NangateOpenCellLibrary
+
+
+Global Operating Voltage = 1.1  
+Power-specific unit information :
+    Voltage Units = 1V
+    Capacitance Units = 1.000000ff
+    Time Units = 1ns
+    Dynamic Power Units = 1uW    (derived from V,C,T units)
+    Leakage Power Units = 1nW
+
+
+Attributes
+----------
+i - Including register clock pin internal power
+
+
+  Cell Internal Power  = 151.5257 uW   (59%)
+  Net Switching Power  = 104.9545 uW   (41%)
+                         ---------
+Total Dynamic Power    = 256.4803 uW  (100%)
+
+Cell Leakage Power     =  11.9287 uW
+
+
+                 Internal         Switching           Leakage            Total
+Power Group      Power            Power               Power              Power   (   %    )  Attrs
+--------------------------------------------------------------------------------------------------
+io_pad             0.0000            0.0000            0.0000            0.0000  (   0.00%)
+memory             0.0000            0.0000            0.0000            0.0000  (   0.00%)
+black_box          0.0000            0.0000            0.0000            0.0000  (   0.00%)
+clock_network     30.1136            0.0000            0.0000           30.1136  (  11.22%)  i
+register          20.4674            9.2081        1.2901e+03           30.9657  (  11.54%)
+sequential         0.0000            0.0000            0.0000            0.0000  (   0.00%)
+combinational    100.9446           95.7464        1.0639e+04          207.3296  (  77.24%)
+--------------------------------------------------------------------------------------------------
+Total            151.5257 uW       104.9545 uW     1.1929e+04 nW       268.4089 uW
+1

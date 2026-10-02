@@ -1,0 +1,47 @@
+ 
+****************************************
+Report : area
+Design : alu_0
+Version: W-2024.09
+Date   : Fri Oct  2 04:42:38 2026
+****************************************
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                           75
+Number of nets:                          1841
+Number of cells:                         1729
+Number of combinational cells:           1670
+Number of sequential cells:                55
+Number of macros/black boxes:               0
+Number of buf/inv:                        336
+Number of references:                      40
+
+Combinational area:               1824.227998
+Buf/Inv area:                      187.530001
+Noncombinational area:             291.004009
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                  2115.232006
+Total area:                 undefined
+
+Hierarchical area distribution
+------------------------------
+
+                                  Global cell area          Local cell area
+                                  ------------------  ---------------------------- 
+Hierarchical cell                 Absolute   Percent  Combi-     Noncombi-  Black-
+                                  Total      Total    national   national   boxes   Design
+--------------------------------  ---------  -------  ---------  ---------  ------  --------------------------------
+alu_0                             2115.2320    100.0  1824.2280   283.0240  0.0000  alu_0
+alu_0_run_inst/clk_gate_reg_v12_ftd_3_reg
+                                     3.9900      0.2     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_alu_0_run_0
+alu_0_run_inst/clk_gate_while_mux1h_186_itm_2_reg
+                                     3.9900      0.2     0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_alu_0_run_1
+--------------------------------  ---------  -------  ---------  ---------  ------  --------------------------------
+Total                                                 1824.2280   291.0040  0.0000
+
+1

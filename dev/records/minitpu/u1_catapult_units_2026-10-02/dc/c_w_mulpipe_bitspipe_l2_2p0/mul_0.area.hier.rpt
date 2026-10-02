@@ -1,0 +1,47 @@
+ 
+****************************************
+Report : area
+Design : mul_0
+Version: W-2024.09
+Date   : Fri Oct  2 04:39:06 2026
+****************************************
+
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                           59
+Number of nets:                           503
+Number of cells:                          405
+Number of combinational cells:            349
+Number of sequential cells:                53
+Number of macros/black boxes:               0
+Number of buf/inv:                         58
+Number of references:                      27
+
+Combinational area:                500.612003
+Buf/Inv area:                       31.920000
+Noncombinational area:             279.300009
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                   779.912012
+Total area:                 undefined
+
+Hierarchical area distribution
+------------------------------
+
+                                  Global cell area          Local cell area
+                                  ------------------  --------------------------- 
+Hierarchical cell                 Absolute   Percent  Combi-    Noncombi-  Black-
+                                  Total      Total    national  national   boxes   Design
+--------------------------------  ---------  -------  --------  ---------  ------  --------------------------------
+mul_0                              779.9120    100.0  500.6120   271.3200  0.0000  mul_0
+mul_0_run_inst/clk_gate_reg_v8_ftd_2_reg
+                                     3.9900      0.5    0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_mul_0_run_1
+mul_0_run_inst/clk_gate_reg_while_v29_1_cse_reg
+                                     3.9900      0.5    0.0000     3.9900  0.0000  SNPS_CLOCK_GATE_HIGH_mul_0_run_0
+--------------------------------  ---------  -------  --------  ---------  ------  --------------------------------
+Total                                                 500.6120   279.3000  0.0000
+
+1

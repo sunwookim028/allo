@@ -1,0 +1,11 @@
+--- w_alu_bits_3p33_l3.prj/run.tcl.emitted	2026-10-02 04:27:50.345837576 -0400
++++ w_alu_bits_3p33_l3.prj/run.tcl	2026-10-02 04:27:50.349837471 -0400
+@@ -28,6 +28,8 @@
+ go compile
+ 
+ solution library add ccs_sample_mem
++go architect
++cycle set /alu_0/run/while -equal 3  ;# [hand-patch: declared latency]
+ go assembly
+ go extract
+ 

@@ -1,0 +1,111 @@
+RTL-CMP bf16_mul mul_bits_3p33: values 6019104/6019104 vs MiniTPU RTL; latency catapult {2: 6019104} vs minitpu [0] (declared 0); 1.0000 cyc/vector, first output cycle 3; ready period 0; 9.2s (MiniTPU 1.0s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+RTL-CMP bf16_mul mul_native_2p0: values 5011890/6019104 vs MiniTPU RTL; latency catapult {2: 6019104} vs minitpu [0] (declared 0); 1.0000 cyc/vector, first output cycle 3; ready period 0; 9.7s (MiniTPU 1.1s)
+    vs IEEE reference (ieee_bf16_mul): 6019104/6019104 equal
+          12  Inf x 0: allo -0x7fc0, rtl +0x7fc0  e.g. 0/ff80: catapult ffc0 minitpu 7fc0, 7f80/8000: catapult ffc0 minitpu 7fc0
+      403886  NaN operand: allo -0x7fc0, rtl +0x7fc0  e.g. 0/ffc0: catapult ffc0 minitpu 7fc0, 0/ff81: catapult ffc0 minitpu 7fc0
+       36401  subnormal operand flushed: rtl signed 0, IEEE a subnormal product  e.g. 1/3f80: catapult 1 minitpu 0, 1/3f81: catapult 1 minitpu 0
+      514904  subnormal operand flushed: rtl signed 0, IEEE a normal product  e.g. 1/7f00: catapult 3c80 minitpu 0, 1/7f7e: catapult 3cfe minitpu 0
+       51958  product < 2^-126 flushed: rtl signed 0, IEEE a subnormal  e.g. 80/3c00: catapult 1 minitpu 0, 80/bc00: catapult 8001 minitpu 8000
+          53  product < 2^-126 flushed: rtl signed 0, IEEE rounds up to 2^-126  e.g. a0b7/1f33: catapult 8080 minitpu 8000, a63a/99b0: catapult 80 minitpu 0
+RTL-CMP bf16_mul mul_native_3p33: values 5011890/6019104 vs MiniTPU RTL; latency catapult {1: 6019104} vs minitpu [0] (declared 0); 1.0000 cyc/vector, first output cycle 2; ready period 0; 9.4s (MiniTPU 0.9s)
+    vs IEEE reference (ieee_bf16_mul): 6019104/6019104 equal
+          12  Inf x 0: allo -0x7fc0, rtl +0x7fc0  e.g. 0/ff80: catapult ffc0 minitpu 7fc0, 7f80/8000: catapult ffc0 minitpu 7fc0
+      403886  NaN operand: allo -0x7fc0, rtl +0x7fc0  e.g. 0/ffc0: catapult ffc0 minitpu 7fc0, 0/ff81: catapult ffc0 minitpu 7fc0
+       36401  subnormal operand flushed: rtl signed 0, IEEE a subnormal product  e.g. 1/3f80: catapult 1 minitpu 0, 1/3f81: catapult 1 minitpu 0
+      514904  subnormal operand flushed: rtl signed 0, IEEE a normal product  e.g. 1/7f00: catapult 3c80 minitpu 0, 1/7f7e: catapult 3cfe minitpu 0
+       51958  product < 2^-126 flushed: rtl signed 0, IEEE a subnormal  e.g. 80/3c00: catapult 1 minitpu 0, 80/bc00: catapult 8001 minitpu 8000
+          53  product < 2^-126 flushed: rtl signed 0, IEEE rounds up to 2^-126  e.g. a0b7/1f33: catapult 8080 minitpu 8000, a63a/99b0: catapult 80 minitpu 0
+RTL-CMP bf16_mul_pipe mulpipe_bitspipe_2p0_io2: values 6019104/6019104 vs MiniTPU RTL; latency catapult {2: 6019104} vs minitpu [2] (declared 2); 1.0000 cyc/vector, first output cycle 3; ready period 0; 9.1s (MiniTPU 8.4s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+RTL-CMP bf16_mul_pipe mulpipe_bitspipe_3p33_io2: values 6019104/6019104 vs MiniTPU RTL; latency catapult {2: 6019104} vs minitpu [2] (declared 2); 1.0000 cyc/vector, first output cycle 3; ready period 0; 8.8s (MiniTPU 1.2s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+RTL-CMP bf16_mul_pipe mulpipe_native_2p0_io2: values 5011890/6019104 vs MiniTPU RTL; latency catapult {2: 6019104} vs minitpu [2] (declared 2); 1.0000 cyc/vector, first output cycle 3; ready period 0; 9.1s (MiniTPU 1.2s)
+    vs IEEE reference (ieee_bf16_mul): 6019104/6019104 equal
+          12  Inf x 0: allo -0x7fc0, rtl +0x7fc0  e.g. 0/ff80: catapult ffc0 minitpu 7fc0, 7f80/8000: catapult ffc0 minitpu 7fc0
+      403886  NaN operand: allo -0x7fc0, rtl +0x7fc0  e.g. 0/ffc0: catapult ffc0 minitpu 7fc0, 0/ff81: catapult ffc0 minitpu 7fc0
+       36401  subnormal operand flushed: rtl signed 0, IEEE a subnormal product  e.g. 1/3f80: catapult 1 minitpu 0, 1/3f81: catapult 1 minitpu 0
+      514904  subnormal operand flushed: rtl signed 0, IEEE a normal product  e.g. 1/7f00: catapult 3c80 minitpu 0, 1/7f7e: catapult 3cfe minitpu 0
+       51958  product < 2^-126 flushed: rtl signed 0, IEEE a subnormal  e.g. 80/3c00: catapult 1 minitpu 0, 80/bc00: catapult 8001 minitpu 8000
+          53  product < 2^-126 flushed: rtl signed 0, IEEE rounds up to 2^-126  e.g. a0b7/1f33: catapult 8080 minitpu 8000, a63a/99b0: catapult 80 minitpu 0
+RTL-CMP bf16_mul_pipe mulpipe_native_3p33_io2: values 5011890/6019104 vs MiniTPU RTL; latency catapult {2: 6019104} vs minitpu [2] (declared 2); 1.0000 cyc/vector, first output cycle 3; ready period 0; 9.5s (MiniTPU 1.2s)
+    vs IEEE reference (ieee_bf16_mul): 6019104/6019104 equal
+          12  Inf x 0: allo -0x7fc0, rtl +0x7fc0  e.g. 0/ff80: catapult ffc0 minitpu 7fc0, 7f80/8000: catapult ffc0 minitpu 7fc0
+      403886  NaN operand: allo -0x7fc0, rtl +0x7fc0  e.g. 0/ffc0: catapult ffc0 minitpu 7fc0, 0/ff81: catapult ffc0 minitpu 7fc0
+       36401  subnormal operand flushed: rtl signed 0, IEEE a subnormal product  e.g. 1/3f80: catapult 1 minitpu 0, 1/3f81: catapult 1 minitpu 0
+      514904  subnormal operand flushed: rtl signed 0, IEEE a normal product  e.g. 1/7f00: catapult 3c80 minitpu 0, 1/7f7e: catapult 3cfe minitpu 0
+       51958  product < 2^-126 flushed: rtl signed 0, IEEE a subnormal  e.g. 80/3c00: catapult 1 minitpu 0, 80/bc00: catapult 8001 minitpu 8000
+          53  product < 2^-126 flushed: rtl signed 0, IEEE rounds up to 2^-126  e.g. a0b7/1f33: catapult 8080 minitpu 8000, a63a/99b0: catapult 80 minitpu 0
+RTL-CMP mul_acc24 macc_bits_2p0: values 6019104/6019104 vs MiniTPU RTL; latency catapult {1: 6019104} vs minitpu [0] (declared 0); 1.0000 cyc/vector, first output cycle 2; ready period 0; 8.9s (MiniTPU 8.1s)
+    vs IEEE reference (ieee_bf16_mul_acc24): 4941067/6019104 equal
+RTL-CMP mul_acc24 macc_bits_3p33: values 6019104/6019104 vs MiniTPU RTL; latency catapult {1: 6019104} vs minitpu [0] (declared 0); 1.0000 cyc/vector, first output cycle 2; ready period 0; 9.4s (MiniTPU 0.9s)
+    vs IEEE reference (ieee_bf16_mul_acc24): 4941067/6019104 equal
+RTL-CMP mul_acc24 macc_native_2p0: values 4941087/6019104 vs MiniTPU RTL; latency catapult {2: 6019104} vs minitpu [0] (declared 0); 1.0000 cyc/vector, first output cycle 3; ready period 0; 9.3s (MiniTPU 1.0s)
+    vs IEEE reference (ieee_bf16_mul_acc24): 6019073/6019104 equal
+          12  Inf x 0: allo NaN from the float32 multiply, rtl +0x7fc000  e.g. 0/ff80: catapult ffc000 minitpu 7fc000, 7f80/8000: catapult ffc000 minitpu 7fc000
+      403886  NaN operand: allo keeps its sign/payload, rtl +0x7fc000  e.g. 0/ffc0: catapult ffc000 minitpu 7fc000, 0/ff81: catapult ffc000 minitpu 7fc000
+       70862  subnormal operand flushed: rtl signed 0, IEEE an acc24 subnormal  e.g. 1/3f80: catapult 100 minitpu 0, 1/3f81: catapult 102 minitpu 0
+      514840  subnormal operand flushed: rtl signed 0, IEEE a normal product  e.g. 1/7f00: catapult 3c8000 minitpu 0, 1/7f7e: catapult 3cfe00 minitpu 0
+       88417  product < 2^-126 flushed: rtl signed 0, IEEE an acc24 subnormal  e.g. 80/3b80: catapult 80 minitpu 0, 80/3c00: catapult 100 minitpu 0
+RTL-CMP mul_acc24 macc_native_3p33: values 4941087/6019104 vs MiniTPU RTL; latency catapult {1: 6019104} vs minitpu [0] (declared 0); 1.0000 cyc/vector, first output cycle 2; ready period 0; 9.4s (MiniTPU 0.9s)
+    vs IEEE reference (ieee_bf16_mul_acc24): 6019073/6019104 equal
+          12  Inf x 0: allo NaN from the float32 multiply, rtl +0x7fc000  e.g. 0/ff80: catapult ffc000 minitpu 7fc000, 7f80/8000: catapult ffc000 minitpu 7fc000
+      403886  NaN operand: allo keeps its sign/payload, rtl +0x7fc000  e.g. 0/ffc0: catapult ffc000 minitpu 7fc000, 0/ff81: catapult ffc000 minitpu 7fc000
+       70862  subnormal operand flushed: rtl signed 0, IEEE an acc24 subnormal  e.g. 1/3f80: catapult 100 minitpu 0, 1/3f81: catapult 102 minitpu 0
+      514840  subnormal operand flushed: rtl signed 0, IEEE a normal product  e.g. 1/7f00: catapult 3c8000 minitpu 0, 1/7f7e: catapult 3cfe00 minitpu 0
+       88417  product < 2^-126 flushed: rtl signed 0, IEEE an acc24 subnormal  e.g. 80/3b80: catapult 80 minitpu 0, 80/3c00: catapult 100 minitpu 0
+RTL-CMP acc24_add_pipe acc24_bits_2p0_io3: values 352116/352116 vs MiniTPU RTL; latency catapult {3: 352116} vs minitpu [3] (declared 3); 1.0000 cyc/vector, first output cycle 4; ready period 0; 7.3s (MiniTPU 7.6s)
+    vs IEEE reference (ieee_acc24_add): 350572/352116 equal
+RTL-CMP acc24_add_pipe acc24_bits_3p33_io3: values 352116/352116 vs MiniTPU RTL; latency catapult {3: 352116} vs minitpu [3] (declared 3); 1.0000 cyc/vector, first output cycle 4; ready period 0; 7.2s (MiniTPU 0.1s)
+    vs IEEE reference (ieee_acc24_add): 350572/352116 equal
+RTL-CMP acc24_add_pipe acc24_native_2p0_io3: values 349935/352116 vs MiniTPU RTL; latency catapult {3: 352116} vs minitpu [3] (declared 3); 1.0000 cyc/vector, first output cycle 4; ready period 0; 7.3s (MiniTPU 0.1s)
+    vs IEEE reference (ieee_acc24_add): 349936/352116 equal
+        2067  NaN becomes a zero: ac_ieee_float's NaN is 0x7fffffff, and native's acc24 round carries its payload into the sign  e.g. 0/7fc000: catapult 800000 minitpu 7fc000, 0/7f8001: catapult 800000 minitpu 7fc000
+           1  (+0)+(-0) = -0 (IEEE RNE: +0)  e.g. 0/800000: catapult 0 minitpu 800000
+         113  double rounding: float32 add then acc24 round, one acc24 ulp off (divergence 5)  e.g. 3f8000/378001: catapult 3f8000 minitpu 3f8001, 400000/b78001: catapult 400000 minitpu 3fffff
+RTL-CMP acc24_add_pipe acc24_native_3p33_io3: values 349935/352116 vs MiniTPU RTL; latency catapult {3: 352116} vs minitpu [3] (declared 3); 1.0000 cyc/vector, first output cycle 4; ready period 0; 7.4s (MiniTPU 0.1s)
+    vs IEEE reference (ieee_acc24_add): 349936/352116 equal
+        2067  NaN becomes a zero: ac_ieee_float's NaN is 0x7fffffff, and native's acc24 round carries its payload into the sign  e.g. 0/7fc000: catapult 800000 minitpu 7fc000, 0/7f8001: catapult 800000 minitpu 7fc000
+           1  (+0)+(-0) = -0 (IEEE RNE: +0)  e.g. 0/800000: catapult 0 minitpu 800000
+         113  double rounding: float32 add then acc24 round, one acc24 ulp off (divergence 5)  e.g. 3f8000/378001: catapult 3f8000 minitpu 3f8001, 400000/b78001: catapult 400000 minitpu 3fffff
+CMP_DONE
+RTL-CMP alu alu_bits_2p0_io3: values 5079552/5079552 vs MiniTPU RTL; latency catapult {3: 5079552} vs minitpu [3] (declared 3); 1.0000 cyc/vector, first output cycle 4; ready period 0; 10.4s (MiniTPU 8.7s)
+    vs IEEE reference (ieee_vpu_alu): 4120374/5079552 equal
+RTL-CMP alu alu_bits_3p33_io3: values 5079552/5079552 vs MiniTPU RTL; latency catapult {3: 5079552} vs minitpu [3] (declared 3); 1.0000 cyc/vector, first output cycle 4; ready period 0; 10.2s (MiniTPU 1.4s)
+    vs IEEE reference (ieee_vpu_alu): 4120374/5079552 equal
+RTL-CMP alu alu_native_2p0_io3: values 5064720/5079552 vs MiniTPU RTL; latency catapult {3: 5079552} vs minitpu [3] (declared 3); 1.0000 cyc/vector, first output cycle 4; ready period 0; 10.2s (MiniTPU 1.4s)
+    vs IEEE reference (ieee_vpu_alu): 4125119/5079552 equal
+        6249  ADD/SUB/MUL: NaN result is always +0x7fc0  e.g. 0/0/7fc0: catapult 7fff minitpu 7fc0, 0/0/7f81: catapult 7fff minitpu 7fc0
+           1  ADD: (+0)+(-0) = -0 (IEEE: +0)  e.g. 0/0/8000: catapult 0 minitpu 8000
+           1  SUB: (+0)-(+0) = -0 (IEEE: +0)  e.g. 1/0/0: catapult 0 minitpu 8000
+        1320  MUL: subnormal operand flushed to signed 0  e.g. 2/1/3f80: catapult 1 minitpu 0, 2/1/3f81: catapult 1 minitpu 0
+        4745  MUL: product < 2^-126 flushed to signed 0  e.g. 2/80/3c00: catapult 1 minitpu 0, 2/80/bc00: catapult 8001 minitpu 8000
+        2514  MAX/MIN: NaN ordered by bf16_gt key, payload kept (IEEE maximum: NaN)  e.g. 4/0/7fc0: catapult 0 minitpu 7fc0, 4/0/7f81: catapult 0 minitpu 7f81
+           2  MAX/MIN: rtl orders -0 < +0 by bf16_gt, allo returns either zero  e.g. 4/8000/0: catapult 8000 minitpu 0, 5/0/8000: catapult 0 minitpu 8000
+RTL-CMP alu alu_native_3p33_io3: values 5064720/5079552 vs MiniTPU RTL; latency catapult {3: 5079552} vs minitpu [3] (declared 3); 1.0000 cyc/vector, first output cycle 4; ready period 0; 10.2s (MiniTPU 1.4s)
+    vs IEEE reference (ieee_vpu_alu): 4125119/5079552 equal
+        6249  ADD/SUB/MUL: NaN result is always +0x7fc0  e.g. 0/0/7fc0: catapult 7fff minitpu 7fc0, 0/0/7f81: catapult 7fff minitpu 7fc0
+           1  ADD: (+0)+(-0) = -0 (IEEE: +0)  e.g. 0/0/8000: catapult 0 minitpu 8000
+           1  SUB: (+0)-(+0) = -0 (IEEE: +0)  e.g. 1/0/0: catapult 0 minitpu 8000
+        1320  MUL: subnormal operand flushed to signed 0  e.g. 2/1/3f80: catapult 1 minitpu 0, 2/1/3f81: catapult 1 minitpu 0
+        4745  MUL: product < 2^-126 flushed to signed 0  e.g. 2/80/3c00: catapult 1 minitpu 0, 2/80/bc00: catapult 8001 minitpu 8000
+        2514  MAX/MIN: NaN ordered by bf16_gt key, payload kept (IEEE maximum: NaN)  e.g. 4/0/7fc0: catapult 0 minitpu 7fc0, 4/0/7f81: catapult 0 minitpu 7f81
+           2  MAX/MIN: rtl orders -0 < +0 by bf16_gt, allo returns either zero  e.g. 4/8000/0: catapult 8000 minitpu 0, 5/0/8000: catapult 0 minitpu 8000
+CMP_DONE
+RTL-CMP bf16_mul_pipe mulpipe_bitspipe_2p0: values 6019104/6019104 vs MiniTPU RTL; latency catapult {3: 6019104} vs minitpu [2] (declared 2); 1.0000 cyc/vector, first output cycle 4; ready period 0; 9.3s (MiniTPU 1.3s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+RTL-CMP bf16_mul_pipe mulpipe_bitspipe_3p33: values 6019104/6019104 vs MiniTPU RTL; latency catapult {1: 6019104} vs minitpu [2] (declared 2); 1.0000 cyc/vector, first output cycle 2; ready period 0; 9.3s (MiniTPU 1.4s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+RTL-CMP alu alu_bits_2p0: values 5079552/5079552 vs MiniTPU RTL; latency catapult {3: 5079552} vs minitpu [3] (declared 3); 1.0000 cyc/vector, first output cycle 4; ready period 0; 10.2s (MiniTPU 2.1s)
+    vs IEEE reference (ieee_vpu_alu): 4120374/5079552 equal
+RTL-CMP alu alu_bits_3p33: values 5079552/5079552 vs MiniTPU RTL; latency catapult {2: 5079552} vs minitpu [3] (declared 3); 1.0000 cyc/vector, first output cycle 3; ready period 0; 10.7s (MiniTPU 1.7s)
+    vs IEEE reference (ieee_vpu_alu): 4120374/5079552 equal
+RTL-CMP bf16_mul mul_bits_3p33_io1: values 6019104/6019104 vs MiniTPU RTL; latency catapult {1: 6019104} vs minitpu [0] (declared 0); 1.0000 cyc/vector, first output cycle 2; ready period 0; 9.0s (MiniTPU 0.9s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+RTL-CMP alu alu_bits_3p33_io3: values 5079552/5079552 vs MiniTPU RTL; latency catapult {3: 1, 4: 2, 5: 5079549} vs minitpu [3] (declared 3); 1.5000 cyc/vector, first output cycle 4; ready period 3; 10.9s (MiniTPU 1.6s)
+    vs IEEE reference (ieee_vpu_alu): 4120374/5079552 equal
+RTL-CMP acc24_add_pipe acc24_bits_3p33_io3: values 352116/352116 vs MiniTPU RTL; latency catapult {3: 1, 4: 2, 5: 352113} vs minitpu [3] (declared 3); 1.5000 cyc/vector, first output cycle 4; ready period 3; 7.8s (MiniTPU 0.1s)
+    vs IEEE reference (ieee_acc24_add): 350572/352116 equal
+RTL-CMP bf16_mul_pipe mulpipe_bitspipe_3p33_io2: values 6019104/6019104 vs MiniTPU RTL; latency catapult {2: 2, 3: 3009552, 4: 3009550} vs minitpu [2] (declared 2); 1.5000 cyc/vector, first output cycle 3; ready period 3; 10.2s (MiniTPU 1.4s)
+    vs IEEE reference (ieee_bf16_mul): 5011890/6019104 equal
+CMP_DONE

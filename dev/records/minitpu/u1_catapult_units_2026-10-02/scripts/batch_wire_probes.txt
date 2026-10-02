@@ -1,0 +1,14 @@
+wprobe_mulpipe_3p33 bf16_mul_pipe wire:bits_pipe --n 16 --synth-top mul_0 --pipeline mul_0:_ --clock 3.33
+wprobe_mulpipe_3p33_w2 bf16_mul_pipe wire:bits_pipe --n 16 --synth-top mul_0 --pipeline mul_0:_ --clock 3.33 --tcl "cycle set {/mul_0/run/v8.write:asn(v8)} -equal 2"
+wprobe_mulpipe_3p33_w3 bf16_mul_pipe wire:bits_pipe --n 16 --synth-top mul_0 --pipeline mul_0:_ --clock 3.33 --tcl "cycle set {/mul_0/run/v8.write:asn(v8)} -equal 3"
+wprobe_mulpipe_2p0 bf16_mul_pipe wire:bits_pipe --n 16 --synth-top mul_0 --pipeline mul_0:_ --clock 2.0
+wprobe_mulpipe_3p33_l2 bf16_mul_pipe wire:bits_pipe --n 16 --synth-top mul_0 --pipeline mul_0:_ --clock 3.33 --tcl "cycle set /mul_0/run/while -equal 2"
+wprobe_mulpipe_3p33_l3 bf16_mul_pipe wire:bits_pipe --n 16 --synth-top mul_0 --pipeline mul_0:_ --clock 3.33 --tcl "cycle set /mul_0/run/while -equal 3"
+wprobe_mulpipe_2p0_l2 bf16_mul_pipe wire:bits_pipe --n 16 --synth-top mul_0 --pipeline mul_0:_ --clock 2.0 --tcl "cycle set /mul_0/run/while -equal 2"
+wprobe_acc24_3p33 acc24_add_pipe wire:bits --n 16 --synth-top add_0 --unroll leading_zeros19:offset --pipeline add_0:_ --clock 3.33
+wprobe_acc24_3p33_l3 acc24_add_pipe wire:bits --n 16 --synth-top add_0 --unroll leading_zeros19:offset --pipeline add_0:_ --clock 3.33 --tcl "cycle set /add_0/run/while -equal 3"
+wprobe_acc24_3p33_l3w2 acc24_add_pipe wire:bits --n 16 --synth-top add_0 --unroll leading_zeros19:offset --pipeline add_0:_ --clock 3.33 --tcl "cycle set /add_0/run/while -equal 3" --tcl "cycle set {/add_0/run/v8.write:asn(v8)} -equal 2"
+wprobe_acc24_3p33_l3w3 acc24_add_pipe wire:bits --n 16 --synth-top add_0 --unroll leading_zeros19:offset --pipeline add_0:_ --clock 3.33 --tcl "cycle set /add_0/run/while -equal 3" --tcl "cycle set {/add_0/run/v8.write:asn(v8)} -equal 3"
+wprobe_mulpipe_3p33_l3w2 bf16_mul_pipe wire:bits_pipe --n 16 --synth-top mul_0 --pipeline mul_0:_ --clock 3.33 --tcl "cycle set /mul_0/run/while -equal 3" --tcl "cycle set {/mul_0/run/v8.write:asn(v8)} -equal 2"
+wprobe_mulpipe_3p33_l3w3 bf16_mul_pipe wire:bits_pipe --n 16 --synth-top mul_0 --pipeline mul_0:_ --clock 3.33 --tcl "cycle set /mul_0/run/while -equal 3" --tcl "cycle set {/mul_0/run/v8.write:asn(v8)} -equal 3"
+wprobe_mulpipe_3p33_l4w3 bf16_mul_pipe wire:bits_pipe --n 16 --synth-top mul_0 --pipeline mul_0:_ --clock 3.33 --tcl "cycle set /mul_0/run/while -equal 4" --tcl "cycle set {/mul_0/run/v8.write:asn(v8)} -equal 3"

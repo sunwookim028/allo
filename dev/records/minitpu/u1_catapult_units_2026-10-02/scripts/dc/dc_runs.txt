@@ -1,0 +1,38 @@
+m_mul_comb_2p0 vpu_bf16_mul none 2.0 $M/vpu/vpu_bf16_mul.sv
+m_mul_oreg_2p0 mtpu_mul_oreg clk 2.0 $M/vpu/vpu_bf16_mul.sv $R/dc/mtpu_mul_oreg.sv
+m_macc_comb_2p0 mxu_bf16_mul_acc24 none 2.0 $M/vpu/vpu_pkg.sv $M/mxu/mxu_bf16_mul_acc24.sv
+m_macc_oreg_2p0 mtpu_macc_oreg clk 2.0 $M/vpu/vpu_pkg.sv $M/mxu/mxu_bf16_mul_acc24.sv $R/dc/mtpu_macc_oreg.sv
+m_mulpipe_2p0 vpu_bf16_mul_pipe clk_i 2.0 $M/vpu/vpu_bf16_mul.sv
+m_acc24_2p0 mxu_acc24_add_pipe clk_i 2.0 $M/vpu/vpu_pkg.sv $M/mxu/mxu_acc24_add_pipe.sv
+m_alu_2p0 vpu_alu clk_i 2.0 $M/vpu/vpu_pkg.sv $M/vpu/vpu_bf16_add_pipe.sv $M/vpu/vpu_bf16_mul.sv $M/vpu/vpu_alu.sv
+c_s_mul_bits_2p0 top clk 2.0 $S/mul_bits_2p0.prj/build/Catapult/top.v1/concat_rtl.v
+c_s_mulpipe_bitspipe_io2_2p0 top clk 2.0 $S/mulpipe_bitspipe_2p0_io2.prj/build/Catapult/top.v1/concat_rtl.v
+c_s_macc_bits_2p0 top clk 2.0 $S/macc_bits_2p0.prj/build/Catapult/top.v1/concat_rtl.v
+c_s_acc24_bits_io3_2p0 top clk 2.0 $S/acc24_bits_2p0_io3.prj/build/Catapult/top.v1/concat_rtl.v
+c_s_alu_bits_io3_2p0 top clk 2.0 $S/alu_bits_2p0_io3.prj/build/Catapult/top.v1/concat_rtl.v
+c_w_mul_bits_l1_2p0 mul_0 clk 2.0 $S/w_mul_bits_2p0_l1.prj/build/Catapult/mul_0.v1/concat_rtl.v
+c_w_macc_bits_2p0 mul_0 clk 2.0 $S/w_macc_bits_2p0.prj/build/Catapult/mul_0.v1/concat_rtl.v
+c_w_mulpipe_bitspipe_l2_2p0 mul_0 clk 2.0 $S/w_mulpipe_bitspipe_2p0_l2.prj/build/Catapult/mul_0.v1/concat_rtl.v
+c_w_acc24_bits_l3_2p0 add_0 clk 2.0 $S/w_acc24_bits_2p0_l3.prj/build/Catapult/add_0.v1/concat_rtl.v
+c_w_alu_bits_l3_2p0 alu_0 clk 2.0 $S/w_alu_bits_2p0_l3.prj/build/Catapult/alu_0.v1/concat_rtl.v
+m_mul_comb_3p33 vpu_bf16_mul none 3.33 $M/vpu/vpu_bf16_mul.sv
+m_mul_oreg_3p33 mtpu_mul_oreg clk 3.33 $M/vpu/vpu_bf16_mul.sv $R/dc/mtpu_mul_oreg.sv
+m_macc_comb_3p33 mxu_bf16_mul_acc24 none 3.33 $M/vpu/vpu_pkg.sv $M/mxu/mxu_bf16_mul_acc24.sv
+m_macc_oreg_3p33 mtpu_macc_oreg clk 3.33 $M/vpu/vpu_pkg.sv $M/mxu/mxu_bf16_mul_acc24.sv $R/dc/mtpu_macc_oreg.sv
+m_mulpipe_3p33 vpu_bf16_mul_pipe clk_i 3.33 $M/vpu/vpu_bf16_mul.sv
+m_acc24_3p33 mxu_acc24_add_pipe clk_i 3.33 $M/vpu/vpu_pkg.sv $M/mxu/mxu_acc24_add_pipe.sv
+m_alu_3p33 vpu_alu clk_i 3.33 $M/vpu/vpu_pkg.sv $M/vpu/vpu_bf16_add_pipe.sv $M/vpu/vpu_bf16_mul.sv $M/vpu/vpu_alu.sv
+c_s_mul_bits_3p33 top clk 3.33 $S/mul_bits_3p33.prj/build/Catapult/top.v1/concat_rtl.v
+c_s_mulpipe_bitspipe_io2_3p33 top clk 3.33 $S/mulpipe_bitspipe_3p33_io2.prj/build/Catapult/top.v1/concat_rtl.v
+c_s_macc_bits_3p33 top clk 3.33 $S/macc_bits_3p33.prj/build/Catapult/top.v1/concat_rtl.v
+c_s_acc24_bits_io3_3p33 top clk 3.33 $S/acc24_bits_3p33_io3.prj/build/Catapult/top.v1/concat_rtl.v
+c_s_alu_bits_io3_3p33 top clk 3.33 $S/alu_bits_3p33_io3.prj/build/Catapult/top.v1/concat_rtl.v
+c_w_mul_bits_l1_3p33 mul_0 clk 3.33 $S/w_mul_bits_3p33_l1.prj/build/Catapult/mul_0.v1/concat_rtl.v
+c_w_macc_bits_3p33 mul_0 clk 3.33 $S/w_macc_bits_3p33.prj/build/Catapult/mul_0.v1/concat_rtl.v
+c_w_mulpipe_bitspipe_l2_3p33 mul_0 clk 3.33 $S/w_mulpipe_bitspipe_3p33_l2.prj/build/Catapult/mul_0.v1/concat_rtl.v
+c_w_acc24_bits_l3_3p33 add_0 clk 3.33 $S/w_acc24_bits_3p33_l3.prj/build/Catapult/add_0.v1/concat_rtl.v
+c_w_alu_bits_l3_3p33 alu_0 clk 3.33 $S/w_alu_bits_3p33_l3.prj/build/Catapult/alu_0.v1/concat_rtl.v
+c_w_mul_native_3p33 mul_0 clk 3.33 $S/w_mul_native_3p33.prj/build/Catapult/mul_0.v1/concat_rtl.v
+c_w_macc_native_3p33 mul_0 clk 3.33 $S/w_macc_native_3p33.prj/build/Catapult/mul_0.v1/concat_rtl.v
+c_w_acc24_native_l3_3p33 add_0 clk 3.33 $S/w_acc24_native_3p33_l3.prj/build/Catapult/add_0.v1/concat_rtl.v
+c_w_alu_native_l3_3p33 alu_0 clk 3.33 $S/w_alu_native_3p33_l3.prj/build/Catapult/alu_0.v1/concat_rtl.v

@@ -1,0 +1,11 @@
+--- wprobe_mulpipe_2p0_l2.prj/run.tcl.emitted	2026-10-02 04:21:49.487312816 -0400
++++ wprobe_mulpipe_2p0_l2.prj/run.tcl	2026-10-02 04:21:49.487312816 -0400
+@@ -28,6 +28,8 @@
+ go compile
+ 
+ solution library add ccs_sample_mem
++go architect
++cycle set /mul_0/run/while -equal 2  ;# [hand-patch: declared latency]
+ go assembly
+ go extract
+ 
