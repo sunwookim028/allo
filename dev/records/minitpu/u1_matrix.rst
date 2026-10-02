@@ -6,6 +6,49 @@ class: bug, missing abstraction, workaround, semantic mismatch), **blocked**,
 or **n/a**. Each finding links to its evidence. Started 2026-10-02 on
 zhang-21; MiniTPU at ``b3ba0a4d``; harness on branch ``u1-pilot``.
 
+For the owner's triage (D-9, second checkpoint)
+-----------------------------------------------
+
+What the pilot settled, and the calls that wait for the owner. Each call has
+the agent's provisional default in brackets.
+
+**What the pilot showed.** Every tool column has been tried on
+``vpu_bf16_add``. The integer ``bits`` expression matches the RTL bit for bit
+in the Allo simulator, RTLGen and AMC; Catapult's RTL from the ``native``
+expression matches except on NaN encoding and one signed zero, and is 8 %
+smaller than MiniTPU's RTL under the same DC flow. Nothing that works needed a
+change to Allo's programming model. What failed were bugs (Allo core: unsigned
+compares; SystemC emitter: seven; AMC: two silent miscompiles) and four gaps
+in what Allo can say.
+
+1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
+   measured impact on every gate, test and TinyTPU emission. *[merge; file
+   the drafted upstream issue]*
+2. **Merge the SystemC emitter fixes** (``systemc-u1-fixes``) once they pass
+   the EVA/TinyTPU regressions? *[merge]*
+3. **NaN and signed-zero rules.** MiniTPU, Allo's simulator, Catapult and
+   RTLGen give four different NaN encodings and two answers to ``(+0)+(-0)``.
+   Options: (a) treat NaN payload/sign and the zero sign as don't-care in the
+   harness; (b) give Allo a way to state a unit's NaN/zero policy on its float
+   type; (c) require ``bits`` expressions wherever the RTL's rules matter.
+   *[(a) for U1 verdicts, with the classification kept; (b) as a D-n
+   proposal, since every machine has its own policy]*
+4. **A combinational unit.** No backend can express "ports a, b, result, no
+   clock": Allo's nearest is ``Wire`` ports (still clocked), RTLGen and AMC
+   always add start/done. Is a zero-latency unit a programming-model feature
+   to add, or is latency >= 1 acceptable as a recorded deviation for leaves?
+   *[recorded deviation for U1; revisit at U3, where leaves compose]*
+5. **Bit-level notation gaps** (concatenation, reduction-OR, ``[hi:lo]``
+   slices; expression widths sized bottom-up; shifts by >= width). Add them,
+   or keep them as recorded workarounds? *[proposal only; they cost
+   readability, not correctness]*
+6. **Pipeline flush mode for Catapult** (default stall leaves the last
+   element of a finite stream stuck; ``style=`` refused for SystemC).
+   *[emitter fix: emit the flush style for finite streams]*
+7. **Report AMC's silent miscompiles** (A5 ``a or b or c`` drops ``c``; A7 a
+   two-scalar loop exits with the wrong one) to AMC's author? *[yes, after the
+   owner's go-ahead]*
+
 ``vpu_bf16_add`` (pilot)
 ------------------------
 
