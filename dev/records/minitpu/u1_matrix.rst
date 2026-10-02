@@ -24,8 +24,15 @@ in what Allo can say.
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
-2. **Merge the SystemC emitter fixes** (``systemc-u1-fixes``) once they pass
-   the EVA/TinyTPU regressions? *[merge]*
+2. **Merge the SystemC emitter fixes** (``systemc-u1-fixes``, eight bugs,
+   each with a compile-and-run regression test)? EVA bit-exact; TinyTPU
+   SystemC csim unchanged; TinyTPU's Vitis and Catapult emission is
+   byte-identical to ``main`` (sha256 ``6bc774bc...``/``ade1ab5d...``);
+   ``tests/test_vhls.py`` gives the same 7 failures (host ``libstdc++``) and
+   28 passes on both trees. With them, SystemC csim of ``bf16_add`` runs the
+   full stimulus in 5.5 s: ``bits`` matches 251,936/251,936; ``native``
+   differs only on NaN encodings (Catapult ``ac::bfloat16`` gives
+   ``0x7FFF``/``0xFFFF``) and ``(+0)+(-0)``. *[merge]*
 3. **NaN and signed-zero rules.** MiniTPU, Allo's simulator, Catapult and
    RTLGen give four different NaN encodings and two answers to ``(+0)+(-0)``.
    Options: (a) treat NaN payload/sign and the zero sign as don't-care in the

@@ -245,8 +245,9 @@ EXPLAIN = [
     ("NaN payload: ac_std_float all-ones 0x7fff/0xffff, rtl +0x7fc0",
      lambda s, g, w: (int(g) & 0x7FFF) == 0x7FFF and int(w) == 0x7FC0),
     ("NaN sign: allo keeps it, rtl always +0x7fc0",
-     lambda s, g, w: _is_nan(g) and int(w) == 0x7FC0),
-    ("NaN payload/canonical form differs",
+     lambda s, g, w: _is_nan(g) and int(w) == 0x7FC0
+     and (int(g) & 0x7FFF) == 0x7FC0),
+    ("NaN encoding: allo payload differs, rtl always +0x7fc0",
      lambda s, g, w: _is_nan(g) and _is_nan(w)),
     ("(+0)+(-0): allo +0 (IEEE), rtl -0",
      lambda s, g, w: (int(s[0]) & 0x7FFF) == 0 and (int(s[1]) & 0x7FFF) == 0),
