@@ -2813,6 +2813,9 @@ unsigned allo::hls::VhlsModuleEmitter::emitNestedLoopHead(Value val) {
 /// MLIR component and HLS C++ pragma emitters.
 void allo::hls::VhlsModuleEmitter::emitBlock(Block &block) {
   for (auto &op : block) {
+    if (skipOp(&op))
+      continue;
+
     if (ExprVisitor(*this).dispatchVisitor(&op))
       continue;
 

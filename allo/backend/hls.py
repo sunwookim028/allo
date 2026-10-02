@@ -471,27 +471,47 @@ class HLSModule:
         check_pipeline_style_reaches_emitter(self.module, platform)
         buf = io.StringIO()
         success = True
-        match platform:
+        # The emitters report refusals as MLIR diagnostics on stderr. Capture
+        # that stream for the duration of the emit so the exception below can
+        # say WHAT was refused (a `comb` port and why, README D-13), not only
+        # that emission failed. (A Python diagnostic handler on the context
+        # segfaulted here; the file-descriptor capture is what works.)
+        import tempfile as _tempfile
+
+        _cap = _tempfile.TemporaryFile(mode="w+b")
+        sys.stderr.flush()
+        _saved_err = os.dup(2)
+        os.dup2(_cap.fileno(), 2)
+        try:
             # [NOTE]: If the HLS backend reports "<func_name> was not declared in this scope", it is likely caused by a forward reference.
             #           MLIR allows calling functions before their definition, but C++ HLS kernels require a prior declaration.
-            case "tapa":
-                success = allo_d.emit_thls(self.module, buf)
-            case "intel_hls":
-                success = allo_d.emit_ihls(self.module, buf)
-            case "catapult":
-                success = allo_d.emit_catapult(self.module, buf)
-            case "systemc":
-                success = allo_d.emit_systemc(self.module, buf)
-            case _:
-                # wrap_io=True has already linearized array indexing in
-                # generate_input_output_buffers, so we don't need to do it again
-                flatten = False if platform == "vivado_hls" else (not wrap_io)
-                success = allo_d.emit_vhls(self.module, buf, flatten=flatten)
-
+            match platform:
+                case "tapa":
+                    success = allo_d.emit_thls(self.module, buf)
+                case "intel_hls":
+                    success = allo_d.emit_ihls(self.module, buf)
+                case "catapult":
+                    success = allo_d.emit_catapult(self.module, buf)
+                case "systemc":
+                    success = allo_d.emit_systemc(self.module, buf)
+                case _:
+                    # wrap_io=True has already linearized array indexing in
+                    # generate_input_output_buffers, so we don't need to do it again
+                    flatten = False if platform == "vivado_hls" else (not wrap_io)
+                    success = allo_d.emit_vhls(self.module, buf, flatten=flatten)
+        finally:
+            os.dup2(_saved_err, 2)
+            os.close(_saved_err)
+            _cap.seek(0)
+            diagnostics = _cap.read().decode("utf-8", errors="replace")
+            _cap.close()
+            if diagnostics:
+                sys.stderr.write(diagnostics)  # still shown, as before
         if not success:
             raise RuntimeError(
                 "Failed to emit HLS code. Check error messages above for details. "
                 "Common issues: nested functions with multi-dimensional arrays when wrap_io=False."
+                + ("\n" + diagnostics.strip() if diagnostics.strip() else "")
             )
 
         buf.seek(0)
@@ -1517,6 +1537,11 @@ class HLSModule:
                         f"[latency] {kern}: latency={u['latency']} ii={u['ii']} "
                         f"{u['status']}"
                         + (f" ({u['reason']})" if u.get("reason") else "")
+                        + (
+                            f" comb ports {sorted(u['ports'])}"
+                            if u.get("ports")
+                            else ""
+                        )
                     )
                     if "declared" in u and u["latency"] != u["declared"]:
                         raise RuntimeError(

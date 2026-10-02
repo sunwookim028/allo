@@ -150,6 +150,10 @@ The link type is a design decision, not a label: each maps to different RTL. ``W
      - ``sc_signal<T>``
      - none
      - no
+   * - ``Wire[T, comb]``
+     - ``sc_signal<T>`` driven by an ``SC_METHOD`` (same-cycle output; below)
+     - none
+     - no
    * - ``Channel[T, valid_ready]``
      - ``Connections::Combinational<T>``
      - full valid/ready
@@ -170,6 +174,82 @@ deliberate performance points -- take them only when you own the timing.
 Boundary arrays are not all alike either. A 1-D array scanned strictly in order becomes a
 stream port (``a[i]`` lowers to ``.Pop()``); anything 2-D, strided, random or re-read becomes an
 addressable memory port behind a request/response channel.
+
+.. _systemc-comb:
+
+Combinational outputs: ``Wire[T, comb]``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Every ``sc_out`` an ``SC_THREAD`` writes is a register: the value shows after the
+next clock edge, whatever the body computed. A unit whose contract is a same-cycle
+output -- a register file's asynchronous read, a decoder, a mux -- declares it
+(README D-13; *declared, never inferred*, because an inferred form would move the
+port's latency silently when its cone changed shape):
+
+.. code-block:: python
+
+   w_qa: Wire[UInt(16), comb]          # a region-scope link; Wire(T, (), comb=True) is the same
+
+   @df.kernel(mapping=[1], args=[])
+   def rf():
+       mem: UInt(16)[32]
+       for _ in range(n):
+           a: int32 = w_ra.get()      # Wire inputs
+           ...
+           w_qa.put(mem[a])           # the comb output: read storage, THEN store
+           if e:
+               mem[x] = d
+
+The marker is part of the IR type (``!allo.wire<i16, comb>``) and the emitter builds
+the kernel as the form measured in ``dev/records/minitpu/u2_comb_read_2026-10-02.rst``
+(form e) and ``u2_comb_wire_impl_2026-10-02.rst``:
+
+- **Storage a comb cone reads becomes signal storage**, ``sc_signal<T> mem[N]`` as a
+  module member (a kernel-local array or an ``@ Stateful`` one; multi-dimensional
+  arrays are flattened), read with ``.read()`` in both processes and written with
+  ``.write()`` in the thread. Catapult requires a signal a thread writes to be set in
+  the reset action (CIN-233), so the storage is **zeroed by reset**. That is a
+  recorded deviation (MiniTPU's register file is never reset): it costs
+  ``DFFR_X1`` in place of ``DFF_X1`` -- +10.7 % area on the w16 register file,
+  all of it in the reset flops. A plain member array cannot feed a combinational
+  process (CIN-197), which is why the storage changes form.
+- **One ``SC_METHOD(comb)`` per kernel** holds every comb port's cone: the put and,
+  backwards from its value, ``Wire`` input reads, storage loads, the iteration's
+  scalar temporaries (``a: int32 = a5``) with the store that reaches them, and pure
+  arithmetic. It is sensitive to those inputs and to every storage element. The
+  thread keeps the stores, the other ports and its ``wait()``, and drops the puts
+  and whatever only they consumed. A comb ``sc_out`` has no reset-action write (the
+  method is its only driver).
+- **The rule.** A comb cone may read storage only *before* any store to it in the
+  iteration, in program order (read first, then store -- what the register file
+  does); it may read no stream, channel or memory port, contain no control flow,
+  depend on nothing computed outside the iteration (the induction variable,
+  loop-carried values) and be driven by exactly one unconditional ``put`` per
+  iteration. The thread's own reads of that storage must also precede its stores
+  (a signal returns the old value until the next delta). Anything else is
+  **refused at build**, naming the port and the reason (``comb port `w_qa` (rf_0):
+  its value reads mem after a store to it in the same iteration ...``); the
+  diagnostic is in the ``RuntimeError``.
+- **Other backends refuse** a comb port: Vitis and the Catapult C++ flow because it
+  is a ``Wire`` (they have none), the simulator with a clear ``NotImplementedError``
+  (it has no wire semantics at all; before, it failed inside the ExecutionEngine).
+- **Where it can be written.** On a region-scope link, as above. ``Wire[...]`` now
+  also evaluates as a value, so a ``@df.unit`` signature can name it -- but the
+  netlist still types every unit port as a ``Stream``
+  (:doc:`../developer/stream_ports`), so a ``Wire`` port of a unit is not wired
+  yet; a comb output belongs to a ``@df.kernel`` that drives a region-scope link.
+- **``latency.json`` reports it as ``comb``**, not ``0``: the kernel entry gains
+  ``"ports": {"v24": "comb", ...}`` (from the ``// allo comb ports:`` line the
+  emitter leaves in the module) while ``latency``/``ii`` stay the clocked thread's.
+  ``comb`` and ``latency=`` are different things (D-10).
+
+Measured (the ``comb`` variant of ``examples/minitpu/units/vpu_regfile.py``, no hand
+patch): Catapult's RTL is bit-exact against MiniTPU's ``vpu_regfile.sv`` on every
+defined slot at read latency 0 and write visible after 1 edge, w16
+(180,780/180,780) and w256 (45,744/45,744); DC same-flow area is the record's
+(4,463 um^2 at w16). In csim a ``Wire`` link is still not cycle-locked
+(:ref:`limitation-22`): the recorded ports agree with the reference at a constant
+offset, one cycle less than the thread form (+3/+2/+2 against +4/+3/+3).
 
 Configuration
 ~~~~~~~~~~~~~
