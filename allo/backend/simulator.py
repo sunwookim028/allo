@@ -1711,8 +1711,21 @@ class LLVMOMPModule(LLVMModule):
                 os.path.join(os.getenv("LLVM_BUILD_DIR"), "lib", "libomp.so"),
             ]
             shared_libs += [lib.compile_shared_lib() for lib in ext_libs]
+            self._shared_libs = shared_libs
             self.execution_engine = ExecutionEngine(
                 self.module, opt_level=2, shared_libs=shared_libs
+            )
+
+    def reset(self):
+        """Return every ``@ Stateful`` to its declared initial value.
+
+        A ``Stateful`` lives in a global of the JIT-compiled module, so it
+        persists across calls (README D-11); what a hardware reset does is
+        re-JIT the same lowered module, whose globals carry the initial values.
+        """
+        with self.module.context:
+            self.execution_engine = ExecutionEngine(
+                self.module, opt_level=2, shared_libs=self._shared_libs
             )
 
     def _hang_report(self, elapsed: float) -> str:

@@ -19,7 +19,9 @@
 #include "allo/Translation/EmitVivadoHLS.h" // reuse the Vhls emitter base
 #include "allo/Translation/EmitCatapultHLS.h" // reuse Catapult's ac_int type map
 #include "allo/Translation/Utils.h"
+#include "allo/Support/Utils.h" // getLayoutMap, isFullyPartitioned
 #include "llvm/ADT/SetVector.h"  // SmallSetVector: dedupe external IP headers
+#include "llvm/ADT/StringSet.h"  // statefulKernels: csim state persistence
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AffineExpr.h"
@@ -28,6 +30,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Tools/mlir-translate/Translation.h"
 #include "llvm/Support/raw_ostream.h"
+#include <cstdlib> // std::atoi (wideIntWidth)
 
 using namespace mlir;
 using namespace allo;
@@ -132,6 +135,33 @@ static bool isFloatCType(const std::string &t) {
   return t == "half" || t == "double" || t == "ac::bfloat16" ||
          t.find("ieee_float") != std::string::npos;
 }
+
+// How the tb moves an element type through its data files:
+//   'a' an ac_int / ap_int / ap_uint of ANY width: decimal text by digit
+//       arithmetic on the ac_int itself (_rdwide/_wrwide). `long long` is wrong
+//       for these twice over: a plain ac_int above 64 bits has no conversion to
+//       it under __SYNTHESIS__ (Catapult CRD-413, S7), and `>> long long` of a
+//       64-bit value >= 2^63 overflows, stores LLONG_MAX and sets failbit, which
+//       sticks: every later value of that file was lost (S8).
+//   'u' a native unsigned (uintN_t / bool): unsigned long long;
+//   's' a native signed: long long;  'f' a float (raw bits, see _fbits).
+static char tbIntKind(const std::string &t) {
+  if (isFloatCType(t))
+    return 'f';
+  size_t lt = t.find('<');
+  if (lt != std::string::npos) {
+    std::string head = t.substr(0, lt);
+    if (head == "ap_int" || head == "ap_uint" || head == "ac_int")
+      return 'a';
+  }
+  if (t.rfind("uint", 0) == 0 || t.rfind("unsigned", 0) == 0 || t == "bool")
+    return 'u';
+  return 's';
+}
+// After `_f >> _v` / _rdwide: a value the tb could not read is an error, never
+// a silent LLONG_MAX (S8).
+static const char *TB_READ_CHECK =
+    "if (_f.fail()) { std::cerr << \"TB: unreadable value in \" << _fn << \" at \" << f << std::endl; std::abort(); } ";
 
 // A Channel's PROTOCOL picks genuinely different hardware, not a cosmetic label:
 //   valid_ready -> Connections::Combinational<T>              (full handshake, back-pressure)
@@ -440,10 +470,22 @@ private:
   // list -- a reset action needs the values one at a time.
   void emitDenseElementLiteral(Attribute element, Type type, bool isUnsigned);
 
+  // csim-only `@ Stateful` persistence across calls of the built module (README
+  // D-11): a kernel that owns stateful members gets __allo_state_save/_load/_resume
+  // (emitStatefulStateIO) and is recorded in statefulKernels; the top records its
+  // (instance, callee) pairs in kernelInsts so sc_main can save every stateful
+  // instance at exit.
+  void emitStatefulStateIO(llvm::ArrayRef<memref::GlobalOp> statefulGlobals);
+  llvm::StringSet<> statefulKernels;
+  SmallVector<std::pair<std::string, std::string>, 4> kernelInsts;
+
   // Loop-shape transform: the kernel's outermost `for t` becomes a free-running while(1)
   // under __SYNTHESIS__ so Catapult pipelines the body (see emitAffineFor).
   bool isSteadyStateLoop(affine::AffineForOp op);
   void emitAffineFor(affine::AffineForOp op) override;
+  // A constant-trip loop nested in a Wire kernel's steady-state loop gets
+  // `#pragma hls_unroll` unless the schedule already says unroll/parallel.
+  void emitLoopDirectivesPreheader(Operation *op) override;
 
   // Sequential-stream body transform: a boundary memref arg becomes a Connections
   // stream port, so load a[i] -> port.Pop(), store b[i]=v -> port.Push(v).
@@ -933,11 +975,18 @@ bool SystemCModuleEmitter::isSeqStreamable(Value v) {  // new (SystemC-only)
     // Reject re-reads/re-writes: an identity a[iv] under an OUTER loop touches
     // each element more than once, which a stream (one element per handshake)
     // cannot reproduce. A 1-D single-pass scan sits inside exactly ONE loop.
+    // And it sits DIRECTLY in that loop: an access under an `if` (or any other
+    // region op) runs on some iterations only, so its Pop()/Push() would skip
+    // elements and the stream would fall out of step with the loop -- silently
+    // wrong values. Such an array takes the memory-port path instead.
     unsigned loops = 0;
     for (Operation *p = op->getParentOp();
-         p && !llvm::isa<func::FuncOp>(p); p = p->getParentOp())
+         p && !llvm::isa<func::FuncOp>(p); p = p->getParentOp()) {
       if (llvm::isa<affine::AffineForOp>(p))
         loops++;
+      else
+        return false; // conditional (scf.if/affine.if) or a non-affine loop
+    }
     if (loops != 1)
       return false;
   }
@@ -1148,6 +1197,44 @@ void SystemCModuleEmitter::emitAffineFor(affine::AffineForOp op) {  // override 
   reduceIndent();
   indent();
   os << "}\n";
+}
+
+// A Wire kernel's steady-state loop IS the clock: one iteration, one sampled
+// step. A constant-trip loop inside it (a shift-register pipe, `for k in
+// range(1, 3): p[3-k] = p[2-k]`) emitted rolled is MERGED by Catapult into the
+// pipelined loop -- "Prescheduled LOOP '/wa_0/run/while' (2 c-steps) (SCHD-7)",
+// after "Loop '/wa_0/run/l_S_k_0_k' is left rolled. (LOOP-4)" -- so the unit
+// samples its Wire inputs every second cycle while reporting II=1 (u2_word_array
+// C-W1: 19,502/67,717; `s.unroll` on the loop made the RTL cycle-exact). Unroll
+// such a loop here unless the schedule already has unroll/parallel on it; a
+// Connections kernel is left alone (its merged loop is caught by the latency
+// manifest, which a Wire kernel's measured step is not).
+void SystemCModuleEmitter::emitLoopDirectivesPreheader(Operation *op) {
+  CatapultModuleEmitter::emitLoopDirectivesPreheader(op);
+  auto forOp = llvm::dyn_cast<affine::AffineForOp>(op);
+  if (!forOp || !forOp.hasConstantBounds())
+    return;
+  if (allo::getLoopDirective(op, "unroll") ||
+      allo::getLoopDirective(op, "parallel"))
+    return;
+  bool underSteady = false;
+  for (Operation *p = op->getParentOp(); p && !underSteady; p = p->getParentOp())
+    if (auto anc = llvm::dyn_cast<affine::AffineForOp>(p))
+      underSteady = isSteadyStateLoop(anc);
+  if (!underSteady)
+    return;
+  auto func = op->getParentOfType<func::FuncOp>();
+  bool wireKernel = false;
+  func.walk([&](Operation *o) {
+    if (isa<allo::WireGetOp, allo::WirePutOp>(o))
+      wireKernel = true;
+  });
+  if (!wireKernel)
+    return;
+  indent();
+  os << "#pragma hls_unroll  // constant-trip loop in a Wire kernel's step: "
+        "rolled, Catapult merges it into the pipelined loop (SCHD-7) and one "
+        "step takes several cycles\n";
 }
 
 // Local reimplementation of the base's file-local affine-expr emitter: walk the
@@ -2269,6 +2356,124 @@ void SystemCModuleEmitter::unresetThreadDead() {  // new (SystemC-only)
   }
 }
 
+// csim only: `@ Stateful` persists across calls of the built module (README D-11).
+// Each call of the module is one process (compile + run of this testbench), so
+// the state crosses calls through a file: sc_main saves every stateful instance's
+// members to allo_state_<instance>.data at exit, and the thread reloads them
+// right after its reset action when the runner (allo/backend/hls.py) sets
+// ALLO_STATE_RESUME -- which it does on every call after the first; `mod.reset()`
+// clears the files. Values cross exactly like the input/output data files
+// (tbIntKind): an ac_int of any width as decimal text (_wrwide/_rdwide), a
+// native unsigned as `unsigned long long`, a native signed as `long long`, a
+// float as its raw bits -- so a value round-trips bit-exact (a uint64 >= 2^63 or
+// an ac_int wider than 64 bits through `long long` would not; S7/S8).
+// Under __SYNTHESIS__ none of this exists: the RTL's contract is "between resets".
+void SystemCModuleEmitter::emitStatefulStateIO(
+    llvm::ArrayRef<memref::GlobalOp> statefulGlobals) {  // new (SystemC-only)
+  // Signal storage (comb storage, D-13; unreset storage, D-14) is a flat
+  // `sc_signal<T> name[N]`, so it is reached as `name[_s].read()/.write()`.
+  // Which process may write it matters (sc_signal's one-writer rule): comb
+  // storage belongs to the thread, which reloads it after its reset action like
+  // any member; unreset storage belongs to the clock-edge `wr` method, which has
+  // no reset action, so it is reloaded before simulation starts
+  // (start_of_simulation, no writer yet) -- consistent with D-14, since unreset
+  // storage keeps its contents across a reset in the RTL too.
+  bool anyUnreset = false;
+  // `body` is called with the indexed element (`name[_s0][_s1]`, or `name[_s]`
+  // for signal storage), the element C type, isFloat, isSignal and isUnreset,
+  // inside one loop nest per global.
+  auto forEachElement = [&](llvm::function_ref<void(const std::string &,
+                                                    const std::string &, bool,
+                                                    bool, bool)>
+                                body) {
+    for (auto g : statefulGlobals) {
+      auto at = llvm::cast<ShapedType>(g.getType());
+      bool unr = isUnresetGlobal(g);
+      bool sig = unr || isCombStorageGlobal(g);
+      anyUnreset |= unr;
+      std::string ctype =
+          sig ? std::string(getStreamPayloadTypeName(at.getElementType(),
+                                                     g->hasAttr("unsigned")).str())
+              : std::string(getSCTypeName(at.getElementType()).str());
+      std::string lv = g.getSymName().str();
+      if (sig) {
+        int64_t total = 1;
+        for (auto s : at.getShape())
+          total *= s;
+        indent();
+        os << "for (int _s = 0; _s < " << total << "; ++_s) ";
+        lv += "[_s]";
+      } else {
+        unsigned rank = at.getRank();
+        for (unsigned d = 0; d < rank; ++d) {
+          indent();
+          os << "for (int _s" << d << " = 0; _s" << d << " < " << at.getShape()[d]
+             << "; ++_s" << d << ") ";
+        }
+        for (unsigned d = 0; d < rank; ++d)
+          lv += "[_s" + std::to_string(d) + "]";
+        if (rank == 0)
+          indent();
+      }
+      body(lv, ctype, isFloatCType(ctype), sig, unr);
+    }
+  };
+  os << "#ifndef __SYNTHESIS__\n";
+  indent(); os << "// csim only: `@ Stateful` across calls of the built module (README D-11)\n";
+  indent(); os << "void __allo_state_save(std::ostream &_o) {\n";
+  addIndent();
+  forEachElement([&](const std::string &lv0, const std::string &ctype, bool isF,
+                     bool sig, bool) {
+    std::string lv = sig ? lv0 + ".read()" : lv0;
+    char kind = tbIntKind(ctype);
+    if (isF)
+      os << "_o << _fbits(" << lv << ") << \"\\n\";\n";
+    else if (kind == 'a')
+      // One statement: it is the body of the brace-less `for` nest above.
+      os << "{ _wrwide(_o, " << lv << "); _o << \"\\n\"; }\n";
+    else
+      os << "_o << (" << (kind == 'u' ? "unsigned long long" : "long long")
+         << ")(" << lv << ") << \"\\n\";\n";
+  });
+  reduceIndent();
+  indent(); os << "}\n";
+  // _unrst selects which storage this pass assigns (the other is read and
+  // dropped, keeping the file's order): false from the thread, true from
+  // start_of_simulation for the `wr` method's unreset storage.
+  indent(); os << "void __allo_state_load(std::istream &_i, bool _unrst) {\n";
+  addIndent();
+  forEachElement([&](const std::string &lv, const std::string &ctype, bool isF,
+                     bool sig, bool unr) {
+    std::string guard = unr ? "if (_unrst) " : "if (!_unrst) ";
+    auto assign = [&](const std::string &v) {
+      return guard + (sig ? lv + ".write(" + v + ");" : lv + " = " + v + ";");
+    };
+    if (isF)
+      os << "{ unsigned long long _v; _i >> _v; "
+         << assign("_ffrombits< " + ctype + " >(_v)") << " }\n";
+    else if (tbIntKind(ctype) == 'a')
+      os << "{ " << ctype << " _v; _rdwide(_i, _v); " << assign("_v") << " }\n";
+    else
+      os << "{ " << (tbIntKind(ctype) == 'u' ? "unsigned long long" : "long long")
+         << " _v; _i >> _v; " << assign("(" + ctype + ")_v") << " }\n";
+  });
+  reduceIndent();
+  indent(); os << "}\n";
+  indent(); os << "void __allo_state_resume(bool _unrst = false) {\n";
+  addIndent();
+  indent(); os << "if (!std::getenv(\"ALLO_STATE_RESUME\")) return;\n";
+  indent(); os << "std::ifstream _f(std::string(\"allo_state_\") + basename() + \".data\");\n";
+  indent(); os << "if (_f) __allo_state_load(_f, _unrst);\n";
+  reduceIndent();
+  indent(); os << "}\n";
+  if (anyUnreset) {
+    indent();
+    os << "void start_of_simulation() { __allo_state_resume(true); }  "
+          "// unreset storage (D-14): before `wr` first runs\n";
+  }
+  os << "#endif\n";
+}
+
 void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (SystemC-only)
   auto name = func.getName();
   // README D-13: classify the declared combinational outputs first; a refused
@@ -2503,6 +2708,22 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
   for (auto &g : statefulGlobals) {
     auto at = llvm::cast<ShapedType>(g.getType());
     fixUnsignedType(g, g->hasAttr("unsigned"));
+    // `s.partition(.., Complete)` on the Stateful: registers, spelled for
+    // Catapult as hls_resource [Register] before the member (the pragma
+    // emitArrayDirectivesPreheader writes for a partitioned local array).
+    if (auto mt = llvm::dyn_cast<MemRefType>(g.getType()))
+      if (allo::getLayoutMap(mt)) {
+        bool full = true;
+        for (int64_t dim = 0; dim < mt.getRank(); ++dim)
+          if (!allo::isFullyPartitioned(mt, dim))
+            full = false;
+        if (full) {
+          indent();
+          os << "#pragma hls_resource " << g.getSymName().str()
+             << "_rsc variables=\"" << g.getSymName().str()
+             << "\" map_to_module=\"[Register]\"\n";
+        }
+      }
     indent();
     if (isCombStorageGlobal(g) || isUnresetGlobal(g)) {
       // Read by a comb cone (D-13): signal storage, flattened, shared by the
@@ -2544,6 +2765,10 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
     os << "sc_signal< "
        << getStreamPayloadTypeName(mt.getElementType(), alloc->hasAttr("unsigned"))
        << " > " << sig << "[" << total << "];  // comb storage (D-13)\n";
+  }
+  if (!statefulGlobals.empty()) {
+    statefulKernels.insert(func.getName());
+    emitStatefulStateIO(statefulGlobals);
   }
 
   // Constructor: name the ports + register a clocked, reset-aware thread.
@@ -2823,6 +3048,13 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
   }
   indent(); os << "done.write(false);  // completion flag low until the pass finishes\n";
   indent(); os << "wait();\n";
+  // After the reset action's wait(), so a reload cannot race the reset that
+  // re-initialises the members (the thread is out of reset once wait() returns).
+  if (!statefulGlobals.empty()) {
+    os << "#ifndef __SYNTHESIS__\n";
+    indent(); os << "__allo_state_resume();  // csim: continue from the previous call's state\n";
+    os << "#endif\n";
+  }
   // Baked-in constant arrays (e.g. `W: T[M,N] = np_W` weights) referenced by this
   // kernel: a memref.global holds the data and a GetGlobalOp aliases it, but the
   // SystemC path (unlike Vhls emitFunction) never emitted the global itself, so the
@@ -3306,11 +3538,18 @@ void SystemCModuleEmitter::emitStreamTryPut(StreamTryPutOp op) {  // override (b
   if (isLocalStream(op->getOperand(0))) {
     // self-FIFO producer end: <success> = <stream>_enq.PushNB(<value>);
     // occupancy += success (bool -> 0/1) so empty()/full() track the logical fill.
+    // Gated by the synchronous counter: the enq Combinational holds one value
+    // in flight beyond the AlloFifo's depth, so a bare PushNB still SUCCEEDS at
+    // full() and the counter ran to depth + 1 -- full() was then never true
+    // again (u2_fifo S9: six try_puts into Stream[int32, 4] gave full
+    // [0,0,0,1,0,0] for the simulator's [0,0,0,1,1,1]). try_put is refused
+    // exactly when full(), as in the simulator.
     Value s = op.getResult();
     std::string sn = std::string(getName(op->getOperand(0)).str());
+    int64_t depth = llvm::cast<StreamType>(op->getOperand(0).getType()).getDepth();
     indent();
     emitValue(s);
-    os << " = " << sn << "_enq.PushNB(";
+    os << " = (" << sn << "_cnt < " << depth << ") && " << sn << "_enq.PushNB(";
     emitValue(op->getOperand(1));
     os << "); " << sn << "_cnt += ";
     emitValue(s);
@@ -3711,9 +3950,12 @@ void SystemCModuleEmitter::emitTopModule(func::FuncOp func) {  // new (SystemC-o
   }
   // Submodule instance members: <callee> uN;
   SmallVector<std::string, 4> instNames;
+  kernelInsts.clear();
   for (auto it : llvm::enumerate(calls)) {
     std::string inst = "u" + std::to_string(it.index());
     instNames.push_back(inst);
+    if (!isIPCall(it.value(), parent))
+      kernelInsts.push_back({inst, std::string(it.value().getCallee())});
     indent();
     os << it.value().getCallee() << " " << inst << ";\n";
     // One signal per non-stream IP port. Every port must be bound or SystemC
@@ -4404,6 +4646,7 @@ void SystemCModuleEmitter::emitModule(ModuleOp module) {  // override (base emit
 typedef ac_ieee_float<binary16> half;
 #include <iostream>
 #include <fstream>
+#include <cstdlib>          // std::getenv: ALLO_STATE_RESUME (@ Stateful across calls)
 #include <iomanip>          // std::setprecision for lossless float tb output
 #include <algorithm>
 // --- float support helpers (half / ac_ieee_float<binary32> / double) ---
@@ -4459,6 +4702,31 @@ template <> inline ac::bfloat16 _ffrombits<ac::bfloat16>(unsigned long long b) {
 template <>
 inline ac_ieee_float<binary32> _ffrombits<ac_ieee_float<binary32> >(unsigned long long b) {
   ac_ieee_float<binary32> v; v.set_data(ac_int<32, true>((long long)b)); return v;
+}
+// Integers WIDER than 64 bits in the testbench's data files: decimal text of
+// any length, read and written by digit arithmetic on the ac_int itself (the
+// same text the Python side writes and parses for every width). `long long`
+// cannot carry them, and a plain ac_int has no conversion to it under
+// __SYNTHESIS__ (Catapult CRD-413), so a 256-bit port used to need a
+// hand-patched testbench. Every step is an explicit T(...) so the csim shim
+// (an ac_int subclass) and the bare ac_int alias both construct from the
+// wider intermediate.
+template <class T> inline void _rdwide(std::istream &f, T &v) {
+  std::string s; f >> s; v = T(0);
+  size_t i = 0; bool neg = false;
+  if (i < s.size() && (s[i] == '-' || s[i] == '+')) { neg = (s[i] == '-'); ++i; }
+  for (; i < s.size(); ++i) v = T(v * 10 + (int)(s[i] - '0'));
+  if (neg) v = T(-v);
+}
+template <class T> inline void _wrwide(std::ostream &f, const T &v) {
+  // The magnitude in a type one bit wider: T(-v) of a signed T's minimum
+  // (ac_int<8,true> -128) wraps back to itself and the digits came out below '0'.
+  typedef ac_int<T::width + 1, true> U;
+  U u = v; bool neg = (u < 0); if (neg) u = U(-u);
+  std::string s;
+  do { s.insert(s.begin(), (char)('0' + (u % 10).to_int())); u = U(u / 10); } while (u != 0);
+  if (neg) s.insert(s.begin(), '-');
+  f << s;
 }
 // Float conversions (casts). ac floats have explicit constructors only, and
 // ac::bfloat16's hard-code round-toward-zero; arith casts round to nearest
@@ -5018,8 +5286,17 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         std::string rt = isF ? "unsigned long long" : "long long";
         std::string conv = isF ? "_ffrombits< " + a.ctype + " >(_v)"
                                : "(" + a.ctype + ")_v";
-        os << "{ std::ifstream _f(\"input" << a.fileIdx << ".data\"); " << rt
-           << " _v; for (int f = 0; f < " << a.total << "; ++f) { _f >> _v; ch_"
+        std::string rd = "_f >> _v;";
+        char kind = tbIntKind(a.ctype);
+        if (kind == 'a') { // any-width ac_int: no long long (see tbIntKind)
+          rt = a.ctype;
+          conv = "_v";
+          rd = "_rdwide(_f, _v);";
+        } else if (kind == 'u') {
+          rt = "unsigned long long";
+        }
+        os << "{ const char *_fn = \"input" << a.fileIdx << ".data\"; std::ifstream _f(_fn); " << rt
+           << " _v; for (int f = 0; f < " << a.total << "; ++f) { " << rd << " " << TB_READ_CHECK << "ch_"
            << a.member << ".Push(" << conv << "); } }\n";
         reduceIndent();
         indent(); os << "}\n";
@@ -5038,10 +5315,16 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
              << ".data\"); for (int f = 0; f < " << a.total
              << "; ++f) _f << _fbits(ch_" << a.member
              << ".Pop()) << \"\\n\"; }\n";
+        else if (tbIntKind(a.ctype) == 'a') // any-width ac_int: no long long (see _wrwide)
+          os << "{ std::ofstream _f(\"output" << a.fileIdx
+             << ".data\"); for (int f = 0; f < " << a.total << "; ++f) { "
+             << a.ctype << " _v = ch_" << a.member
+             << ".Pop(); _wrwide(_f, _v); _f << \"\\n\"; } }\n";
         else
           os << "{ std::ofstream _f(\"output" << a.fileIdx
              << ".data\"); for (int f = 0; f < " << a.total
-             << "; ++f) _f << (long long)(ch_" << a.member
+             << "; ++f) _f << (" << (tbIntKind(a.ctype) == 'u' ? "unsigned long long" : "long long")
+             << ")(ch_" << a.member
              << ".Pop()) << \"\\n\"; }\n";
         indent(); os << "if (++_snk_done == " << numStreamOut << ") sc_stop();\n";
         reduceIndent();
@@ -5080,10 +5363,19 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         std::string rt = isF ? "unsigned long long" : "long long";
         std::string conv = isF ? "_ffrombits< " + mi.ctype + " >(_v)"
                                : "(" + mi.ctype + ")_v";
+        std::string rd = "_f >> _v;";
+        char kind = tbIntKind(mi.ctype);
+        if (kind == 'a') { // any-width ac_int: no long long (see tbIntKind)
+          rt = mi.ctype;
+          conv = "_v";
+          rd = "_rdwide(_f, _v);";
+        } else if (kind == 'u') {
+          rt = "unsigned long long";
+        }
         // Exposed memories live in the tb; replicated ones are still inside the DUT.
         std::string owner = mi.exposed ? "t." : "t.dut.";
-        os << "{ std::ifstream _f(\"input" << mi.inIdx << ".data\"); " << rt
-           << " _v; for (int f = 0; f < " << mi.total << "; ++f) { _f >> _v; "
+        os << "{ const char *_fn = \"input" << mi.inIdx << ".data\"; std::ifstream _f(_fn); " << rt
+           << " _v; for (int f = 0; f < " << mi.total << "; ++f) { " << rd << " " << TB_READ_CHECK
            << owner << mi.chan << "_mem.mem[f] = " << conv << "; } }\n";
       }
     indent(); os << "t.rst = 0; sc_start(1, SC_NS);\n";
@@ -5138,8 +5430,13 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
         // +0 (all-zero bits) elsewhere, so OR-ing their bits merges them exactly
         // (a float sum would turn -0 into +0 and could not carry NaN bits).
         bool isFloat = isFloatCType(m.ctype);
+        bool isWide = tbIntKind(m.ctype) == 'a'; // any-width ac_int: no long long
         indent();
-        os << (isFloat ? "    unsigned long long _s = 0;\n" : "    long long _s = 0;\n");
+        if (isWide)
+          os << "    " << m.ctype << " _s = 0;\n";
+        else
+          os << (isFloat || tbIntKind(m.ctype) == 'u' ? "    unsigned long long _s = 0;\n"
+                                                        : "    long long _s = 0;\n");
         for (auto &mi : memInsts)
           if (mi.dir != 'i' && mi.outIdx == m.outIdx) {
             // Exposed memories live in the tb; replicated ones inside the DUT.
@@ -5147,14 +5444,32 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
             indent();
             if (isFloat)
               os << "    _s |= _fbits(" << owner << mi.chan << "_mem.mem[f]);\n";
+            else if (isWide)
+              os << "    _s = " << m.ctype << "(_s + " << owner << mi.chan
+                 << "_mem.mem[f]);\n";
             else
-              os << "    _s += (long long) " << owner << mi.chan
-                 << "_mem.mem[f];\n";
+              os << "    _s += (" << (tbIntKind(m.ctype) == 'u' ? "unsigned long long" : "long long")
+                 << ") " << owner << mi.chan << "_mem.mem[f];\n";
           }
         indent();
-        os << "    _f << _s << \"\\n\";\n";
+        if (isWide)
+          os << "    _wrwide(_f, _s); _f << \"\\n\";\n";
+        else
+          os << "    _f << _s << \"\\n\";\n";
         indent();
         os << "  } }\n";
+      }
+    // `@ Stateful` persistence (README D-11): save every stateful instance's
+    // members for the next call of the built module to resume from (the thread
+    // reloads them in __allo_state_resume when ALLO_STATE_RESUME is set). Done
+    // here, after the run is quiescent, not at the end of each thread's pass: a
+    // stream sink's sc_stop() can land before a producer's thread reaches the
+    // end of its body.
+    for (auto &ki : kernelInsts)
+      if (statefulKernels.count(ki.second)) {
+        indent();
+        os << "{ std::ofstream _f(\"allo_state_" << ki.first << ".data\"); t.dut."
+           << ki.first << ".__allo_state_save(_f); }\n";
       }
     indent(); os << "return 0;\n";
     reduceIndent();

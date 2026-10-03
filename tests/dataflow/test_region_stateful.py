@@ -19,6 +19,14 @@ Three variants are exercised:
 
 The persistence contract: invoking the module multiple times must
 preserve the buffer's contents across calls.
+
+Since README D-11 (one Stateful has one kernel) variants 2 and 3 are refused
+at build on every backend unless the region states the ``shared_stateful``
+premise -- that streams already order every access -- which the simulator
+honours and the HLS emitters still refuse. The sharing tests below carry that
+premise so they keep testing what they were written for: the simulator's
+sharing semantics under it, and each emitter's own refusal. The refusal
+itself is tested in ``test_stateful_semantics.py``.
 """
 
 import numpy as np
@@ -61,7 +69,7 @@ def test_region_stateful_single_kernel():
 
 
 def test_region_stateful_two_kernels_shared():
-    @df.region()
+    @df.region(shared_stateful={"acc": "test: the reader tolerates any interleaving"})
     def top(out_a: int32[4], out_b: int32[4]):
         acc: int32[4] @ Stateful = 0  # shared by both kernels
 
@@ -104,7 +112,7 @@ def test_region_stateful_two_kernels_shared():
 
 
 def test_region_stateful_with_stream():
-    @df.region()
+    @df.region(shared_stateful={"acc": "test: the driver tolerates any interleaving"})
     def top(out: int32[4]):
         acc: int32[4] @ Stateful = 0  # shared between decoder + driver
         sig: Stream[int32, 4]
@@ -160,7 +168,8 @@ NAMES_THE_KERNELS = {"vhls": True, "catapult": True, "systemc": False}
 
 @pytest.mark.parametrize("target", HLS_TARGETS)
 def test_region_stateful_shared_by_two_kernels_is_rejected_for_hls(target, capfd):
-    """Sharing is honoured by the simulator; every HLS emitter must refuse it.
+    """Sharing (under the premise) is honoured by the simulator; every HLS
+    emitter must refuse it, premise or not.
 
     The emitter re-emits each stateful global as a function-local ``static``,
     so two kernels referencing one region-scope ``Stateful`` would get two
@@ -183,7 +192,7 @@ def test_region_stateful_shared_by_two_kernels_is_rejected_for_hls(target, capfd
     emit a silently wrong circuit.
     """
 
-    @df.region()
+    @df.region(shared_stateful={"acc": "test: exercise the emitter's refusal"})
     def top(out_a: int32[4], out_b: int32[4]):
         acc: int32[4] @ Stateful = 0  # shared by both kernels
 
@@ -208,9 +217,7 @@ def test_region_stateful_shared_by_two_kernels_is_rejected_for_hls(target, capfd
 
 
 @pytest.mark.parametrize("target", HLS_TARGETS)
-def test_region_stateful_shared_by_three_kernels_is_rejected_for_hls(
-    target, capfd
-):
+def test_region_stateful_shared_by_three_kernels_is_rejected_for_hls(target, capfd):
     """The three-client shape: one writer, one read-modify-writer, one reader.
 
     This is the design that found the ``catapult`` hole. Two clients can be
@@ -220,7 +227,7 @@ def test_region_stateful_shared_by_three_kernels_is_rejected_for_hls(
     must refuse it.
     """
 
-    @df.region()
+    @df.region(shared_stateful={"acc": "test: exercise the emitter's refusal"})
     def top(out_a: int32[4], out_b: int32[4], out_c: int32[4]):
         acc: int32[4] @ Stateful = 0  # touched by all three kernels
 
@@ -264,7 +271,7 @@ def test_catapult_emits_no_shared_file_scope_static(target, capfd):
     succeeds and is wrong".
     """
 
-    @df.region()
+    @df.region(shared_stateful={"acc": "test: exercise the emitter's refusal"})
     def top(out_a: int32[4], out_b: int32[4]):
         acc: int32[4] @ Stateful = 0
 

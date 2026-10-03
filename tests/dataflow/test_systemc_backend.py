@@ -283,7 +283,7 @@ def test_systemc_mem_port_store_emit():
     # write pins driven, read pins never used for a store-only array
     assert "_we.write(true)" in code and "_re.write(true)" not in code
     assert "sc_start(" in code and "SC_NS);" in code  # time-based completion
-    assert "_mem.mem[f];" in code  # tb reads the memory out (sum-merge) to file
+    assert "_mem.mem[f])" in code  # tb reads the memory out (sum-merge) to file
     print("random OUTPUT access -> write memory port emitted")
 
 

@@ -17,7 +17,15 @@ import allo.dataflow as df
 from allo.ir.types import Stateful, int32
 
 
-@df.region()
+# The sharing between decoder and driver is deliberate (it is item 1's shape);
+# README D-11 refuses it without this premise, and the repro is about the
+# lowering, not the sharing -- only decoder's persistent output is checked.
+@df.region(
+    shared_stateful={
+        "acc": "limits repro: driver's view is racy by design and not checked",
+        "pc": "limits repro: driver's view is racy by design and not checked",
+    }
+)
 def top(sel: int32[1], out_a: int32[4], out_b: int32[4]):
     acc: int32[4] @ Stateful = 0
     pc: int32[1] @ Stateful = 0
@@ -51,8 +59,15 @@ def main():
         ok = np.array_equal(a, exp_a)
         # driver's view of acc/pc is racy across kernels (no ordering), so
         # only decoder's persistent output is checked.
-        verdict(1, not ok, f"out_a after 2 calls = {a.tolist()} (expect {exp_a.tolist()}), out_b = {b.tolist()}")
-    except (Exception, SystemExit) as e:  # noqa: BLE001  (customize() sys.exit(1)s on frontend errors)
+        verdict(
+            1,
+            not ok,
+            f"out_a after 2 calls = {a.tolist()} (expect {exp_a.tolist()}), out_b = {b.tolist()}",
+        )
+    except (
+        Exception,
+        SystemExit,
+    ) as e:  # noqa: BLE001  (customize() sys.exit(1)s on frontend errors)
         traceback.print_exc()
         verdict(1, True, f"{type(e).__name__}: {e}")
 

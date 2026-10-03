@@ -354,5 +354,86 @@ def test_unreset_regfile_csim():
     print(f"unreset regfile csim: values match at offset +{best}")
 
 
+def _regfile_stateful(n, D, reset):
+    """``_regfile`` with ``mem`` a ``@ Stateful`` -- comb storage written by the
+    thread (``reset=True``) or unreset storage written by ``wr`` -- so that it
+    persists across csim calls (README D-11)."""
+    st = Stateful if reset else Stateful(reset=False)
+
+    @df.region()
+    def top(RA: A5[n], WA: A5[n], WD: D[n], WE: uint1[n], QA: D[n]):
+        w_ra: Wire[A5]
+        w_wa: Wire[A5]
+        w_wd: Wire[D]
+        w_we: Wire[uint1]
+        w_qa: Wire[D, comb]
+
+        @df.kernel(mapping=[1], args=[RA, WA, WD, WE])
+        def src(ra: A5[n], wa: A5[n], wd: D[n], we: uint1[n]):
+            for t in range(n):
+                w_ra.put(ra[t])
+                w_wa.put(wa[t])
+                w_wd.put(wd[t])
+                w_we.put(we[t])
+
+        @df.kernel(mapping=[1], args=[])
+        def rf():
+            mem: D[32] @ st = 0
+            for _ in range(n):
+                a5: A5 = w_ra.get()
+                a: int32 = a5
+                x5: A5 = w_wa.get()
+                x: int32 = x5
+                d: D = w_wd.get()
+                e: uint1 = w_we.get()
+                w_qa.put(mem[a])
+                if e:
+                    mem[x] = d
+
+        @df.kernel(mapping=[1], args=[QA])
+        def sink(qa: D[n]):
+            for t in range(n):
+                qa[t] = w_qa.get()
+
+    return top
+
+
+@needs_csim
+@pytest.mark.parametrize("reset", [True, False], ids=["comb_storage", "unreset"])
+def test_signal_storage_persists_across_csim_calls(reset):
+    """D-11 over D-13/D-14 signal storage (``sc_signal<T> mem[32]``): saved
+    through ``.read()``, reloaded through ``.write()`` by the process that owns
+    the signal -- the thread after its reset action for comb storage,
+    ``start_of_simulation`` for unreset storage (the ``wr`` method has no reset
+    action, and a second writer would break sc_signal's one-writer rule). An
+    80-bit element takes the decimal-text path (_rdwide/_wrwide, S7)."""
+    n, D = 64, UInt(80)
+    val = lambda i: (1 << 79) + (i + 1) * 977
+
+    def obj(vals):  # > 64-bit elements travel as Python ints
+        out = np.empty(len(vals), dtype=object)
+        out[:] = [int(v) for v in vals]
+        return out
+
+    t = list(range(n))
+    wa = np.array([i % 32 for i in t], np.uint8)
+    wd = obj([val(i % 32) for i in t])
+    with tempfile.TemporaryDirectory() as tmp:
+        mod = df.build(_regfile_stateful(n, D, reset), target="systemc", mode="csim",
+                       project=tmp)
+        assert ("start_of_simulation" in mod.hls_code) == (not reset)
+        mod(np.zeros(n, np.uint8), wa, wd, np.ones(n, np.uint8), obj([0] * n))
+        q = obj([0] * n)  # second call: no writes, read every address
+        mod(wa, wa, wd, np.zeros(n, np.uint8), q)
+        got = [int(v) for v in q]
+        assert any(
+            all(got[i + k] == val(i % 32) for i in range(n - k)) for k in range(6)
+        ), f"state not resumed: {got[:6]}"
+        mod.reset()
+        q = obj([0] * n)
+        mod(wa, wa, wd, np.zeros(n, np.uint8), q)
+        assert all(int(v) == 0 for v in q), "reset() did not clear the state"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

@@ -37,6 +37,7 @@ from ..utils import (
     is_anywidth_int_type_and_not_np,
     handle_overflow,
     make_anywidth_numpy_array,
+    pack_wide_int_array,
     struct_array_to_int_array,
     get_np_struct_type,
     create_output_struct,
@@ -175,7 +176,9 @@ class LLVMModule:
                     raise RuntimeError(
                         "The input data is not contiguous. Please use np.ascontiguousarray to change the layout first."
                     )
-                if not isinstance(arg.dtype, np.dtypes.VoidDType):
+                if arg.dtype != object and not isinstance(
+                    arg.dtype, np.dtypes.VoidDType
+                ):
                     np_type = np_type_to_str(arg.dtype)
                     if np_type != target_in_type:
                         DTypeWarning(
@@ -194,6 +197,21 @@ class LLVMModule:
                     if bitwidth <= 64:
                         arg = handle_overflow(arg, bitwidth, target_in_type)
                         arg = make_anywidth_numpy_array(arg, bitwidth)
+                    elif isinstance(arg.dtype, np.dtypes.VoidDType):
+                        # already the LLVM element layout: it must be the full
+                        # element, or the kernel reads past the buffer
+                        want = max(get_clostest_pow2(bitwidth), 8) // 8
+                        if arg.dtype.itemsize != want:
+                            raise RuntimeError(
+                                f"Input type mismatch: {target_in_type} is "
+                                f"{want} bytes per element, got {arg.dtype.itemsize}"
+                            )
+                    else:
+                        # > 64 bits: pack Python ints (range-checked); the
+                        # results come back as an object array of Python ints
+                        arg = pack_wide_int_array(
+                            arg, bitwidth, target_in_type.startswith("i")
+                        )
                 elif target_in_type in np_supported_types:
                     target_np_type = np_supported_types[target_in_type]
                     if arg.dtype != target_np_type:
@@ -229,9 +247,16 @@ class LLVMModule:
                 if len(shape) > 0:
                     if is_anywidth_int_type_and_not_np(target_in_type):
                         bitwidth = get_bitwidth_from_type(target_in_type)
-                        arg[:] = struct_array_to_int_array(
-                            new_arg, bitwidth, target_in_type[0] == "i"
-                        )
+                        if bitwidth > 64 and isinstance(
+                            arg.dtype, np.dtypes.VoidDType
+                        ):
+                            arg[:] = new_arg
+                        else:
+                            # > 64 bits: Python ints; a narrower numpy array
+                            # refuses (OverflowError) a value it cannot hold
+                            arg[:] = struct_array_to_int_array(
+                                new_arg, bitwidth, target_in_type[0] == "i"
+                            )
                     else:
                         arg[:] = new_arg
             return

@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # pylint: disable=consider-using-with, no-name-in-module, too-many-branches
 
+import glob
 import os
 import re
 import io
@@ -395,6 +396,41 @@ def _run_group_timeout(cmd, timeout, what, **kwargs):
     return subprocess.CompletedProcess(cmd, proc.returncode, out, err)
 
 
+_SELF_FIFO_PORT = re.compile(r"Connections::Out< (?P<T>[^;]*) > (?P<name>\w+)_enq;")
+
+
+def refuse_self_fifo_for_synthesis(hls_code):
+    """A stream put and got by ONE kernel (a self-FIFO) is emitted as a
+    MatchLib AlloFifo wired as a self-loop with ``_enq``/``_deq`` Connections
+    ports and a synchronous occupancy counter. csim runs it bit-exactly, but
+    Catapult cannot schedule it in any loop that puts and gets conditionally:
+    ``could not schedule partition '/top/fifo_0/run' even with unlimited
+    resources`` (SCHD-30; with and without pipelining, with and without the
+    reset drain -- the chained feedback through the counter and the deq Pop).
+    The build failed late, in csynth, instead of being refused (MiniTPU U2
+    FIFO record, C1). Refuse at emission for every mode that synthesizes."""
+    found = []
+    module = None
+    for line in hls_code.splitlines():
+        if line.startswith("SC_MODULE("):
+            module = line[len("SC_MODULE("):].split(")")[0]
+        m = _SELF_FIFO_PORT.search(line)
+        if m:
+            found.append((module, m.group("name")))
+    if not found:
+        return
+    what = ", ".join(f"stream '{s}' in kernel '{k}'" for k, s in found)
+    raise RuntimeError(
+        f"SystemC synthesis: {what} is a self-FIFO (one kernel both puts and "
+        "gets it). Its lowering (an AlloFifo self-loop with a synchronous "
+        "occupancy counter) cannot be scheduled by Catapult: SCHD-30 \"could not "
+        "schedule partition ... even with unlimited resources\", pipelined or "
+        "not. csim (mode='csim') runs it; for synthesis keep the FIFO as an "
+        "in-kernel ring (an array with head/tail pointers) or move its two "
+        "ends into two kernels."
+    )
+
+
 class HLSModule:
     def __init__(
         self,
@@ -414,6 +450,9 @@ class HLSModule:
         self.platform = platform
         self.ext_libs = [] if ext_libs is None else ext_libs
         self.num_output_args = None  # Will be set from configs if provided
+        # Calls of this module so far: the systemc csim resumes `@ Stateful`
+        # from the previous call's state on every call after the first.
+        self._calls = 0
         user_configs = configs if configs is not None else {}
         # For Catapult (ASIC), start with ASIC-appropriate defaults instead of FPGA defaults.
         if platform in {"catapult", "systemc"}:
@@ -547,6 +586,8 @@ class HLSModule:
         # run.tcl then tells Catapult not to add a reset to every register.
         if platform == "systemc" and "// allo unreset storage:" in self.hls_code:
             configs["unreset_storage"] = True
+        if platform == "systemc" and mode is not None and mode != "csim":
+            refuse_self_fifo_for_synthesis(self.hls_code)
         if project is not None:
             assert mode is not None, "mode must be specified when project is specified"
             os.makedirs(project, exist_ok=True)
@@ -896,6 +937,37 @@ class HLSModule:
         if self.mode is None:
             return self.hls_code
         return f"HLSModule({self.top_func_name}, {self.mode}, {self.project})"
+
+    # `@ Stateful` persists across calls of the built module (README D-11). The
+    # systemc csim is one process per call, so the emitted testbench saves every
+    # kernel instance's stateful members to allo_state_<inst>.data at exit and
+    # reloads them when ALLO_STATE_RESUME is set (EmitSystemC.cpp,
+    # emitStatefulStateIO). The first call of a module starts from the declared
+    # initial values -- and clears whatever a previous build left in the project
+    # -- and every later call resumes. Not done for cosim (SCVerify drives its
+    # own run) nor for the vhls/catapult csim host (documented in
+    # docs/source/developer/dataflow_semantics.rst).
+    def _csim_state_env(self):
+        env = dict(os.environ)
+        env.pop("ALLO_STATE_RESUME", None)
+        if self._calls == 0:
+            self._clear_csim_state()
+        else:
+            env["ALLO_STATE_RESUME"] = "1"
+        return env
+
+    def _clear_csim_state(self):
+        for f in glob.glob(os.path.join(self.project, "allo_state_*.data")):
+            os.remove(f)
+
+    def reset(self):
+        """Return every ``@ Stateful`` to its declared initial value.
+
+        What a hardware reset does: the next call starts from the initial
+        values instead of resuming from the previous call's state.
+        """
+        self._calls = 0
+        self._clear_csim_state()
 
     def __call__(self, *args, shell=True):
         if self.platform == "vivado_hls":
@@ -1247,16 +1319,20 @@ class HLSModule:
 
                 # Execution
                 cmd = f"cd {self.project}; ./sim"
+                env = self._csim_state_env() if self.platform == "systemc" else None
                 print(
                     f"[{time.strftime('%H:%M:%S', time.gmtime())}] Running simulation ..."
                 )
                 if shell:
-                    process = subprocess.Popen(cmd, shell=True)
+                    process = subprocess.Popen(cmd, shell=True, env=env)
                 else:
-                    process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+                    process = subprocess.Popen(
+                        cmd, shell=True, stdout=subprocess.PIPE, env=env
+                    )
                 process.wait()
                 if process.returncode != 0:
                     raise RuntimeError("Simulation failed.")
+                self._calls += 1
 
                 # Read outputs
                 if self.platform == "systemc":

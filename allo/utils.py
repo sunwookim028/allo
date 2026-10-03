@@ -361,6 +361,55 @@ def make_anywidth_numpy_array(array, bitwidth):
         return array
 
 
+def pack_wide_int_array(array, bitwidth, signed):
+    """Pack an integer array (any numpy integer dtype, or ``object`` holding
+    Python ints) into the byte-struct array of an ``i<N>``/``ui<N>`` with
+    ``N > 64``: the LLVM path's element is ``N`` rounded up to a power of two
+    bits, little-endian, two's complement. Every value is range-checked
+    against the type, so nothing silently wraps and nothing is read past the
+    caller's buffer (a ``uint64`` array handed to a ``UInt(256)`` argument
+    used to be passed as is and read 4x past its end)."""
+    if bitwidth <= 64:
+        raise ValueError("pack_wide_int_array is for integers wider than 64 bits")
+    if array.dtype != object and array.dtype.kind not in "iu":
+        raise TypeError(
+            f"an integer of {bitwidth} bits takes an integer array or an "
+            f"object array of Python ints, not dtype {array.dtype}"
+        )
+    n_bytes = max(get_clostest_pow2(bitwidth), 8) // 8
+    lo, hi = (-(1 << (bitwidth - 1)), (1 << (bitwidth - 1)) - 1) if signed else (
+        0,
+        (1 << bitwidth) - 1,
+    )
+    vals = [int(v) for v in np.asarray(array).reshape(-1).tolist()]
+    for v in vals:
+        if not isinstance(v, int) or v < lo or v > hi:
+            raise ValueError(
+                f"value {v!r} does not fit {'i' if signed else 'ui'}{bitwidth}"
+            )
+    buf = b"".join(v.to_bytes(n_bytes, "little", signed=signed) for v in vals)
+    out = np.frombuffer(buf, dtype=get_np_struct_type(n_bytes * 8))
+    return np.ascontiguousarray(out.reshape(array.shape))
+
+
+def unpack_wide_int_array(array, bitwidth, signed=True):
+    """The inverse of :func:`pack_wide_int_array`: an ``object`` array of
+    Python ints, the value of the low ``bitwidth`` bits of each element."""
+    shape = array.shape
+    raw = np.ascontiguousarray(array).view(np.uint8).reshape(-1, array.dtype.itemsize)
+    n_bytes = int(np.ceil(bitwidth / 8))
+    mask = (1 << bitwidth) - 1
+    vals = []
+    for row in raw:
+        v = int.from_bytes(row[:n_bytes].tobytes(), "little") & mask
+        if signed and v >> (bitwidth - 1):
+            v -= 1 << bitwidth
+        vals.append(v)
+    out = np.empty(len(vals), dtype=object)
+    out[:] = vals
+    return out.reshape(shape)
+
+
 def struct_array_to_int_array(array, bitwidth, signed=True):
     """
     Converts a structured numpy array to back to an integer array.
@@ -389,10 +438,8 @@ def struct_array_to_int_array(array, bitwidth, signed=True):
     shape = array.shape
     n_bytes = int(np.ceil(bitwidth / 8))
     if bitwidth > 64:
-        DTypeWarning(
-            "Coverting data with bitwidth > 64 to numpy array, "
-            "which may lead to possible incorrect results."
-        ).warn()
+        # numpy has no integer wider than 64 bits: hand back Python ints.
+        return unpack_wide_int_array(array, bitwidth, signed)
     target_bytes = max(get_clostest_pow2(bitwidth), 8) // 8
     if n_bytes == 1:
         _bytes = [array] if array.dtype == np.uint8 else [array["f0"]]
