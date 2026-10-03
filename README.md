@@ -268,6 +268,40 @@ backend, and one `Stateful` has one kernel.**
   The simulator treats it as ordinary storage; harness verdicts mask its
   pre-write contents as undefined (as for MiniTPU's).
 
+**D-12 (2026-10-02). A memory declares its ports; each port has one owner.**
+- `compose.Memory(rows=, ports=(Port(name, kind, latency, visible, count),),
+  collision=)` declares an on-chip memory. `kind` is `r`, `w` or `rw`;
+  `latency` is the read latency in edges, `0` meaning asynchronous;
+  `visible` is the edges until a write is seen on any port; `count` gives
+  that many interchangeable ports (as AMC's port type does), default 1.
+  A `Memory` without `rows` stays today's boundary array.
+- A unit binds ports, not memories (`memories=("vreg.ra", "vreg.rb")`). Each
+  port has exactly one owner; this replaces one owner per memory. A port
+  that several writers share in the hardware (MiniTPU's OR-muxed VREG write
+  port) is owned by one writeback unit fed over channels. Composition checks
+  each body against its ports' direction and accesses per iteration.
+- `collision=` states what a same-word access on two ports in one cycle
+  means: `refuse`, an `obligation` on the composition checked by stress
+  cosim, or `undefined` (masked in verdicts). VMEM's compute/DMA collision is
+  an obligation (MiniTPU issue #21).
+- The per-cycle port calendar is derived from the declared latencies at the
+  Actions layer and handed to the assembler and ACT; composition checks
+  structure only.
+- A declared read latency `L >= 1` lowers to exactly the read pipeline that
+  matched MiniTPU on every RTL backend at U2 (the pipe written as data);
+  `latency=0` lowers to a combinational read (D-13).
+- Every backend honours a port, refuses it naming the port and the cause, or
+  lowers it through a stated implementation (replica, registers, SRAM),
+  reported in `memory.json` beside `latency.json`; none drops it. Vitis
+  refuses any memory with more than one owner for now.
+  `allo.memory.Memory(latency=, depth=)` is refused until it becomes the
+  one-port shorthand of this declaration.
+- Evidence: `dev/records/minitpu/d12_memory_ports_2026-10-02.rst`,
+  `u2_regfile_2026-10-02.rst` (G1, H3), `u2_word_array_2026-10-02.rst`.
+- *Reverses if* the regfile prototype (three reader units and one writeback
+  unit) cannot match MiniTPU per cycle on Catapult, or a two-port VMEM
+  cannot reach II=1.
+
 ## Milestones
 
 Each milestone passes on **one acceptance check** and names the tools it uses
