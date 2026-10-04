@@ -33,6 +33,7 @@ from ._mlir.dialects import (
     scf as scf_d,
     linalg as linalg_d,
     arith as arith_d,
+    builtin as builtin_d,
 )
 from ._mlir.ir import StringAttr
 from ._mlir.passmanager import PassManager as mlir_pass_manager
@@ -493,6 +494,43 @@ def decompose_library_function(module):
         for op in body_op_to_remove:
             op.operation.erase()
         return module
+
+
+def materialize_returned_arguments(module):
+    """Give a function that returns a scalar argument as is a value to return.
+
+    The HLS emitters turn each result into an output pointer named after the
+    value that defines it, and skip a returned value that is an argument (an
+    array argument is returned in place). A *scalar* argument returned as is
+    -- ``def pack(v: int32) -> int32: return v`` -- was therefore emitted
+    with no output port, while every call site passes one: g++ "too many
+    arguments" (E3). A same-type ``unrealized_conversion_cast`` before the
+    return is the value the result port is named after, and every emitter
+    prints it as ``*out = v;``. Run on the emission copy only, after the
+    lowering passes (a canonicalizer would fold it back).
+    """
+    with module.context, Location.unknown():
+        for func in module.body.operations:
+            if not isinstance(func, func_d.FuncOp) or func.is_external:
+                continue
+            ret = func.entry_block.operations[len(func.entry_block.operations) - 1]
+            if not isinstance(ret, func_d.ReturnOp):
+                continue
+            for idx, value in enumerate(ret.operands):
+                if not (
+                    BlockArgument.isinstance(value)
+                    and BlockArgument(value).owner == func.entry_block
+                ):
+                    continue
+                if MemRefType.isinstance(value.type) or str(value.type).startswith(
+                    "!allo.stream"
+                ):
+                    continue
+                cast = builtin_d.UnrealizedConversionCastOp(
+                    [value.type], [value], ip=InsertionPoint(ret), loc=ret.location
+                )
+                ret.operation.operands[idx] = cast.result
+    return module
 
 
 def call_ext_libs_in_ptr(module, ext_libs):
