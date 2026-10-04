@@ -1,0 +1,2 @@
+30a31
+> directive set /wa_d12g/vmem_mem_0/run/mem:rsc -MAP_TO_MODULE ccs_sample_mem.ccs_ram_sync_dualport  ;# [hand-patch]

@@ -798,3 +798,10 @@ VARIANTS = {
     "annotated": (annotated, _run_flat),
     "wire": (wire, _run_flat),
 }
+
+# README D-12: the two ports as two units on one ``compose.Memory``
+# (``vpu_word_array_d12.py``); ``_wire`` is the Catapult port shape.
+from examples.minitpu.units import vpu_word_array_d12 as _d12  # noqa: E402
+
+VARIANTS["d12_server"] = (_d12.make("simulator"), _run_flat)
+VARIANTS["d12_server_wire"] = (_d12.make("systemc"), _run_flat)

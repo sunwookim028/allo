@@ -1,0 +1,426 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+####################################################################
+U2: D-12 prototyped -- a memory declares its ports, each port one owner
+####################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-04.** zhang-21, branch ``d12-ports``
+   (worktree ``scratch/wt-d12`` from ``origin/u1-pilot`` at ``d1e729b4``, its
+   own ``mlir/build`` configured as ``main``'s), the owner away (mandate
+   ``1160a495``). MiniTPU at ``b3ba0a4d``, read only. Catapult 2024.2
+   (``nangate-45nm_beh``), DC W-2024.09 (FreePDK45; ``dc_u1.tcl`` of
+   ``u2_regfile_2026-10-02/scripts/dc`` **unchanged**, 3.33 ns), Verilator
+   5.052, SystemC 2.3.3 (Catapult's). Scratch (Catapult, DC and csim projects,
+   not kept): ``scratch/d12/``. Record files: ``u2_d12_prototype_2026-10-04/``
+   (``logs/``, ``catapult/``, ``dc/``, ``composed/``, ``scripts/``).
+
+README D-12 (``28645725``) said what a memory with ports is and named its
+*reverses-if*: "the regfile prototype (three reader units and one writeback
+unit) cannot match MiniTPU per cycle on Catapult, or a two-port VMEM cannot
+reach II=1". This record is the prototype: the declaration in
+``allo/compose.py``, its composition rules and their refusals, two lowerings
+to SystemC/Catapult (D-13 combinational reads, D-14 unreset storage), the
+simulator path, ``memory.json``, the ``vpu_regfile`` as four units and the
+two-port ``vpu_word_array`` as two units, each measured on every backend
+against MiniTPU's RTL, and DC in the U2 flow.
+
+**Result. Neither reverses-if fired.** The four-unit register file is
+**bit- and cycle-exact to ``vpu_regfile.sv`` on Catapult RTL: 180,780/180,780
+defined slots at read latency 0, write visible 1**, under both lowerings
+(``server``: one storage kernel; ``replica``: one copy per read port), with
+every port kernel at **II=1, 1 c-step**; DC same flow **4,061.6 um^2**
+(``server``) against MiniTPU's **4,021.7** (+39.9, **+0.99 %**) and the
+one-kernel D-13/D-14 form's **4,033.9** (+27.7, +0.69 %). The two-port VMEM
+(``narrow``, 8 x 64 b, ``rw`` at 3 and 2) as two units on one declared memory
+**schedules at II=1** and is **cycle-exact: 67,717/67,717** on both ports
+(read 3 / 2, write -> read 1 on all four port pairs). On the simulator and in
+SystemC csim both units match (Stream links); the Wire form's csim is the
+known limitation 22 offset (+3/+2/+2, exactly the D-13 ``comb`` form's).
+Composition refuses two owners of a port, a read through a ``w`` port, a
+write through an ``r`` port, two accesses per iteration on ``count=1``, an
+access under control flow, a dangling port, binding the memory itself, two
+write-capable ports under ``collision="refuse"`` and Vitis on more than one
+owner -- each naming the port. ``allo.memory.Memory(latency=, depth=)`` is
+refused (D-12's last bullet). The ``mid`` VMEM (4,096 x 64 b, a RAM) is where
+the one-kernel form already stood (``u2_word_array``): Catapult's sync-RAM
+model does not give a write-next-cycle-visible two-port RAM at II=1
+(SCHD-30); it schedules at **II=2** on ``ccs_ram_sync_dualport``.
+
+Reproduce (``source examples/minitpu/harness/env-zhang21.sh`` first, from the
+worktree root; ``R`` is this record's directory, ``S`` a scratch directory)::
+
+   $ALLO_PYTHON -m pytest tests/dataflow/test_compose_memory_ports.py -q -s   # 14, csim included
+   $ALLO_PYTHON -m pytest tests/test_memory.py -q                              # latency=/depth= refused
+   # the four-unit regfile and the two-unit VMEM through the harness (R/scripts/checks.sh)
+   $ALLO_PYTHON -m examples.minitpu.harness.check vpu_regfile --inst w16 \
+       --backend simulator --backend systemc --variant d12_server --variant d12_replica
+   $ALLO_PYTHON -m examples.minitpu.harness.check vpu_word_array --inst narrow \
+       --backend simulator --backend systemc --variant d12_server
+   # Catapult: the port kernels (+ server) as one synthesis unit, ~40 s each
+   $ALLO_PYTHON $R/scripts/d12_csyn.py server  $S/cat_server    # prints KERNELS and PORTS
+   $ALLO_PYTHON $R/scripts/d12_csyn.py replica $S/cat_replica
+   $ALLO_PYTHON $R/scripts/d12_csyn.py server $S/cat_wa_narrow --unit word_array --inst narrow
+   # per cycle against MiniTPU (the U2 scripts; --top is the group, --ports the PORTS line)
+   $ALLO_PYTHON dev/records/minitpu/u2_comb_read_2026-10-02/scripts/cmp_rf.py \
+       $S/cat_server/build/Catapult/rf_d12g.v1/concat_sim_rtl.v --top rf_d12g \
+       --ports v126,v127,v128,v129,v130,v131:v132,v133,v134 --label d12_server
+   $ALLO_PYTHON $R/scripts/cmp_wa_heldaddr_probe.py $S/cat_wa_narrow --top wa_d12g --inst narrow
+   # DC, the U2 flow (R/dc/run_dc.sh; paths inside)
+   $R/dc/run_dc.sh d12_server rf_d12g clk 3.33 $S/cat_server/build/Catapult/rf_d12g.v1/concat_rtl.v
+
+1. What was built
+=================
+
+``allo/compose.py`` (+~740 lines), ``allo/backend/systemc_group.py`` (new,
+100 lines), ``allo/backend/hls.py`` (+9), ``mlir/lib/Translation/
+EmitSystemC.cpp`` (+11), ``allo/memory.py`` (+13),
+``examples/minitpu/units/vpu_regfile_d12.py`` and ``vpu_word_array_d12.py``
+(new), ``tests/dataflow/test_compose_memory_ports.py`` (new, 14 tests).
+
+**The declaration** (``compose.Port``, ``compose.Memory``)::
+
+   VREG = Memory("vreg", "UInt(W)", rows="32",
+                 ports=(Port("ra", "r", latency=0), Port("rb", "r", latency=0),
+                        Port("rc", "r", latency=0), Port("w", "w", visible=1)),
+                 collision="refuse", reset=False)
+
+   @unit(memories=("vreg.ra",), reads=("ra",), writes=("qa",), parameters=("N",))
+   def rd_a(mem):
+       for _ in range(N):
+           a5: UInt(5) = ra.get()
+           a: int32 = a5
+           qa.put(mem[a])
+
+   @unit(memories=("vreg.w",), reads=("wa", "wd", "we"), parameters=("N", "W"))
+   def wb(mem):
+       for _ in range(N):
+           ...
+           if e:
+               mem[x] = d
+
+A ``Memory`` without ``rows`` is today's boundary array. With ``rows`` and
+``ports`` it is on chip; a unit binds a **port** (``"vreg.ra"``), never the
+memory. ``Port(name, kind, latency, visible, count)`` as D-12 words it; a
+``w`` port refuses a ``latency``, an ``r``/``rw`` port requires one.
+``collision`` is checked at declaration: two write-capable ports under
+``refuse`` are refused ("nothing can refuse it statically"); ``obligation``
+requires ``Architecture(obligations={mem: "<why>"})``.
+
+**Composition rules** (``Architecture._check`` and ``port_uses``), each a
+test in ``test_compose_memory_ports.py`` with its message:
+
+* one owner per port (``port 'vreg.ra' is bound by both rd_a and rd_c_on_ra;
+  each port has exactly one owner``), and no port without one (``port
+  vreg.rd has no owner; a port nobody binds is refused, like a channel nobody
+  reads``);
+* a port is reached only as ``p[address]``; every access sits in the unit's
+  one top-level ``for`` loop (one iteration = one cycle of the port) and not
+  under control flow, except a write alone under ``if <enable>:`` (the enable
+  is a pin of the port; the S6 shape);
+* direction (``reads through a write-only port``, ``writes through a
+  read-only port``) and ``count`` (``2 reads per iteration through a port
+  that serves count=1``); an ``rw`` access has one address;
+* binding the memory itself (``binds memory 'vreg' itself; a memory with
+  ports is reached through a port: bind one of vreg.ra, ...``);
+* Vitis: ``NotImplementedError`` on any ported memory with more than one
+  owner (owner's decision in D-12), at ``plan()``/``region("vhls")``.
+
+**Lowerings** (``Architecture.plan``; ``region(target, lowering={mem:
+...})``). ``local``: one unit owns every port -- the degenerate case, today's
+kernel-local array. ``server``: one generated kernel ``<mem>_mem`` holds the
+storage; each port is a bundle of links to its owner -- address (``comb``),
+data and enable (``comb``), read data (``comb`` at latency 0, a registered
+``Wire`` plus a pipe-as-data of ``L`` for ``L >= 1``). ``replica``: every
+``r`` port's owner holds a copy, the one ``w`` port's owner sends each write
+(address, data, enable) to every copy; refused for ``rw`` or two write ports
+("N_R x N_W copies and a live-value table"). ``shared``: one region-scope
+``Stateful`` the owners address -- kept only to record that D-11 refuses it
+on every backend (``logs/a0_shared.txt``). ``target="simulator"`` emits every
+link as a Stream (the simulator refuses ``Wire``); the SystemC target emits
+the declared ``Wire``/``comb`` links. The composed sources are in
+``composed/`` (``server``: 112 lines for the regfile; the generated server
+is the last kernel). Only ``visible=1`` has a lowering (a write at an edge,
+seen next cycle); any other value is refused by ``plan``.
+
+**Storage** follows D-14: ``reset=False`` (MiniTPU's) becomes ``@
+Stateful(reset=False)`` on the server's (or each copy's) array -- an
+``sc_signal`` array written from a clock-edge ``SC_METHOD`` with no reset
+action. With ``reset=True`` and an ``rw`` port at ``L >= 1`` the server
+writes each port as ONE ``if en: write else: read`` (the RAM-mappable form
+``u2_word_array`` found; a read in a write cycle is undefined, as MiniTPU
+masks it).
+
+**Catapult as one unit** (``configs={"synth_group": {"name", "kernels"}}``,
+``allo/backend/systemc_group.py``). The hardware to measure is the union of
+the port owners and the server, not one kernel; ``synth_top`` names one
+module. ``add_synth_group`` adds an ``SC_MODULE`` to the emitted file holding
+those instances and the signals between them; every signal that also reaches
+a kernel outside becomes a port of it. Only ``sc_signal`` links may cross the
+boundary (a Connections channel crossing is refused, naming the signal). The
+region's own ``top`` is untouched, so csim runs as before; ``run.tcl`` names
+the group. ``Architecture.port_kernels()`` lists the members.
+
+**memory.json** (``Architecture.memory_manifest``; ``build(project=)``
+writes it beside ``latency.json``): per memory the lowering, the
+implementation sentence, the storage, the obligation if any, and per port
+its kind, owner, latency/visible and how the read and the write are realised
+(``catapult/cat_server/memory.json``). ``status`` is ``untimed`` on the
+simulator, ``lowered`` elsewhere.
+
+**Two fixes on the way.** (a) ``EmitSystemC.cpp``: the testbench's
+``__allo_state_save`` calls are now under ``#ifndef __SYNTHESIS__`` like the
+method itself; without it every design with a ``@ Stateful`` failed ``go
+analyze`` (CRD-135 "has no member __allo_state_save") -- the one-kernel
+``comb_unreset`` never saw it because its state lived in a kernel the TB did
+not save. (b) ``allo.memory.Memory(latency=, depth=)`` raises
+``NotImplementedError`` naming D-12 (``tests/test_memory.py`` updated:
+``test_memory_all_options`` now asserts the refusal).
+
+2. The four-unit register file (``vpu_regfile_d12.py``)
+=======================================================
+
+Variants added to ``vpu_regfile.VARIANTS``: ``d12_server``, ``d12_replica``
+(Stream links: simulator and csim) and ``d12_server_wire``,
+``d12_replica_wire`` (the SystemC/Catapult port shape).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 14 64
+
+   * - Tool
+     - Cell
+     - Evidence
+   * - Allo simulator, ``d12_server`` / ``d12_replica``
+     - **match**
+     - 180,780/180,780 defined (3 masked, ``uninit``), cycle = order only
+       (``logs/check_vpu_regfile_w16_simulator_*.txt``). ``[memory] vreg:
+       server, untimed`` is printed: the simulator keeps the order of accesses,
+       not latency or visibility.
+   * - SystemC csim, Stream links
+     - **match**
+     - 180,780/180,780 both lowerings, per iteration
+       (``logs/check_vpu_regfile_w16_systemc_all.txt``).
+   * - SystemC csim, Wire form
+     - **limitation 22** (unchanged)
+     - ``UNIT-DIFF 23,010/180,780`` per iteration -- the same count as the
+       D-13 ``comb``/``comb_unreset`` forms in the same run; offset-aligned
+       (``csim_offset.py``, 64 cycles) **+3/+2/+2, values right**
+       (``logs/csim_offset_wire.txt``), the comb form's offsets exactly. The
+       test compares the Wire form per port at its constant offset.
+   * - Catapult RTL per cycle, ``server``
+     - **match**
+     - **180,780/180,780 at L=0** (MiniTPU 0), 3 masked; step probes on all
+       three ports: read 0, **write -> read 1** (MiniTPU 0 / 1); 60,261 cycles
+       (``logs/cmp_server_w16.txt``). Every kernel of ``rf_d12g``
+       (``rd_a_0``..``rd_c_0``, ``wb_0``, ``vreg_mem_0``): ``ii=1, latency=1,
+       1 c-step, scheduled``; storage ``unreset``
+       (``catapult/cat_server/latency.json``). 38 s.
+   * - Catapult RTL per cycle, ``replica``
+     - **match**
+     - 180,780/180,780 at L=0, same probes (``logs/cmp_replica_w16.txt``);
+       three ``unreset`` copies, one per reader (``latency.json``). 39 s.
+   * - Catapult area score
+     - --
+     - ``server`` **3,876.6** (registers 2,391.9); ``replica`` **8,576.0**
+       (registers 7,007.1): the three copies cost what three copies cost
+       (``catapult/*/rtl_rpt_summary.txt``). Max delay 0.465 ns, both.
+   * - DC, 3.33 ns, ``rf_d12g``
+     - **+0.99 %** vs MiniTPU
+     - ``server`` **4,061.6 um^2** (comb 1,586.7, seq 2,474.9), slack 2.80;
+       ``replica`` 4,054.6 (1,585.1 / 2,469.5), slack 2.80. MiniTPU 4,021.7
+       (1,578.7 / 2,442.9); one-kernel ``comb_unreset`` 4,033.9 (1,580.3 /
+       2,453.6). Flops: 512 ``DFF_X1`` (the storage) + 6 ``DFFR_X1`` (the five
+       kernels' FSM/``done`` flops and the group's ``done``) vs the one
+       kernel's 512 + 2 -- the difference IS the four extra control flops
+       plus their logic. **The replica's DC number is not its cost:** DC's
+       ``compile_ultra`` merged the three equal copies into one (1,027
+       ``OPT-1215`` "removed because it is merged" lines, ``dc/d12_replica/
+       flops.txt``; 512 ``DFF_X1`` remain). Catapult's area score is the
+       honest comparison of the two lowerings. (``dc/*/rf_d12g.area.rpt``,
+       ``qor.rpt``, ``timing_summary.txt``.)
+
+``server`` is the default lowering (``compose.DEFAULT_LOWERING``): it is the
+general one (``rw`` ports, any read latency) and holds one storage.
+
+3. The two-port VMEM (``vpu_word_array_d12.py``)
+=================================================
+
+``vmem``: ``rows=words``, ``Port("c", "rw", latency=3)``, ``Port("d", "rw",
+latency=2)``, ``visible=1`` each, ``collision="obligation"`` with MiniTPU
+issue #21 as the stated premise; two units ``port_c`` and ``port_d``, each
+reading the addressed word every cycle (unconditional, the S6 shape: a read
+the RTL does not make is a masked slot) and writing it under ``if en & we``.
+Variants ``d12_server`` and ``d12_server_wire`` in ``vpu_word_array.VARIANTS``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 14 62
+
+   * - Tool
+     - Cell
+     - Evidence
+   * - Allo simulator, ``narrow``
+     - **match**
+     - 67,717/67,717 defined (93,501 masked: collision 2,693, no read 41,104,
+       uninit 7, write cycle 48,344, ww collision 1,353 -- the U2 census)
+       (``logs/check_vpu_word_array_narrow_simulator_d12_server.txt``).
+   * - SystemC csim, Stream links
+     - **match**
+     - 67,717/67,717 per iteration.
+   * - SystemC csim, Wire form
+     - **limitation 22**
+     - ``UNIT-DIFF 5,975/67,717`` per iteration; the per-port offset was not
+       measured here (``csim_offset.py`` is the regfile's; the word array has
+       no offset script). Values are checked on Catapult RTL below.
+   * - Catapult, ``narrow``, unreset storage (MiniTPU's)
+     - **match, II=1**
+     - ``port_c_0``, ``port_d_0``, ``vmem_mem_0``: ``ii=1, 1 c-step,
+       scheduled``, storage ``unreset``; 45 s. Per cycle: **67,717/67,717**,
+       compute +0 rows and dma +0 rows vs MiniTPU; probes **read 3 / 2**;
+       write -> read same port **1 / 1** (``logs/cmp_wa_narrow_server.txt``).
+       Area score 4,672.4 (reg 3,789.4), max delay 0.527 ns.
+   * - Catapult, ``narrow``, reset storage (RAM-mappable ``if/else`` form)
+     - **match, II=1**
+     - same verdict (``logs/cmp_wa_narrow_server_reset.txt``); 39 s; area score
+       7,948.2, max delay 0.843 ns (``catapult/cat_wa_narrow_rst``).
+   * - Cross-port visibility probes
+     - **match** (after a probe fix)
+     - ``cmp_trace.py`` first reported ``write compute -> read dma: MiniTPU 1;
+       Catapult 0`` (and dma -> compute). Not a visibility difference: that
+       probe disables the reader (``en=0``) in the write cycle and leaves its
+       address at the trace default 0; a D-12 port reads unconditionally, so
+       the output moved at word 0's read latency and ``probe_trace`` (first
+       row the port *leaves* its value) took that as the event. With the
+       reader's address **held** at the probed word
+       (``scripts/cmp_wa_heldaddr_probe.py``, one line changed) **all four
+       pairs read 1 = MiniTPU**, both storage forms
+       (``logs/cmp_wa_narrow_server_heldaddr_probe.txt``). The U2 probe is
+       right for an ``en``-gated port and wrong for an unconditional one; the
+       harness should hold the address (not changed here: the original script
+       is a record's).
+   * - Catapult, ``mid`` (4,096 x 64 b), reset storage
+     - **refused at II=1; II=2**
+     - as ``u2_word_array`` found for the one-kernel form. Verbatim
+       (``catapult/cat_wa_mid*/refusal.txt``): default mapping ``Memory
+       Resource '/wa_d12g/vmem_mem_0/run/mem:rsc' ... mapped to
+       'ccs_sample_mem.ccs_ram_sync_1R1W' (size: 4096 x 64). (MEM-4)`` then
+       ``Design 'wa_d12g' could not schedule partition
+       '/wa_d12g/vmem_mem_0/run' - could not schedule even with unlimited
+       resources`` (SCHD-30; the SCHD-6 chain is a ``read_mem``/``write_mem``
+       of ``mem:rsc`` at II=1). Hand-patch ``directive set .../mem:rsc
+       -MAP_TO_MODULE ccs_sample_mem.ccs_ram_sync_dualport`` (recorded in
+       ``run_tcl_handpatch.diff``): same SCHD-30, both server forms (reads
+       then writes; one ``if/else`` per port). Plus ``ignore_memory_precedences
+       -from *write_mem(mem:rsc* -to *read_mem(mem:rsc*`` after ``go
+       architect``: same. **II=2** (``s.pipeline(..., initiation_interval=2)``)
+       on the dual-port RAM: scheduled, ``vmem_mem_0`` 3 c-steps, area score
+       1,946.1 (``catapult/cat_wa_mid2_dp_ii2``) -- the one-kernel record's
+       number (1,946). A write-next-cycle-visible two-port RAM at II=1 is what
+       MiniTPU's XPM gives and Catapult's sync-RAM model does not; the
+       declaration changes nothing there, and refuses loudly (D-1).
+
+4. The owner's alternatives
+===========================
+
+The reverses-if did not fire, so the alternatives were built as lowerings
+rather than as fall-backs:
+
+* **write-broadcast replica** -- ``lowering={"vreg": "replica"}``, measured
+  above (match; 2.2x the Catapult area score of the server);
+* **one register array with N combinational read processes** -- this is the
+  ``server`` lowering as Catapult realises it: ``vreg_mem_0`` holds one
+  unreset array, its three latency-0 reads are ``comb`` pins (``'ports':
+  {'v82': 'comb', 'v84': 'comb', 'v86': 'comb'}`` in ``latency.json``), the
+  write is the D-14 clock-edge method;
+* **Catapult RAM library** -- exercised on the ``mid`` VMEM
+  (``ccs_ram_sync_1R1W`` by default, ``ccs_ram_sync_dualport`` by
+  hand-patch): II=2, as above. The regfile has no reason to leave registers.
+
+5. Regression (worktree, before push)
+=====================================
+
+* TinyTPU emission unchanged: ``vhls`` sha256 ``6bc774bc...`` (166,563 B),
+  ``catapult`` ``ade1ab5d...`` (170,812 B) (``scripts/hash_tinytpu.py``).
+* TinyTPU gates: ``gen_isa --check`` ISA OK; ``lift_units --check`` OK;
+  ``bench_isa`` ALL EXACT; ``stress_isa`` 492/492; ``act_compile --gate``
+  12/12; ``systemc_csim.py 3`` SYSTEMC CSIM OK.
+* ``pytest tests/dataflow/test_systemc*.py tests/test_memory.py
+  tests/dataflow/test_compose_memory_ports.py``: 116 passed after the two
+  test fixes below (the first run: 4 of this record's own tests failed --
+  ``Architecture.build("simulator")`` went through ``Schedule.build``, which
+  has no simulator target, and the Wire-form csim test required one offset
+  for all three ports; both fixed, 14/14).
+* ``pytest tests/act``: **195 passed, 4 skipped** (the U2 baseline). A first run
+  under ``TPU_MAXDIM=16`` -- the gates' setting, left exported by the
+  regression script -- failed 5 (``64x64x64 exceeds the built MAXDIM=16``,
+  ``mlp_small extracted no layers``): an environment error of the script,
+  not of the branch; ``scripts/regress.sh`` keeps the two apart now.
+* Harness, SystemC csim, ``vpu_regfile`` w16 every variant: as the U2
+  baseline (``trace``/``trace_raw``/``stateful``/``ported``/``annotated``
+  match; ``shared``/``shared_sync`` refused by D-11; ``wire``/``comb`` forms
+  limitation 22) plus the four D-12 rows
+  (``logs/check_vpu_regfile_w16_systemc_all.txt``). ``bf16_add`` systemc:
+  ``bits`` match, ``native`` 249,907/251,936 -- the U1 baseline.
+* Lint: ``pylint`` on ``allo/compose.py`` and ``systemc_group.py`` leaves
+  three refactor messages (R0913/R0916/R1702, structural); the fork's
+  ``compose.py`` at HEAD already carried five. New files are ``black``
+  formatted; ``compose.py`` keeps the fork's existing style.
+
+6. What this record did not do, and what is open
+=================================================
+
+* ``visible`` other than 1, ``count > 1`` on hardware, a ``w`` port with
+  ``count > 1`` (the OR-mux write port as several pins) -- declarable,
+  refused or untested; ``plan`` refuses what has no lowering.
+* The Actions-layer port calendar (D-12's fourth bullet) is phase two; nothing
+  here touches ``allo/actions.py``.
+* The ``mid`` VMEM at II=1 needs a RAM model with write-next-cycle
+  visibility; Catapult's library does not give one (same as U2). RTLGen/AMC
+  (M2) are the places to ask.
+* The word array's Wire-form csim offset is unmeasured; the harness probe's
+  held-address fix is proposed, not applied.
+* Vitis refuses every ported memory with more than one owner (owner's
+  decision); ``memory.json`` for Vitis is therefore only the refusal.
+* The DC comparison of lowerings is blind to replicas (register merging);
+  use Catapult's area score or disable merging for that question.
+
+7. Matrix-ready rows (for ``u2_matrix.rst``; not edited here)
+=============================================================
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 40 42
+
+   * - Tool
+     - Cell
+     - Evidence / note
+   * - ``vpu_regfile`` D-12 (``d12_server``/``d12_replica``), Allo simulator
+     - **match** 180,780/180,780 (3 masked), untimed
+     - ``u2_d12_prototype_2026-10-04.rst`` s.2
+   * - same, SystemC csim
+     - **match** (Stream links); Wire form **limitation 22**, offset +3/+2/+2
+     - ``logs/check_vpu_regfile_w16_systemc_all.txt``, ``logs/csim_offset_wire.txt``
+   * - same, Catapult RTL
+     - **match** 180,780/180,780 at read 0 / write -> read 1, II=1, both lowerings
+     - ``logs/cmp_server_w16.txt``, ``logs/cmp_replica_w16.txt``
+   * - same, DC 3.33 ns
+     - 4,061.6 um^2 (``server``, +0.99 % vs MiniTPU 4,021.7; +0.69 % vs one-kernel 4,033.9)
+     - ``dc/``; replica's DC number merged by OPT-1215 -- Catapult score 8,576 vs 3,877
+   * - ``vpu_word_array`` D-12 ``narrow`` (``d12_server``), simulator / csim
+     - **match** 67,717/67,717 (93,501 masked); Wire form limitation 22
+     - s.3
+   * - same, Catapult RTL
+     - **match** 67,717/67,717, read 3/2, visibility 1 on all four pairs, **II=1**
+     - ``logs/cmp_wa_narrow_server*.txt``; probe fix noted
+   * - ``vpu_word_array`` D-12 ``mid``, Catapult
+     - **refused** at II=1 (SCHD-30, as U2); II=2 on ``ccs_ram_sync_dualport``
+     - ``catapult/cat_wa_mid*``
+   * - composition rules
+     - **refused** naming the port: two owners, direction, count, control flow, dangling port, whole-memory binding, collision, Vitis
+     - ``tests/dataflow/test_compose_memory_ports.py``
+   * - ``allo.memory.Memory(latency=, depth=)``
+     - **refused** (D-12)
+     - ``tests/test_memory.py``

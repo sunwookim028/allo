@@ -1,0 +1,44 @@
+{
+  "vreg": {
+    "collision": "refuse",
+    "dtype": "UInt(W)",
+    "implementation": "write-broadcast replica x3: one copy per read port, inside its owner; every write sent to every copy",
+    "links": "declared",
+    "lowering": "replica",
+    "ports": {
+      "ra": {
+        "count": 1,
+        "kind": "r",
+        "latency": 0,
+        "owner": "rd_a",
+        "read": "combinational (D-13 comb links)"
+      },
+      "rb": {
+        "count": 1,
+        "kind": "r",
+        "latency": 0,
+        "owner": "rd_b",
+        "read": "combinational (D-13 comb links)"
+      },
+      "rc": {
+        "count": 1,
+        "kind": "r",
+        "latency": 0,
+        "owner": "rd_c",
+        "read": "combinational (D-13 comb links)"
+      },
+      "w": {
+        "count": 1,
+        "kind": "w",
+        "owner": "wb",
+        "visible": 1,
+        "write": "comb pins into a clock-edge write: seen next cycle"
+      }
+    },
+    "reset": false,
+    "rows": 32,
+    "status": "lowered",
+    "storage": "registers (sc_signal array), unreset: clock-edge write SC_METHOD, no reset action (D-14)",
+    "target": "systemc"
+  }
+}
