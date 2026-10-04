@@ -310,6 +310,10 @@ session; facts as of minitpu-tmp master ``a9757be``, its decisions in
   (stay on ``b3ba0a4d`` v1-course through U5, then re-pin; follow master v1;
   or model v2 for U4's control), and the D-7 interlock note given v2.
 
+**Checkpoint 13, 2026-10-04:** the owner decided the ladder **stays on
+``b3ba0a4d`` (v1-course) through U5, then re-pins** (README D-16); **D-7 kept
+as is**. E03/v2 become declared variants later.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*

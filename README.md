@@ -324,6 +324,29 @@ accumulate order is a different function.**
 - Evidence: `dev/records/minitpu/u3_composition_design_2026-10-04.rst` §1,
   prototype `examples/minitpu/template/`.
 
+**D-16 (2026-10-04). The ladder models MiniTPU `b3ba0a4d` (ISA v1-course)
+through U5, then re-pins.**
+- MiniTPU now has three ISA versions (`minitpu-comp`, master `a9757be`):
+  `v1-course` = the frozen course ISA (our pin, MXU push->valid 82),
+  `v1` = master (85), `v2` = `docs/ISA_V2.md` (branches, one zero-overhead
+  loop, post-increment addressing, semaphores, a fault register, and
+  interlocks). E03 (freeze-on-stall; new `en_i` ports and a VMEM landing
+  ring) is in flight on branch `e03`.
+- U4 and U5 model the control that exists in RTL at `b3ba0a4d`. E03 and v2
+  become declared variants afterwards: new ports as declared ports, v2's
+  interlocks as optional modules with their own contract. D-7's note stands:
+  an interlock in the Allo MiniTPU is a recorded deviation until the pin
+  moves to a version that has it.
+- The shared truth for ISA timing stays MiniTPU's `docs/isa_latency.json` +
+  `isa_slots.json`; Allo's `latency.json`/`memory.json` feed a generator that
+  writes a version's deltas there, with `--check` failing on disagreement.
+  The schema is agreed when `minitpu-comp`'s `versions` branch lands.
+- Arithmetic contracts are unchanged across v1, E03 and v2; open items there
+  (vrecip wrap ISA-N03, vmax/vmin NaN ISA-X02) change our references only
+  when decided.
+- Track E's composition drafts, labelled D-16..D-19 in their record, take the
+  next free numbers when adopted.
+
 ## Milestones
 
 Each milestone passes on **one acceptance check** and names the tools it uses
