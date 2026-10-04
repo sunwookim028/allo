@@ -1,0 +1,11 @@
+BUILT amc pipeline N=64 0.5s
+dump_verilog -> ['fsm_enum_typedefs.sv', 'mem0_bram.sv', 'mem1_bram.sv', 'mem2_bram.sv', 'sfu.sv', 'sfu_fsm.sv', 'sfu_rom_0_impl.sv', 'sfu_rom_2_impl.sv', 'sfu_rom_4_impl.sv', 'sfu_rom_6_impl.sv', 'ieeefpmult_l5.sv', 'int_arith_pipe.v', 'ram_1r1rw.sv', 'ram_1r1w.sv', 'ram_1rw.sv', 'ram_1w.sv', 'ram_1w1rw.sv', 'ram_2rw.sv', 'ram_2rw_rl2.sv', 'ram_2w.sv', 'rom_1r.sv', 'rom_2r.sv']
+RAN amc pipeline N=64 chunks=2 cycles/chunk=[72] match=62/128 (46.0s)
+   op 0 x 0xe1b got 0x0 want 0x3b00
+   op 0 x 0x1c36 got 0x0 want 0x3b00
+   op 0 x 0x2a51 got 0x0 want 0x3b00
+   op 0 x 0x386c got 0x0 want 0x3b00
+   op 0 x 0x8d0e got 0x0 want 0xbaff
+   op 0 x 0x9b29 got 0x0 want 0xbaff
+   op 0 x 0xa944 got 0x0 want 0xbaff
+   op 0 x 0xb75f got 0x0 want 0xbaff

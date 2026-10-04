@@ -1,0 +1,2 @@
+chain K=2 none llvm: OK
+chain K=2 none amc: OK

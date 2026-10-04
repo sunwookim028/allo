@@ -1,0 +1,32 @@
+EXPORTED N=16384 freq=300.0 in 0.4s
+INFO: [PREP] Performing if-conversion on hyperblock (at 'res' sfu_rtlgen.py:117:12)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'res' sfu_rtlgen.py:115:12)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'res' sfu_rtlgen.py:110:12)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'res' sfu_rtlgen.py:108:12)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'res' sfu_rtlgen.py:106:12)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'res' sfu_rtlgen.py:105:8)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'res' sfu_rtlgen.py:99:12)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'res' sfu_rtlgen.py:97:12)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'res' sfu_rtlgen.py:96:8)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'res' sfu_rtlgen.py:92:12)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'res' sfu_rtlgen.py:90:12)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'res' sfu_rtlgen.py:88:12)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'res' sfu_rtlgen.py:87:8)
+INFO: [PREP] Performing if-conversion on hyperblock (at 's_exp' sfu_rtlgen.py:76:8)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'ga' sfu_rtlgen.py:57:8)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'mag' sfu_rtlgen.py:50:8)
+INFO: [PREP] Performing if-conversion on hyperblock (at 'mag' sfu_rtlgen.py:48:8)
+INFO: [SCHED] ------------------------------------------------------
+INFO: [SCHED] -- Start scheduling for sfu
+INFO: [SCHED] ------------------------------------------------------
+INFO: [SCHED] Detected as a for-loop, using modulo-scheduling in the innermost body (at loop 'i' sfu_rtlgen.py:34:4)
+INFO: [SCHED] Split 69 combinational chain(s) to meet the 3.33333 ns clock period (adds pipeline register stages / latency) (at loop 'i' sfu_rtlgen.py:34:4)
+INFO: [SCHED] Initiation interval search seeded at II=1 (resource-min II=1, pipeline-directive floor minII=1) (at loop 'i' sfu_rtlgen.py:34:4)
+INFO: [SCHED] Lifetime repair re-placed the schedule's slack: modeled chain and pulse cost 3168 -> 1536 (at loop 'i' sfu_rtlgen.py:34:4)
+INFO: [SCHED] Scheduled: II=1 (fully pipelined), latency = 16388 (at loop 'i' sfu_rtlgen.py:34:4)
+SCHED latency: 16388 | II: [1]
+QOR: lat 16388 fmax 339.3 area Utilization(lut=1130, logic_lut=1114, srl=16, ff=343, dsp=2, carry8=41, muxf=0, bram36=4, uram288=0)
+CRIT: TimingPath(total=2.947374986484647, slack=0.38595826737582684, endpoint='the input of a pipeline register', where="'mag' sfu_rtlgen.py:48:8", steps=(TimingStep(what='launch: a delay register', delay=0.4189999997615814), TimingStep(what='extui at 32 bits', delay=0), TimingStep(what='shrsi at 32 bits', delay=0), TimingStep(what='trunci at 8 bits', delay=0.014000000432133675), TimingStep(what='
+MICROARCH (storage lines):
+    MicroarchReport(binding='exact-share', cycle_time=3.3333332538604736, funcs=[FuncUarch(func='sfu', module='sfu', top=True, read_ports=2, write_ports=1, regions=[RegionUarch(order=0, shape='leaf', kind
+COSIM N=16384 chunks=29 cycles/chunk=[16388] time=434.3s match=462144/462144

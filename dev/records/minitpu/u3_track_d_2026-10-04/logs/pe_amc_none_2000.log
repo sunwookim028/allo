@@ -1,0 +1,420 @@
+GENERATED /tmp/claude-1772902/-work-shared-users-phd-sk3463-allo/3b1c24a0-f6d1-4c37-88e0-31db609cddf4/scratchpad/amctmp/pe_amc_kernel_2000.py: 245 lines (amc, N=2000)
+BUILT llvm none N=2000 0.4s
+MATCH pe llvm none N=2000: 11978/11978 defined, cycles=None (0.1s)
+loc("-":1267:9): error: port binding: more concurrent accesses than the group's count; the schedule violates the declared port capacity
+Failed to run scheduling pipeline
+  oplib.library @pe_library {
+    oplib.operator @i5_addi_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_addi_i5(%arg0: i5, %arg1: i5) -> i5 {
+        oplib.output %0 : i5
+      oplib.hw_match(@arith_addi_i5 : (i5, i5) -> i5) produce (in %arg0 : i5, in %arg1 : i5) {
+        oplib.hw_return %0 : i5
+    oplib.operator @i9_addi_l0 latency<0>, incDelay<0.1489032533688972>, outDelay<0.1489032533688972> {
+      oplib.target @arith_addi_i9(%arg0: i9, %arg1: i9) -> i9 {
+        oplib.output %0 : i9
+      oplib.hw_match(@arith_addi_i9 : (i9, i9) -> i9) produce (in %arg0 : i9, in %arg1 : i9) {
+        oplib.hw_return %0 : i9
+    oplib.operator @i10_addi_l0 latency<0>, incDelay<0.17386755994018843>, outDelay<0.17386755994018843> {
+      oplib.target @arith_addi_i10(%arg0: i10, %arg1: i10) -> i10 {
+        oplib.output %0 : i10
+      oplib.hw_match(@arith_addi_i10 : (i10, i10) -> i10) produce (in %arg0 : i10, in %arg1 : i10) {
+        oplib.hw_return %0 : i10
+    oplib.operator @i12_addi_l0 latency<0>, incDelay<0.21752135307954035>, outDelay<0.21752135307954035> {
+      oplib.target @arith_addi_i12(%arg0: i12, %arg1: i12) -> i12 {
+        oplib.output %0 : i12
+      oplib.hw_match(@arith_addi_i12 : (i12, i12) -> i12) produce (in %arg0 : i12, in %arg1 : i12) {
+        oplib.hw_return %0 : i12
+    oplib.operator @i16_addi_l0 latency<0>, incDelay<0.37099999999999989>, outDelay<0.37099999999999989> {
+      oplib.target @arith_addi_i16(%arg0: i16, %arg1: i16) -> i16 {
+        oplib.output %0 : i16
+      oplib.hw_match(@arith_addi_i16 : (i16, i16) -> i16) produce (in %arg0 : i16, in %arg1 : i16) {
+        oplib.hw_return %0 : i16
+    oplib.operator @i33_addi_l0 latency<0>, incDelay<0.4764193440246961>, outDelay<0.4764193440246961> {
+      oplib.target @arith_addi_i33(%arg0: i33, %arg1: i33) -> i33 {
+        oplib.output %0 : i33
+      oplib.hw_match(@arith_addi_i33 : (i33, i33) -> i33) produce (in %arg0 : i33, in %arg1 : i33) {
+        oplib.hw_return %0 : i33
+    oplib.operator @i9_subi_l0 latency<0>, incDelay<0.14890325318995579>, outDelay<0.14890325318995579> {
+      oplib.target @arith_subi_i9(%arg0: i9, %arg1: i9) -> i9 {
+        oplib.output %0 : i9
+      oplib.hw_match(@arith_subi_i9 : (i9, i9) -> i9) produce (in %arg0 : i9, in %arg1 : i9) {
+        oplib.hw_return %0 : i9
+    oplib.operator @i10_subi_l0 latency<0>, incDelay<0.1738675597344711>, outDelay<0.1738675597344711> {
+      oplib.target @arith_subi_i10(%arg0: i10, %arg1: i10) -> i10 {
+        oplib.output %0 : i10
+      oplib.hw_match(@arith_subi_i10 : (i10, i10) -> i10) produce (in %arg0 : i10, in %arg1 : i10) {
+        oplib.hw_return %0 : i10
+    oplib.operator @i11_subi_l0 latency<0>, incDelay<0.19661126010942065>, outDelay<0.19661126010942065> {
+      oplib.target @arith_subi_i11(%arg0: i11, %arg1: i11) -> i11 {
+        oplib.output %0 : i11
+      oplib.hw_match(@arith_subi_i11 : (i11, i11) -> i11) produce (in %arg0 : i11, in %arg1 : i11) {
+        oplib.hw_return %0 : i11
+    oplib.operator @i32_subi_l0 latency<0>, incDelay<0.45499999999999996>, outDelay<0.45499999999999996> {
+      oplib.target @arith_subi_i32(%arg0: i32, %arg1: i32) -> i32 {
+        oplib.output %0 : i32
+      oplib.hw_match(@arith_subi_i32 : (i32, i32) -> i32) produce (in %arg0 : i32, in %arg1 : i32) {
+        oplib.hw_return %0 : i32
+    oplib.operator @i33_subi_l0 latency<0>, incDelay<0.47641934370892314>, outDelay<0.47641934370892314> {
+      oplib.target @arith_subi_i33(%arg0: i33, %arg1: i33) -> i33 {
+        oplib.output %0 : i33
+      oplib.hw_match(@arith_subi_i33 : (i33, i33) -> i33) produce (in %arg0 : i33, in %arg1 : i33) {
+        oplib.hw_return %0 : i33
+    oplib.operator @i1_andi_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_andi_i1(%arg0: i1, %arg1: i1) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_andi_i1 : (i1, i1) -> i1) produce (in %arg0 : i1, in %arg1 : i1) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i2_andi_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_andi_i2(%arg0: i2, %arg1: i2) -> i2 {
+        oplib.output %0 : i2
+      oplib.hw_match(@arith_andi_i2 : (i2, i2) -> i2) produce (in %arg0 : i2, in %arg1 : i2) {
+        oplib.hw_return %0 : i2
+    oplib.operator @i3_andi_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_andi_i3(%arg0: i3, %arg1: i3) -> i3 {
+        oplib.output %0 : i3
+      oplib.hw_match(@arith_andi_i3 : (i3, i3) -> i3) produce (in %arg0 : i3, in %arg1 : i3) {
+        oplib.hw_return %0 : i3
+    oplib.operator @i7_andi_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_andi_i7(%arg0: i7, %arg1: i7) -> i7 {
+        oplib.output %0 : i7
+      oplib.hw_match(@arith_andi_i7 : (i7, i7) -> i7) produce (in %arg0 : i7, in %arg1 : i7) {
+        oplib.hw_return %0 : i7
+    oplib.operator @i8_andi_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_andi_i8(%arg0: i8, %arg1: i8) -> i8 {
+        oplib.output %0 : i8
+      oplib.hw_match(@arith_andi_i8 : (i8, i8) -> i8) produce (in %arg0 : i8, in %arg1 : i8) {
+        oplib.hw_return %0 : i8
+    oplib.operator @i9_andi_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_andi_i9(%arg0: i9, %arg1: i9) -> i9 {
+        oplib.output %0 : i9
+      oplib.hw_match(@arith_andi_i9 : (i9, i9) -> i9) produce (in %arg0 : i9, in %arg1 : i9) {
+        oplib.hw_return %0 : i9
+    oplib.operator @i10_andi_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_andi_i10(%arg0: i10, %arg1: i10) -> i10 {
+        oplib.output %0 : i10
+      oplib.hw_match(@arith_andi_i10 : (i10, i10) -> i10) produce (in %arg0 : i10, in %arg1 : i10) {
+        oplib.hw_return %0 : i10
+    oplib.operator @i11_andi_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_andi_i11(%arg0: i11, %arg1: i11) -> i11 {
+        oplib.output %0 : i11
+      oplib.hw_match(@arith_andi_i11 : (i11, i11) -> i11) produce (in %arg0 : i11, in %arg1 : i11) {
+        oplib.hw_return %0 : i11
+    oplib.operator @i12_andi_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_andi_i12(%arg0: i12, %arg1: i12) -> i12 {
+        oplib.output %0 : i12
+      oplib.hw_match(@arith_andi_i12 : (i12, i12) -> i12) produce (in %arg0 : i12, in %arg1 : i12) {
+        oplib.hw_return %0 : i12
+    oplib.operator @i16_andi_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_andi_i16(%arg0: i16, %arg1: i16) -> i16 {
+        oplib.output %0 : i16
+      oplib.hw_match(@arith_andi_i16 : (i16, i16) -> i16) produce (in %arg0 : i16, in %arg1 : i16) {
+        oplib.hw_return %0 : i16
+    oplib.operator @i17_andi_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_andi_i17(%arg0: i17, %arg1: i17) -> i17 {
+        oplib.output %0 : i17
+      oplib.hw_match(@arith_andi_i17 : (i17, i17) -> i17) produce (in %arg0 : i17, in %arg1 : i17) {
+        oplib.hw_return %0 : i17
+    oplib.operator @i18_andi_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_andi_i18(%arg0: i18, %arg1: i18) -> i18 {
+        oplib.output %0 : i18
+      oplib.hw_match(@arith_andi_i18 : (i18, i18) -> i18) produce (in %arg0 : i18, in %arg1 : i18) {
+        oplib.hw_return %0 : i18
+    oplib.operator @i19_andi_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_andi_i19(%arg0: i19, %arg1: i19) -> i19 {
+        oplib.output %0 : i19
+      oplib.hw_match(@arith_andi_i19 : (i19, i19) -> i19) produce (in %arg0 : i19, in %arg1 : i19) {
+        oplib.hw_return %0 : i19
+    oplib.operator @i20_andi_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_andi_i20(%arg0: i20, %arg1: i20) -> i20 {
+        oplib.output %0 : i20
+      oplib.hw_match(@arith_andi_i20 : (i20, i20) -> i20) produce (in %arg0 : i20, in %arg1 : i20) {
+        oplib.hw_return %0 : i20
+    oplib.operator @i24_andi_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_andi_i24(%arg0: i24, %arg1: i24) -> i24 {
+        oplib.output %0 : i24
+      oplib.hw_match(@arith_andi_i24 : (i24, i24) -> i24) produce (in %arg0 : i24, in %arg1 : i24) {
+        oplib.hw_return %0 : i24
+    oplib.operator @i32_andi_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_andi_i32(%arg0: i32, %arg1: i32) -> i32 {
+        oplib.output %0 : i32
+      oplib.hw_match(@arith_andi_i32 : (i32, i32) -> i32) produce (in %arg0 : i32, in %arg1 : i32) {
+        oplib.hw_return %0 : i32
+    oplib.operator @i33_andi_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_andi_i33(%arg0: i33, %arg1: i33) -> i33 {
+        oplib.output %0 : i33
+      oplib.hw_match(@arith_andi_i33 : (i33, i33) -> i33) produce (in %arg0 : i33, in %arg1 : i33) {
+        oplib.hw_return %0 : i33
+    oplib.operator @i1_ori_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_ori_i1(%arg0: i1, %arg1: i1) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_ori_i1 : (i1, i1) -> i1) produce (in %arg0 : i1, in %arg1 : i1) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i8_ori_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_ori_i8(%arg0: i8, %arg1: i8) -> i8 {
+        oplib.output %0 : i8
+      oplib.hw_match(@arith_ori_i8 : (i8, i8) -> i8) produce (in %arg0 : i8, in %arg1 : i8) {
+        oplib.hw_return %0 : i8
+    oplib.operator @i16_ori_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_ori_i16(%arg0: i16, %arg1: i16) -> i16 {
+        oplib.output %0 : i16
+      oplib.hw_match(@arith_ori_i16 : (i16, i16) -> i16) produce (in %arg0 : i16, in %arg1 : i16) {
+        oplib.hw_return %0 : i16
+    oplib.operator @i20_ori_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_ori_i20(%arg0: i20, %arg1: i20) -> i20 {
+        oplib.output %0 : i20
+      oplib.hw_match(@arith_ori_i20 : (i20, i20) -> i20) produce (in %arg0 : i20, in %arg1 : i20) {
+        oplib.hw_return %0 : i20
+    oplib.operator @i24_ori_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_ori_i24(%arg0: i24, %arg1: i24) -> i24 {
+        oplib.output %0 : i24
+      oplib.hw_match(@arith_ori_i24 : (i24, i24) -> i24) produce (in %arg0 : i24, in %arg1 : i24) {
+        oplib.hw_return %0 : i24
+    oplib.operator @i28_ori_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_ori_i28(%arg0: i28, %arg1: i28) -> i28 {
+        oplib.output %0 : i28
+      oplib.hw_match(@arith_ori_i28 : (i28, i28) -> i28) produce (in %arg0 : i28, in %arg1 : i28) {
+        oplib.hw_return %0 : i28
+    oplib.operator @i29_ori_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_ori_i29(%arg0: i29, %arg1: i29) -> i29 {
+        oplib.output %0 : i29
+      oplib.hw_match(@arith_ori_i29 : (i29, i29) -> i29) produce (in %arg0 : i29, in %arg1 : i29) {
+        oplib.hw_return %0 : i29
+    oplib.operator @i32_ori_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_ori_i32(%arg0: i32, %arg1: i32) -> i32 {
+        oplib.output %0 : i32
+      oplib.hw_match(@arith_ori_i32 : (i32, i32) -> i32) produce (in %arg0 : i32, in %arg1 : i32) {
+        oplib.hw_return %0 : i32
+    oplib.operator @i1_xori_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_xori_i1(%arg0: i1, %arg1: i1) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_xori_i1 : (i1, i1) -> i1) produce (in %arg0 : i1, in %arg1 : i1) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i2_shli_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_shli_i2(%arg0: i2, %arg1: i2) -> i2 {
+        oplib.output %0 : i2
+      oplib.hw_match(@arith_shli_i2 : (i2, i2) -> i2) produce (in %arg0 : i2, in %arg1 : i2) {
+        oplib.hw_return %0 : i2
+    oplib.operator @i15_shli_l0 latency<0>, incDelay<0.16513562725182018>, outDelay<0.16513562725182018> {
+      oplib.target @arith_shli_i15(%arg0: i15, %arg1: i15) -> i15 {
+        oplib.output %0 : i15
+      oplib.hw_match(@arith_shli_i15 : (i15, i15) -> i15) produce (in %arg0 : i15, in %arg1 : i15) {
+        oplib.hw_return %0 : i15
+    oplib.operator @i16_shli_l0 latency<0>, incDelay<0.16899999999999993>, outDelay<0.16899999999999993> {
+      oplib.target @arith_shli_i16(%arg0: i16, %arg1: i16) -> i16 {
+        oplib.output %0 : i16
+      oplib.hw_match(@arith_shli_i16 : (i16, i16) -> i16) produce (in %arg0 : i16, in %arg1 : i16) {
+        oplib.hw_return %0 : i16
+    oplib.operator @i19_shli_l0 latency<0>, incDelay<0.21507079607740243>, outDelay<0.21507079607740243> {
+      oplib.target @arith_shli_i19(%arg0: i19, %arg1: i19) -> i19 {
+        oplib.output %0 : i19
+      oplib.hw_match(@arith_shli_i19 : (i19, i19) -> i19) produce (in %arg0 : i19, in %arg1 : i19) {
+        oplib.hw_return %0 : i19
+    oplib.operator @i23_shli_l0 latency<0>, incDelay<0.25653495425213946>, outDelay<0.25653495425213946> {
+      oplib.target @arith_shli_i23(%arg0: i23, %arg1: i23) -> i23 {
+        oplib.output %0 : i23
+      oplib.hw_match(@arith_shli_i23 : (i23, i23) -> i23) produce (in %arg0 : i23, in %arg1 : i23) {
+        oplib.hw_return %0 : i23
+    oplib.operator @i24_shli_l0 latency<0>, incDelay<0.26592853966857011>, outDelay<0.26592853966857011> {
+      oplib.target @arith_shli_i24(%arg0: i24, %arg1: i24) -> i24 {
+        oplib.output %0 : i24
+      oplib.hw_match(@arith_shli_i24 : (i24, i24) -> i24) produce (in %arg0 : i24, in %arg1 : i24) {
+        oplib.hw_return %0 : i24
+    oplib.operator @i28_shli_l0 latency<0>, incDelay<0.30049672444503062>, outDelay<0.30049672444503062> {
+      oplib.target @arith_shli_i28(%arg0: i28, %arg1: i28) -> i28 {
+        oplib.output %0 : i28
+      oplib.hw_match(@arith_shli_i28 : (i28, i28) -> i28) produce (in %arg0 : i28, in %arg1 : i28) {
+        oplib.hw_return %0 : i28
+    oplib.operator @i29_shli_l0 latency<0>, incDelay<0.30849478678191133>, outDelay<0.30849478678191133> {
+      oplib.target @arith_shli_i29(%arg0: i29, %arg1: i29) -> i29 {
+        oplib.output %0 : i29
+      oplib.hw_match(@arith_shli_i29 : (i29, i29) -> i29) produce (in %arg0 : i29, in %arg1 : i29) {
+        oplib.hw_return %0 : i29
+    oplib.operator @i30_shli_l0 latency<0>, incDelay<0.31627052943541301>, outDelay<0.31627052943541301> {
+      oplib.target @arith_shli_i30(%arg0: i30, %arg1: i30) -> i30 {
+        oplib.output %0 : i30
+      oplib.hw_match(@arith_shli_i30 : (i30, i30) -> i30) produce (in %arg0 : i30, in %arg1 : i30) {
+        oplib.hw_return %0 : i30
+    oplib.operator @i32_shli_l0 latency<0>, incDelay<0.3849999999999999>, outDelay<0.3849999999999999> {
+      oplib.target @arith_shli_i32(%arg0: i32, %arg1: i32) -> i32 {
+        oplib.output %0 : i32
+      oplib.hw_match(@arith_shli_i32 : (i32, i32) -> i32) produce (in %arg0 : i32, in %arg1 : i32) {
+        oplib.hw_return %0 : i32
+    oplib.operator @i32_shrsi_l0 latency<0>, incDelay<3.840000e-01>, outDelay<3.840000e-01> {
+      oplib.target @arith_shrsi_i32(%arg0: i32, %arg1: i32) -> i32 {
+        oplib.output %0 : i32
+      oplib.hw_match(@arith_shrsi_i32 : (i32, i32) -> i32) produce (in %arg0 : i32, in %arg1 : i32) {
+        oplib.hw_return %0 : i32
+    oplib.operator @i5_select_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_select_i5(%arg0: i1, %arg1: i5, %arg2: i5) -> i5 {
+        oplib.output %0 : i5
+      oplib.hw_match(@arith_select_i5 : (i1, i5, i5) -> i5) produce (in %arg0 : i1, in %arg1 : i5, in %arg2 : i5) {
+        oplib.hw_return %0 : i5
+    oplib.operator @i9_select_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_select_i9(%arg0: i1, %arg1: i9, %arg2: i9) -> i9 {
+        oplib.output %0 : i9
+      oplib.hw_match(@arith_select_i9 : (i1, i9, i9) -> i9) produce (in %arg0 : i1, in %arg1 : i9, in %arg2 : i9) {
+        oplib.hw_return %0 : i9
+    oplib.operator @i10_select_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_select_i10(%arg0: i1, %arg1: i10, %arg2: i10) -> i10 {
+        oplib.output %0 : i10
+      oplib.hw_match(@arith_select_i10 : (i1, i10, i10) -> i10) produce (in %arg0 : i1, in %arg1 : i10, in %arg2 : i10) {
+        oplib.hw_return %0 : i10
+    oplib.operator @i11_select_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_select_i11(%arg0: i1, %arg1: i11, %arg2: i11) -> i11 {
+        oplib.output %0 : i11
+      oplib.hw_match(@arith_select_i11 : (i1, i11, i11) -> i11) produce (in %arg0 : i1, in %arg1 : i11, in %arg2 : i11) {
+        oplib.hw_return %0 : i11
+    oplib.operator @i19_select_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_select_i19(%arg0: i1, %arg1: i19, %arg2: i19) -> i19 {
+        oplib.output %0 : i19
+      oplib.hw_match(@arith_select_i19 : (i1, i19, i19) -> i19) produce (in %arg0 : i1, in %arg1 : i19, in %arg2 : i19) {
+        oplib.hw_return %0 : i19
+    oplib.operator @i20_select_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_select_i20(%arg0: i1, %arg1: i20, %arg2: i20) -> i20 {
+        oplib.output %0 : i20
+      oplib.hw_match(@arith_select_i20 : (i1, i20, i20) -> i20) produce (in %arg0 : i1, in %arg1 : i20, in %arg2 : i20) {
+        oplib.hw_return %0 : i20
+    oplib.operator @i30_select_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_select_i30(%arg0: i1, %arg1: i30, %arg2: i30) -> i30 {
+        oplib.output %0 : i30
+      oplib.hw_match(@arith_select_i30 : (i1, i30, i30) -> i30) produce (in %arg0 : i1, in %arg1 : i30, in %arg2 : i30) {
+        oplib.hw_return %0 : i30
+    oplib.operator @i32_select_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_select_i32(%arg0: i1, %arg1: i32, %arg2: i32) -> i32 {
+        oplib.output %0 : i32
+      oplib.hw_match(@arith_select_i32 : (i1, i32, i32) -> i32) produce (in %arg0 : i1, in %arg1 : i32, in %arg2 : i32) {
+        oplib.hw_return %0 : i32
+    oplib.operator @i1_cmpi_eq_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_cmpi_eq_i1(%arg0: i1, %arg1: i1) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_eq_i1 : (i1, i1) -> i1) produce (in %arg0 : i1, in %arg1 : i1) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i2_cmpi_eq_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_cmpi_eq_i2(%arg0: i2, %arg1: i2) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_eq_i2 : (i2, i2) -> i1) produce (in %arg0 : i2, in %arg1 : i2) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i8_cmpi_eq_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_cmpi_eq_i8(%arg0: i8, %arg1: i8) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_eq_i8 : (i8, i8) -> i1) produce (in %arg0 : i8, in %arg1 : i8) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i15_cmpi_eq_l0 latency<0>, incDelay<0.12968108842533266>, outDelay<0.12968108842533266> {
+      oplib.target @arith_cmpi_eq_i15(%arg0: i15, %arg1: i15) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_eq_i15 : (i15, i15) -> i1) produce (in %arg0 : i15, in %arg1 : i15) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i19_cmpi_eq_l0 latency<0>, incDelay<0.16571633891220483>, outDelay<0.16571633891220483> {
+      oplib.target @arith_cmpi_eq_i19(%arg0: i19, %arg1: i19) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_eq_i19 : (i19, i19) -> i1) produce (in %arg0 : i19, in %arg1 : i19) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i20_cmpi_eq_l0 latency<0>, incDelay<0.17344363703325338>, outDelay<0.17344363703325338> {
+      oplib.target @arith_cmpi_eq_i20(%arg0: i20, %arg1: i20) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_eq_i20 : (i20, i20) -> i1) produce (in %arg0 : i20, in %arg1 : i20) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i23_cmpi_eq_l0 latency<0>, incDelay<0.19430715910295138>, outDelay<0.19430715910295138> {
+      oplib.target @arith_cmpi_eq_i23(%arg0: i23, %arg1: i23) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_eq_i23 : (i23, i23) -> i1) produce (in %arg0 : i23, in %arg1 : i23) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i1_cmpi_ne_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_cmpi_ne_i1(%arg0: i1, %arg1: i1) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_ne_i1 : (i1, i1) -> i1) produce (in %arg0 : i1, in %arg1 : i1) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i7_cmpi_ne_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_cmpi_ne_i7(%arg0: i7, %arg1: i7) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_ne_i7 : (i7, i7) -> i1) produce (in %arg0 : i7, in %arg1 : i7) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i8_cmpi_ne_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_cmpi_ne_i8(%arg0: i8, %arg1: i8) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_ne_i8 : (i8, i8) -> i1) produce (in %arg0 : i8, in %arg1 : i8) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i15_cmpi_ne_l0 latency<0>, incDelay<0.12968108554746383>, outDelay<0.12968108554746383> {
+      oplib.target @arith_cmpi_ne_i15(%arg0: i15, %arg1: i15) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_ne_i15 : (i15, i15) -> i1) produce (in %arg0 : i15, in %arg1 : i15) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i19_cmpi_ne_l0 latency<0>, incDelay<0.16571633579022216>, outDelay<0.16571633579022216> {
+      oplib.target @arith_cmpi_ne_i19(%arg0: i19, %arg1: i19) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_ne_i19 : (i19, i19) -> i1) produce (in %arg0 : i19, in %arg1 : i19) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i20_cmpi_ne_l0 latency<0>, incDelay<0.17344363387678452>, outDelay<0.17344363387678452> {
+      oplib.target @arith_cmpi_ne_i20(%arg0: i20, %arg1: i20) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_ne_i20 : (i20, i20) -> i1) produce (in %arg0 : i20, in %arg1 : i20) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i9_cmpi_slt_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_cmpi_slt_i9(%arg0: i9, %arg1: i9) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_slt_i9 : (i9, i9) -> i1) produce (in %arg0 : i9, in %arg1 : i9) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i10_cmpi_slt_l0 latency<0>, incDelay<0.050118742153790641>, outDelay<0.050118742153790641> {
+      oplib.target @arith_cmpi_slt_i10(%arg0: i10, %arg1: i10) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_slt_i10 : (i10, i10) -> i1) produce (in %arg0 : i10, in %arg1 : i10) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i12_cmpi_slt_l0 latency<0>, incDelay<0.076387465708877222>, outDelay<0.076387465708877222> {
+      oplib.target @arith_cmpi_slt_i12(%arg0: i12, %arg1: i12) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_slt_i12 : (i12, i12) -> i1) produce (in %arg0 : i12, in %arg1 : i12) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i20_cmpi_slt_l0 latency<0>, incDelay<0.14945804522245054>, outDelay<0.14945804522245054> {
+      oplib.target @arith_cmpi_slt_i20(%arg0: i20, %arg1: i20) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_slt_i20 : (i20, i20) -> i1) produce (in %arg0 : i20, in %arg1 : i20) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i32_cmpi_slt_l0 latency<0>, incDelay<0.17499999999999993>, outDelay<0.17499999999999993> {
+      oplib.target @arith_cmpi_slt_i32(%arg0: i32, %arg1: i32) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_slt_i32 : (i32, i32) -> i1) produce (in %arg0 : i32, in %arg1 : i32) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i10_cmpi_sle_l0 latency<0>, incDelay<0.050118742153790752>, outDelay<0.050118742153790752> {
+      oplib.target @arith_cmpi_sle_i10(%arg0: i10, %arg1: i10) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_sle_i10 : (i10, i10) -> i1) produce (in %arg0 : i10, in %arg1 : i10) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i10_cmpi_sgt_l0 latency<0>, incDelay<0.050118745109782759>, outDelay<0.050118745109782759> {
+      oplib.target @arith_cmpi_sgt_i10(%arg0: i10, %arg1: i10) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_sgt_i10 : (i10, i10) -> i1) produce (in %arg0 : i10, in %arg1 : i10) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i10_cmpi_sge_l0 latency<0>, incDelay<0.050118742153790752>, outDelay<0.050118742153790752> {
+      oplib.target @arith_cmpi_sge_i10(%arg0: i10, %arg1: i10) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_sge_i10 : (i10, i10) -> i1) produce (in %arg0 : i10, in %arg1 : i10) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i11_cmpi_sge_l0 latency<0>, incDelay<0.063860988128359497>, outDelay<0.063860988128359497> {
+      oplib.target @arith_cmpi_sge_i11(%arg0: i11, %arg1: i11) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_sge_i11 : (i11, i11) -> i1) produce (in %arg0 : i11, in %arg1 : i11) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i24_cmpi_sge_l0 latency<0>, incDelay<0.17528552087604943>, outDelay<0.17528552087604943> {
+      oplib.target @arith_cmpi_sge_i24(%arg0: i24, %arg1: i24) -> i1 {
+        oplib.output %0 : i1
+      oplib.hw_match(@arith_cmpi_sge_i24 : (i24, i24) -> i1) produce (in %arg0 : i24, in %arg1 : i24) {
+        oplib.hw_return %0 : i1
+    oplib.operator @i16_muli_l4 latency<4>, incDelay<5.000000e-01>, outDelay<5.000000e-01> {
+      oplib.target @arith_muli_i16(%arg0: i16, %arg1: i16) -> i16 {
+        oplib.output %0 : i16
+      oplib.hw_match(@arith_muli_i16 : (i16, i16) -> i16) produce (clk %arg0 : i1, reset %arg1 : i1, ce %arg2 : i1, in %arg3 : i16, in %arg4 : i16) {
+        oplib.hw_return %0 : i16
+    oplib.operator @amcmem_pe_d1_w32_l1 latency<1>, incDelay<1.000000e-01>, outDelay<5.150000e-01> {
+    oplib.operator @amcmem_pe_d2000_w8_l1 latency<1>, incDelay<1.000000e-01>, outDelay<5.150000e-01> {
+    oplib.operator @amcmem_pe_d2000_w16_l1 latency<1>, incDelay<1.000000e-01>, outDelay<5.150000e-01> {
+    oplib.operator @amcmem_pe_d2000_w32_l1 latency<1>, incDelay<1.000000e-01>, outDelay<5.150000e-01> {
+FAIL amc none N=2000: RuntimeError: lower_amc_to_loopschedule_vivado failed
+Traceback (most recent call last):
+  File "/work/shared/users/phd/sk3463/scratch/u3d_work/pe/pe_amc.py", line 25, in <module>
+    f = s.build(target=tgt)
+        ^^^^^^^^^^^^^^^^^^^
+  File "/work/shared/users/phd/sk3463/scratch/amc/amc-dialect/allo/allo/customize.py", line 1045, in build
+           ^^^^^^^^^^
+  File "/work/shared/users/phd/sk3463/scratch/amc/amc-dialect/allo/allo/backend/amc.py", line 437, in __init__
+    raise RuntimeError("lower_amc_to_loopschedule_vivado failed")
+RuntimeError: lower_amc_to_loopschedule_vivado failed

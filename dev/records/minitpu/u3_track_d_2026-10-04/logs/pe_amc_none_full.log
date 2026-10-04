@@ -1,0 +1,3 @@
+GENERATED /tmp/claude-1772902/-work-shared-users-phd-sk3463-allo/3b1c24a0-f6d1-4c37-88e0-31db609cddf4/scratchpad/amctmp/pe_amc_kernel_60090.py: 275 lines (amc, N=60090)
+BUILT amc none N=60090 1.0s
+MATCH pe amc none N=60090: 360202/360202 defined, cycles=360547 (39.1s)
