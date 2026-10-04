@@ -1,3 +1,5 @@
+# Copyright Allo authors. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
 # Source (bash) on zhang-21 before running the harness against every backend.
 # Order matters: the allo env's activate script prepends gcc-toolset-13, and
 # Catapult's module prepends its own bin/ (with a python of its own), so the
