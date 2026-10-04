@@ -314,6 +314,52 @@ bound names a bound index and folds, and is accepted; elsewhere a bound unit
 converts by typed assignment (``a: MAC_IN = word``). The front-end form,
 ``@df.unit`` type parameters, is separate work and subsumes this renaming.
 
+An optional module is a declared delta
+======================================
+
+README D-19. ``compose.Option`` names what one module brings: units,
+channels, memories, parameters, engines, the ``rebind`` of its neighbours'
+names when it is present (``{"writeback": {"alu_out": "sfu_out"}}``, applied
+as an ``Instance``), and the ISA slots that exist only with it.
+``Architecture.with_options(base, *options)`` composes them; the base
+declares its own slots (``Architecture(slots=...)``).
+
+.. code-block:: python
+
+   SFU = Option(name="sfu", units=(sfu,),
+                channels=(Channel("sfu_out", "UInt(64)", "QD"),),
+                rebind={"writeback": {"alu_out": "sfu_out"}},
+                isa=("vgelu", "vexp", "vrecip", "vrsqrt"))
+   lane = Architecture.with_options(base(n), SFU)
+   isa_slots(lane)          # {"vadd": "base", ..., "vgelu": "sfu", ...}
+   check_program(base(n), ["vadd", "vgelu"], known=(SFU,))   # refused, naming 'sfu'
+
+Composition is legal iff the netlist rules pass on the result, so the two
+conditional-form hazards are refused naming the channel: the SFU without the
+rebind (``channel 'alu_out' reads in both writeback and sfu``) and the
+rebind without the SFU (``nothing reads 'alu_out'``). ``isa_slots(arch)`` is
+the instance's ISA derived from its composition, for an assembler or
+``gen_isa --check`` to consume. The first use is MiniTPU's SFU over a lane
+of real units, U1's ``bits`` ALU and track A's ``bits`` SFU
+(``examples/minitpu/template/vpu_lane.py``, ``tests/test_compose_options.py``).
+
+A unit's own helper functions are declared ``calls=("add_bits", ...)``:
+resolved from the body's module, never bound by the architecture, never
+renamed by an instance. A function an architecture chooses is an engine
+slot (D-15).
+
+A geometry record is a parameter set
+====================================
+
+README D-20. ``Architecture(parameters=MxuGeometry(...))`` binds the
+record's ``namespace()``: derived numbers (``PE_LATENCY``,
+``PUSH_TO_VALID``) are properties computed from the declared ones and the
+bound engine's latencies, so they bind without being typed in, and each
+unit's ``legality`` runs on them. A namespace key that names a property of
+the record must equal it; a declared copy beside a derived number
+(``PUSH_TO_VALID=82`` with a 5-cycle adder) is refused by the unit's
+legality, naming the parameter (``tests/test_compose_geometry.py``).
+
 What is still true
 ==================
 

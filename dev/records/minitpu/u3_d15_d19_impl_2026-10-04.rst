@@ -1,9 +1,10 @@
 ..  Copyright Allo authors. All Rights Reserved.
     SPDX-License-Identifier: Apache-2.0
 
-######################################################################
-U3: compose engines (README D-15), implemented in ``allo/compose.py``
-######################################################################
+###########################################################################
+U3: engines, instances, carried directives, options and geometries in
+``allo/compose.py`` (README D-15, D-17, D-18, D-19, D-20)
+###########################################################################
 
 .. note::
 
@@ -205,3 +206,86 @@ region schedule: before ``directives`` the MLIR holds one ``loop_name =
 it): the directive runs once, from ``pe_feed_a``. The front-end form (a
 schedule attribute on the function) and the SystemC emitter's handling of
 carried directives (D-18 third bullet) are not part of this change.
+
+D-19: what landed
+=================
+
+``compose.Option(name, units, channels, memories, rebind, isa, parameters,
+engines)`` and ``Architecture.with_options(base, *options)`` (lifted from
+``template/optional.py``'s ``assemble``): an option's units, channels,
+memories, parameters and engines are added, its ``rebind`` (``{unit:
+{name: new}}``) is applied to the named neighbours as ``Instance``\ s (D-17),
+and its ``isa`` slots are added to the base's ``Architecture(slots=)``.
+Legality is the existing netlist rules on the result. Also refused: a rebind
+of a unit the architecture lacks, an option composed twice, a slot two
+modules bring, a parameter or engine slot an option re-sets differently.
+``isa_slots(arch)`` -> ``{slot: module}`` (base first, then each option) is
+what an assembler or ``gen_isa --check`` consumes (``examples/tinytpu/
+gen_isa.py`` unchanged; TinyTPU's spec stays as is).
+``check_program(arch, program, known=())`` refuses an instruction whose
+module is not composed in, naming the module when a known option brings it.
+
+``Unit(calls=)`` (provisional, P8): the module-level functions a body calls
+as part of the unit itself (``add_bits``, ``mul_bits``, ``bf16_gt``,
+``gelu_addr``, ``exp_addr``, ``sfu_bits``), resolved from the body's own
+module and added to the region's namespace; refused if not a function, if
+two units call different functions under one name, if an ``Instance`` binds
+one. *Reason:* a compose unit could call no helper before (every free name
+had to be an architecture parameter), and D-15 refuses a function bound as a
+parameter; a fixed helper is neither swappable nor the architecture's.
+
+The use case: ``template/vpu_lane.py``, one VPU lane from real units --
+``issue -> alu -> writeback``, the ALU U1's ``bits`` composition
+(``units/alu.py`` ``composed``, line for line), and the option ``SFU``:
+track A's S1 ``bits`` SFU (``units/sfu.py``: ROMs and PWL tables bound to
+kernel-local constants, ``sfu_bits``), channel ``sfu_out``, slots
+``vgelu``/``vexp``/``vrecip``/``vrsqrt``, rebind ``writeback: alu_out ->
+sfu_out``. As in ``vpu.sv:88`` the SFU's operand is VREG port A (the ALU
+forwards it on ``alu_out``) and the result is chosen by the op tag
+(``:157-184``). Untimed: the SFU's declared latency 5 and the ALU's 3 are
+not modelled by these streams.
+
+.. list-table:: ``tests/test_compose_options.py`` (oracles ``ref.vpu_alu``, ``ref.sfu``)
+   :header-rows: 1
+   :widths: 46 18 18 18
+
+   * - instance
+     - simulator
+     - SystemC csim
+     - slots
+   * - base lane (no SFU), random ALU ops, random bf16 bit patterns
+     - 512/512
+     - 128/128
+     - 6 (``base``)
+   * - lane + ``SFU``, random ALU and SFU ops
+     - 512/512
+     - 128/128
+     - 6 + 4 (``sfu``)
+   * - ``vgelu`` in a program for the base lane
+     - refused: "its module 'sfu' is not composed in"
+     - --
+     - --
+   * - SFU without the rebind / rebind without the SFU
+     - refused: "channel 'alu_out' reads in both writeback and sfu" /
+       "nothing reads 'alu_out'"
+     - --
+     - --
+
+``template/optional.py`` (the stub lane) now uses ``Option``,
+``with_options`` and ``isa_slots``; ``run_u3e``'s output is unchanged but for
+the H10 label (``compose.Instance``).
+
+D-20: what landed
+=================
+
+``Architecture(parameters=<record>)``: a geometry record with
+``namespace()`` (``MxuGeometry``/``TreeGeometry``) is bound through it;
+``Architecture.geometry`` keeps the record. A namespace key that names a
+property of the record must equal the property, refused otherwise naming
+the key. The units' ``legality`` runs on the namespace as on any parameter
+set (``tests/test_compose_geometry.py``): ``MxuGeometry()`` binds
+``PUSH_TO_VALID`` 82 and ``PE_LATENCY`` 4, with a 5-cycle adder 114; a record
+that declares ``PUSH_TO_VALID=82`` as a field beside a 5-cycle adder is
+refused by ``mxu_legality`` naming ``PUSH_TO_VALID`` (``must be 2 +
+DIM*(PE_LATENCY+1) = 114``). The harness side of D-20 (manifest vs booking)
+is another agent's; ``harness/latency.py`` untouched.

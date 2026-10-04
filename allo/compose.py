@@ -947,11 +947,39 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
     #: The order the composite's verdict uses: ``order``, or the accepted
     #: order a bound part changed it to. Set by ``_check``.
     reference_order: str = field(default=None, init=False)
+    #: The geometry record ``parameters`` was given as, if any (README D-20).
+    geometry: object = field(default=None, init=False)
     _region: object = field(default=None, init=False, repr=False)
     _regions: dict = field(default_factory=dict, init=False, repr=False)
 
     def __post_init__(self):
+        if not isinstance(self.parameters, dict):
+            self._bind_geometry()
         self._check()
+
+    def _bind_geometry(self):
+        """README D-20: ``parameters`` may be a frozen geometry record whose
+        derived numbers are properties; its ``namespace()`` is what the units
+        bind. A key of the namespace that names a property of the record must
+        be that property's value -- a derived number typed in beside the one
+        it must equal is refused, naming it. The units' ``legality`` then
+        runs on the record's namespace, as on any parameter set."""
+        record = self.parameters
+        assert hasattr(record, "namespace"), (
+            f"{self.name}: parameters={record!r} is neither a dict nor a "
+            f"geometry record with namespace() (README D-20)")
+        ns = dict(record.namespace())
+        for key, value in ns.items():
+            prop = getattr(type(record), key, None)
+            if isinstance(prop, property):
+                derived = getattr(record, key)
+                assert value == derived, (
+                    f"{self.name}: geometry {type(record).__name__} declares "
+                    f"{key}={value!r}, but its derived {key} is {derived!r}; a "
+                    f"derived parameter is a property, never a second "
+                    f"declaration (README D-20)")
+        self.geometry = record
+        self.parameters = ns
 
     def _check(self):
         declared = {c.name for c in self.channels}
