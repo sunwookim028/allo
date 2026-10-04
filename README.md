@@ -347,6 +347,31 @@ through U5, then re-pins.**
 - Track E's composition drafts, labelled D-16..D-19 in their record, take the
   next free numbers when adopted.
 
+**D-17 (2026-10-04). A unit is instantiated, and the instantiation binds its
+parameters, channels and engines.**
+- `compose.Architecture` instantiates a `Unit` under an instance name with a
+  binding of the unit's free names: parameters (`DIM`, `N`), channels,
+  engines (D-15). One `Unit` object composes any number of times in one
+  region; two instances at two bindings is what the Design target's
+  "parameters" level means.
+- A binding names only free names of the body, and every check `compose`
+  already makes (declaration == body, one owner per channel, legality on the
+  bound parameter set) runs per instance.
+- `@df.unit` gets the same at the front end: `unit[P0, P1](...)` type
+  parameters as kernels have, resolved at the instantiation and type-checked
+  by the `wiring-type` rule. Until then a `@df.unit` sized by a module global
+  is frozen at decoration (C9), and a factory (C11) is the recorded
+  workaround for leaves only.
+- A parameter in a slice bound (`word[0:MAC_IN_BITS]`) is refused today; a
+  bound unit converts by typed assignment until the front end folds
+  constants into bounds.
+- `compose`'s binding (a renaming of the body's free names) and the front
+  end's type parameters are two mechanisms for one idea; the front-end form
+  subsumes the renaming when it lands, so the renaming layer is not kept.
+- Evidence: `dev/records/minitpu/u3_composition_design_2026-10-04.rst` §2
+  (two PE instances, bf16 and int8 engines, in one region: simulator
+  512/512 + 512/512, csim 256/256 + 256/256); `u1_alu` C9/C11.
+
 ## Milestones
 
 Each milestone passes on **one acceptance check** and names the tools it uses

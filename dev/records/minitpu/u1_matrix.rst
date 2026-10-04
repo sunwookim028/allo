@@ -314,6 +314,12 @@ session; facts as of minitpu-tmp master ``a9757be``, its decisions in
 ``b3ba0a4d`` (v1-course) through U5, then re-pins** (README D-16); **D-7 kept
 as is**. E03/v2 become declared variants later.
 
+**Checkpoint 14, 2026-10-04:** D-17 (instantiation binds parameters,
+channels, engines) **approved** with the subsumption note; implementation
+joins ``compose-engines``; the ``@df.unit`` type-parameter form is queued
+front-end work. Drafts 3-5 (schedules that travel, optional modules, derived
+legality) will be README D-18..D-20.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
