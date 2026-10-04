@@ -66,47 +66,41 @@ def make(n, inst="n64"):
                 v: uint8 = vld[t]
                 o: uint8 = op[t]
                 w: WD = d[t]
-                # outputs first: the root's stage B and the tap's stage B of the
-                # previous iteration (the RTL's register outputs)
-                lw: WL = 0
-                with allo.meta_for(sub) as s:
-                    lw[16 * s : 16 * s + 16] = stB[tap_base - nl + s]
-                lro[t] = lw
-                ro[t] = stB[NN - 1]
-                vo[t] = vq[VD - 1]
-                lvo[t] = lvq[TD - 1]
-                # stage B <= stage A, every node
-                for m0 in range(NN):
-                    stB[m0] = stA[m0]
-                    opB[m0] = opA[m0]
-                # stage A <= f(children's stage B), levels above the leaves (nodes
-                # whose children are internal): children of node N+m are 2m, 2m+1;
-                # internal when 2m >= N
+                # the register edge, as T1 writes it: stage B <= stage A and
+                # stage A <= f(the OLD stage B of the children), then the valid
+                # pipes shift and clear, then the outputs are the new registers
+                # (MiniTPU's "post" row: a clear at t reads 0 at t)
+                nxt: uint16[NN]
+                nop: uint8[NN]
                 for m1 in range(nl // 2, NN):
                     a: uint16 = stB[2 * m1 - nl]
                     b: uint16 = stB[2 * m1 + 1 - nl]
                     oc: uint8 = opB[2 * m1 - nl]
                     if oc == 0:
-                        stA[m1] = add_bits(a, b)
+                        nxt[m1] = add_bits(a, b)
                     else:
                         if bf16_gt(a, b):
-                            stA[m1] = a
+                            nxt[m1] = a
                         else:
-                            stA[m1] = b
-                    opA[m1] = oc
-                # the leaf level: children are the popped word's lanes
+                            nxt[m1] = b
+                    nop[m1] = oc
                 with allo.meta_for(nl // 2) as m:
                     a0: uint16 = w[32 * m : 32 * m + 16]
                     b0: uint16 = w[32 * m + 16 : 32 * m + 32]
                     if o == 0:
-                        stA[m] = add_bits(a0, b0)
+                        nxt[m] = add_bits(a0, b0)
                     else:
                         if bf16_gt(a0, b0):
-                            stA[m] = a0
+                            nxt[m] = a0
                         else:
-                            stA[m] = b0
-                    opA[m] = o
-                # valid pipes: shift, load, synchronous clear
+                            nxt[m] = b0
+                    nop[m] = o
+                for m0 in range(NN):
+                    stB[m0] = stA[m0]
+                    opB[m0] = opA[m0]
+                for m2 in range(NN):
+                    stA[m2] = nxt[m2]
+                    opA[m2] = nop[m2]
                 for k2 in range(1, VD):
                     vq[VD - k2] = vq[VD - k2 - 1]
                 vq[0] = v
@@ -118,5 +112,12 @@ def make(n, inst="n64"):
                         vq[k3] = 0
                     for k4 in range(TD):
                         lvq[k4] = 0
+                lw: WL = 0
+                with allo.meta_for(sub) as s:
+                    lw[16 * s : 16 * s + 16] = stB[tap_base - nl + s]
+                lro[t] = lw
+                ro[t] = stB[NN - 1]
+                vo[t] = vq[VD - 1]
+                lvo[t] = lvq[TD - 1]
 
     return top

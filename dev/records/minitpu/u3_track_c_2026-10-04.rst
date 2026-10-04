@@ -1,0 +1,162 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+###########################################################################
+U3 track C: Catapult RTL and Design Compiler area for the landed U3 units
+###########################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-04.** zhang-21, branch ``u3-catapult``
+   (worktree ``scratch/wt-u3c``) from ``u1-pilot`` at ``79683bc3`` (track A
+   landed), merged with ``03d8dcc7`` (track B landed; ``allo/compose.py`` and
+   ``allo/memory.py`` changed, ``mlir/`` did not, so the worktree's own
+   bindings build stands). MiniTPU at ``b3ba0a4d``, read only. Catapult
+   Ultra Synthesis 2024.2/1130128, library ``nangate-45nm_beh``, 3.33 and
+   2.0 ns; Verilator 5.052; Design Compiler W-2024.09 with the U1 flow
+   (``dc_u1.tcl`` plus ``-define``/``-parameters``, FreePDK45 ``stdcells.db``
+   md5 ``f5560259ca91a4b67336b715b729f94d``, ``adk.tcl``
+   ``5e884494824b75be2350b2e43ea9608a``, ``dw_foundation.sldb``
+   ``d955c61b84f986958ce94ccd738f45e7``). The owner is away: every call below
+   is **provisional** (D-9). Nothing under ``allo/`` or ``mlir/`` changed;
+   core defects are proposals (section 6). Plan: ``u3_plan_2026-10-04.rst``
+   (track C = every landed ``bits``/``staged`` variant through SystemC ->
+   Catapult, RTL vs the Phase 0 oracle per cycle, ``latency.json`` vs the
+   declared value, same-flow DC area; then H2, H4, H14; A2/H8 not attempted).
+   Oracles: ``u3_phase0_2026-10-04.rst``; the forms held to them: track A
+   (``u3_track_a_2026-10-04.rst``) and track B (``u3_track_b_2026-10-04.rst``).
+
+Reproduce (``source examples/minitpu/harness/env-zhang21.sh``, worktree root,
+``R=dev/records/minitpu/u3_track_c_2026-10-04``, ``S`` a scratch directory;
+projects are not kept)::
+
+   $R/scripts/u3c_batch.sh $R/scripts/batch1.txt $S 6     # track A's units, 16 Catapult runs (2-20 min each)
+   $R/scripts/u3c_batch.sh $R/scripts/batch1b.txt $S 4    # the staged SFU row form, mxu_pe bits
+   $R/scripts/u3c_batch.sh $R/scripts/batch2.txt $S 3     # the composites (P2, A1, M1, T2), 3.33 ns
+   $ALLO_PYTHON $R/scripts/u3c_cmp.py sfu $S/sfu_bits_3p33_L5.prj                 # valid unit: full stimulus
+   $ALLO_PYTHON $R/scripts/u3c_cmp.py sfu $S/sfu_rows_3p33_L1.prj --shift 4       # 4 rows written as data
+   $ALLO_PYTHON $R/scripts/u3c_cmp.py mxu_pe $S/pe_bits_3p33_L1.prj               # trace unit, per row
+   $ALLO_PYTHON $R/scripts/u3c_cmp.py xlu_reduction_tree $S/tree16_staged_3p33_L1.prj --inst n16
+   $ALLO_PYTHON $R/scripts/u3c_cmp_landed.py mxu_systolic_array streams $S/array2_3p33.prj --inst dim2
+   python3 $R/scripts/gen_sfu_dc.py /work/shared/users/phd/sk3463/minitpu $S/sfu_dc.sv   # DC stand-in for the $readmemh ROMs
+   sed "s#\$S#$S#g" $R/scripts/dc_minitpu.txt | xargs -P 6 -L 1 $R/scripts/u3c_dc.sh      # MiniTPU rows (+ tree16 with DEFINES/PARAMS)
+   sed "s#\$S#$S#g" $R/scripts/dc_catapult1.txt | xargs -P 6 -L 1 $R/scripts/u3c_dc.sh    # Catapult RTL rows
+   python3 dev/records/minitpu/u1_catapult_units_2026-10-02/scripts/dc/summarize_dc.py $S/dc
+
+Record files (``u3_track_c_2026-10-04/``): ``scripts/`` (the builder with
+``latency=`` as a build config, the two Verilator comparators, the DC flow),
+``forms/`` (the track-C forms, section 2), ``logs/`` (every ``BUILD``,
+``UNIT-MATCH`` and ``LATENCY`` line, Catapult ``cycle.rpt``/``rtl.rpt`` and
+``latency.json`` per build, DC reports), ``SHA256SUMS.txt`` (emitted
+``kernel.cpp``, ``concat_rtl.v``, DC netlists, MiniTPU sources).
+
+.. contents::
+   :local:
+   :depth: 1
+
+1. Verdicts (matrix-ready)
+==========================
+
+**match** = ``UNIT-MATCH`` on every defined slot of the Phase 0 trace (or the
+full ``valid`` stimulus) against MiniTPU's RTL, both in Verilator, with the
+Catapult RTL's row ``t`` held to the oracle's row ``t``; **cycle-equal** adds
+that every output's measured I/O latency ``L`` is 1 (the Pop->Push edge is
+the row's own edge, section 2) at II = 1, so the Allo RTL shows MiniTPU's
+value on MiniTPU's edge. ``L`` is the manifest's number and is checked
+against it (D-10). Small geometry decides (P-4).
+
+TABLE_PLACEHOLDER
+
+2. The forms, and why the landed ones needed a track-C shape
+============================================================
+
+Every landed form writes the RTL's registers as data (checkpoint 6: one kernel
+iteration per RTL cycle, the register edges as rows). On Catapult that means
+**the Pop->Push edge of a row is the row's own edge**: a row form with ``k``
+rows of delay written as data and the kernel's I/O latency pinned to 1
+(``latency=1``, ``cycle set {Push} -from {Pop} -equal 1``) is MiniTPU's
+``k + 1``. The staged SFU's 4 rows + 1 = ``VPU_SFU_LATENCY`` 5; the PE's rows
++ 1 = its contract; the tree's ``2 LEVELS`` rows + 1 = 13/9. So P-3's "pin SFU 5,
+tree 13/9, PE 4" is one of two pins: ``latency=5`` on the *combinational* S1
+(Catapult places the five registers), or ``latency=1`` on a row form (the
+registers are already in the data). Both were run on the SFU and both are
+cycle-equal (section 1).
+
+The landed forms needed three changes to reach Connections RTL at all, each a
+finding on the emitter's port rules, none on the units' logic:
+
+* **C1 -- a 2-D lane array is not a stream.** ``isSeqStreamable``
+  (``EmitSystemC.cpp:945``) streams only a rank-1 boundary array with one
+  access site directly under one loop; ``uint16[n, N]`` (P-8's lane arrays:
+  the tree's ``data_i``/``lane_result_o``, the transpose's words, the array's
+  and the MXU's ``[N * D]`` lane memories) becomes **RAM pins**
+  (``_radr/_re/_q/_rrdy``, ``_wadr/_d/_we/_wrdy`` -- a memory the integrator
+  provides, read one word per cycle). That is a different unit boundary from
+  MiniTPU's (a 1,024-bit port per cycle), and no per-cycle RTL comparison in
+  the harness's shapes. Track-C forms ``forms/tree_wide.py``,
+  ``forms/tree_wide_staged.py``, ``forms/transpose_wide.py`` pack the lanes
+  into one ``UInt(16 N)`` word per row (``allo.meta_for`` slices; the emitter
+  gives ``ap_uint<1024>`` Connections ports): the RTL's own port shape, and
+  numpy-free (the simulator cannot run them, B6; Catapult needs no run).
+* **C2 -- a conditional port access is not a stream.** The landed S2
+  (``sfu.staged``) warms up and drains (``if t < n: read``, ``if t >= 4:
+  write`` over ``n + 4`` iterations), and ``xlu_transpose.trace`` stores
+  ``rvo[t]`` under ``if r == 0 ... else``. Each makes the array RAM pins, so
+  ``latency=`` is refused -- verbatim: ``ValueError: latency=1 on sfu_k_0: it
+  has no Connections In/Out pair (Wire ports?). Catapult cannot pin a Wire
+  port's latency ...`` -- the refusal is right (D-1), the message names the
+  wrong cause. ``forms/sfu_staged_rows.py`` pops and pushes once per row over
+  exactly ``n`` rows (output row ``t`` is input row ``t - 4``; the comparator
+  shifts, ``--shift 4``); ``transpose_wide`` stores ``rvo[t] = 0 if r == 0
+  else v`` once.
+* **C5 -- a ``Stateful`` array is a RAM unless partitioned.** The transpose's
+  ``tile: uint16[16, 16] @ Stateful`` was mapped to
+  ``ccs_sample_mem.ccs_ram_sync_1R1W`` (a synchronous RAM, one read port,
+  read visible the next cycle), so ``latency=1`` was refused: ``chained data
+  dependency ... from operation MEMORYREAD "l_S_t_0_t:v557:read_mem(
+  __stateful_tx_0_tile_1:rsc.@)" ... mapped to "ccs_sample_mem.
+  ccs_ram_sync_1R1W_rwport(14,16,8,256,256,16,5)"`` (SCHD-6/SCHD-30), and a
+  64-way crossing read would be 64 cycles. MiniTPU's tile is 256 flops with a
+  mux. ``s.partition("tx_0:tile")`` (complete) emits ``#pragma hls_resource
+  ... map_to_module="[Register]"`` on the Stateful (the U2 ``vpu_regfile``
+  precedent), which is the honest form; it is a *schedule* on the unit that
+  nothing in the source declares -- D-12's ``Memory(ports=)`` would (a
+  16-port read is a register array), and is not in this tree (track A, X2).
+
+Loops: every constant-trip inner loop is unrolled (``--unroll-inner``: the
+shift pipes, the node loops, ``leading_zeros17/19``'s ``offset``), and each
+kernel's iteration loop is pipelined at II = 1 -- a rolled inner loop merged
+into the pipelined loop is the one way the manifest lies
+(``latency_report_2026-10-02.rst``). ``mxu_pe.bits``'s nested ``def
+leading_zeros19`` is emitted as one helper function with one ``offset`` loop,
+so one ``unroll`` covers it (H4 below).
+
+3. Hypotheses
+=============
+
+HYP_PLACEHOLDER
+
+4. Findings
+===========
+
+FINDINGS_PLACEHOLDER
+
+5. Same-flow DC area
+====================
+
+DC_PLACEHOLDER
+
+6. Proposals for the core (no patches here)
+===========================================
+
+PROPOSALS_PLACEHOLDER
+
+7. Provisional calls made (D-9)
+===============================
+
+CALLS_PLACEHOLDER
+
+8. Not done
+===========
+
+NOTDONE_PLACEHOLDER

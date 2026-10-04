@@ -40,26 +40,29 @@ PORTS = {
 ap = argparse.ArgumentParser()
 ap.add_argument("unit"); ap.add_argument("prj")
 ap.add_argument("--inst", default=None)
-ap.add_argument("--top", default=None)
+ap.add_argument("--top", default="top", help="synthesized top (the region; its .v1 holds the RTL)")
+ap.add_argument("--kernel", default=None, help="kernel module for the manifest (default: the one kernel)")
 ap.add_argument("--n", type=int, default=0)
+ap.add_argument("--shift", type=int, default=0, help="valid units: output row t holds input row t-shift (rows of delay written as data)")
 a = ap.parse_args()
 u = importlib.import_module(f"examples.minitpu.units.{a.unit}")
 inst = a.inst or getattr(u, "DEFAULT", None)
 name = os.path.basename(a.prj.rstrip("/")).replace(".prj", "")
 k = open(os.path.join(a.prj, "kernel.cpp")).read()
-top = a.top or re.search(r"SC_MODULE\((\w+_0)\)", k).group(1)
+top = a.top
+kern = a.kernel or re.search(r"SC_MODULE\((\w+_0)\)", k).group(1)
 blk = k[k.index(f"SC_MODULE({top})"):]
 blk = blk[: blk.index("\n};")]
 
 
 def _w(t):
-    m = re.match(r"ac_int<(\d+),", t)
+    m = re.match(r"(?:ac_int|ap_uint|ap_int)<(\d+)", t)
     return int(m.group(1)) if m else {"bool": 1}[t]
 
 
 ins = [(p, _w(t)) for t, p in re.findall(r"Connections::In< (.+?) > (\w+);", blk)]
 outs = [(p, _w(t)) for t, p in re.findall(r"Connections::Out< (.+?) > (\w+);", blk)]
-pin_names, pout_names = PORTS[a.unit]
+pin_names, pout_names = PORTS.get(a.unit, ([p for p, _ in u.RTL.inputs], [o[0] for o in u.RTL.outputs]))
 assert len(ins) == len(pin_names) and len(outs) == len(pout_names), (ins, outs)
 src = os.path.abspath(os.path.join(a.prj, "build", "Catapult", f"{top}.v1", "concat_sim_rtl.v"))
 nw = rtl.nwords
@@ -210,17 +213,26 @@ if u.RTL.shape == "valid":
     acc, got, cyc, cycles = run(rows)
     p = outs[0][0]
     g = got[p][:, 0]
-    kd = int((g != want).sum())
-    lat = hist(cyc[p] - acc)
+    sh = a.shift
+    lat_io = hist(cyc[p] - acc)  # the manifest's number: Push edge - Pop edge of one row
+    if sh:  # rows of delay carried as data: output row t holds input row t - sh
+        g, want_, acc_, cyc_ = g[sh:], want[: n - sh], acc[: n - sh], cyc[p][sh:]
+        kd = int((g != want_).sum())
+        lat = hist(cyc_ - acc_)  # the unit's latency: input row t accepted -> its result pushed
+        want = want_
+    else:
+        kd = int((g != want).sum())
+        lat = lat_io
     tag = "UNIT-MATCH" if kd == 0 else "UNIT-DIFF "
-    print(f"{tag} {a.unit} {name} catapult-rtl {n - kd}/{n} vs MiniTPU RTL; latency {lat} (declared {u.RTL.latency}); "
-          f"{cycles / n:.4f} cyc/vector ({time.time() - t0:.1f}s)", flush=True)
+    print(f"{tag} {a.unit} {name} catapult-rtl {len(g) - kd}/{len(g)} vs MiniTPU RTL; latency {lat} (declared {u.RTL.latency}"
+          f"{f'; {sh} rows as data + I/O {lat_io}' if sh else ''}); {cycles / n:.4f} cyc/vector ({time.time() - t0:.1f}s)", flush=True)
     if kd:
-        for nm, idx in check.classify(stim, g, want, getattr(u, "EXPLAIN", [])).items():
+        for nm, idx in check.classify(stim[: len(g)], g, want, getattr(u, "EXPLAIN", [])).items():
             ex = ", ".join("/".join(f"{int(x):x}" for x in stim[i]) + f": catapult {int(g[i]):x} minitpu {int(want[i]):x}" for i in idx[:2])
             print(f"    {len(idx):8d}  {nm}  e.g. {ex}")
     if man:
-        print("    " + latency.verdict(man, top, lat, cycles / n, u.RTL.latency))
+        print("    " + latency.verdict(man, kern, lat_io, cycles / n, u.RTL.latency)
+              + (f" [unit latency = {sh} rows + I/O: {sorted(lat)}]" if sh else ""))
 else:
     unit = u.INSTANCES[inst]
     cmd, spans = check._trace_all(u, inst, a.n)
@@ -272,4 +284,4 @@ else:
         for h in lats.values():
             for L, c in h.items():
                 allh[L] = allh.get(L, 0) + c
-        print("    " + latency.verdict(man, top, allh, cycles / n, 1))
+        print("    " + latency.verdict(man, kern, allh, cycles / n, 1))

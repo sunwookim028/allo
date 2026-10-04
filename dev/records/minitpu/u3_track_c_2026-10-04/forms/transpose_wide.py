@@ -4,7 +4,7 @@
 ``uint16[n, 64]`` lane arrays packed into ``UInt(1024)[n]`` words (the RTL's
 ``write_data_i``/``read_data_o``), so the ports are Connections streams and not
 RAM pins (as for ``tree_wide``). ``make(n, inst, unreset=False)``: the tile is
-``@ Stateful`` (reset) as the landed X1; ``unreset=True`` declares
+``@ Stateful`` (reset) as the landed X1; ``rvo`` is stored once per row (the landed ``if r == 0`` pair of stores made it RAM pins, C2). ``unreset=True`` declares
 ``Stateful(reset=False)`` (P-9) -- expected refused by the emitter on a kernel
 with non-Wire ports (track A finding A6), recorded.
 """
@@ -38,10 +38,9 @@ def make(n, inst="t16x4", unreset=False):
                     with allo.meta_for(LANES) as l:
                         o[16 * (s * LANES + l) : 16 * (s * LANES + l) + 16] = tile[l, 4 * q + s]
                 rdo[t] = o
-                if r == 0:
-                    rvo[t] = 0
-                else:
-                    rvo[t] = v
+                # one unconditional store: a store under `if` is not streamable
+                # (the emitter makes the array RAM pins, finding C2)
+                rvo[t] = 0 if r == 0 else v
                 if e == 1:
                     with allo.meta_for(SUB) as s:
                         with allo.meta_for(LANES) as l:
@@ -70,10 +69,9 @@ def make_unreset(n, inst="t16x4"):
                     with allo.meta_for(LANES) as l:
                         o[16 * (s * LANES + l) : 16 * (s * LANES + l) + 16] = tile[l, 4 * q + s]
                 rdo[t] = o
-                if r == 0:
-                    rvo[t] = 0
-                else:
-                    rvo[t] = v
+                # one unconditional store: a store under `if` is not streamable
+                # (the emitter makes the array RAM pins, finding C2)
+                rvo[t] = 0 if r == 0 else v
                 if e == 1:
                     with allo.meta_for(SUB) as s:
                         with allo.meta_for(LANES) as l:

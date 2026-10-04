@@ -19,7 +19,8 @@ set hdlin_ff_always_sync_set_reset      true
 set compile_seqmap_honor_sync_set_reset true
 if {[info exists ADK_DONT_USE_CELL_LIST]} { set_dont_use [get_lib_cells $ADK_DONT_USE_CELL_LIST] }
 define_design_lib WORK -path $out/WORK
-set defs [expr {[info exists ::env(DEFINES)] && $::env(DEFINES) ne ""} ? [list -define [split $::env(DEFINES)]] : ""]
+set defs ""
+if { [info exists ::env(DEFINES)] && $::env(DEFINES) ne "" } { set defs [list -define [split $::env(DEFINES)]] }
 if { ![eval analyze -format sverilog $defs [list [split $::env(SRCS)]]] } { exit 1 }
 if { [info exists ::env(PARAMS)] && $::env(PARAMS) ne "" } { elaborate $design -parameters $::env(PARAMS) } else { elaborate $design }
 current_design $design
