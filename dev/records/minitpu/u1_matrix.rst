@@ -232,6 +232,23 @@ to non-const callee param; **A7 missing abstraction** -- ``compose.Unit``
 has no latency, so a composed tree's adder latency is a trusted parameter
 (the D-10/D-15 hook). X2 ``ported`` blocked until D-12 is in the tree.
 
+**Owner's decisions, 2026-10-04, checkpoint 11** (the owner back briefly):
+
+- D-15..D-19: **reviewed in chat, one at a time**, like D-12.
+- MXU push-to-output latency (O1/O2): **a manifest number** the assembler
+  reads (D-10), not a contract; a Stream link's extra cycles are recorded.
+- Large memories: **add an SRAM-macro path now** (OpenRAM in the codebase,
+  FreePDK45), and **revisit FPGA-flavoured design choices** -- the multi-copy
+  LUTRAM-style register file -- replacing them with ASIC-flavoured swap-ins
+  (flop array + mux; SRAM macro) implemented and integrated as stated
+  lowerings. Branch ``asic-memories``.
+- MiniTPU findings from U3 Phase 0 and tracks A/E: **file all** on
+  sunwookim028/minitpu-tmp.
+- Catapult's target technology, confirmed for the owner: ASIC
+  (``nangate-45nm_beh`` cells, generic sync-RAM models, DC on FreePDK45);
+  ``ccs_fpga`` never used; the large VMEM's area is not an ASIC number until
+  a macro path exists.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
