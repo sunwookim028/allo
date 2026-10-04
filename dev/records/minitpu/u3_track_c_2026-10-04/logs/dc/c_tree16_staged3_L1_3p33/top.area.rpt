@@ -1,0 +1,32 @@
+ 
+****************************************
+Report : area
+Design : top
+Version: W-2024.09
+Date   : Sun Oct  4 12:12:42 2026
+****************************************
+
+Information: Updating design information... (UID-85)
+Warning: Design 'top' contains 1 high-fanout nets. A fanout number of 1000 will be used for delay calculations involving these nets. (TIM-134)
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                          739
+Number of nets:                         22890
+Number of cells:                        21663
+Number of combinational cells:          18463
+Number of sequential cells:              3111
+Number of macros/black boxes:               0
+Number of buf/inv:                       3049
+Number of references:                     134
+
+Combinational area:              19581.323948
+Buf/Inv area:                     1683.514010
+Noncombinational area:           16438.268519
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                 36019.592467
+Total area:                 undefined
+1

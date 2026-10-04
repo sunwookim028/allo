@@ -1,0 +1,22 @@
+top mxu_streams_dim2
+UNIT-DIFF  mxu:dim2 form:mxu_streams_fifo mxu2_sfifo_3p33 catapult-rtl 116124/151172 defined (17288 masked; catapult==rtl on 35) cycle=per-row; 10.0036 cyc/row; output skew vs input accept (cycles) {'v2862': {0: 42115}, 'v2863': {0: 42115}, 'v2864': {9: 42115}, 'v2866': {'min': -149, 'max': 1, 'median': -129}, 'v2867': {'min': -421291, 'max': -1, 'median': -166091}} (46.0s)
+    differing defined slots by trace: identity=9, banks-at-span=38, fifo-full-exact=99, waiting-pops=6, group-straddles-load=13, push-before-load=31, reset-mid-stream=90, overflow=104, bank-overwrite=1, commit-early=18, random-0=11551, random-1=11516, random-2=11544, tb_mxu_single_port=28
+    e.g. identity cycle 19 output_valid_o: catapult 0 rtl 1
+    e.g. identity cycle 20 output_valid_o: catapult 1 rtl 0
+    e.g. identity cycle 21 output_valid_o: catapult 1 rtl 0
+    e.g. identity cycle 22 output_valid_o: catapult 1 rtl 0
+    MXU-CONTRACT identity           pops rtl 1 catapult 0 in-order-equal 0/1 | output_valid per cycle 18/26 | first valid rtl 0 catapult 20 | push->valid: rows 13, cycles 121
+    MXU-CONTRACT banks-at-span      pops rtl 3 catapult 3 in-order-equal 0/3 | output_valid per cycle 6/41 | first valid rtl 25 catapult 0
+    MXU-CONTRACT fifo-full-exact    pops rtl 16 catapult 16 in-order-equal 0/16 | output_valid per cycle 87/106 | first valid rtl 19 catapult 0
+    MXU-CONTRACT waiting-pops       pops rtl 4 catapult 4 in-order-equal 4/4 | output_valid per cycle 46/48 | first valid rtl 19 catapult 23 | push->valid: rows 4, cycles 1
+    MXU-CONTRACT group-straddles-load pops rtl 3 catapult 1 in-order-equal 1/3 | output_valid per cycle 27/37 | first valid rtl 19 catapult 24 | push->valid: rows 7, cycles 21
+    MXU-CONTRACT push-before-load   pops rtl 2 catapult 2 in-order-equal 0/2 | output_valid per cycle 2/31 | first valid rtl 17 catapult 0
+    MXU-CONTRACT reset-mid-stream   pops rtl 2 catapult 2 in-order-equal 0/2 | output_valid per cycle 9/90 | first valid rtl 19 catapult 0
+    MXU-CONTRACT overflow           pops rtl 16 catapult 17 in-order-equal 0/16 | output_valid per cycle 91/111 | first valid rtl 19 catapult 0
+    MXU-CONTRACT bank-overwrite     pops rtl 1 catapult 0 in-order-equal 0/1 | output_valid per cycle 31/32 | first valid rtl 24 catapult None
+    MXU-CONTRACT commit-early       pops rtl 1 catapult 1 in-order-equal 0/1 | output_valid per cycle 9/27 | first valid rtl 19 catapult 1
+    MXU-CONTRACT random-0           pops rtl 2423 catapult 2422 in-order-equal 0/2423 | output_valid per cycle 10567/13884 | first valid rtl 20 catapult 2
+    MXU-CONTRACT random-1           pops rtl 2420 catapult 2419 in-order-equal 0/2420 | output_valid per cycle 10392/13790 | first valid rtl 19 catapult 0
+    MXU-CONTRACT random-2           pops rtl 2424 catapult 2424 in-order-equal 0/2424 | output_valid per cycle 10610/13862 | first valid rtl 20 catapult 0
+    MXU-CONTRACT tb_mxu_single_port pops rtl 0 catapult 0 in-order-equal 0/0 | output_valid per cycle 1/29 | first valid rtl 28 catapult 0
+DONE

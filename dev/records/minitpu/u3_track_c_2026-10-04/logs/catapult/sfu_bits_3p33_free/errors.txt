@@ -1,0 +1,5 @@
+# Warning: $PROJECT_HOME/../kernel.cpp(873): Reducing the number of bits used to represent array elements of 'rom_gelu', from '32' bits to '16' bits. (MEM-87)
+# Warning: $PROJECT_HOME/../kernel.cpp(874): Reducing the number of bits used to represent array elements of 'rom_exp', from '32' bits to '16' bits. (MEM-87)
+# Warning: $PROJECT_HOME/../kernel.cpp(874): Reducing the number of bits used to represent array elements of 'rom_exp.rom', from '16' bits to '12' bits. (MEM-87)
+# Warning: $PROJECT_HOME/../kernel.cpp(875): Reducing the number of bits used to represent array elements of 'recip_pwl.rom#1', from '32' bits to '21' bits. (MEM-87)
+# Warning: $PROJECT_HOME/../kernel.cpp(876): Reducing the number of bits used to represent array elements of 'rsqrt_pwl.rom#1', from '32' bits to '21' bits. (MEM-87)

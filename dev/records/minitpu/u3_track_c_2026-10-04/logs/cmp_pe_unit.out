@@ -1,0 +1,4 @@
+top mxu_pe_unit
+ports (15 region args): v734:in1 v735:in1 v736:in1 v737:in16 v738:in1 v739:in32 v740:in8 v741:in32 v742:in1 v743:out1 v744:out16 v745:out1 v746:out32 v747:out32 v748:out1
+UNIT-MATCH mxu_pe:pe unit pe_unit_3p33 catapult-rtl 360196/360196 defined (338 masked; catapult==rtl on 337) cycle=per-row; 2.0001 cyc/row; output skew vs input accept (cycles) {'v743': {5: 30046, 7: 30044}, 'v744': {5: 30046, 7: 30044}, 'v745': {5: 30046, 7: 30044}, 'v746': {5: 30046, 7: 30044}, 'v747': {5: 30046, 7: 30044}, 'v748': {5: 30046, 7: 30044}} (72.0s)
+DONE

@@ -1,0 +1,9 @@
+top xlu_tree_4x4
+    stalled at cycle 2021810 (done=0)
+UNIT-DIFF  xlu_reduction_tree:n16 units tree16_units_3p33 catapult-rtl 204106/204120 defined (38520 masked; catapult==rtl on 35935) cycle=per-row; 33.3302 cyc/row; output skew vs input accept (cycles) {'v643': {-2001809: 1, -2001749: 1, -2001716: 1, -2001683: 1, 32: 60655, 191: 1}, 'v644': {-2001809: 1, -2001749: 1, -2001716: 1, -2001683: 1, 32: 60655, 191: 1}, 'v645': {-2001809: 1, -2001749: 1, -2001716: 1, -2001683: 1, 32: 60655, 191: 1}, 'v646': {'min': -2001809, 'max': 181, 'median': 18}} (36.9s)
+    differing defined slots by trace: random-2=14
+    e.g. random-2 cycle 60656 valid_o: catapult 0 rtl 1
+    e.g. random-2 cycle 60657 valid_o: catapult 0 rtl 1
+    e.g. random-2 cycle 60658 valid_o: catapult 0 rtl 1
+    e.g. random-2 cycle 60656 result_o: catapult 0 rtl 7f81
+DONE

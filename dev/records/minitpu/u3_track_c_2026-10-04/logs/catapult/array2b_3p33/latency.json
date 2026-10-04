@@ -1,0 +1,110 @@
+{
+ "clock_period_ns": 3.33,
+ "definition": "latency: rising edges from the input-accepting edge to the edge after which the output is visible, no stall; ii: cycles between iterations of the I/O loop",
+ "solution": "/work/shared/users/phd/sk3463/scratch/u3c/array2b_3p33.prj/build/Catapult/mxu_array_dim2.v1",
+ "tool": "catapult",
+ "units": {
+  "array_drive_0": {
+   "ii": 9,
+   "io": {
+    "v0.Pop()": 0,
+    "v1.Pop()": 0,
+    "v10.Push()": 8,
+    "v2.Pop()": 0,
+    "v4.Pop()": 0,
+    "v6.Pop()": 0,
+    "v7.Push()": 2,
+    "v8.Push()": 4,
+    "v9.Push()": 6
+   },
+   "iterations": 40136,
+   "latency": 8,
+   "loop": "l_S_t_0_t",
+   "loop_c_steps": 9,
+   "port_style": "connections",
+   "process": "/mxu_array_dim2/array_drive_0/run",
+   "status": "scheduled"
+  },
+  "array_sink_0": {
+   "ii": 3,
+   "io": {
+    "v2589.Push()": 2,
+    "v2590.Pop()": 0,
+    "v2591.Pop()": 1
+   },
+   "iterations": 40136,
+   "latency": 2,
+   "loop": "l_S_t_0_t5",
+   "loop_c_steps": 3,
+   "port_style": "connections",
+   "process": "/mxu_array_dim2/array_sink_0/run",
+   "status": "scheduled"
+  },
+  "pe_unit_0_0": {
+   "ii": 1,
+   "io": {
+    "v86.Pop()": 0,
+    "v87.Pop()": 0,
+    "v88.Push()": 1,
+    "v89.Push()": 1,
+    "v90.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_array_dim2/pe_unit_0_0/run",
+   "status": "scheduled"
+  },
+  "pe_unit_0_1": {
+   "ii": 1,
+   "io": {
+    "v724.Pop()": 0,
+    "v725.Pop()": 0,
+    "v726.Push()": 1,
+    "v727.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_array_dim2/pe_unit_0_1/run",
+   "status": "scheduled"
+  },
+  "pe_unit_1_0": {
+   "ii": 1,
+   "io": {
+    "v1345.Pop()": 0,
+    "v1346.Pop()": 0,
+    "v1347.Pop()": 0,
+    "v1348.Push()": 1,
+    "v1349.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_array_dim2/pe_unit_1_0/run",
+   "status": "scheduled"
+  },
+  "pe_unit_1_1": {
+   "ii": 1,
+   "io": {
+    "v1975.Pop()": 0,
+    "v1976.Pop()": 0,
+    "v1977.Pop()": 0,
+    "v1978.Push()": 0
+   },
+   "iterations": null,
+   "latency": 0,
+   "loop": "while",
+   "loop_c_steps": 1,
+   "port_style": "connections",
+   "process": "/mxu_array_dim2/pe_unit_1_1/run",
+   "status": "scheduled"
+  }
+ }
+}

@@ -1,0 +1,6 @@
+c_sfu_bits_L5_3p33 top clk 3.33 /work/shared/users/phd/sk3463/scratch/u3c/sfu_bits_3p33_L5.prj/build/Catapult/top.v1/concat_rtl.v
+c_sfu_bits_L5_2p0 top clk 2.0 /work/shared/users/phd/sk3463/scratch/u3c/sfu_bits_2p0_L5.prj/build/Catapult/top.v1/concat_rtl.v
+c_sfu_rows_L1_3p33 top clk 3.33 /work/shared/users/phd/sk3463/scratch/u3c/sfu_rows_3p33_L1.prj/build/Catapult/top.v1/concat_rtl.v
+c_sfu_rows_L1_2p0 top clk 2.0 /work/shared/users/phd/sk3463/scratch/u3c/sfu_rows_2p0_L1.prj/build/Catapult/top.v1/concat_rtl.v
+c_pe_bits_L1_3p33 top clk 3.33 /work/shared/users/phd/sk3463/scratch/u3c/pe_bits_3p33_L1.prj/build/Catapult/top.v1/concat_rtl.v
+c_pe_bits_L1_2p0 top clk 2.0 /work/shared/users/phd/sk3463/scratch/u3c/pe_bits_2p0_L1.prj/build/Catapult/top.v1/concat_rtl.v

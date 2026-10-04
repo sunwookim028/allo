@@ -1,0 +1,6 @@
+# composites (self-timed Streams; no latency pin): P2, A1 at DIM 2 and 4, M1 at DIM 4, and T2 (H4) at 3.33 ns
+pe_unit_3p33 mxu_pe unit --inst pe --clock 3.33 --pipeline-all --unroll-inner
+array2_3p33 mxu_systolic_array streams --inst dim2 --clock 3.33 --pipeline-all --unroll-inner
+array4_3p33 mxu_systolic_array streams --inst dim4 --clock 3.33 --pipeline-all --unroll-inner
+mxu4_3p33 mxu lockstep --inst dim4 --clock 3.33 --pipeline-all --unroll-inner
+tree16_units_3p33 xlu_reduction_tree units --inst n16 --clock 3.33 --pipeline-all --unroll-inner --unroll leading_zeros17:offset

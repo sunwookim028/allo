@@ -1,0 +1,4 @@
+top mxu_array_dim4
+ports (9 region args): v10363:in1 v10364:in16 v10365:in16 v10366:mr16 v10367:in16 v10368:mr16 v10369:in32 v10370:mw32 v10371:out16
+UNIT-MATCH mxu_systolic_array:dim4 streams array4b_3p33 catapult-rtl 79849/79849 defined (589 masked; catapult==rtl on 582) cycle=per-row; 17.0003 cyc/row; output skew vs input accept (cycles) {'v10370': {20: 40220, 22: 40220, 24: 40220, 25: 40220}, 'v10371': {25: 40220}} (71.4s)
+DONE

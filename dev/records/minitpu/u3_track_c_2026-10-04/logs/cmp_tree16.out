@@ -1,0 +1,12 @@
+RTL xlu_reduction_tree:n16: 60660 cycles in 7 traces, 204120 defined slots, RTL vs reference on defined: 204120/204120
+UNIT-DIFF  xlu_reduction_tree:n16 tree16_staged_3p33_free catapult-rtl 125907/204120 defined (38520 masked: fill=3661, no valid=34859; catapult==rtl on 2360) cycle=per-row; L per output {'valid_o': {2: 60660}, 'result_o': {2: 60660}, 'lane_valid_o': {2: 60660}, 'lane_result_o': {1: 60660}}; 1.0000 cyc/row; CYCLE-EQUAL no (21.1s)
+    differing defined slots by trace: reset-mid-stream=102, random-0=25689, random-1=25768, random-2=25750, lane-leak=4, corners=123, mixed-sum-max=777
+    e.g. reset-mid-stream cycle 587 valid_o: catapult 1 rtl 0
+    e.g. random-0 cycle 1008 valid_o: catapult 1 rtl 0
+    e.g. random-0 cycle 1411 valid_o: catapult 1 rtl 0
+    e.g. random-0 cycle 1465 valid_o: catapult 1 rtl 0
+    LATENCY-MISMATCH tree_0: reported 2 ii=1 (scheduled), measured [1, 2] at 1.00005 cyc/vector; unit declares 1
+RTL xlu_reduction_tree:n16: 60660 cycles in 7 traces, 204120 defined slots, RTL vs reference on defined: 204120/204120
+UNIT-MATCH xlu_reduction_tree:n16 tree16_wide_3p33_free catapult-rtl 204120/204120 defined (38520 masked: fill=3661, no valid=34859; catapult==rtl on 35936) cycle=per-row; L per output {'valid_o': {1: 60660}, 'result_o': {1: 60660}, 'lane_valid_o': {1: 60660}, 'lane_result_o': {0: 60660}}; 1.0000 cyc/row; CYCLE-EQUAL no (25.8s)
+    LATENCY-MISMATCH tree_0: reported 1 ii=1 (scheduled), measured [0, 1] at 1.00003 cyc/vector; unit declares 1
+DONE

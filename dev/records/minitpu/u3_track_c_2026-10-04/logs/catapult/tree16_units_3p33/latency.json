@@ -1,0 +1,289 @@
+{
+ "clock_period_ns": 3.33,
+ "definition": "latency: rising edges from the input-accepting edge to the edge after which the output is visible, no stall; ii: cycles between iterations of the I/O loop",
+ "solution": "/work/shared/users/phd/sk3463/scratch/u3c/tree16_units_3p33.prj/build/Catapult/xlu_tree_4x4.v1",
+ "tool": "catapult",
+ "units": {
+  "add_high_0": {
+   "ii": 1,
+   "io": {
+    "v572.Pop()": 0,
+    "v573.Pop()": 0,
+    "v574.Push()": 2
+   },
+   "iterations": null,
+   "latency": 2,
+   "loop": "while",
+   "loop_c_steps": 3,
+   "port_style": "connections",
+   "process": "/xlu_tree_4x4/add_high_0/run",
+   "status": "scheduled"
+  },
+  "add_high_1": {
+   "ii": 1,
+   "io": {
+    "v580.Pop()": 0,
+    "v581.Pop()": 0,
+    "v582.Push()": 2
+   },
+   "iterations": null,
+   "latency": 2,
+   "loop": "while",
+   "loop_c_steps": 3,
+   "port_style": "connections",
+   "process": "/xlu_tree_4x4/add_high_1/run",
+   "status": "scheduled"
+  },
+  "add_high_2": {
+   "ii": 1,
+   "io": {
+    "v588.Pop()": 0,
+    "v589.Pop()": 0,
+    "v590.Push()": 2
+   },
+   "iterations": null,
+   "latency": 2,
+   "loop": "while",
+   "loop_c_steps": 3,
+   "port_style": "connections",
+   "process": "/xlu_tree_4x4/add_high_2/run",
+   "status": "scheduled"
+  },
+  "add_low_0": {
+   "ii": 1,
+   "io": {
+    "v464.Pop()": 0,
+    "v465.Pop()": 0,
+    "v466.Push()": 2
+   },
+   "iterations": null,
+   "latency": 2,
+   "loop": "while",
+   "loop_c_steps": 3,
+   "port_style": "connections",
+   "process": "/xlu_tree_4x4/add_low_0/run",
+   "status": "scheduled"
+  },
+  "add_low_1": {
+   "ii": 1,
+   "io": {
+    "v472.Pop()": 0,
+    "v473.Pop()": 0,
+    "v474.Push()": 2
+   },
+   "iterations": null,
+   "latency": 2,
+   "loop": "while",
+   "loop_c_steps": 3,
+   "port_style": "connections",
+   "process": "/xlu_tree_4x4/add_low_1/run",
+   "status": "scheduled"
+  },
+  "add_low_2": {
+   "ii": 1,
+   "io": {
+    "v480.Pop()": 0,
+    "v481.Pop()": 0,
+    "v482.Push()": 2
+   },
+   "iterations": null,
+   "latency": 2,
+   "loop": "while",
+   "loop_c_steps": 3,
+   "port_style": "connections",
+   "process": "/xlu_tree_4x4/add_low_2/run",
+   "status": "scheduled"
+  },
+  "add_low_3": {
+   "ii": 1,
+   "io": {
+    "v488.Pop()": 0,
+    "v489.Pop()": 0,
+    "v490.Push()": 2
+   },
+   "iterations": null,
+   "latency": 2,
+   "loop": "while",
+   "loop_c_steps": 3,
+   "port_style": "connections",
+   "process": "/xlu_tree_4x4/add_low_3/run",
+   "status": "scheduled"
+  },
+  "add_low_4": {
+   "ii": 1,
+   "io": {
+    "v496.Pop()": 0,
+    "v497.Pop()": 0,
+    "v498.Push()": 2
+   },
+   "iterations": null,
+   "latency": 2,
+   "loop": "while",
+   "loop_c_steps": 3,
+   "port_style": "connections",
+   "process": "/xlu_tree_4x4/add_low_4/run",
+   "status": "scheduled"
+  },
+  "add_low_5": {
+   "ii": 1,
+   "io": {
+    "v504.Pop()": 0,
+    "v505.Pop()": 0,
+    "v506.Push()": 2
+   },
+   "iterations": null,
+   "latency": 2,
+   "loop": "while",
+   "loop_c_steps": 3,
+   "port_style": "connections",
+   "process": "/xlu_tree_4x4/add_low_5/run",
+   "status": "scheduled"
+  },
+  "add_low_6": {
+   "ii": 1,
+   "io": {
+    "v512.Pop()": 0,
+    "v513.Pop()": 0,
+    "v514.Push()": 2
+   },
+   "iterations": null,
+   "latency": 2,
+   "loop": "while",
+   "loop_c_steps": 3,
+   "port_style": "connections",
+   "process": "/xlu_tree_4x4/add_low_6/run",
+   "status": "scheduled"
+  },
+  "add_low_7": {
+   "ii": 1,
+   "io": {
+    "v520.Pop()": 0,
+    "v521.Pop()": 0,
+    "v522.Push()": 2
+   },
+   "iterations": null,
+   "latency": 2,
+   "loop": "while",
+   "loop_c_steps": 3,
+   "port_style": "connections",
+   "process": "/xlu_tree_4x4/add_low_7/run",
+   "status": "scheduled"
+  },
+  "add_tap_0": {
+   "ii": 1,
+   "io": {
+    "v528.Pop()": 0,
+    "v529.Pop()": 0,
+    "v530.Push()": 2,
+    "v531.Push()": 2
+   },
+   "iterations": null,
+   "latency": 2,
+   "loop": "while",
+   "loop_c_steps": 3,
+   "port_style": "connections",
+   "process": "/xlu_tree_4x4/add_tap_0/run",
+   "status": "scheduled"
+  },
+  "add_tap_1": {
+   "ii": 1,
+   "io": {
+    "v539.Pop()": 0,
+    "v540.Pop()": 0,
+    "v541.Push()": 2,
+    "v542.Push()": 2
+   },
+   "iterations": null,
+   "latency": 2,
+   "loop": "while",
+   "loop_c_steps": 3,
+   "port_style": "connections",
+   "process": "/xlu_tree_4x4/add_tap_1/run",
+   "status": "scheduled"
+  },
+  "add_tap_2": {
+   "ii": 1,
+   "io": {
+    "v550.Pop()": 0,
+    "v551.Pop()": 0,
+    "v552.Push()": 2,
+    "v553.Push()": 2
+   },
+   "iterations": null,
+   "latency": 2,
+   "loop": "while",
+   "loop_c_steps": 3,
+   "port_style": "connections",
+   "process": "/xlu_tree_4x4/add_tap_2/run",
+   "status": "scheduled"
+  },
+  "add_tap_3": {
+   "ii": 1,
+   "io": {
+    "v561.Pop()": 0,
+    "v562.Pop()": 0,
+    "v563.Push()": 2,
+    "v564.Push()": 2
+   },
+   "iterations": null,
+   "latency": 2,
+   "loop": "while",
+   "loop_c_steps": 3,
+   "port_style": "connections",
+   "process": "/xlu_tree_4x4/add_tap_3/run",
+   "status": "scheduled"
+  },
+  "tree_feed_0": {
+   "ii": 33,
+   "io": {
+    "v317.Pop()": 0,
+    "v319.Push()": 2,
+    "v320.Push()": 4,
+    "v321.Push()": 6,
+    "v322.Push()": 8,
+    "v323.Push()": 10,
+    "v324.Push()": 12,
+    "v325.Push()": 14,
+    "v326.Push()": 16,
+    "v327.Push()": 18,
+    "v328.Push()": 20,
+    "v329.Push()": 22,
+    "v330.Push()": 24,
+    "v331.Push()": 26,
+    "v332.Push()": 28,
+    "v333.Push()": 30,
+    "v334.Push()": 32
+   },
+   "iterations": 60660,
+   "latency": 32,
+   "loop": "l_S_t_0_t",
+   "loop_c_steps": 33,
+   "port_style": "connections",
+   "process": "/xlu_tree_4x4/tree_feed_0/run",
+   "status": "scheduled"
+  },
+  "tree_sink_0": {
+   "ii": 3,
+   "io": {
+    "v596.Pop()": 0,
+    "v597.Pop()": 0,
+    "v598.Push()": 2,
+    "v599.Push()": 2,
+    "v600.Push()": 2,
+    "v602.Pop()": 0,
+    "v603.Pop()": 0,
+    "v604.Pop()": 0,
+    "v605.Pop()": 0,
+    "v606.Pop()": 0
+   },
+   "iterations": 60660,
+   "latency": 2,
+   "loop": "l_S_t_2_t16",
+   "loop_c_steps": 3,
+   "port_style": "connections",
+   "process": "/xlu_tree_4x4/tree_sink_0/run",
+   "reason": "rolled loop(s) ['l_S_s_7_s1'] merged into the scheduled loop",
+   "status": "unreliable"
+  }
+ }
+}

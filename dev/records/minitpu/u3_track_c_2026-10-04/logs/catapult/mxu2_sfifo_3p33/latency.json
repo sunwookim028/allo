@@ -1,0 +1,132 @@
+{
+ "clock_period_ns": 3.33,
+ "definition": "latency: rising edges from the input-accepting edge to the edge after which the output is visible, no stall; ii: cycles between iterations of the I/O loop",
+ "solution": "/work/shared/users/phd/sk3463/scratch/u3c/mxu2_sfifo_3p33.prj/build/Catapult/mxu_streams_dim2.v1",
+ "tool": "catapult",
+ "units": {
+  "gather_try_0": {
+   "ii": 4,
+   "io": {
+    "v2690.Push()": 3,
+    "v2691.Pop()": 0,
+    "v2692.Pop()": 0,
+    "v2693.PushNB()": 1,
+    "v2694.Pop()": 1,
+    "v2695.PushNB()": 2
+   },
+   "iterations": 42115,
+   "latency": 3,
+   "loop": "l_S_t_0_t5",
+   "loop_c_steps": 4,
+   "port_style": "connections",
+   "process": "/mxu_streams_dim2/gather_try_0/run",
+   "status": "scheduled"
+  },
+  "mxu_front_0": {
+   "ii": 5,
+   "io": {
+    "v0.Pop()": 0,
+    "v1.Pop()": 0,
+    "v10.Push()": 1,
+    "v11.Push()": 1,
+    "v2.Pop()": 0,
+    "v4.Pop()": 0,
+    "v5.Push()": 0,
+    "v6.Push()": 0,
+    "v7.Push()": 1,
+    "v8.Push()": 1,
+    "v9.Push()": 1
+   },
+   "iterations": 42115,
+   "latency": 1,
+   "loop": "l_S_t_0_t",
+   "loop_c_steps": 5,
+   "port_style": "connections",
+   "process": "/mxu_streams_dim2/mxu_front_0/run",
+   "reason": "rolled loop(s) ['l_S_s_2_s2'] merged into the scheduled loop",
+   "status": "unreliable"
+  },
+  "pe_unit_0_0": {
+   "ii": 1,
+   "io": {
+    "v188.Pop()": 0,
+    "v189.Pop()": 0,
+    "v190.Push()": 1,
+    "v191.Push()": 1,
+    "v192.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_streams_dim2/pe_unit_0_0/run",
+   "status": "scheduled"
+  },
+  "pe_unit_0_1": {
+   "ii": 1,
+   "io": {
+    "v826.Pop()": 0,
+    "v827.Pop()": 0,
+    "v828.Push()": 1,
+    "v829.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_streams_dim2/pe_unit_0_1/run",
+   "status": "scheduled"
+  },
+  "pe_unit_1_0": {
+   "ii": 1,
+   "io": {
+    "v1447.Pop()": 0,
+    "v1448.Pop()": 0,
+    "v1449.Pop()": 0,
+    "v1450.Push()": 1,
+    "v1451.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_streams_dim2/pe_unit_1_0/run",
+   "status": "scheduled"
+  },
+  "pe_unit_1_1": {
+   "ii": 1,
+   "io": {
+    "v2077.Pop()": 0,
+    "v2078.Pop()": 0,
+    "v2079.Pop()": 0,
+    "v2080.Push()": 0
+   },
+   "iterations": null,
+   "latency": 0,
+   "loop": "while",
+   "loop_c_steps": 1,
+   "port_style": "connections",
+   "process": "/mxu_streams_dim2/pe_unit_1_1/run",
+   "status": "scheduled"
+  },
+  "pop_engine_0": {
+   "ii": 10,
+   "io": {
+    "v2818.Pop()": 0,
+    "v2819.Push()": 1,
+    "v2821.Pop()": 1,
+    "v2822.Pop()": 5
+   },
+   "iterations": 42115,
+   "latency": 1,
+   "loop": "l_S_t_0_t6",
+   "loop_c_steps": 10,
+   "port_style": "connections",
+   "process": "/mxu_streams_dim2/pop_engine_0/run",
+   "status": "scheduled"
+  }
+ }
+}

@@ -1,0 +1,154 @@
+sfu_staged_2p0_L1: BUILD sfu staged inst=None n=462144 unroll=[] pipeline=['sfu_k_0:t'] {'clock_period': 2.0, 'latency': {'sfu_k_0': 1}}: ValueError: latency=1 on sfu_k_0: it has no Connections In/Out pair (Wire ports?). Catapult cannot pin a Wire port's latency: an sc_in read is not a scheduled operation, so `cycle set` has no anchor (u1_catapult_units N2). Refusing rather than dropping it. (0s)
+sfu_staged_3p33_L1: BUILD sfu staged inst=None n=462144 unroll=[] pipeline=['sfu_k_0:t'] {'clock_period': 3.33, 'latency': {'sfu_k_0': 1}}: ValueError: latency=1 on sfu_k_0: it has no Connections In/Out pair (Wire ports?). Catapult cannot pin a Wire port's latency: an sc_in read is not a scheduled operation, so `cycle set` has no anchor (u1_catapult_units N2). Refusing rather than dropping it. (0s)
+sfu_bits_3p33_L5: [latency] sfu_k_0: latency=5 ii=1 scheduled
+sfu_bits_3p33_L5: BUILD sfu bits inst=None n=462144 unroll=[] pipeline=['sfu_k_0:i'] {'clock_period': 3.33, 'latency': {'sfu_k_0': 5}}: ok 130s
+sfu_bits_3p33_free: [latency] sfu_k_0: latency=1 ii=1 scheduled
+sfu_bits_3p33_free: BUILD sfu bits inst=None n=462144 unroll=[] pipeline=['sfu_k_0:i'] {'clock_period': 3.33}: ok 131s
+sfu_bits_2p0_free: [latency] sfu_k_0: latency=2 ii=1 scheduled
+sfu_bits_2p0_free: BUILD sfu bits inst=None n=462144 unroll=[] pipeline=['sfu_k_0:i'] {'clock_period': 2.0}: ok 137s
+sfu_bits_2p0_L5: [latency] sfu_k_0: latency=5 ii=1 scheduled
+sfu_bits_2p0_L5: BUILD sfu bits inst=None n=462144 unroll=[] pipeline=['sfu_k_0:i'] {'clock_period': 2.0, 'latency': {'sfu_k_0': 5}}: ok 138s
+sfu_staged_3p33_free: [latency] sfu_k_0: latency=1 ii=1 scheduled
+sfu_staged_3p33_free: BUILD sfu staged inst=None n=462144 unroll=[] pipeline=['sfu_k_0:t'] {'clock_period': 3.33}: ok 144s
+tree16_staged_2p0_L1: BUILD xlu_reduction_tree form:tree_wide_staged inst=n16 n=60660 unroll=['leading_zeros17:offset', 'tree_0:k0', 'tree_0:k1', 'tree_0:m0', 'tree_0:m1', 'tree_0:k2', 'tree_0:j', 'tree_0:k3', 'tree_0:k4'] pipeline=['tree_0:t'] {'clock_period': 2.0, 'latency': {'tree_0': 1}}: RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode
+tree16_staged_3p33_L1: BUILD xlu_reduction_tree form:tree_wide_staged inst=n16 n=60660 unroll=['leading_zeros17:offset', 'tree_0:k0', 'tree_0:k1', 'tree_0:m0', 'tree_0:m1', 'tree_0:k2', 'tree_0:j', 'tree_0:k3', 'tree_0:k4'] pipeline=['tree_0:t'] {'clock_period': 3.33, 'latency': {'tree_0': 1}}: RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode
+tx_wide_3p33_L1: BUILD xlu_transpose form:transpose_wide inst=t16x4 n=60092 unroll=[] pipeline=['tx_0:t'] {'clock_period': 3.33, 'latency': {'tx_0': 1}}: RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode
+tx_wide_3p33_free: BUILD xlu_transpose form:transpose_wide inst=t16x4 n=60092 unroll=[] pipeline=['tx_0:t'] {'clock_period': 3.33}: RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode
+tx_wide_2p0_L1: BUILD xlu_transpose form:transpose_wide inst=t16x4 n=60092 unroll=[] pipeline=['tx_0:t'] {'clock_period': 2.0, 'latency': {'tx_0': 1}}: RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode
+tree16_staged_3p33_free: [latency] tree_0: latency=2 ii=1 scheduled
+tree16_staged_3p33_free: BUILD xlu_reduction_tree form:tree_wide_staged inst=n16 n=60660 unroll=['leading_zeros17:offset', 'tree_0:k0', 'tree_0:k1', 'tree_0:m0', 'tree_0:m1', 'tree_0:k2', 'tree_0:j', 'tree_0:k3', 'tree_0:k4'] pipeline=['tree_0:t'] {'clock_period': 3.33}: ok 1129s
+tree16_wide_3p33_free: [latency] tree_0: latency=1 ii=1 scheduled
+tree16_wide_3p33_free: BUILD xlu_reduction_tree form:tree_wide inst=n16 n=60660 unroll=['leading_zeros17:offset', 'tree_0:k0', 'tree_0:k1', 'tree_0:m', 'tree_0:k2', 'tree_0:j', 'tree_0:s0', 'tree_0:s1', 'tree_0:k3', 'tree_0:k4'] pipeline=['tree_0:t'] {'clock_period': 3.33}: ok 1343s
+tree16_wide_3p33_L1: [latency] tree_0: latency=1 ii=1 scheduled
+tree16_wide_3p33_L1: BUILD xlu_reduction_tree form:tree_wide inst=n16 n=60660 unroll=['leading_zeros17:offset', 'tree_0:k0', 'tree_0:k1', 'tree_0:m', 'tree_0:k2', 'tree_0:j', 'tree_0:s0', 'tree_0:s1', 'tree_0:k3', 'tree_0:k4'] pipeline=['tree_0:t'] {'clock_period': 3.33, 'latency': {'tree_0': 1}}: ok 1285s
+tree16_wide_2p0_free: [latency] tree_0: latency=3 ii=1 scheduled
+tree16_wide_2p0_free: BUILD xlu_reduction_tree form:tree_wide inst=n16 n=60660 unroll=['leading_zeros17:offset', 'tree_0:k0', 'tree_0:k1', 'tree_0:m', 'tree_0:k2', 'tree_0:j', 'tree_0:s0', 'tree_0:s1', 'tree_0:k3', 'tree_0:k4'] pipeline=['tree_0:t'] {'clock_period': 2.0}: ok 1764s
+BATCH1_DONE
+sfu_rows_3p33_L1: [latency] sfu_k_0: latency=1 ii=1 scheduled
+sfu_rows_3p33_L1: BUILD sfu form:sfu_staged_rows inst=None n=462144 unroll=[] pipeline=['sfu_k_0:t'] {'clock_period': 3.33, 'latency': {'sfu_k_0': 1}}: ok 87s
+sfu_rows_2p0_L1: [latency] sfu_k_0: latency=1 ii=1 scheduled
+sfu_rows_2p0_L1: BUILD sfu form:sfu_staged_rows inst=None n=462144 unroll=[] pipeline=['sfu_k_0:t'] {'clock_period': 2.0, 'latency': {'sfu_k_0': 1}}: ok 94s
+sfu_rows_3p33_free: [latency] sfu_k_0: latency=1 ii=1 scheduled
+sfu_rows_3p33_free: BUILD sfu form:sfu_staged_rows inst=None n=462144 unroll=[] pipeline=['sfu_k_0:t'] {'clock_period': 3.33}: ok 95s
+pe_bits_3p33_L1: [latency] pe_0: latency=1 ii=1 scheduled
+pe_bits_3p33_L1: BUILD mxu_pe bits inst=pe n=60090 unroll=['leading_zeros19:offset'] pipeline=['pe_0:t'] {'clock_period': 3.33, 'latency': {'pe_0': 1}}: ok 129s
+pe_bits_3p33_free: [latency] pe_0: latency=1 ii=1 scheduled
+pe_bits_3p33_free: BUILD mxu_pe bits inst=pe n=60090 unroll=['leading_zeros19:offset'] pipeline=['pe_0:t'] {'clock_period': 3.33}: ok 104s
+pe_bits_2p0_free: [latency] pe_0: latency=1 ii=1 scheduled
+pe_bits_2p0_free: BUILD mxu_pe bits inst=pe n=60090 unroll=['leading_zeros19:offset'] pipeline=['pe_0:t'] {'clock_period': 2.0}: ok 111s
+pe_bits_2p0_L1: [latency] pe_0: latency=1 ii=1 scheduled
+pe_bits_2p0_L1: BUILD mxu_pe bits inst=pe n=60090 unroll=['leading_zeros19:offset'] pipeline=['pe_0:t'] {'clock_period': 2.0, 'latency': {'pe_0': 1}}: ok 128s
+BATCH1B_DONE
+tx_wide_3p33_L1: BUILD xlu_transpose form:transpose_wide inst=t16x4 n=60092 unroll=[] pipeline=['tx_0:t'] partition=['tx_0:tile'] {'clock_period': 3.33, 'latency': {'tx_0': 1}}: RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode
+tx_wide_2p0_free: BUILD xlu_transpose form:transpose_wide inst=t16x4 n=60092 unroll=[] pipeline=['tx_0:t'] partition=['tx_0:tile'] {'clock_period': 2.0}: RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode
+tx_wide_3p33_free: BUILD xlu_transpose form:transpose_wide inst=t16x4 n=60092 unroll=[] pipeline=['tx_0:t'] partition=['tx_0:tile'] {'clock_period': 3.33}: RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode
+tx_wide_2p0_L1: BUILD xlu_transpose form:transpose_wide inst=t16x4 n=60092 unroll=[] pipeline=['tx_0:t'] partition=['tx_0:tile'] {'clock_period': 2.0, 'latency': {'tx_0': 1}}: RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode
+DONE
+DONE
+tx_wide_3p33_free: [latency] tx_0: latency=1 ii=1 scheduled
+tx_wide_3p33_free: BUILD xlu_transpose form:transpose_wide inst=t16x4 n=60092 unroll=[] pipeline=['tx_0:t'] partition=['tx_0:tile'] tcl=['directive set -REGISTER_THRESHOLD 4096'] {'clock_period': 3.33}: ok 118s
+tx_wide_2p0_free: [latency] tx_0: latency=1 ii=1 scheduled
+tx_wide_2p0_free: BUILD xlu_transpose form:transpose_wide inst=t16x4 n=60092 unroll=[] pipeline=['tx_0:t'] partition=['tx_0:tile'] tcl=['directive set -REGISTER_THRESHOLD 4096'] {'clock_period': 2.0}: ok 125s
+tx_wide_3p33_L1: [latency] tx_0: latency=1 ii=1 scheduled
+tx_wide_3p33_L1: BUILD xlu_transpose form:transpose_wide inst=t16x4 n=60092 unroll=[] pipeline=['tx_0:t'] partition=['tx_0:tile'] tcl=['directive set -REGISTER_THRESHOLD 4096'] {'clock_period': 3.33, 'latency': {'tx_0': 1}}: ok 147s
+tx_wide_2p0_L1: [latency] tx_0: latency=1 ii=1 scheduled
+tx_wide_2p0_L1: BUILD xlu_transpose form:transpose_wide inst=t16x4 n=60092 unroll=[] pipeline=['tx_0:t'] partition=['tx_0:tile'] tcl=['directive set -REGISTER_THRESHOLD 4096'] {'clock_period': 2.0, 'latency': {'tx_0': 1}}: ok 150s
+DONE
+tree16_staged_2p0_free: BUILD xlu_reduction_tree form:tree_wide_staged inst=n16 n=60660 unroll=['leading_zeros17:offset', 'tree_0:k0', 'tree_0:k1', 'tree_0:m1', 'tree_0:m0', 'tree_0:m2', 'tree_0:k2', 'tree_0:j', 'tree_0:k3', 'tree_0:k4'] pipeline=['tree_0:t'] partition=[] tcl=[] {'clock_period': 2.0}: RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode
+tree16_staged_3p33_free: [latency] tree_0: latency=1 ii=1 scheduled
+tree16_staged_3p33_free: BUILD xlu_reduction_tree form:tree_wide_staged inst=n16 n=60660 unroll=['leading_zeros17:offset', 'tree_0:k0', 'tree_0:k1', 'tree_0:m1', 'tree_0:m0', 'tree_0:m2', 'tree_0:k2', 'tree_0:j', 'tree_0:k3', 'tree_0:k4'] pipeline=['tree_0:t'] partition=[] tcl=[] {'clock_period': 3.33}: ok 1047s
+DONE
+array2_3p33: BUILD mxu_systolic_array streams inst=dim2 n=40136 unroll=['pe_unit_0_0:offset', 'pe_unit_0_1:offset', 'pe_unit_1_0:offset', 'pe_unit_1_1:offset'] pipeline=['array_drive_0:t', 'pe_unit_0_0:t', 'pe_unit_0_1:t', 'pe_unit_1_0:t', 'pe_unit_1_1:t', 'array_sink_0:t'] {'clock_period': 3.33}: RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode
+pe_unit_3p33: [latency] pe_drive_0: latency=3 ii=1 scheduled
+pe_unit_3p33: [latency] pe_sink_0: latency=1 ii=1 scheduled
+pe_unit_3p33: [latency] pe_unit_0_0: latency=1 ii=1 scheduled
+pe_unit_3p33: BUILD mxu_pe unit inst=pe n=60090 unroll=['pe_unit_0_0:offset'] pipeline=['pe_drive_0:t', 'pe_unit_0_0:t', 'pe_sink_0:t'] {'clock_period': 3.33}: ok 140s
+array4_3p33: BUILD mxu_systolic_array streams inst=dim4 n=40220 unroll=['pe_unit_0_0:offset', 'pe_unit_0_1:offset', 'pe_unit_0_2:offset', 'pe_unit_0_3:offset', 'pe_unit_1_0:offset', 'pe_unit_1_1:offset', 'pe_unit_1_2:offset', 'pe_unit_1_3:offset', 'pe_unit_2_0:offset', 'pe_unit_2_1:offset', 'pe_unit_2_2:offset', 'pe_unit_2_3:offset', 'pe_unit_3_0:offset', 'pe_unit_3_1:offset', 'pe_unit_3_2:offset', 'pe_unit_3_
+mxu4_3p33: BUILD mxu lockstep inst=dim4 n=31071 unroll=['mxu_front_0:s', 'pe_unit_0_0:offset', 'pe_unit_0_1:offset', 'pe_unit_0_2:offset', 'pe_unit_0_3:offset', 'pe_unit_1_0:offset', 'pe_unit_1_1:offset', 'pe_unit_1_2:offset', 'pe_unit_1_3:offset', 'pe_unit_2_0:offset', 'pe_unit_2_1:offset', 'pe_unit_2_2:offset', 'pe_unit_2_3:offset', 'pe_unit_3_0:offset', 'pe_unit_3_1:offset', 'pe_unit_3_2:offset', 'pe_unit
+BATCH2_DONE
+array2b_3p33: [latency] array_drive_0: latency=8 ii=9 scheduled
+array2b_3p33: [latency] array_sink_0: latency=2 ii=3 scheduled
+array2b_3p33: [latency] pe_unit_0_0: latency=1 ii=1 scheduled
+array2b_3p33: [latency] pe_unit_0_1: latency=1 ii=1 scheduled
+array2b_3p33: [latency] pe_unit_1_0: latency=1 ii=1 scheduled
+array2b_3p33: [latency] pe_unit_1_1: latency=0 ii=1 scheduled
+array2b_3p33: BUILD mxu_systolic_array streams inst=dim2 n=40136 unroll=['pe_unit_0_0:offset', 'pe_unit_0_1:offset', 'pe_unit_1_0:offset', 'pe_unit_1_1:offset'] pipeline=['pe_unit_0_0:t', 'pe_unit_0_1:t', 'pe_unit_1_0:t', 'pe_unit_1_1:t'] partition=[] {'clock_period': 3.33}: ok 258s
+DONE
+array4b_3p33: [latency] array_drive_0: latency=16 ii=17 scheduled
+array4b_3p33: [latency] array_sink_0: latency=4 ii=5 scheduled
+array4b_3p33: [latency] pe_unit_0_0: latency=1 ii=1 scheduled
+array4b_3p33: [latency] pe_unit_0_1: latency=1 ii=1 scheduled
+array4b_3p33: [latency] pe_unit_0_2: latency=1 ii=1 scheduled
+array4b_3p33: [latency] pe_unit_0_3: latency=1 ii=1 scheduled
+array4b_3p33: [latency] pe_unit_1_0: latency=1 ii=1 scheduled
+array4b_3p33: [latency] pe_unit_1_1: latency=1 ii=1 scheduled
+array4b_3p33: [latency] pe_unit_1_2: latency=1 ii=1 scheduled
+array4b_3p33: [latency] pe_unit_1_3: latency=1 ii=1 scheduled
+array4b_3p33: [latency] pe_unit_2_0: latency=1 ii=1 scheduled
+array4b_3p33: [latency] pe_unit_2_1: latency=1 ii=1 scheduled
+array4b_3p33: [latency] pe_unit_2_2: latency=1 ii=1 scheduled
+array4b_3p33: [latency] pe_unit_2_3: latency=1 ii=1 scheduled
+array4b_3p33: [latency] pe_unit_3_0: latency=1 ii=1 scheduled
+array4b_3p33: [latency] pe_unit_3_1: latency=1 ii=1 scheduled
+array4b_3p33: [latency] pe_unit_3_2: latency=1 ii=1 scheduled
+array4b_3p33: [latency] pe_unit_3_3: latency=0 ii=1 scheduled
+array4b_3p33: BUILD mxu_systolic_array streams inst=dim4 n=40220 unroll=['pe_unit_0_0:offset', 'pe_unit_0_1:offset', 'pe_unit_0_2:offset', 'pe_unit_0_3:offset', 'pe_unit_1_0:offset', 'pe_unit_1_1:offset', 'pe_unit_1_2:offset', 'pe_unit_1_3:offset', 'pe_unit_2_0:offset', 'pe_unit_2_1:offset', 'pe_unit_2_2:offset', 'pe_unit_2_3:offset', 'pe_unit_3_0:offset', 'pe_unit_3_1:offset', 'pe_unit_3_2:offset', 'pe_unit_3_
+mxu4b_3p33: [latency] mxu_back_0: latency=1 ii=26 scheduled
+mxu4b_3p33: [latency] mxu_front_0: latency=50 ii=59 unreliable (rolled loop(s) ['l_S_s_2_s2'] merged into the scheduled loop)
+mxu4b_3p33: [latency] pe_unit_0_0: latency=1 ii=1 scheduled
+mxu4b_3p33: [latency] pe_unit_0_1: latency=1 ii=1 scheduled
+mxu4b_3p33: [latency] pe_unit_0_2: latency=1 ii=1 scheduled
+mxu4b_3p33: [latency] pe_unit_0_3: latency=1 ii=1 scheduled
+mxu4b_3p33: [latency] pe_unit_1_0: latency=1 ii=1 scheduled
+mxu4b_3p33: [latency] pe_unit_1_1: latency=1 ii=1 scheduled
+mxu4b_3p33: [latency] pe_unit_1_2: latency=1 ii=1 scheduled
+mxu4b_3p33: [latency] pe_unit_1_3: latency=1 ii=1 scheduled
+mxu4b_3p33: [latency] pe_unit_2_0: latency=1 ii=1 scheduled
+mxu4b_3p33: [latency] pe_unit_2_1: latency=1 ii=1 scheduled
+mxu4b_3p33: [latency] pe_unit_2_2: latency=1 ii=1 scheduled
+mxu4b_3p33: [latency] pe_unit_2_3: latency=1 ii=1 scheduled
+mxu4b_3p33: [latency] pe_unit_3_0: latency=1 ii=1 scheduled
+mxu4b_3p33: [latency] pe_unit_3_1: latency=1 ii=1 scheduled
+mxu4b_3p33: [latency] pe_unit_3_2: latency=1 ii=1 scheduled
+mxu4b_3p33: [latency] pe_unit_3_3: latency=0 ii=1 scheduled
+mxu4b_3p33: BUILD mxu lockstep inst=dim4 n=31071 unroll=['mxu_front_0:s', 'pe_unit_0_0:offset', 'pe_unit_0_1:offset', 'pe_unit_0_2:offset', 'pe_unit_0_3:offset', 'pe_unit_1_0:offset', 'pe_unit_1_1:offset', 'pe_unit_1_2:offset', 'pe_unit_1_3:offset', 'pe_unit_2_0:offset', 'pe_unit_2_1:offset', 'pe_unit_2_2:offset', 'pe_unit_2_3:offset', 'pe_unit_3_0:offset', 'pe_unit_3_1:offset', 'pe_unit_3_2:offset', 'pe_unit
+DONE
+tx_trace_landed_3p33: BUILD xlu_transpose trace inst=t16x4 n=60092 unroll=['tx_0:s', 'tx_0:l'] pipeline=[] partition=['tx_0:tile'] tcl=['directive set -REGISTER_THRESHOLD 4096'] {'clock_period': 3.33}: RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode
+tree16_units_3p33: UNROLL-SKIP tree_sink_0:k (ambiguous name across bands)
+tree16_units_3p33: UNROLL-SKIP tree_sink_0:k (ambiguous name across bands)
+tree16_units_3p33: UNROLL-SKIP tree_sink_0:k (ambiguous name across bands)
+tree16_units_3p33: [latency] add_high_0: latency=2 ii=1 scheduled
+tree16_units_3p33: [latency] add_high_1: latency=2 ii=1 scheduled
+tree16_units_3p33: [latency] add_high_2: latency=2 ii=1 scheduled
+tree16_units_3p33: [latency] add_low_0: latency=2 ii=1 scheduled
+tree16_units_3p33: [latency] add_low_1: latency=2 ii=1 scheduled
+tree16_units_3p33: [latency] add_low_2: latency=2 ii=1 scheduled
+tree16_units_3p33: [latency] add_low_3: latency=2 ii=1 scheduled
+tree16_units_3p33: [latency] add_low_4: latency=2 ii=1 scheduled
+tree16_units_3p33: [latency] add_low_5: latency=2 ii=1 scheduled
+tree16_units_3p33: [latency] add_low_6: latency=2 ii=1 scheduled
+tree16_units_3p33: [latency] add_low_7: latency=2 ii=1 scheduled
+tree16_units_3p33: [latency] add_tap_0: latency=2 ii=1 scheduled
+tree16_units_3p33: [latency] add_tap_1: latency=2 ii=1 scheduled
+tree16_units_3p33: [latency] add_tap_2: latency=2 ii=1 scheduled
+tree16_units_3p33: [latency] add_tap_3: latency=2 ii=1 scheduled
+tree16_units_3p33: [latency] tree_feed_0: latency=32 ii=33 scheduled
+tree16_units_3p33: [latency] tree_sink_0: latency=2 ii=3 unreliable (rolled loop(s) ['l_S_s_7_s1'] merged into the scheduled loop)
+tree16_units_3p33: BUILD xlu_reduction_tree units inst=n16 n=60660 unroll=['leading_zeros17:offset', 'tree_sink_0:j', 'tree_sink_0:s'] pipeline=['add_low_0:t', 'add_low_1:t', 'add_low_2:t', 'add_low_3:t', 'add_low_4:t', 'add_low_5:t', 'add_low_6:t', 'add_low_7:t', 'add_tap_0:t', 'add_tap_1:t', 'add_tap_2:t', 'add_tap_
+mxu2_sfifo_3p33: [latency] gather_try_0: latency=3 ii=4 scheduled
+mxu2_sfifo_3p33: [latency] mxu_front_0: latency=1 ii=5 unreliable (rolled loop(s) ['l_S_s_2_s2'] merged into the scheduled loop)
+mxu2_sfifo_3p33: [latency] pe_unit_0_0: latency=1 ii=1 scheduled
+mxu2_sfifo_3p33: [latency] pe_unit_0_1: latency=1 ii=1 scheduled
+mxu2_sfifo_3p33: [latency] pe_unit_1_0: latency=1 ii=1 scheduled
+mxu2_sfifo_3p33: [latency] pe_unit_1_1: latency=0 ii=1 scheduled
+mxu2_sfifo_3p33: [latency] pop_engine_0: latency=1 ii=10 scheduled
+mxu2_sfifo_3p33: BUILD mxu form:mxu_streams_fifo inst=dim2 n=42115 unroll=['mxu_front_0:s', 'pe_unit_0_0:offset', 'pe_unit_0_1:offset', 'pe_unit_1_0:offset', 'pe_unit_1_1:offset'] pipeline=['pe_unit_0_0:t', 'pe_unit_0_1:t', 'pe_unit_1_0:t', 'pe_unit_1_1:t'] partition=[] tcl=[] {'clock_period': 3.33}: ok 295s
+tree16_bits_landed_3p33: UNROLL-SKIP tree_0:k (ambiguous name across bands)
+tree16_bits_landed_3p33: UNROLL-SKIP tree_0:k (ambiguous name across bands)
+tree16_bits_landed_3p33: UNROLL-SKIP tree_0:k (ambiguous name across bands)
+tree16_bits_landed_3p33: [latency] tree_0: latency=25 ii=26 unreliable (rolled loop(s) ['l_S_s_10_s2', 'l_S_s_7_s1'] merged into the scheduled loop)
+tree16_bits_landed_3p33: BUILD xlu_reduction_tree bits inst=n16 n=60660 unroll=['leading_zeros17:offset', 'tree_0:l', 'tree_0:m', 'tree_0:j', 'tree_0:s'] pipeline=[] partition=[] tcl=[] {'clock_period': 3.33}: ok 972s
+tree16_staged3_3p33_free: [latency] tree_0: latency=1 ii=1 scheduled
+tree16_staged3_3p33_free: BUILD xlu_reduction_tree form:tree_wide_staged inst=n16 n=60660 unroll=['leading_zeros17:offset', 'tree_0:k0', 'tree_0:k1', 'tree_0:m1', 'tree_0:m0', 'tree_0:m2', 'tree_0:k2', 'tree_0:j', 'tree_0:k3', 'tree_0:k4'] pipeline=['tree_0:t'] partition=[] tcl=[] {'clock_period': 3.33}: ok 815s
+tree16_staged3_3p33_L1: [latency] tree_0: latency=1 ii=1 scheduled
+tree16_staged3_3p33_L1: BUILD xlu_reduction_tree form:tree_wide_staged inst=n16 n=60660 unroll=['leading_zeros17:offset', 'tree_0:k0', 'tree_0:k1', 'tree_0:m1', 'tree_0:m0', 'tree_0:m2', 'tree_0:k2', 'tree_0:j', 'tree_0:k3', 'tree_0:k4'] pipeline=['tree_0:t'] partition=[] tcl=[] {'clock_period': 3.33, 'latency': {'tree_0':

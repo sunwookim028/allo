@@ -1,0 +1,32 @@
+ 
+****************************************
+Report : area
+Design : xlu_reduction_tree
+Version: W-2024.09
+Date   : Sun Oct  4 11:11:14 2026
+****************************************
+
+Information: Updating design information... (UID-85)
+Warning: Design 'xlu_reduction_tree' contains 1 high-fanout nets. A fanout number of 1000 will be used for delay calculations involving these nets. (TIM-134)
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                         1110
+Number of nets:                         72218
+Number of cells:                        68380
+Number of combinational cells:          61216
+Number of sequential cells:              7161
+Number of macros/black boxes:               0
+Number of buf/inv:                       9120
+Number of references:                      55
+
+Combinational area:              65374.287854
+Buf/Inv area:                     4935.896043
+Noncombinational area:           32388.158825
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                 97762.446680
+Total area:                 undefined
+1

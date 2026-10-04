@@ -1,0 +1,31 @@
+ 
+****************************************
+Report : area
+Design : mxu_systolic_array_DIM2
+Version: W-2024.09
+Date   : Sun Oct  4 11:23:15 2026
+****************************************
+
+Information: Updating design information... (UID-85)
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                          160
+Number of nets:                          5211
+Number of cells:                         4698
+Number of combinational cells:           3964
+Number of sequential cells:               725
+Number of macros/black boxes:               0
+Number of buf/inv:                        472
+Number of references:                      42
+
+Combinational area:               4744.110010
+Buf/Inv area:                      252.966002
+Noncombinational area:            3274.193882
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                  8018.303893
+Total area:                 undefined
+1

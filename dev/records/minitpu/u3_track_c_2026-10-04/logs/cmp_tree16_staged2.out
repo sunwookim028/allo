@@ -1,0 +1,8 @@
+UNIT-DIFF  xlu_reduction_tree:n16 tree16_staged_3p33_free catapult-rtl 76999/204120 defined (38520 masked: fill=3661, no valid=34859; catapult==rtl on 2374) cycle=per-row; L per output {'valid_o': {1: 60660}, 'result_o': {1: 60660}, 'lane_valid_o': {1: 60660}, 'lane_result_o': {1: 60660}}; 1.0000 cyc/row; CYCLE-EQUAL no (21.5s)
+    differing defined slots by trace: lane-leak=8, corners=126, mixed-sum-max=780, reset-mid-stream=102, random-0=42132, random-1=42116, random-2=41857
+    e.g. lane-leak cycle 13 valid_o: catapult 1 rtl 0
+    e.g. lane-leak cycle 15 valid_o: catapult 0 rtl 1
+    e.g. corners cycle 41 valid_o: catapult 1 rtl 0
+    e.g. corners cycle 117 valid_o: catapult 0 rtl 1
+    LATENCY-MATCH tree_0: reported 1 ii=1 (scheduled), measured 1 at 1.00003 cyc/vector; unit declares 1
+DONE

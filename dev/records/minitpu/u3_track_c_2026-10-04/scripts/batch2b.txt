@@ -1,0 +1,2 @@
+# composites again with only the PE grid pipelined: a driver/sink that reads or writes D elements of one RAM-pin array per iteration cannot be II=1 (one port), SCHD-30 "could not schedule even with unlimited resources"
+array2b_3p33 mxu_systolic_array streams --inst dim2 --clock 3.33 --pipeline-match pe_unit --unroll-inner

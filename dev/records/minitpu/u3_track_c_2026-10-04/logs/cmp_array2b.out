@@ -1,0 +1,4 @@
+top mxu_array_dim2
+ports (9 region args): v2613:in1 v2614:in16 v2615:in16 v2616:mr16 v2617:in16 v2618:mr16 v2619:in32 v2620:mw32 v2621:out16
+UNIT-MATCH mxu_systolic_array:dim2 streams array2b_3p33 catapult-rtl 79983/79983 defined (287 masked; catapult==rtl on 284) cycle=per-row; 9.0002 cyc/row; output skew vs input accept (cycles) {'v2620': {12: 40136, 13: 40136}, 'v2621': {13: 40136}} (46.7s)
+DONE
