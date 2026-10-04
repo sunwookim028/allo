@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/work/shared/users/phd/sk3463/scratch/wt-u3c/dev/records/minitpu/u3_track_c_2026-10-04/scripts/u3c_cmp.py", line 63, in <module>
+    ins = [(p, _w(t)) for t, p in re.findall(r"Connections::In< (.+?) > (\w+);", blk)]
+               ^^^^^
+  File "/work/shared/users/phd/sk3463/scratch/wt-u3c/dev/records/minitpu/u3_track_c_2026-10-04/scripts/u3c_cmp.py", line 60, in _w
+    return int(m.group(1)) if m else {"bool": 1}[t]
+                                     ~~~~~~~~~~~^^^
+KeyError: 'ap_uint<256>'
+DONE

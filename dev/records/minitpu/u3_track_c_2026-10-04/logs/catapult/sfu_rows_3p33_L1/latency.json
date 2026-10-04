@@ -1,0 +1,24 @@
+{
+ "clock_period_ns": 3.33,
+ "definition": "latency: rising edges from the input-accepting edge to the edge after which the output is visible, no stall; ii: cycles between iterations of the I/O loop",
+ "solution": "/work/shared/users/phd/sk3463/scratch/u3c/sfu_rows_3p33_L1.prj/build/Catapult/top.v1",
+ "tool": "catapult",
+ "units": {
+  "sfu_k_0": {
+   "declared": 1,
+   "ii": 1,
+   "io": {
+    "v26.Pop()": 0,
+    "v27.Pop()": 0,
+    "v28.Push()": 1
+   },
+   "iterations": 462144,
+   "latency": 1,
+   "loop": "l_S_t_0_t",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/top/sfu_k_0/run",
+   "status": "scheduled"
+  }
+ }
+}

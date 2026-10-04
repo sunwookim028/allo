@@ -1,0 +1,32 @@
+ 
+****************************************
+Report : area
+Design : xlu_transpose
+Version: W-2024.09
+Date   : Sun Oct  4 10:58:28 2026
+****************************************
+
+Information: Updating design information... (UID-85)
+Warning: Design 'xlu_transpose' contains 5 high-fanout nets. A fanout number of 1000 will be used for delay calculations involving these nets. (TIM-134)
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                         2073
+Number of nets:                         14554
+Number of cells:                        13510
+Number of combinational cells:           8380
+Number of sequential cells:              5125
+Number of macros/black boxes:               0
+Number of buf/inv:                       1199
+Number of references:                      14
+
+Combinational area:               8389.108070
+Buf/Inv area:                      751.183995
+Noncombinational area:           23173.121160
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                 31562.229230
+Total area:                 undefined
+1

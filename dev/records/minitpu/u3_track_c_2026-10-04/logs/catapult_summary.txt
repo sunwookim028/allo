@@ -1,0 +1,39 @@
+project	top	area_score	slack_ns	manifest latency/ii per kernel	wall	exit
+array2_3p33	mxu_array_dim2	-	-	-	130s	RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode
+array2b_3p33	mxu_array_dim2	26022.488	-0.307	array_drive_0: 8/9 scheduled; array_sink_0: 2/3 scheduled; pe_unit_0_0: 1/1 scheduled; pe_unit_0_1: 1/1 scheduled; pe_unit_1_0: 1/1 scheduled; pe_unit_1_1: 0/1 scheduled	258s	ok
+array4_3p33	mxu_array_dim4	-	-	-	278s	RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode
+array4b_3p33	mxu_array_dim4	106586.064	-0.307	array_drive_0: 16/17 scheduled; array_sink_0: 4/5 scheduled; pe_unit_0_0: 1/1 scheduled; pe_unit_0_1: 1/1 scheduled; pe_unit_0_2: 1/1 scheduled; pe_unit_0_3: 1/1 scheduled; pe_unit_1_0: 1/1 scheduled; pe_unit_1_1: 1/1 scheduled; pe_unit_1_2: 1/1 scheduled; pe_unit_1_3: 1/1 scheduled; pe_unit_2_0: 1/1 scheduled; pe_unit_2_1: 1/1 scheduled; pe_unit_2_2: 1/1 scheduled; pe_unit_2_3: 1/1 scheduled; pe_unit_3_0: 1/1 scheduled; pe_unit_3_1: 1/1 scheduled; pe_unit_3_2: 1/1 scheduled; pe_unit_3_3: 0/1 scheduled	770s	ok
+mxu2_sfifo_3p33	mxu_streams_dim2	42868.457	-0.307	gather_try_0: 3/4 scheduled; mxu_front_0: 1/5 unreliable; pe_unit_0_0: 1/1 scheduled; pe_unit_0_1: 1/1 scheduled; pe_unit_1_0: 1/1 scheduled; pe_unit_1_1: 0/1 scheduled; pop_engine_0: 1/10 scheduled	295s	ok
+mxu4_3p33	mxu_dim4	-	-	-	314s	RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode
+mxu4b_3p33	mxu_dim4	118317.884	-0.307	mxu_back_0: 1/26 scheduled; mxu_front_0: 50/59 unreliable; pe_unit_0_0: 1/1 scheduled; pe_unit_0_1: 1/1 scheduled; pe_unit_0_2: 1/1 scheduled; pe_unit_0_3: 1/1 scheduled; pe_unit_1_0: 1/1 scheduled; pe_unit_1_1: 1/1 scheduled; pe_unit_1_2: 1/1 scheduled; pe_unit_1_3: 1/1 scheduled; pe_unit_2_0: 1/1 scheduled; pe_unit_2_1: 1/1 scheduled; pe_unit_2_2: 1/1 scheduled; pe_unit_2_3: 1/1 scheduled; pe_unit_3_0: 1/1 scheduled; pe_unit_3_1: 1/1 scheduled; pe_unit_3_2: 1/1 scheduled; pe_unit_3_3: 0/1 scheduled	897s	ok
+pe_bits_2p0_L1	top	6076.913	-1.885	pe_0: 1/1 scheduled pin 1	128s	ok
+pe_bits_2p0_free	top	6076.913	-1.885	pe_0: 1/1 scheduled	111s	ok
+pe_bits_3p33_L1	top	5317.270	-0.307	pe_0: 1/1 scheduled pin 1	129s	ok
+pe_bits_3p33_free	top	5317.270	-0.307	pe_0: 1/1 scheduled	104s	ok
+pe_unit_3p33	mxu_pe_unit	11510.226	-0.307	pe_drive_0: 3/1 scheduled; pe_sink_0: 1/1 scheduled; pe_unit_0_0: 1/1 scheduled	140s	ok
+sfu_bits_2p0_L5	top	6181.170	0.094	sfu_k_0: 5/1 scheduled pin 5	138s	ok
+sfu_bits_2p0_free	top	5890.192	0.094	sfu_k_0: 2/1 scheduled	137s	ok
+sfu_bits_3p33_L5	top	5603.005	0.970	sfu_k_0: 5/1 scheduled pin 5	130s	ok
+sfu_bits_3p33_free	top	5218.924	0.970	sfu_k_0: 1/1 scheduled	131s	ok
+sfu_rows_2p0_L1	top	6836.126	0.469	sfu_k_0: 1/1 scheduled pin 1	94s	ok
+sfu_rows_3p33_L1	top	6712.118	1.780	sfu_k_0: 1/1 scheduled pin 1	87s	ok
+sfu_rows_3p33_free	top	6712.118	1.780	sfu_k_0: 1/1 scheduled	95s	ok
+sfu_staged_2p0_L1	-	-	-	-	0s	ValueError: latency=1 on sfu_k_0: it has no Connections In/Out pair (Wire ports?). Catapult cannot pin
+sfu_staged_3p33_L1	-	-	-	-	0s	ValueError: latency=1 on sfu_k_0: it has no Connections In/Out pair (Wire ports?). Catapult cannot pin
+sfu_staged_3p33_free	top	6693.371	0.973	sfu_k_0: 1/1 scheduled	144s	ok
+tree16_bits_landed_3p33	top	32910.030	-1.126	tree_0: 25/26 unreliable	972s	ok
+tree16_staged_2p0_L1	top	-	-	-	606s	RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode
+tree16_staged_2p0_free	top	-	-	-	421s	RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode
+tree16_staged_3p33_L1	top	56880.774	-1.469	tree_0: 1/1 scheduled pin 1	833s	ok
+tree16_staged_3p33_free	top	56405.451	-1.469	tree_0: 1/1 scheduled	815s	ok
+tree16_staged_3p33_free_v1	top	52821.330	-1.463	tree_0: 2/1 scheduled	1129s	ok
+tree16_staged_3p33_free_v2	top	56763.252	-1.469	tree_0: 1/1 scheduled	1047s	ok
+tree16_units_3p33	xlu_tree_4x4	80801.390	-1.733	add_high_0: 2/1 scheduled; add_high_1: 2/1 scheduled; add_high_2: 2/1 scheduled; add_low_0: 2/1 scheduled; add_low_1: 2/1 scheduled; add_low_2: 2/1 scheduled; add_low_3: 2/1 scheduled; add_low_4: 2/1 scheduled; add_low_5: 2/1 scheduled; add_low_6: 2/1 scheduled; add_low_7: 2/1 scheduled; add_tap_0: 2/1 scheduled; add_tap_1: 2/1 scheduled; add_tap_2: 2/1 scheduled; add_tap_3: 2/1 scheduled; tree_feed_0: 32/33 scheduled; tree_sink_0: 2/3 unreliable	454s	ok
+tree16_wide_2p0_free	top	68353.446	-1.354	tree_0: 3/1 scheduled	1764s	ok
+tree16_wide_3p33_L1	top	55907.053	-1.401	tree_0: 1/1 scheduled pin 1	1285s	ok
+tree16_wide_3p33_free	top	55363.832	-1.463	tree_0: 1/1 scheduled	1343s	ok
+tx_trace_landed_3p33	top	-	-	-	81s	RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode
+tx_wide_2p0_L1	top	81827.401	0.885	tx_0: 1/1 scheduled pin 1	150s	ok
+tx_wide_2p0_free	top	81827.401	0.885	tx_0: 1/1 scheduled	125s	ok
+tx_wide_3p33_L1	top	81827.401	2.215	tx_0: 1/1 scheduled pin 1	147s	ok
+tx_wide_3p33_free	top	81827.401	2.215	tx_0: 1/1 scheduled	118s	ok

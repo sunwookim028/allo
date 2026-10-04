@@ -1,0 +1,9 @@
+UNIT-MATCH sfu sfu_bits_3p33_L5 catapult-rtl 462144/462144 vs MiniTPU RTL; latency {5: 462144} (declared 5); 1.0000 cyc/vector (15.9s)
+    LATENCY-MATCH sfu_k_0: reported 5 ii=1 (scheduled), measured 5 at 1.00001 cyc/vector; unit declares 5; pinned 5
+UNIT-MATCH sfu sfu_bits_2p0_L5 catapult-rtl 462144/462144 vs MiniTPU RTL; latency {5: 462144} (declared 5); 1.0000 cyc/vector (14.0s)
+    LATENCY-MATCH sfu_k_0: reported 5 ii=1 (scheduled), measured 5 at 1.00001 cyc/vector; unit declares 5; pinned 5
+UNIT-MATCH sfu sfu_bits_3p33_free catapult-rtl 462144/462144 vs MiniTPU RTL; latency {1: 462144} (declared 5); 1.0000 cyc/vector (14.5s)
+    LATENCY-MATCH sfu_k_0: reported 1 ii=1 (scheduled), measured 1 at 1 cyc/vector; unit declares 5
+UNIT-MATCH sfu sfu_bits_2p0_free catapult-rtl 462144/462144 vs MiniTPU RTL; latency {2: 462144} (declared 5); 1.0000 cyc/vector (13.1s)
+    LATENCY-MATCH sfu_k_0: reported 2 ii=1 (scheduled), measured 2 at 1.00001 cyc/vector; unit declares 5
+CMP_DONE

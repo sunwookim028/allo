@@ -41,8 +41,8 @@ def make(n, inst="n64"):
     WD = UInt(16 * nl)
     WL = UInt(16 * sub)
     NN = nl - 1  # internal nodes, heap index m -> node N + m
-    VD = 2 * levels  # rows of delay for the root (+1 Pop->Push edge = root_d)
-    TD = 2 * tap_level
+    VD = 2 * levels + 1  # valid pipe entries: read after the shift, as T1 (delay 2 LEVELS rows; + the Pop->Push edge = root_d)
+    TD = 2 * tap_level + 1
 
     @df.region()
     def top(RST: uint8[n], VLD: uint8[n], OP: uint8[n], D: WD[n],
@@ -66,10 +66,15 @@ def make(n, inst="n64"):
                 v: uint8 = vld[t]
                 o: uint8 = op[t]
                 w: WD = d[t]
-                # the register edge, as T1 writes it: stage B <= stage A and
-                # stage A <= f(the OLD stage B of the children), then the valid
-                # pipes shift and clear, then the outputs are the new registers
-                # (MiniTPU's "post" row: a clear at t reads 0 at t)
+                # payload outputs are the registers BEFORE this row's update (the
+                # root's stage B holds the result of the row 2 LEVELS back); the
+                # valid pipes are read after their shift and clear, as T1 does
+                lw: WL = 0
+                with allo.meta_for(sub) as s:
+                    lw[16 * s : 16 * s + 16] = stB[tap_base - nl + s]
+                lro[t] = lw
+                ro[t] = stB[NN - 1]
+                # stage A <= f(the OLD stage B of the children), stage B <= stage A
                 nxt: uint16[NN]
                 nop: uint8[NN]
                 for m1 in range(nl // 2, NN):
@@ -112,11 +117,6 @@ def make(n, inst="n64"):
                         vq[k3] = 0
                     for k4 in range(TD):
                         lvq[k4] = 0
-                lw: WL = 0
-                with allo.meta_for(sub) as s:
-                    lw[16 * s : 16 * s + 16] = stB[tap_base - nl + s]
-                lro[t] = lw
-                ro[t] = stB[NN - 1]
                 vo[t] = vq[VD - 1]
                 lvo[t] = lvq[TD - 1]
 

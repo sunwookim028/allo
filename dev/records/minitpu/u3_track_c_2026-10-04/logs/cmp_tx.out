@@ -1,0 +1,13 @@
+RTL xlu_transpose:t16x4: 60092 cycles in 7 traces, 95783 defined slots, RTL vs reference on defined: 95783/95783
+UNIT-MATCH xlu_transpose:t16x4 tx_wide_3p33_L1 catapult-rtl 95783/95783 defined (24401 masked: no valid=24401; catapult==rtl on 24392) cycle=per-row; L per output {'read_valid_o': {1: 60092}, 'read_data_o': {1: 60092}}; 1.0000 cyc/row; CYCLE-EQUAL yes (48.9s)
+    LATENCY-MATCH tx_0: reported 1 ii=1 (scheduled), measured 1 at 1.00003 cyc/vector; unit declares 1; pinned 1
+RTL xlu_transpose:t16x4: 60092 cycles in 7 traces, 95783 defined slots, RTL vs reference on defined: 95783/95783
+UNIT-MATCH xlu_transpose:t16x4 tx_wide_2p0_L1 catapult-rtl 95783/95783 defined (24401 masked: no valid=24401; catapult==rtl on 24392) cycle=per-row; L per output {'read_valid_o': {1: 60092}, 'read_data_o': {1: 60092}}; 1.0000 cyc/row; CYCLE-EQUAL yes (50.7s)
+    LATENCY-MATCH tx_0: reported 1 ii=1 (scheduled), measured 1 at 1.00003 cyc/vector; unit declares 1; pinned 1
+RTL xlu_transpose:t16x4: 60092 cycles in 7 traces, 95783 defined slots, RTL vs reference on defined: 95783/95783
+UNIT-MATCH xlu_transpose:t16x4 tx_wide_3p33_free catapult-rtl 95783/95783 defined (24401 masked: no valid=24401; catapult==rtl on 24392) cycle=per-row; L per output {'read_valid_o': {1: 60092}, 'read_data_o': {1: 60092}}; 1.0000 cyc/row; CYCLE-EQUAL yes (43.6s)
+    LATENCY-MATCH tx_0: reported 1 ii=1 (scheduled), measured 1 at 1.00003 cyc/vector; unit declares 1
+RTL xlu_transpose:t16x4: 60092 cycles in 7 traces, 95783 defined slots, RTL vs reference on defined: 95783/95783
+UNIT-MATCH xlu_transpose:t16x4 tx_wide_2p0_free catapult-rtl 95783/95783 defined (24401 masked: no valid=24401; catapult==rtl on 24392) cycle=per-row; L per output {'read_valid_o': {1: 60092}, 'read_data_o': {1: 60092}}; 1.0000 cyc/row; CYCLE-EQUAL yes (46.6s)
+    LATENCY-MATCH tx_0: reported 1 ii=1 (scheduled), measured 1 at 1.00003 cyc/vector; unit declares 1
+DONE

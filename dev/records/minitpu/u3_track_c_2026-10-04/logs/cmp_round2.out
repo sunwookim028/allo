@@ -1,0 +1,19 @@
+UNIT-MATCH sfu sfu_rows_3p33_L1 catapult-rtl 462144/462144 vs MiniTPU RTL; latency {9: 462140} (declared 5); 1.0000 cyc/vector (14.5s)
+    LATENCY-MISMATCH sfu_k_0: reported 1 ii=1 (scheduled), measured 9 at 1 cyc/vector; unit declares 5; pinned 1
+UNIT-MATCH sfu sfu_rows_2p0_L1 catapult-rtl 462144/462144 vs MiniTPU RTL; latency {9: 462140} (declared 5); 1.0000 cyc/vector (15.9s)
+    LATENCY-MISMATCH sfu_k_0: reported 1 ii=1 (scheduled), measured 9 at 1 cyc/vector; unit declares 5; pinned 1
+UNIT-MATCH sfu sfu_rows_3p33_free catapult-rtl 462144/462144 vs MiniTPU RTL; latency {9: 462140} (declared 5); 1.0000 cyc/vector (15.7s)
+    LATENCY-MISMATCH sfu_k_0: reported 1 ii=1 (scheduled), measured 9 at 1 cyc/vector; unit declares 5
+RTL mxu_pe:pe: 60090 cycles in 7 traces, 360202 defined slots, RTL vs reference on defined: 360202/360202
+UNIT-MATCH mxu_pe:pe pe_bits_3p33_L1 catapult-rtl 360202/360202 defined (338 masked: reset fill=338; catapult==rtl on 337) cycle=per-row; L per output {'weight_commit_o': {1: 60090}, 'lhs_o': {1: 60090}, 'lhs_valid_o': {1: 60090}, 'weight_o': {1: 60090}, 'psum_o': {1: 60090}, 'psum_valid_o': {1: 60090}}; 1.0000 cyc/row; CYCLE-EQUAL yes (85.8s)
+    LATENCY-MATCH pe_0: reported 1 ii=1 (scheduled), measured 1 at 1.00003 cyc/vector; unit declares 1; pinned 1
+RTL mxu_pe:pe: 60090 cycles in 7 traces, 360202 defined slots, RTL vs reference on defined: 360202/360202
+UNIT-MATCH mxu_pe:pe pe_bits_2p0_L1 catapult-rtl 360202/360202 defined (338 masked: reset fill=338; catapult==rtl on 337) cycle=per-row; L per output {'weight_commit_o': {1: 60090}, 'lhs_o': {1: 60090}, 'lhs_valid_o': {1: 60090}, 'weight_o': {1: 60090}, 'psum_o': {1: 60090}, 'psum_valid_o': {1: 60090}}; 1.0000 cyc/row; CYCLE-EQUAL yes (87.4s)
+    LATENCY-MATCH pe_0: reported 1 ii=1 (scheduled), measured 1 at 1.00003 cyc/vector; unit declares 1; pinned 1
+RTL mxu_pe:pe: 60090 cycles in 7 traces, 360202 defined slots, RTL vs reference on defined: 360202/360202
+UNIT-MATCH mxu_pe:pe pe_bits_3p33_free catapult-rtl 360202/360202 defined (338 masked: reset fill=338; catapult==rtl on 337) cycle=per-row; L per output {'weight_commit_o': {1: 60090}, 'lhs_o': {1: 60090}, 'lhs_valid_o': {1: 60090}, 'weight_o': {1: 60090}, 'psum_o': {1: 60090}, 'psum_valid_o': {1: 60090}}; 1.0000 cyc/row; CYCLE-EQUAL yes (74.5s)
+    LATENCY-MATCH pe_0: reported 1 ii=1 (scheduled), measured 1 at 1.00003 cyc/vector; unit declares 1
+RTL mxu_pe:pe: 60090 cycles in 7 traces, 360202 defined slots, RTL vs reference on defined: 360202/360202
+UNIT-MATCH mxu_pe:pe pe_bits_2p0_free catapult-rtl 360202/360202 defined (338 masked: reset fill=338; catapult==rtl on 337) cycle=per-row; L per output {'weight_commit_o': {1: 60090}, 'lhs_o': {1: 60090}, 'lhs_valid_o': {1: 60090}, 'weight_o': {1: 60090}, 'psum_o': {1: 60090}, 'psum_valid_o': {1: 60090}}; 1.0000 cyc/row; CYCLE-EQUAL yes (71.9s)
+    LATENCY-MATCH pe_0: reported 1 ii=1 (scheduled), measured 1 at 1.00003 cyc/vector; unit declares 1
+CMP2_DONE

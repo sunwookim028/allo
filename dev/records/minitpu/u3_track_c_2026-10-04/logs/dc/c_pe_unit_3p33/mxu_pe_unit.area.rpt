@@ -1,0 +1,31 @@
+ 
+****************************************
+Report : area
+Design : mxu_pe_unit
+Version: W-2024.09
+Date   : Sun Oct  4 11:17:59 2026
+****************************************
+
+Information: Updating design information... (UID-85)
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                          377
+Number of nets:                          4007
+Number of cells:                         3575
+Number of combinational cells:           2401
+Number of sequential cells:              1122
+Number of macros/black boxes:               0
+Number of buf/inv:                        365
+Number of references:                      75
+
+Combinational area:               2874.661999
+Buf/Inv area:                      211.204000
+Noncombinational area:            5913.180186
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                  8787.842185
+Total area:                 undefined
+1

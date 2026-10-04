@@ -173,9 +173,10 @@ def fake_mod(*arrays):
         if kd in ("in", "out"):
             n = len(arr) if n is None else n
             assert len(arr) == n, (p, len(arr), n)
+    arrays = [np.asarray(a_) for a_ in arrays]
     if n is None:  # every port is a memory (no stream): the rows are the arrays' length
         n = len(arrays[0])
-    sizes = [len(arr) for arr in arrays]
+    sizes = [np.asarray(arr).size for arr in arrays]  # a 2-D lane array is one flat memory
     code = driver(n, sizes)
     exe = build(code)
     d = os.path.dirname(exe)
@@ -183,7 +184,7 @@ def fake_mod(*arrays):
     with open(fi, "wb") as f:
         for (kd, p, w, _), arr in zip(args, arrays):
             if kd in ("in", "mr"):
-                rtl.pack(np.asarray(arr).astype(np.int64), w).astype(np.uint64).tofile(f)
+                rtl.pack(np.asarray(arr).reshape(-1).astype(np.int64), w).astype(np.uint64).tofile(f)
     r = subprocess.run([exe, fi, fo], capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError(f"driver exited {r.returncode}: {r.stderr[-1500:]}")
@@ -197,12 +198,12 @@ def fake_mod(*arrays):
     off = n
     for i, ((kd, p, w, _), arr) in enumerate(zip(args, arrays)):
         if kd in ("out", "mw"):
-            sz, k_ = len(arr), nw(w)
+            sz, k_ = arr.size, nw(w)
             blk_ = raw[off: off + sz * (k_ + 1)].reshape(sz, k_ + 1)
             off += sz * (k_ + 1)
             vals = rtl.unpack(blk_[:, :k_])
             m = (1 << w) - 1
-            arr[:] = np.array([v & m for v in vals], dtype=arr.dtype)
+            arr.reshape(-1)[:] = np.array([v & m for v in vals], dtype=arr.dtype)
             stamps[i] = blk_[:, k_].astype(np.int64)
 
 
@@ -231,6 +232,8 @@ if u.RTL.shape == "valid":
 else:
     w = u.WIDTH[inst]
     unit = u.INSTANCES[inst]
+    if hasattr(u, "_BUILT"):  # a geometry-bearing runner reads the instance its make() recorded (track A note A8)
+        u._BUILT["inst"] = inst
     cmd, spans = check._trace_all(u, inst, a.n, trace_variant)
     n = len(next(iter(cmd.values())))
     packed = {p: rtl.pack(cmd[p], wd) for p, wd in unit.inputs}

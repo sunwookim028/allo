@@ -1,0 +1,7 @@
+sfu_rows_3p33_L1 sfu form:sfu_staged_rows --clock 3.33 --pipeline sfu_k_0:t --latency sfu_k_0=1
+sfu_rows_2p0_L1 sfu form:sfu_staged_rows --clock 2.0 --pipeline sfu_k_0:t --latency sfu_k_0=1
+sfu_rows_3p33_free sfu form:sfu_staged_rows --clock 3.33 --pipeline sfu_k_0:t
+pe_bits_3p33_L1 mxu_pe bits --clock 3.33 --pipeline pe_0:t --unroll leading_zeros19:offset --latency pe_0=1
+pe_bits_2p0_L1 mxu_pe bits --clock 2.0 --pipeline pe_0:t --unroll leading_zeros19:offset --latency pe_0=1
+pe_bits_3p33_free mxu_pe bits --clock 3.33 --pipeline pe_0:t --unroll leading_zeros19:offset
+pe_bits_2p0_free mxu_pe bits --clock 2.0 --pipeline pe_0:t --unroll leading_zeros19:offset

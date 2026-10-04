@@ -1,0 +1,3 @@
+top top
+UNIT-MATCH xlu_reduction_tree:n16 bits tree16_bits_landed_3p33 catapult-rtl 204120/204120 defined (38520 masked; catapult==rtl on 35936) cycle=per-row; 42.0000 cyc/row; output skew vs input accept (cycles) {'v340': {41: 60660}, 'v341': {41: 60660}, 'v342': {41: 60660}, 'v343': {25: 60660, 27: 60660, 29: 60660, 31: 60660}} (28.2s)
+DONE

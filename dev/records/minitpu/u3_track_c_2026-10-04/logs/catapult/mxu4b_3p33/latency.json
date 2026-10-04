@@ -1,0 +1,331 @@
+{
+ "clock_period_ns": 3.33,
+ "definition": "latency: rising edges from the input-accepting edge to the edge after which the output is visible, no stall; ii: cycles between iterations of the I/O loop",
+ "solution": "/work/shared/users/phd/sk3463/scratch/u3c/mxu4b_3p33.prj/build/Catapult/mxu_dim4.v1",
+ "tool": "catapult",
+ "units": {
+  "mxu_back_0": {
+   "ii": 26,
+   "io": {
+    "v10464.Pop()": 0,
+    "v10465.Push()": 1,
+    "v10467.Pop()": 0,
+    "v10468.Pop()": 18,
+    "v10469.Pop()": 18,
+    "v10470.Pop()": 18,
+    "v10471.Pop()": 18
+   },
+   "iterations": 31071,
+   "latency": 1,
+   "loop": "l_S_t_0_t17",
+   "loop_c_steps": 26,
+   "port_style": "connections",
+   "process": "/mxu_dim4/mxu_back_0/run",
+   "status": "scheduled"
+  },
+  "mxu_front_0": {
+   "ii": 59,
+   "io": {
+    "v0.Pop()": 0,
+    "v1.Pop()": 0,
+    "v10.Push()": 35,
+    "v11.Push()": 50,
+    "v12.Push()": 50,
+    "v13.Push()": 50,
+    "v14.Push()": 50,
+    "v15.Push()": 50,
+    "v2.Pop()": 0,
+    "v4.Pop()": 0,
+    "v5.Push()": 0,
+    "v6.Push()": 0,
+    "v7.Push()": 1,
+    "v8.Push()": 5,
+    "v9.Push()": 20
+   },
+   "iterations": 31071,
+   "latency": 50,
+   "loop": "l_S_t_0_t",
+   "loop_c_steps": 59,
+   "port_style": "connections",
+   "process": "/mxu_dim4/mxu_front_0/run",
+   "reason": "rolled loop(s) ['l_S_s_2_s2'] merged into the scheduled loop",
+   "status": "unreliable"
+  },
+  "pe_unit_0_0": {
+   "ii": 1,
+   "io": {
+    "v308.Pop()": 0,
+    "v309.Pop()": 0,
+    "v310.Push()": 1,
+    "v311.Push()": 1,
+    "v312.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_dim4/pe_unit_0_0/run",
+   "status": "scheduled"
+  },
+  "pe_unit_0_1": {
+   "ii": 1,
+   "io": {
+    "v946.Pop()": 0,
+    "v947.Pop()": 0,
+    "v948.Push()": 1,
+    "v949.Push()": 1,
+    "v950.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_dim4/pe_unit_0_1/run",
+   "status": "scheduled"
+  },
+  "pe_unit_0_2": {
+   "ii": 1,
+   "io": {
+    "v1584.Pop()": 0,
+    "v1585.Pop()": 0,
+    "v1586.Push()": 1,
+    "v1587.Push()": 1,
+    "v1588.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_dim4/pe_unit_0_2/run",
+   "status": "scheduled"
+  },
+  "pe_unit_0_3": {
+   "ii": 1,
+   "io": {
+    "v2222.Pop()": 0,
+    "v2223.Pop()": 0,
+    "v2224.Push()": 1,
+    "v2225.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_dim4/pe_unit_0_3/run",
+   "status": "scheduled"
+  },
+  "pe_unit_1_0": {
+   "ii": 1,
+   "io": {
+    "v2843.Pop()": 0,
+    "v2844.Pop()": 0,
+    "v2845.Pop()": 0,
+    "v2846.Push()": 1,
+    "v2847.Push()": 1,
+    "v2848.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_dim4/pe_unit_1_0/run",
+   "status": "scheduled"
+  },
+  "pe_unit_1_1": {
+   "ii": 1,
+   "io": {
+    "v3487.Pop()": 0,
+    "v3488.Pop()": 0,
+    "v3489.Pop()": 0,
+    "v3490.Push()": 1,
+    "v3491.Push()": 1,
+    "v3492.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_dim4/pe_unit_1_1/run",
+   "status": "scheduled"
+  },
+  "pe_unit_1_2": {
+   "ii": 1,
+   "io": {
+    "v4131.Pop()": 0,
+    "v4132.Pop()": 0,
+    "v4133.Pop()": 0,
+    "v4134.Push()": 1,
+    "v4135.Push()": 1,
+    "v4136.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_dim4/pe_unit_1_2/run",
+   "status": "scheduled"
+  },
+  "pe_unit_1_3": {
+   "ii": 1,
+   "io": {
+    "v4775.Pop()": 0,
+    "v4776.Pop()": 0,
+    "v4777.Pop()": 0,
+    "v4778.Push()": 1,
+    "v4779.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_dim4/pe_unit_1_3/run",
+   "status": "scheduled"
+  },
+  "pe_unit_2_0": {
+   "ii": 1,
+   "io": {
+    "v5402.Pop()": 0,
+    "v5403.Pop()": 0,
+    "v5404.Pop()": 0,
+    "v5405.Push()": 1,
+    "v5406.Push()": 1,
+    "v5407.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_dim4/pe_unit_2_0/run",
+   "status": "scheduled"
+  },
+  "pe_unit_2_1": {
+   "ii": 1,
+   "io": {
+    "v6046.Pop()": 0,
+    "v6047.Pop()": 0,
+    "v6048.Pop()": 0,
+    "v6049.Push()": 1,
+    "v6050.Push()": 1,
+    "v6051.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_dim4/pe_unit_2_1/run",
+   "status": "scheduled"
+  },
+  "pe_unit_2_2": {
+   "ii": 1,
+   "io": {
+    "v6690.Pop()": 0,
+    "v6691.Pop()": 0,
+    "v6692.Pop()": 0,
+    "v6693.Push()": 1,
+    "v6694.Push()": 1,
+    "v6695.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_dim4/pe_unit_2_2/run",
+   "status": "scheduled"
+  },
+  "pe_unit_2_3": {
+   "ii": 1,
+   "io": {
+    "v7334.Pop()": 0,
+    "v7335.Pop()": 0,
+    "v7336.Pop()": 0,
+    "v7337.Push()": 1,
+    "v7338.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_dim4/pe_unit_2_3/run",
+   "status": "scheduled"
+  },
+  "pe_unit_3_0": {
+   "ii": 1,
+   "io": {
+    "v7961.Pop()": 0,
+    "v7962.Pop()": 0,
+    "v7963.Pop()": 0,
+    "v7964.Push()": 1,
+    "v7965.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_dim4/pe_unit_3_0/run",
+   "status": "scheduled"
+  },
+  "pe_unit_3_1": {
+   "ii": 1,
+   "io": {
+    "v8591.Pop()": 0,
+    "v8592.Pop()": 0,
+    "v8593.Pop()": 0,
+    "v8594.Push()": 1,
+    "v8595.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_dim4/pe_unit_3_1/run",
+   "status": "scheduled"
+  },
+  "pe_unit_3_2": {
+   "ii": 1,
+   "io": {
+    "v9221.Pop()": 0,
+    "v9222.Pop()": 0,
+    "v9223.Pop()": 0,
+    "v9224.Push()": 1,
+    "v9225.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/mxu_dim4/pe_unit_3_2/run",
+   "status": "scheduled"
+  },
+  "pe_unit_3_3": {
+   "ii": 1,
+   "io": {
+    "v9851.Pop()": 0,
+    "v9852.Pop()": 0,
+    "v9853.Pop()": 0,
+    "v9854.Push()": 0
+   },
+   "iterations": null,
+   "latency": 0,
+   "loop": "while",
+   "loop_c_steps": 1,
+   "port_style": "connections",
+   "process": "/mxu_dim4/pe_unit_3_3/run",
+   "status": "scheduled"
+  }
+ }
+}

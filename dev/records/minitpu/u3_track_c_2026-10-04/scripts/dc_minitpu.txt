@@ -1,0 +1,6 @@
+m_sfu_3p33 sfu clk_i 3.33 /work/shared/users/phd/sk3463/minitpu/src/core/vpu/vpu_pkg.sv /work/shared/users/phd/sk3463/scratch/u3c/sfu_dc.sv
+m_sfu_2p0 sfu clk_i 2.0 /work/shared/users/phd/sk3463/minitpu/src/core/vpu/vpu_pkg.sv /work/shared/users/phd/sk3463/scratch/u3c/sfu_dc.sv
+m_tree64_3p33 xlu_reduction_tree clk_i 3.33 /work/shared/users/phd/sk3463/minitpu/src/core/vpu/vpu_pkg.sv /work/shared/users/phd/sk3463/minitpu/src/core/vpu/vpu_bf16_add_pipe.sv /work/shared/users/phd/sk3463/minitpu/src/core/xlu/xlu_reduction_tree.sv
+m_tree64_2p0 xlu_reduction_tree clk_i 2.0 /work/shared/users/phd/sk3463/minitpu/src/core/vpu/vpu_pkg.sv /work/shared/users/phd/sk3463/minitpu/src/core/vpu/vpu_bf16_add_pipe.sv /work/shared/users/phd/sk3463/minitpu/src/core/xlu/xlu_reduction_tree.sv
+m_tx_3p33 xlu_transpose clk_i 3.33 /work/shared/users/phd/sk3463/minitpu/src/core/vpu/vpu_pkg.sv /work/shared/users/phd/sk3463/minitpu/src/core/xlu/xlu_transpose.sv
+m_tx_2p0 xlu_transpose clk_i 2.0 /work/shared/users/phd/sk3463/minitpu/src/core/vpu/vpu_pkg.sv /work/shared/users/phd/sk3463/minitpu/src/core/xlu/xlu_transpose.sv

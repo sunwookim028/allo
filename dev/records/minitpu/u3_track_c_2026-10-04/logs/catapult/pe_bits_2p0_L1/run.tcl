@@ -1,0 +1,89 @@
+# Project root directory
+set sfd [file dir [info script]]
+
+# Create new solution
+solution new -state initial
+solution options defaults
+solution options set /Input/CppStandard c++11
+
+# Add source files
+solution file add "$sfd/kernel.cpp" -type C++
+
+# Set top-level design function
+directive set -DESIGN_HIERARCHY top
+
+# Set clock constraints
+directive set -CLOCKS {clk {-CLOCK_PERIOD 2.0}}
+
+# Set output language
+solution options set /Output/OutputVerilog true
+solution options set /Output/OutputVHDL false
+
+directive set -IO_MODE super
+directive set -SPECULATE true
+solution library add nangate-45nm_beh
+
+# Flow
+go analyze
+go compile
+
+solution library add ccs_sample_mem
+go architect
+cycle set {v19.Push()} -from {v10.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v19.Push()} -from {v11.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v19.Push()} -from {v12.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v19.Push()} -from {v13.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v19.Push()} -from {v14.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v19.Push()} -from {v15.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v19.Push()} -from {v16.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v19.Push()} -from {v17.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v19.Push()} -from {v18.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v20.Push()} -from {v10.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v20.Push()} -from {v11.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v20.Push()} -from {v12.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v20.Push()} -from {v13.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v20.Push()} -from {v14.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v20.Push()} -from {v15.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v20.Push()} -from {v16.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v20.Push()} -from {v17.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v20.Push()} -from {v18.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v21.Push()} -from {v10.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v21.Push()} -from {v11.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v21.Push()} -from {v12.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v21.Push()} -from {v13.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v21.Push()} -from {v14.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v21.Push()} -from {v15.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v21.Push()} -from {v16.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v21.Push()} -from {v17.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v21.Push()} -from {v18.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v22.Push()} -from {v10.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v22.Push()} -from {v11.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v22.Push()} -from {v12.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v22.Push()} -from {v13.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v22.Push()} -from {v14.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v22.Push()} -from {v15.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v22.Push()} -from {v16.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v22.Push()} -from {v17.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v22.Push()} -from {v18.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v23.Push()} -from {v10.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v23.Push()} -from {v11.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v23.Push()} -from {v12.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v23.Push()} -from {v13.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v23.Push()} -from {v14.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v23.Push()} -from {v15.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v23.Push()} -from {v16.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v23.Push()} -from {v17.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v23.Push()} -from {v18.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v24.Push()} -from {v10.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v24.Push()} -from {v11.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v24.Push()} -from {v12.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v24.Push()} -from {v13.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v24.Push()} -from {v14.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v24.Push()} -from {v15.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v24.Push()} -from {v16.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v24.Push()} -from {v17.Pop()} -equal 1  ;# latency=1 on pe_0
+cycle set {v24.Push()} -from {v18.Pop()} -equal 1  ;# latency=1 on pe_0
+go assembly
+go extract
+
+exit

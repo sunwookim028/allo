@@ -1,0 +1,1 @@
+# Warning: $MGC_HOME/shared/include/connections/connections_fifo.h(70): Reducing the number of bits used to represent array elements of 'buffer.init_val', from '64' bits to '32' bits. (MEM-87)

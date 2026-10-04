@@ -1,0 +1,17 @@
+# wave 1: track A's units. pins per P-3: sfu 5 (bits), the staged forms 1 (the Pop->Push edge completes the declared count)
+sfu_bits_3p33_L5 sfu bits --clock 3.33 --pipeline sfu_k_0:i --latency sfu_k_0=5
+sfu_bits_2p0_L5 sfu bits --clock 2.0 --pipeline sfu_k_0:i --latency sfu_k_0=5
+sfu_bits_3p33_free sfu bits --clock 3.33 --pipeline sfu_k_0:i
+sfu_bits_2p0_free sfu bits --clock 2.0 --pipeline sfu_k_0:i
+sfu_staged_3p33_L1 sfu staged --clock 3.33 --pipeline sfu_k_0:t --latency sfu_k_0=1
+sfu_staged_2p0_L1 sfu staged --clock 2.0 --pipeline sfu_k_0:t --latency sfu_k_0=1
+sfu_staged_3p33_free sfu staged --clock 3.33 --pipeline sfu_k_0:t
+tree16_wide_3p33_free xlu_reduction_tree form:tree_wide --inst n16 --clock 3.33 --pipeline tree_0:t --unroll-inner --unroll leading_zeros17:offset
+tree16_wide_2p0_free xlu_reduction_tree form:tree_wide --inst n16 --clock 2.0 --pipeline tree_0:t --unroll-inner --unroll leading_zeros17:offset
+tree16_wide_3p33_L1 xlu_reduction_tree form:tree_wide --inst n16 --clock 3.33 --pipeline tree_0:t --unroll-inner --unroll leading_zeros17:offset --latency tree_0=1
+tree16_staged_3p33_L1 xlu_reduction_tree form:tree_wide_staged --inst n16 --clock 3.33 --pipeline tree_0:t --unroll-inner --unroll leading_zeros17:offset --latency tree_0=1
+tree16_staged_2p0_L1 xlu_reduction_tree form:tree_wide_staged --inst n16 --clock 2.0 --pipeline tree_0:t --unroll-inner --unroll leading_zeros17:offset --latency tree_0=1
+tree16_staged_3p33_free xlu_reduction_tree form:tree_wide_staged --inst n16 --clock 3.33 --pipeline tree_0:t --unroll-inner --unroll leading_zeros17:offset
+tx_wide_3p33_L1 xlu_transpose form:transpose_wide --clock 3.33 --pipeline tx_0:t --latency tx_0=1
+tx_wide_2p0_L1 xlu_transpose form:transpose_wide --clock 2.0 --pipeline tx_0:t --latency tx_0=1
+tx_wide_3p33_free xlu_transpose form:transpose_wide --clock 3.33 --pipeline tx_0:t

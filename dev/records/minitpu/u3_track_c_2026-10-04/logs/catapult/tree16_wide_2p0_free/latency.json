@@ -1,0 +1,28 @@
+{
+ "clock_period_ns": 2.0,
+ "definition": "latency: rising edges from the input-accepting edge to the edge after which the output is visible, no stall; ii: cycles between iterations of the I/O loop",
+ "solution": "/work/shared/users/phd/sk3463/scratch/u3c/tree16_wide_2p0_free.prj/build/Catapult/top.v1",
+ "tool": "catapult",
+ "units": {
+  "tree_0": {
+   "ii": 1,
+   "io": {
+    "v294.Pop()": 0,
+    "v295.Pop()": 0,
+    "v296.Pop()": 0,
+    "v297.Pop()": 0,
+    "v298.Push()": 2,
+    "v299.Push()": 3,
+    "v300.Push()": 3,
+    "v301.Push()": 2
+   },
+   "iterations": 60660,
+   "latency": 3,
+   "loop": "l_S_t_2_t",
+   "loop_c_steps": 11,
+   "port_style": "connections",
+   "process": "/top/tree_0/run",
+   "status": "scheduled"
+  }
+ }
+}

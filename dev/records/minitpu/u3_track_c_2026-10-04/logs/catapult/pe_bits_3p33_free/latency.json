@@ -1,0 +1,35 @@
+{
+ "clock_period_ns": 3.33,
+ "definition": "latency: rising edges from the input-accepting edge to the edge after which the output is visible, no stall; ii: cycles between iterations of the I/O loop",
+ "solution": "/work/shared/users/phd/sk3463/scratch/u3c/pe_bits_3p33_free.prj/build/Catapult/top.v1",
+ "tool": "catapult",
+ "units": {
+  "pe_0": {
+   "ii": 1,
+   "io": {
+    "v10.Pop()": 0,
+    "v11.Pop()": 0,
+    "v12.Pop()": 0,
+    "v13.Pop()": 0,
+    "v14.Pop()": 0,
+    "v15.Pop()": 0,
+    "v16.Pop()": 0,
+    "v17.Pop()": 0,
+    "v18.Pop()": 0,
+    "v19.Push()": 1,
+    "v20.Push()": 1,
+    "v21.Push()": 1,
+    "v22.Push()": 1,
+    "v23.Push()": 1,
+    "v24.Push()": 1
+   },
+   "iterations": 60090,
+   "latency": 1,
+   "loop": "l_S_t_0_t",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/top/pe_0/run",
+   "status": "scheduled"
+  }
+ }
+}

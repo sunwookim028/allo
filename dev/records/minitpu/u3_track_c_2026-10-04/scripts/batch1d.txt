@@ -1,0 +1,5 @@
+# the transpose tile as 256 registers: Catapult refuses to split the partitioned Stateful above its REGISTER_THRESHOLD (MEM-8, default 256), so the directive is raised by hand (finding C5)
+tx_wide_3p33_L1 xlu_transpose form:transpose_wide --clock 3.33 --pipeline tx_0:t --partition tx_0:tile --latency tx_0=1 --tcl "directive set -REGISTER_THRESHOLD 4096"
+tx_wide_2p0_L1 xlu_transpose form:transpose_wide --clock 2.0 --pipeline tx_0:t --partition tx_0:tile --latency tx_0=1 --tcl "directive set -REGISTER_THRESHOLD 4096"
+tx_wide_3p33_free xlu_transpose form:transpose_wide --clock 3.33 --pipeline tx_0:t --partition tx_0:tile --tcl "directive set -REGISTER_THRESHOLD 4096"
+tx_wide_2p0_free xlu_transpose form:transpose_wide --clock 2.0 --pipeline tx_0:t --partition tx_0:tile --tcl "directive set -REGISTER_THRESHOLD 4096"

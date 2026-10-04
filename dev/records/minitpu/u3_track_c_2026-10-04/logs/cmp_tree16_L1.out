@@ -1,0 +1,4 @@
+RTL xlu_reduction_tree:n16: 60660 cycles in 7 traces, 204120 defined slots, RTL vs reference on defined: 204120/204120
+UNIT-MATCH xlu_reduction_tree:n16 tree16_wide_3p33_L1 catapult-rtl 204120/204120 defined (38520 masked: fill=3661, no valid=34859; catapult==rtl on 35936) cycle=per-row; L per output {'valid_o': {1: 60660}, 'result_o': {1: 60660}, 'lane_valid_o': {1: 60660}, 'lane_result_o': {1: 60660}}; 1.0000 cyc/row; CYCLE-EQUAL yes (27.4s)
+    LATENCY-MATCH tree_0: reported 1 ii=1 (scheduled), measured 1 at 1.00003 cyc/vector; unit declares 1; pinned 1
+DONE

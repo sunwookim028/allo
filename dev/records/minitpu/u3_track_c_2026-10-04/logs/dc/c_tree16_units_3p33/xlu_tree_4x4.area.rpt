@@ -1,0 +1,31 @@
+ 
+****************************************
+Report : area
+Design : xlu_tree_4x4
+Version: W-2024.09
+Date   : Sun Oct  4 11:34:49 2026
+****************************************
+
+Information: Updating design information... (UID-85)
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                         1465
+Number of nets:                         29898
+Number of cells:                        28314
+Number of combinational cells:          21218
+Number of sequential cells:              6763
+Number of macros/black boxes:               0
+Number of buf/inv:                       3324
+Number of references:                     382
+
+Combinational area:              22313.143997
+Buf/Inv area:                     1890.994005
+Noncombinational area:           35541.325107
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                 57854.469104
+Total area:                 undefined
+1

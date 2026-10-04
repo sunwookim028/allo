@@ -1,0 +1,2 @@
+tree16_staged_3p33_free xlu_reduction_tree form:tree_wide_staged --inst n16 --clock 3.33 --pipeline tree_0:t --unroll-inner --unroll leading_zeros17:offset
+tree16_staged_2p0_free xlu_reduction_tree form:tree_wide_staged --inst n16 --clock 2.0 --pipeline tree_0:t --unroll-inner --unroll leading_zeros17:offset

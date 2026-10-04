@@ -1,0 +1,2 @@
+array4b_3p33 mxu_systolic_array streams --inst dim4 --clock 3.33 --pipeline-match pe_unit --unroll-inner
+mxu4b_3p33 mxu lockstep --inst dim4 --clock 3.33 --pipeline-match pe_unit --unroll-inner

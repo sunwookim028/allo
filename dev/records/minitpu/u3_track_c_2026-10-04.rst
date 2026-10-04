@@ -107,26 +107,33 @@ against it (D-10). Small geometry decides (P-4).
      - **204,120/204,120**
      - 3 / 1; L 2, 3, 3, 2
      - match; not cycle-equal (Catapult takes 2-3 c-steps Pop->Push at 2.0 ns; a pin at 1 was not run at 2.0)
-   * - T1 as ``tree_wide_staged`` n16 (3.33 / 2.0, ``latency=1``)
+   * - T1 as ``tree_wide_staged`` n16 (3.33 / 2.0, ``latency=1``; first ordering, C7)
      - --
      - **refused**, SCHD-30: ``chained data dependency ... from operation OR
-       "add_bits:add_bits:or"`` (the one-adder-per-c-step recurrence does not
-       fit Pop->Push = 1 in Catapult's model); free at 2.0: refused the same
-       way at II = 1
-     - blocked (C6): the RTL's two registers per level would have to be the
-       adder's own stage split, which no Allo form of ``bf16_add`` has
+       "add_bits:add_bits:or"`` (that ordering computed the adder from a
+       register written in the same iteration, so the Pop->Push chain held
+       an adder); free at 2.0 ns (second ordering): refused the same way at
+       II = 1 (the one-adder recurrence does not fit 2.0 ns)
+     - blocked at 2.0 ns (C6): the RTL's two registers per level would have
+       to be the adder's own stage split, which no Allo form of ``bf16_add``
+       has; at 3.33 ns see the next two rows
    * - same, free (3.33)
-     - STAGED_V2_PLACEHOLDER
-     - STAGED_V2_LAT
-     - STAGED_V2_VERDICT
+     - **204,120/204,120** defined (third ordering of the form, C7)
+     - 1 / 1; L 1 on ``valid_o`` and ``lane_valid_o``, **0** on ``result_o`` and ``lane_result_o`` (the payload Pushes read registers and were scheduled in the Pop's c-step); 815 s
+     - match; **not cycle-equal unpinned** (C4: two outputs a cycle early); pinned 1 (next row) it is
+   * - same, ``latency=1`` (3.33)
+     - **204,120/204,120** defined
+     - 1 / 1 pinned; L 1 on all four outputs; 1.000 cyc/row; 833 s
+     - **match, cycle-equal**: the RTL's register placement (two per level, as
+       rows) with one adder per c-step -- the second cycle-equal tree form
    * - T1 landed ``bits`` n16 as emitted (3.33, no pipeline)
-     - LANDED_TREE_PLACEHOLDER
+     - **204,120/204,120** defined (memory-pin comparator: the lanes served one word per cycle)
      - RAM pins for ``data_i``/``lane_result_o`` (C1)
-     - LANDED_TREE_VERDICT
+     - manifest 25 / **26 unreliable** (two rolled ``s`` loops merged: their names repeat across bands, proposal 6); 972 s. **match per row; 42.0 cyc/row**, outputs 41 cycles after the row (C1: a lane memory is read one word per cycle)
    * - T2 ``units`` n16 (compose, 3.33)
-     - T2_ROW_PLACEHOLDER
-     - T2_ROW_LAT
-     - T2_ROW_VERDICT
+     - **204,106/204,120** defined: the 14 differing slots are rows 60,656-60,659 of the last trace, which never came out -- the composite stalled before its last rows and never raised ``done`` (tail deadlock of the feed/sink FIFOs; 2.02 M cycles)
+     - 15 node kernels 2 / 1; ``tree_feed`` 32 / **33**; ``tree_sink`` 2 / 3 (unreliable: a rolled loop merged; its two ``k`` and two ``s`` loops share names, which ``unroll`` cannot address, proposal 6); 454 s
+     - **match per row but for the last 4 rows; semantic mismatch per cycle**: 33.3 cyc/row, outputs 32 cycles after the row (H4: one helper, one unroll, all 15 nodes II 1)
    * - ``xlu_transpose`` X1 as ``transpose_wide`` (3.33 and 2.0, ``latency=1``; tile partitioned, ``REGISTER_THRESHOLD 4096``)
      - **95,783/95,783** defined (24,401 masked "no valid", equal on 24,392)
      - 1 / 1 pinned; L 1 on ``read_valid_o`` and ``read_data_o``; 1.000 cyc/row
@@ -154,14 +161,14 @@ against it (D-10). Small geometry decides (P-4).
      - **match per row; semantic mismatch per cycle** (H7); with the driver
        and sink pipelined too: refused (C1, ``array_sink_0`` II 1 impossible)
    * - same, DIM 4 (3.33)
-     - ARRAY4_PLACEHOLDER
+     - **79,849/79,849** defined (589 masked, equal on 582)
      - drive 16 / **17**, sink 4 / 5, PEs 1 / 1 (one 0 / 1)
-     - ARRAY4_VERDICT
+     - **match per row; semantic mismatch per cycle**: **17.000 cyc/row**, outputs 20-25 cycles after the row
    * - ``mxu`` M1 ``lockstep`` DIM 4 (3.33)
-     - MXU4_ROW_PLACEHOLDER
+     - **111,067/111,067** defined (13,217 masked, equal on 13,162): the contract holds per row
      - with every kernel pipelined: refused, ``could not schedule partition
-       '/mxu_dim4/mxu_back_0/run'`` (C1); MXU4_ROW_LAT
-     - MXU4_ROW_VERDICT
+       '/mxu_dim4/mxu_back_0/run'`` (C1); PE grid only pipelined: PEs 1 / 1, ``mxu_back`` 1 / **26**, ``mxu_front`` 50 / **59 unreliable** (rolled ``s2`` loop merged); **74.06 cyc/row**; ``input_ready_o``/``input_accept_o`` skew 0, ``output_valid_o`` 3, ``output_data_o`` 2-20 cycles
+     - **match per row (contract); semantic mismatch per cycle** -- push->valid 1,631 cycles for the contract's 22 rows (every program: pops in order equal, ``output_valid_o`` per row equal, first-valid row equal) (P-3: a manifest number)
 
 2. The forms, and why the landed ones needed a track-C shape
 ============================================================
@@ -262,7 +269,7 @@ so one ``unroll`` covers it (H4 below).
   for 15 or 63 nodes: C10 does not recur on the SystemC path for ``@df.kernel``
   (T1 body) nor for ``compose.unit`` (T2, P2, A1: the PE's ``offset`` loop is
   one per unit *instance* because B inlined it into the body, and
-  ``--unroll-inner`` lists them). T2_PLACEHOLDER
+  ``--unroll-inner`` lists them). T2 (``xlu_tree_compose``, n16) through Catapult: ``add_bits`` and ``leading_zeros17`` are defined **once** in the emitted ``kernel.cpp`` (2 definitions for 15 node kernels), the one ``unroll("leading_zeros17:offset")`` reaches every node, and all 15 ``add_low``/``add_tap``/``add_high`` kernels schedule at latency 2, II 1. **H4: C10 does not recur on this path for either unit mechanism.** What T2 does cost is the composition's boundary: ``tree_feed`` reads the 16 lanes from a RAM-pin array and puts 16 tokens per row (II 33), the sink II 3 -- the lane-array boundary of C1, not the adders.
 * **H7 (a Stream-linked array computes the contract but not the cycle
   model; push->valid > 82)** -- **measured on Catapult RTL for the first
   time, and it is a rate as much as a latency.** ``mxu_pe.unit`` (P2: one PE
@@ -276,7 +283,7 @@ so one ``unroll`` covers it (H4 below).
   holds *in token time* (B's P-11) and fails *in cycles* exactly as the plan
   expected, with the numbers: 2x the rows for one PE hop, 9x for a lane
   memory read per row; the Catapult FIFO hop costs what ``u3_fifo_composed``
-  measured. MXU4_PLACEHOLDER
+  measured. ``mxu.lockstep`` at DIM 4 (M1, every PE pipelined, front and back not): **111,067/111,067 defined slots per row** -- the push/commit/pop contract holds on Catapult RTL -- at **74.06 cycles per row** (``mxu_front`` II 59 with one rolled loop merged, manifest ``unreliable`` as D-10 requires; ``mxu_back`` II 26), so the contract's ``2 + 5 DIM = 22`` rows are **1,631 cycles** of push->valid (identity program: 22 rows x 74.06; the random programs' 1-row distance is 77 cycles): the manifest number the owner asked for, and the measure of what a lane-memory boundary and two FIFO hops cost when every row is a token. At DIM 4 the array alone (A1) is 79,849/79,849 per row at 17.0 cycles per row, outputs 20-25 cycles after their row.
 * **H8 / A2 (Wire-locked grid)** -- not attempted (plan: expected blocked).
 * **H14 (D-14 unreset payload: DC area within 5 % of MiniTPU; reset form
   +10-20 %)** -- **not reached as stated**: the one unreset form in the
@@ -378,20 +385,51 @@ form nothing on that path is an adder -- the adders sit on the
 register-to-register path, which the scheduler checks against the clock
 with its own (optimistic) model. The measured truth is DC's.
 
-**C7 -- bug (my form, caught by the oracle): the staged tree's register
-order.** The first ``tree_wide_staged`` updated ``stB <= stA`` before
+**C7 -- bug (my form, caught by the oracle, twice): the staged tree's
+register order.** The first ``tree_wide_staged`` updated ``stB <= stA`` before
 computing ``stA <= f(stB)``, so each level cost one row, not two, and read
-the valid pipe before the cycle's clear: 125,907/204,120 on RTL, every
-difference a valid or a one-row-early payload. Fixed (compute from the old
-registers, then shift, then output, as T1 and ``sfu.staged`` do); the
-rebuilt form is in section 1. Recorded because it is the second time
-(track B's finding 7) that a hand-written pipe-as-data form was wrong in its
-*ordering* and only the per-cycle RTL oracle said so.
+the valid pipe before the cycle's clear: 125,907/204,120 on RTL. The second
+computed from the old registers but read the outputs after the update and
+the valid pipe after a shift one entry short: 76,999/204,120, every
+difference one row early. The third (payload read before the update, valid
+pipes one entry deeper read after shift and clear, as T1 and ``sfu.staged``
+do) matches 204,120/204,120. Recorded because it is the second time (track
+B's finding 7) that a hand-written pipe-as-data form was wrong only in its
+*ordering*, and only the per-cycle RTL oracle said so -- an argument for the
+pipe-as-data form being generated from a declaration (stage count per
+level) rather than written by hand.
 
 **C8 -- finding (Catapult, scale):** the unrolled n16 tree takes Catapult
 19-22 min per run (``dpfsm`` 500-1,100 s on 15 unrolled adders), the SFU
 and PE ~2 min, the DIM-2 array 4 min; the n64 tree and the DIM-4 array/MXU
 were not finished in this session's budget (section 8).
+
+
+**C9 -- bug candidate (SystemC emitter / Catapult RTL): a Stream polled with
+``empty()`` and fed by ``try_put`` is not a FIFO on RTL.** Track B's finding 3
+measured, as asked: the MXU with its lane FIFOs as ``Stream[UInt(64), 16]``
+(``gather_try`` ``try_put``\ s a finished group, ``pop_engine`` polls every
+lane's ``empty()`` and ``get``\ s on a pop; B's probe units unchanged,
+``forms/mxu_streams_fifo.py``), DIM 2, 3.33 ns, every Phase 0 program, on
+Catapult RTL through the memory-pin comparator. Catapult schedules it (PEs
+1 / 1, ``gather_try`` 3 / 4, ``pop_engine`` 1 / **10**, ``mxu_front`` 1 / 5
+unreliable; 10.0 cycles per row). **The contract fails**: pops in order equal
+**0/2423, 0/2420, 0/2424** on the random programs and 0/16 on
+``fifo-full-exact`` (``waiting-pops`` alone 4/4); ``output_valid_o`` is high
+from cycle 0 on nine programs (``first valid catapult 0`` where the RTL's is
+19-25) and ``overflow`` delivers 17 pops for the RTL's 16 -- the lanes' heads
+are consumed out of step. In csim B saw the *data* intact in order and only
+the *cycle* gone (943/943 in order on ``random-0``); on RTL the order is gone
+too. The likely mechanism is the ``empty()`` sideband: ``laneq[lane]_empty``
+is an ``sc_in<bool>`` driven by the top-level ``AlloFifo``'s ``empty_o``, and
+a value of 0 before the first token (or one cycle stale after a ``get``) makes
+the engine ``get()`` from an empty lane -- ``u3_fifo_composed`` cosim'd one
+FIFO, not a polled gather/pop pair. By contrast M1's explicit ring
+(``mxu.lockstep``) holds the contract on RTL on every program (above).
+Proposal: a Verilator regression of one ``try_put``/``empty()``/``get`` lane
+on Catapult RTL (the form is in ``forms/mxu_streams_fifo.py``), and the
+``empty_o`` reset value checked in ``AlloFifo``/``AlloFifoC``. Until then P-12
+(explicit rings for the verdict) stands on RTL as well as on the simulator.
 
 5. Same-flow DC area
 ====================
@@ -491,10 +529,10 @@ Catapult's ``rtl.rpt`` reports at -0.3 to -1.9 ns (C6, N4).
      - 1729
      - 0.00
      - T1 ``tree_wide`` free (L 2-3)
-     - TREE2P0_DC
-     - TREE2P0_FLOPS
-     - TREE2P0_SLACK
-     - TREE2P0_RATIO
+     - 45817.7
+     - 4846
+     - **-0.11** (crit 2.06 ns: DC does not close it)
+     - 1.99
    * - xlu_reduction_tree n64
      - 3.33 / 2.0
      - ``xlu_reduction_tree`` shipped
@@ -575,14 +613,69 @@ Catapult's ``rtl.rpt`` reports at -0.3 to -1.9 ns (C6, N4).
    * - mxu_systolic_array DIM 4
      - 3.33
      - ``mxu_systolic_array`` (``DIM=4``)
-     - MARRAY4_DC
-     - MARRAY4_FLOPS
-     - MARRAY4_SLACK
-     - A1 ``streams`` composite
-     - CARRAY4_DC
-     - CARRAY4_FLOPS
-     - CARRAY4_SLACK
-     - ARRAY4_RATIO
+     - 35309.9
+     - 3095
+     - 0.00
+     - A1 ``streams`` composite (driver, 16 PEs, sink, FIFOs)
+     - 75051.9
+     - 8655
+     - 0.00
+     - 2.13
+   * - mxu DIM 4
+     - 3.33
+     - ``mxu`` (``DIM=4``: FIFOs, skew, array, gather)
+     - 64482.1
+     - 8347
+     - 0.00
+     - M1 ``lockstep`` composite (front, 16 PEs, back)
+     - 84989.1
+     - 9875
+     - 0.01
+     - **1.32**
+   * - mxu DIM 2
+     - 3.33
+     - ``mxu`` (``DIM=2``)
+     - 21998.2
+     - 3222
+     - 0.01
+     - B finding 3: ``mxu_streams_fifo`` (front, 4 PEs, ``gather_try``, ``pop_engine``; lane FIFOs as Streams)
+     - 34387.7
+     - 4787
+     - 0.04
+     - 1.56 (and the contract fails, C9)
+   * - xlu_reduction_tree n16
+     - 3.33
+     - same as above
+     - 20663.4
+     - 1729
+     - 0.02
+     - T2 ``units`` composite (feed, 15 node kernels, sink, 31 + 4 FIFOs)
+     - 57854.5
+     - 6763
+     - 0.00
+     - 2.80
+   * - xlu_reduction_tree n16
+     - 3.33
+     - same
+     - 20663.4
+     - 1729
+     - 0.02
+     - T1 ``tree_wide_staged`` free (two registers per level as rows)
+     - 34867.0
+     - 3039
+     - 0.00
+     - 1.69
+   * - xlu_reduction_tree n16
+     - 3.33
+     - same
+     - 20663.4
+     - 1729
+     - 0.02
+     - T1 ``tree_wide_staged``, ``latency=1`` (cycle-equal)
+     - 36019.6
+     - 3111
+     - 0.00
+     - 1.74
 
 Reading it:
 
@@ -677,7 +770,7 @@ Reading it:
   2.0 ns rows for the composites.
 * **The staged tree's honest 2.0 ns form** needs ``bf16_add`` written as its
   two RTL stages (``vpu_bf16_add_pipe``'s split) -- no such Allo text exists;
-  the per-level staged form is refused at ``latency=1`` at both clocks (C6).
+  the per-level staged form is refused at II = 1 at 2.0 ns (C6).
 * **B's finding 3 on RTL** (the MXU output FIFOs as polled Streams,
   ``try_put``/``empty()``, vs the explicit ring): the probe units
   (``u3_track_b_2026-10-04/repros/mxu_streams_units.py``) were not built

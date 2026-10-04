@@ -1,0 +1,4 @@
+top top
+ports (3 region args): v263:mr8 v264:mr16 v265:mw16
+UNIT-MATCH sfu staged sfu_staged_3p33_free catapult-rtl 462144/462144 vs MiniTPU RTL; latency {write-cycle stamps, no accept edge: memory ports} (declared 5); 1.0000 cyc/vector (1.8s)
+DONE
