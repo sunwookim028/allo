@@ -1,0 +1,8 @@
+RTL xlu_reduction_tree:n64: 19861 cycles in 9 traces, 65336 defined slots, RTL vs reference on defined: 65336/65336 (0.7s)
+UNIT-MATCH xlu_reduction_tree:n64 bits simulator 65336/65336 defined (14108 masked: fill=1535, no valid=12573; allo==rtl on 12916) cycle=order-only (build 1.9s, run 0.3s)
+Connections Clock: t.clk Period: 1 ns
+Info: /OSCI/SystemC: Simulation stopped by user.
+[14:26:47] Compiling with g++ ...
+[14:26:53] Running simulation ...
+UNIT-MATCH xlu_reduction_tree:n64 bits systemc 65336/65336 defined (14108 masked: fill=1535, no valid=12573; allo==rtl on 12917) cycle=per-iteration, time unchecked (build 1.6s, run 17.4s)
+== exit=0

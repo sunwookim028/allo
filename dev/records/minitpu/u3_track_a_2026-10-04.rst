@@ -1,0 +1,261 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+########################################################################
+U3 track A: ``sfu``, ``xlu_reduction_tree``, ``xlu_transpose`` in Allo
+########################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-04.** zhang-21, branch ``u3-xlu-sfu``
+   (worktree ``scratch/wt-u3a``) from ``u1-pilot`` at ``dab9e7b4``; MiniTPU
+   at ``b3ba0a4d``, read only. Oracles: Phase 0 (``u3_phase0_2026-10-04.rst``);
+   plan: ``u3_plan_2026-10-04.rst`` (track A = S1, S2, T1, X1 on the simulator
+   and SystemC csim, then T2; hypotheses H1, H3, H5, H12). The owner is away:
+   every call below is **provisional** (D-9). Nothing under ``allo/`` or
+   ``mlir/`` changed; core defects are proposals (section 4). No Catapult
+   (track C) and no RTLGen/AMC (track D).
+
+Reproduce (``source examples/minitpu/harness/env-zhang21.sh``, ``export
+PYTHONPATH=$PWD``; ``--project`` anywhere writable)::
+
+   $ALLO_PYTHON -m examples.minitpu.harness.check sfu --backend simulator --backend systemc
+   $ALLO_PYTHON -m examples.minitpu.harness.check xlu_transpose --backend simulator --backend systemc
+   $ALLO_PYTHON -m examples.minitpu.harness.check xlu_reduction_tree --inst n16 --backend simulator --backend systemc
+   $ALLO_PYTHON -m examples.minitpu.harness.check xlu_reduction_tree --inst n64 --backend simulator --backend systemc
+   $ALLO_PYTHON u3_track_a_2026-10-04/h5_refusals.py       # H5: the wrong parameter sets
+
+Logs and repros: ``u3_track_a_2026-10-04/`` (``*.log`` are the ``check``
+runs; ``repro_*.py`` the minimal repros of section 3, each self-contained).
+
+1. Verdicts (matrix-ready)
+==========================
+
+The RTL column is Phase 0's. **match** is ``UNIT-MATCH`` on every defined
+slot; the simulator compares order only, csim per iteration (time unchecked:
+latency on Allo-produced RTL is track C's). Small geometry decides (P-4); the
+shipped one ran once per variant.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 14 32 32
+
+   * - unit / variant
+     - RTL oracle
+     - Allo simulator
+     - SystemC csim
+   * - ``sfu`` S1 ``bits``
+     - 462,144 / lat 5
+     - **match** 462,144/462,144 (H1: first time once the four tables were
+       bound in the kernel, A1-A4)
+     - **match** 462,144/462,144; **finding** A2, A4 (bug, emitter) worked around
+   * - ``sfu`` S2 ``staged``
+     - same
+     - **match** 462,144/462,144
+     - **match** 462,144/462,144 (pipe-as-data, the form for track C)
+   * - ``xlu_reduction_tree`` T1 ``bits``, n16
+     - 204,120 / lat 9, tap 5
+     - **match** 204,120/204,120 (H3 Sim: yes)
+     - **match** 204,120/204,120 after A5 (bug, csim: last iteration's 2-D
+       stores dropped; 204,119 before the store reorder)
+   * - same, n64 (shipped, once)
+     - 65,336 / lat 13, tap 9
+     - **match** 65,336/65,336
+     - **match** 65,336/65,336
+   * - ``xlu_reduction_tree`` T2 ``units``, n16
+     - as above
+     - **match** 204,120/204,120 (15 composed adder units)
+     - **match** 204,120/204,120 after A5 (same slot as T1 before it)
+   * - same, n64 (once)
+     - as above
+     - **match** 65,336/65,336 (63 adder units, 127 + 4 streams)
+     - **match** 65,336/65,336
+   * - T2 derived legality (H5)
+     - --
+     - **match**: 7 wrong parameter sets refused at composition, 2 legal sets
+       composed (``h5_refusals.log``)
+     - n/a (composition time)
+   * - ``xlu_transpose`` X1 ``trace`` (tile reset)
+     - 95,783 / read 1
+     - **match** 95,783/95,783
+     - **match** 95,783/95,783; the reset tile is a **recorded deviation**
+       from the RTL (D-13's last bullet)
+   * - ``xlu_transpose`` X1 ``trace_unreset`` (P-9)
+     - same
+     - **match** 95,783/95,783 (ordinary storage, D-14)
+     - **refused** (D-14, honest): ``Stateful(reset=False)`` on a kernel with
+       array ports; the unreset lowering is Wire-only (A6, missing abstraction)
+   * - ``xlu_transpose`` X2 ``ported`` (H13)
+     - --
+     - **blocked**: D-12's ``compose.Memory(rows=, ports=)`` is not in this
+       tree (``allo/compose.py`` has name/dtype only); the probe is a design note (section 5)
+     - blocked
+
+2. Hypotheses
+=============
+
+* **H1** (S1 matches first time): **yes for the arithmetic** -- no vector
+  ever differed on either backend; the three builds before the first run were
+  tool findings (A1-A4), none in the logic. The ``sfu.sv`` transcription in
+  ``int32`` with masks reused nothing of U1 and needed no B1/B4 workaround.
+* **H3** (T1 matches; Catapult's free depth): Sim and SC **yes** at both
+  geometries; the depth is track C's. T1 carries the declared depths as
+  pipe-as-data (``declared(inst)``: ``1 + 2*LEVELS``), so ``latency=13`` is a
+  one-line pin when C needs it.
+* **H5** (derived legality refuses a wrong adder latency): **yes**.
+  ``tree_legality`` holds ``MAX_LATENCY``, ``ROOT_LATENCY``, ``TAP_LATENCY``,
+  ``TAP_LEVEL``, ``TAP_BASE``, ``LEVELS`` and ``N`` to ``LANES``, ``SUB`` and
+  ``ADD_LATENCY``; every wrong set is refused with the derivation in the
+  message, including ``ROOT_LATENCY=13`` at 16 leaves (the shipped constant
+  at the wrong geometry) and ``ADD_LATENCY=3`` with the rest not re-derived.
+  **Gap behind it** (missing abstraction, A7): a ``compose.Unit`` has no
+  latency of its own, so the adder's 2 is a *parameter* (``ADD_LATENCY``)
+  the composition trusts; D-10's ``latency.json`` exists only after a backend
+  runs. The sink's pipe depths are the one place the derived numbers are
+  consumed here; on cycle-locked RTL they are what ``latency=`` would pin.
+* **H12** (wide ports: B6/S7/S8 recur unless ports are lane arrays): **not
+  tested as stated** -- every variant used lane arrays from the start (P-8:
+  ``uint16[n, 64]`` for the 1,024-bit tile and tree words), and no S7/S8
+  recurred. What did recur in the lane-array form is **new**: A5 (a 2-D
+  output's last-iteration stores dropped by csim), silent and deterministic.
+
+3. Findings
+===========
+
+Classified per D-9. ``repro_*.py`` in the record directory; each runs alone
+(``$ALLO_PYTHON repro_x.py <project dir>``).
+
+**A1 -- workaround (known, C4 class).** A module-level numpy array cannot be
+indexed in a kernel (``Unsupported global variable``); it is bound to a
+kernel-local constant (``rom: int32[2048] = ROM``), which lowers to a
+``memref.global`` + ``get_global``. ``sfu.py`` does this for the two
+2,048-entry ROMs and the two 32-entry PWL tables (the data read from the
+clone's ``.mem`` files, the same reader as ``ref``). H2's question (what each
+backend makes of a 2,048 x 16 b constant) is open for tracks C and D.
+
+**A3 -- bug (core, silent-then-loud).** ``allo/passes.py:471``
+``decompose_library_function`` erases every module-level op whose
+``sym_name`` starts with ``gelu``, ``layernorm`` or ``tril`` -- the library
+functions it means to replace -- so a user constant named ``gelu_rom`` (or a
+user function ``gelu_addr``) is deleted and the simulator's pass pipeline
+fails with ``'memref.get_global' op 'gelu_rom' does not reference a valid
+global memref``. ``repro_gelu_name.py``: ``tab_gelu`` ok, ``gelu_tab``
+fails. Workaround: no symbol starting with those three prefixes (``sfu.py``
+names them ``rom_gelu``). Proposal: match the library functions by the exact
+names ``decompose_library_function`` generates, and only ``func.func`` ops.
+
+**A2 -- bug (SystemC emitter).** A constant global referenced from a *helper*
+function (a callee, not a ``df.kernel``) is not declared in the emitted C++:
+``kernel.cpp: 'rom' was not declared in this scope``. ``EmitSystemC.cpp``
+emits constant globals only inside ``emitKernelModule`` (as ``static const``
+locals before the kernel body, ~l.3058) while helpers go through
+``VhlsModuleEmitter::emitFunction`` (~l.5156) with no global emission.
+``repro_global.py`` ("df helper/systemc csim"). Proposal: emit each constant
+global once at file scope before the helpers and drop the per-kernel copies.
+
+**A4 -- bug (SystemC emitter, follows A2).** Passing the constant array down
+to the helper instead (``sfu_bits(op, x, rom: int32[2048], ...)``) emits the
+caller's array ``const int32_t[]`` and the callee's parameter ``int32_t*``:
+``invalid conversion from 'const int32_t*' to 'int32_t*'``. Workaround (the
+shipped S1): the table *lookups* stay in the kernel and the helper takes the
+four words; two small address helpers (``gelu_addr``, ``exp_addr``) keep the
+transcription readable. Proposal: emit memref parameters a callee never
+stores to as ``const T*``.
+
+**A5 -- bug (SystemC csim, silent, high).** When a kernel's last iteration
+ends with several stores to a 2-D output array, only the first of them is
+kept: ``xlu_reduction_tree`` T1 and T2 at n16 read back
+``lane_result_o[last] = 0x....50e2`` with lanes 1-3 zero (204,119/204,120,
+the single differing slot, deterministic across runs), while n64 passed
+because the data happened to leave the top lanes equal. ``repro_lastrow_multi.py``:
+with ``a[t], b[t], c[t]`` stored before ``d[t, 0..3]`` the last row of ``d``
+comes back ``[152, 0, 0, 0]``; with ``d`` stored first every row is right.
+The plain 2-D case (``repro_2d_lastrow.py``, one output) does **not**
+reproduce, so it is the interaction of the kernel's end with pending memory
+writes to the last-written array. Workaround (both tree variants): store the
+lane array first. Proposal: have the testbench drain every output memory's
+pending writes before sampling (or the kernel's ``done`` wait for them).
+
+**A6 -- missing abstraction / refusal (SystemC emitter, D-14).** ``tile @
+Stateful(reset=False)`` in a kernel with array (memory) ports is refused:
+"the kernel has a non-Wire argument (argument 0); the write runs at every
+clock edge, which matches the kernel's iterations only when every port is a
+Wire". The refusal is correct under D-14's lowering, so X1's SC verdict uses
+the reset tile (a recorded deviation, as D-13 already allows for storage).
+The honest unreset form is U2's ``comb_unreset`` shape (a ``src`` kernel over
+Wires, the tile kernel Wire-only, a ``sink``), not built here for time;
+it is the natural X1 on Catapult and belongs to track C with A2-style ports.
+
+**A7 -- missing abstraction (compose).** A ``compose.Unit`` cannot declare a
+latency, so a derived-latency legality has to take the adder's latency as an
+architecture parameter (``ADD_LATENCY``), which nothing checks against the
+unit. The ``ip_gaps`` pattern (legality on parameters) works for geometry;
+for timing it wants a unit-level ``latency`` that the legality can read and
+``latency.json`` can be checked against (D-10).
+
+**A8 -- harness note (minor).** ``check.py`` hands a trace runner ``(mod, cmd,
+n, w)`` without the instance, so a geometry-bearing unit's runner cannot know
+``N``; ``xlu_reduction_tree`` keeps the last built instance in a module
+variable (``_BUILT``). Track B's ``mxu`` (DIM 2/4/16) has the same need; the
+fix is ``check_trace`` passing ``inst`` when the runner's signature takes it,
+as it already does for ``make`` -- left to the integrator (shared file).
+
+**A9 -- front-end note.** A Python ``bool`` closed over by a kernel
+(``if unreset: tile ... @ Stateful(reset=False) else: ...``) is compiled as
+an ``scf.if`` on an ``i32``, not folded: ``'scf.if' op operand #0 must be
+1-bit signless integer``. Variants that differ by a declaration are two
+functions (``xlu_transpose.trace`` / ``trace_unreset``).
+
+**A10 -- compose note.** Unit bodies annotate their parameters with
+architecture names (``op: UInt(8)[NCYC]``), so the module needs ``from
+__future__ import annotations`` (as ``examples/tinytpu/ip/reduce.py`` has)
+or the decorator fails at import with ``NameError: NCYC``.
+
+4. Proposals for the core (no patches here)
+===========================================
+
+1. ``allo/passes.py`` ``decompose_library_function``: exact-name match on
+   ``func.func`` ops only (A3). One-line; a regression test is
+   ``repro_gelu_name.py``.
+2. ``mlir/lib/Translation/EmitSystemC.cpp``: constant globals emitted once at
+   file scope before helper functions (A2); ``const`` memref parameters for
+   read-only callee arrays (A4).
+3. SystemC csim testbench: drain pending output-memory writes before the
+   kernel's ``done`` is honoured (A5). Regression: ``repro_lastrow_multi.py``.
+4. ``compose.Unit.latency`` (A7) -- a D-10 follow-up, for the owner.
+
+5. Provisional calls made (D-9)
+===============================
+
+* **P-A1.** S1 keeps "one function of ``(op, operand)``" with the table reads
+  in the kernel (A2/A4 workaround) rather than inlining the whole body (which
+  S2 does anyway). *Reason:* the helper is what a ``sfu_group`` of 16 lanes
+  would instantiate; the workaround moves four reads, not the logic.
+* **P-A2.** X1's SC verdict is taken with the tile **reset** and the unreset
+  form recorded as refused, not blocked. *Reason:* the refusal is D-14 working
+  as written; the Wire-only unreset form exists (U2) and is track C's shape.
+* **P-A3.** T2's wavefront word is ``UInt(17)`` = ``{op, value}`` on every
+  stream, so the op travels with its data (as the RTL's ``op_q`` pipe does),
+  and the valid/reset pipes live in the sink at the derived depths. *Reason:*
+  a self-timed tree has no cycle to attach a valid to; the sink is where the
+  RTL's contract (valid 13 edges later, cleared by reset) is restated.
+* **P-A4.** The tree's node numbering is the heap form of
+  ``ip/units/reduction_tree.py`` (``node[N + m]`` has children ``2m``,
+  ``2m + 1``), in three instance groups (below / at / above the tap) of one
+  body, so no instance puts conditionally. *Reason:* one writer per stream
+  element is a structural fact, not a runtime branch (``stream_ports.rst``).
+* **P-A5.** No second geometry for the transpose (16 x 4 only), per the plan.
+
+6. Not done
+===========
+
+* X2 (``ported``, H13): D-12 is not implemented in this tree; design note
+  only: a transposing read is a permutation across all 16 rows, i.e. 16 read
+  ports of one column each in D-12's terms, or a register array with a
+  registered mux -- the latter is what X1 is.
+* The Wire-only unreset transpose (A6) and T3 (TinyTPU's ``reduction_tree``
+  with a bf16 node engine) -- time; T3's "rounding tree, order declared" is
+  P-7's draft (track E).
+* H2 (ROM inference), H4 (C10 for 63 ``@df.unit`` adders -- T2 used
+  ``compose.unit``, which has neither C9 nor C10, as P-6 predicted), H14:
+  track C.

@@ -1,0 +1,2 @@
+RTL xlu_reduction_tree:n64: 19861 cycles in 9 traces, 65336 defined slots, RTL vs reference on defined: 65336/65336 (0.7s)
+UNIT-MATCH xlu_reduction_tree:n64 units simulator 65336/65336 defined (14108 masked: fill=1535, no valid=12573; allo==rtl on 12918) cycle=order-only (build 11.6s, run 3.0s)
