@@ -1,0 +1,49 @@
+GENERATED /tmp/claude-1772902/-work-shared-users-phd-sk3463-allo/3b1c24a0-f6d1-4c37-88e0-31db609cddf4/scratchpad/amctmp/treep/tree_amc_kernel_n16_400.py: 1576 lines
+ #0 0x00007f6dbb791d5a (/work/shared/users/phd/sk3463/scratch/amc/amc-dialect/build/tools/amc/python_packages/amc_core/amc_mlir/_mlir_libs/_amc.cpython-312-x86_64-linux-gnu.so+0x13cd5a)
+ #1 0x00007f6dbb78e8b8 (/work/shared/users/phd/sk3463/scratch/amc/amc-dialect/build/tools/amc/python_packages/amc_core/amc_mlir/_mlir_libs/_amc.cpython-312-x86_64-linux-gnu.so+0x1398b8)
+ #2 0x00007f6dbb78ea0b (/work/shared/users/phd/sk3463/scratch/amc/amc-dialect/build/tools/amc/python_packages/amc_core/amc_mlir/_mlir_libs/_amc.cpython-312-x86_64-linux-gnu.so+0x139a0b)
+ #3 0x00007f6ffb568990 __restore_rt (/lib64/libpthread.so.0+0x12990)
+ #4 0x00007f6ffaa445af raise (/lib64/libc.so.6+0x4e5af)
+ #5 0x00007f6ffaa17ee5 abort (/lib64/libc.so.6+0x21ee5)
+ #6 0x00007f6ffaa17db9 _nl_load_domain.cold.0 (/lib64/libc.so.6+0x21db9)
+ #7 0x00007f6ffaa3cf06 (/lib64/libc.so.6+0x46f06)
+ #8 0x00007f6dc415cda2 (anonymous namespace)::SCFToLoopSchedulePass::createLoopSchedulePipeline(mlir::scf::WhileOp&, circt::scheduling::CyclicProblem&, mlir::Value) SCFToLoopSchedule.cpp:0:0
+ #9 0x00007f6dc416795d (anonymous namespace)::SCFToLoopSchedulePass::runOnFunc(mlir::func::FuncOp) SCFToLoopSchedule.cpp:0:0
+#10 0x00007f6dc4169054 (anonymous namespace)::SCFToLoopSchedulePass::runOnOperation() SCFToLoopSchedule.cpp:0:0
+#11 0x00007f6dc15b6d69 mlir::detail::OpToOpPassAdaptor::run(mlir::Pass*, mlir::Operation*, mlir::AnalysisManager, bool, unsigned int) (/work/shared/users/phd/sk3463/scratch/amc/amc-dialect/build/tools/amc/python_packages/amc_core/amc_mlir/_mlir_libs/libAMCAggregateCAPI.so.24.0git+0x5618d69)
+#12 0x00007f6dc15b7086 mlir::detail::OpToOpPassAdaptor::runPipeline(mlir::OpPassManager&, mlir::Operation*, mlir::AnalysisManager, bool, unsigned int, mlir::PassInstrumentor*, mlir::PassInstrumentation::PipelineParentInfo const*) (/work/shared/users/phd/sk3463/scratch/amc/amc-dialect/build/tools/amc/python_packages/amc_core/amc_mlir/_mlir_libs/libAMCAggregateCAPI.so.24.0git+0x5619086)
+#13 0x00007f6dc15b786d mlir::PassManager::runPasses(mlir::Operation*, mlir::AnalysisManager) (/work/shared/users/phd/sk3463/scratch/amc/amc-dialect/build/tools/amc/python_packages/amc_core/amc_mlir/_mlir_libs/libAMCAggregateCAPI.so.24.0git+0x561986d)
+#14 0x00007f6dc15b8b56 mlir::PassManager::run(mlir::Operation*) (/work/shared/users/phd/sk3463/scratch/amc/amc-dialect/build/tools/amc/python_packages/amc_core/amc_mlir/_mlir_libs/libAMCAggregateCAPI.so.24.0git+0x561ab56)
+#15 0x00007f6dc18cfa3c circt::amc::applyAmcToLoopSchedulePass(mlir::ModuleOp&, mlir::MLIRContext&, circt::amc::OperatorAllocationGenerator, llvm::StringRef, double, double) (/work/shared/users/phd/sk3463/scratch/amc/amc-dialect/build/tools/amc/python_packages/amc_core/amc_mlir/_mlir_libs/libAMCAggregateCAPI.so.24.0git+0x5931a3c)
+#16 0x00007f6dc13f22ab amcMlirApplyAmcToLoopScheduleVivado (/work/shared/users/phd/sk3463/scratch/amc/amc-dialect/build/tools/amc/python_packages/amc_core/amc_mlir/_mlir_libs/libAMCAggregateCAPI.so.24.0git+0x54542ab)
+#17 0x00007f6dbb6bbbc2 (/work/shared/users/phd/sk3463/scratch/amc/amc-dialect/build/tools/amc/python_packages/amc_core/amc_mlir/_mlir_libs/_amc.cpython-312-x86_64-linux-gnu.so+0x66bc2)
+#18 0x00007f6dca211383 (/work/shared/users/phd/sk3463/scratch/amc/amc-dialect/build/tools/amc/python_packages/amc_core/amc_mlir/_mlir_libs/libnanobind-mlir.so+0x13383)
+#19 0x0000561dae8ded1e _PyErr_Occurred /usr/local/src/conda/python-split-3.12.14/Include/internal/pycore_pyerrors.h:23:15
+#20 0x0000561dae8ded1e _Py_CheckFunctionResult /usr/local/src/conda/python-split-3.12.14/Objects/call.c:29:14
+#21 0x0000561dae8ded1e _PyObject_VectorcallTstate /usr/local/src/conda/python-split-3.12.14/Include/internal/pycore_call.h:93:12
+#22 0x0000561dae8ded1e PyObject_Vectorcall /usr/local/src/conda/python-split-3.12.14/Objects/call.c:325:12
+#23 0x0000561dae8c9dc1 _PyEval_EvalFrameDefault /home/conda/feedstock_root/build_artifacts/python-split_1788390929916/work/build-static/Python/bytecodes.c:2719:16
+#24 0x0000561dae8c266a _PyObject_FastCallDictTstate /usr/local/src/conda/python-split-3.12.14/Objects/call.c:146:9
+#25 0x0000561dae8f9ce2 _PyObject_Call_Prepend /usr/local/src/conda/python-split-3.12.14/Objects/call.c:508:24
+#26 0x0000561dae8f9ce2 slot_tp_init /usr/local/src/conda/python-split-3.12.14/Objects/typeobject.c:9035:15
+#27 0x0000561dae8bf7ab type_call /usr/local/src/conda/python-split-3.12.14/Objects/typeobject.c:1680:12
+#28 0x0000561dae8bf7ab _PyObject_MakeTpCall /usr/local/src/conda/python-split-3.12.14/Objects/call.c:240:18
+#29 0x0000561dae8c9dc1 _PyEval_EvalFrameDefault /home/conda/feedstock_root/build_artifacts/python-split_1788390929916/work/build-static/Python/bytecodes.c:2719:16
+#30 0x0000561dae9847a9 _Py_IsImmortal /usr/local/src/conda/python-split-3.12.14/Include/object.h:242:12
+#31 0x0000561dae9847a9 PyEval_EvalCode /usr/local/src/conda/python-split-3.12.14/Python/ceval.c:581:5
+#32 0x0000561dae9c24b9 run_eval_code_obj /usr/local/src/conda/python-split-3.12.14/Python/pythonrun.c:1758:8
+#33 0x0000561dae9bcc87 _Py_IsImmortal /usr/local/src/conda/python-split-3.12.14/Include/object.h:242:12
+#34 0x0000561dae9bcc87 Py_DECREF /usr/local/src/conda/python-split-3.12.14/Include/object.h:700:9
+#35 0x0000561dae9bcc87 run_mod /usr/local/src/conda/python-split-3.12.14/Python/pythonrun.c:1779:5
+#36 0x0000561dae9b9940 pyrun_file /usr/local/src/conda/python-split-3.12.14/Python/pythonrun.c:1674:15
+#37 0x0000561dae9b9687 _PyRun_SimpleFileObject /usr/local/src/conda/python-split-3.12.14/Python/pythonrun.c:459:13
+#38 0x0000561dae9b9464 _PyRun_AnyFileObject /usr/local/src/conda/python-split-3.12.14/Python/pythonrun.c:78:15
+#39 0x0000561dae9b5de4 pymain_run_file_obj /usr/local/src/conda/python-split-3.12.14/Modules/main.c:362:17
+#40 0x0000561dae9b5de4 pymain_run_file /usr/local/src/conda/python-split-3.12.14/Modules/main.c:380:15
+#41 0x0000561dae9b5de4 pymain_run_python /usr/local/src/conda/python-split-3.12.14/Modules/main.c:634:21
+#42 0x0000561dae9b5de4 Py_RunMain /usr/local/src/conda/python-split-3.12.14/Modules/main.c:714:5
+#43 0x0000561dae96c7b5 Py_BytesMain /usr/local/src/conda/python-split-3.12.14/Modules/main.c:769:1
+#44 0x00007f6ffaa30865 __libc_start_main (/lib64/libc.so.6+0x3a865)
+#45 0x0000561dae96c624 _start (/work/shared/users/phd/sk3463/scratch/amc/env/bin/python3.12+0x2a7624)
+PLEASE submit a bug report to https://github.com/llvm/llvm-project/issues/ and include the crash backtrace and instructions to reproduce the bug.
+/var/tmp/sclSyqaxg: line 5: 1156698 Aborted                 (core dumped) python "tree_amc.py" "../oracles/tree_n16.npz" "n16" "400" "amc" "pipeline"

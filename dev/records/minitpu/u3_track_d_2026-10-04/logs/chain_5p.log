@@ -1,0 +1,4 @@
+chain K=5 pipeline llvm: WRONG [0, 0, 0, 0, 3, 10, 17, 24, 31, 38, 45, 52, 59, 66, 73, 80]
+Stack dump without symbol names (ensure you have llvm-symbolizer in your PATH or set the environment var `LLVM_SYMBOLIZER_PATH` to point to it):
+PLEASE submit a bug report to https://github.com/llvm/llvm-project/issues/ and include the crash backtrace and instructions to reproduce the bug.
+/var/tmp/sclGXhbBr: line 5: 1194620 Aborted                 (core dumped) python "repro_reg_chain.py" "5" "pipeline"

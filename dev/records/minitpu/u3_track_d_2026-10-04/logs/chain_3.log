@@ -1,0 +1,4 @@
+chain K=3 none llvm: OK
+Stack dump without symbol names (ensure you have llvm-symbolizer in your PATH or set the environment var `LLVM_SYMBOLIZER_PATH` to point to it):
+PLEASE submit a bug report to https://github.com/llvm/llvm-project/issues/ and include the crash backtrace and instructions to reproduce the bug.
+/var/tmp/sclRqs13c: line 5: 1197097 Aborted                 (core dumped) python "repro_reg_chain.py" "3"

@@ -1,0 +1,6 @@
+GENERATED /tmp/claude-1772902/-work-shared-users-phd-sk3463-allo/3b1c24a0-f6d1-4c37-88e0-31db609cddf4/scratchpad/amctmp/tree/tree_amc_kernel_n16_400.py: 1576 lines
+BUILT llvm none n16 N=400 1.4s
+MATCH tree llvm none n16 N=400: 1472/1472 defined, cycles=None (0.2s)
+Stack dump without symbol names (ensure you have llvm-symbolizer in your PATH or set the environment var `LLVM_SYMBOLIZER_PATH` to point to it):
+PLEASE submit a bug report to https://github.com/llvm/llvm-project/issues/ and include the crash backtrace and instructions to reproduce the bug.
+/var/tmp/sclmT8Duy: line 5: 1150230 Aborted                 (core dumped) python "tree_amc.py" "../oracles/tree_n16.npz" "n16" "400" "llvm,amc" "none"

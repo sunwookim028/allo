@@ -1,0 +1,11 @@
+DUMPED sfu 462144 vectors (0.1s)
+  n16 valid_o: defined 60660, RTL vs ref bad 0
+  n16 result_o: defined 41049, RTL vs ref bad 0
+  n16 lane_valid_o: defined 60660, RTL vs ref bad 0
+  n16 lane_result_o: defined 41751, RTL vs ref bad 0
+DUMPED tree n16: 60660 cycles, 7 traces (1.6s)
+  n64 valid_o: defined 19861, RTL vs ref bad 0
+  n64 result_o: defined 12720, RTL vs ref bad 0
+  n64 lane_valid_o: defined 19861, RTL vs ref bad 0
+  n64 lane_result_o: defined 12894, RTL vs ref bad 0
+DUMPED tree n64: 19861 cycles, 9 traces (0.7s)

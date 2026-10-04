@@ -1,0 +1,350 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+##########################################################################
+U3 track D: ``sfu``, ``xlu_reduction_tree``, ``mxu_pe`` through RTLGen and AMC
+##########################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-04.** zhang-21, branch ``u3-openhls``
+   (worktree ``scratch/wt-u3d``) from ``u1-pilot`` at ``79683bc3``, then
+   ``87209b3c`` (track B merged, for ``mxu_pe``). MiniTPU at ``b3ba0a4d``,
+   read only. Tools as built for U1 and reused without rebuilding: **RTLGen**
+   = Kai Shao's ``kkkaishao/allo`` ``allo-rtlgen`` @ ``13b55a63`` (CIRCT
+   ``af5369d7``, OR-Tools 9.15 prebuilt; ``scratch/rtlgen/``,
+   ``open_hls/rtlgen_exploration_2026-10-02.rst``); **AMC** =
+   ``cornell-zhang/amc-dialect`` @ ``fe60c121`` (CIRCT ``a470836d``, LLVM
+   ``62797005``; ``scratch/amc/``, ``open_hls/amc_exploration_2026-10-02.rst``).
+   Verilator 5.052 in both tools' cosims; Vivado 2022.1 out of context for
+   AMC's area (its own estimator is broken, U1 E1). The owner is away: every
+   call below is **provisional** (D-9); tool defects are recorded, not filed
+   (P-10). Nothing under ``allo/`` or ``mlir/`` changed, and nothing in the
+   tools' clones.
+
+Plan: ``u3_plan_2026-10-04.rst`` wave 2 track D -- S1, T1, P1 on RTLGen and
+AMC (hypotheses H1, H2, H6), AMC's ``rom_1r`` against the SFU tables. Oracles:
+Phase 0 (``u3_phase0_2026-10-04.rst``), dumped once from the Allo env to
+``.npz`` (``dump_oracles.py``: the SFU stimulus with ``ref.sfu`` = the RTL on
+every vector; the joined tree and PE command traces with **the RTL's own
+response** and the defined-slot masks, RTL == reference on every defined slot
+at dump time). The tools then run in their own environments and read only
+those files. The forms ported are track A's S1 ``bits`` and T1 ``bits``
+(``u3_track_a_2026-10-04.rst``) and track B's P1 ``bits``
+(``u3_track_b_2026-10-04.rst``), each re-expressed on 32-bit signed locals
+with masks -- both frontends refuse the bit-slice form (U1: AMC A2/A8; RTLGen
+has no bit types) -- and generated as text where a unit repeats a body (the
+tree's ``N - 1`` nodes, the PE's register list), because in both tools a
+Python ``for`` is time and a nested kernel is a call (section 3).
+
+Reproduce (each script's docstring has its arguments)::
+
+   # Allo env: the oracles
+   (source examples/minitpu/harness/env-zhang21.sh; export PYTHONPATH=$PWD
+    $ALLO_PYTHON dev/records/minitpu/u3_track_d_2026-10-04/dump_oracles.py <oracles> sfu n16 n64 pe)
+   # RTLGen env (source rtlgen/env.sh; cwd = a scratch directory)
+   python rtlgen/sfu_rtlgen.py <oracles>/sfu.npz 16384 all          # 462,144 vectors, 29 cosims, ~8 min
+   python rtlgen/tree_rtlgen.py <oracles>/tree_n16.npz n16 400 inline  # or: call
+   python pe/pe_rtlgen.py <oracles>/pe.npz 60090
+   python rtlgen/repro_pipe_nest.py; python rtlgen/repro_call_2d.py
+   # AMC env (source amc/env.sh; TMPDIR on a local disk; under scl enable gcc-toolset-13 --)
+   python amc/sfu_amc.py <oracles>/sfu.npz 64 llvm,amc pipeline 0:462144:3611
+   python pe/pe_amc.py <oracles>/pe.npz 60090 amc pipeline
+   python amc/tree_amc.py <oracles>/tree_n16.npz n16 400 llvm,amc none
+   python amc/repro_rom_init.py; python amc/repro_reg_chain.py 3
+   # AMC area: Vivado 2022.1 OOC on a dump (module load xilinx-2022.1)
+   vivado -mode batch -source amc/synth_u3d.tcl -tclargs <dump_dir> <out> 3.333 xcu55c-fsvh2892-2L-e pe
+
+``logs/`` holds the runs condensed (tool chatter and IR dumps stripped);
+``rtlgen/sfu_N64_f300.microarch.txt`` RTLGen's storage report for the SFU;
+``amc/sfu_rom_4_impl.sv`` the ROM AMC emitted; ``amc/*.alloc.txt`` and
+``pe/*.alloc.txt`` AMC's port allocations; ``pe/vivado_*`` and
+``amc/vivado_*`` the synthesis reports.
+
+1. Verdicts (matrix-ready)
+==========================
+
+**match** = every defined slot of the Phase 0 oracle equal, on the whole
+stimulus / trace unless a prefix is named. Cycles are the tool's cosim count
+for the trace of ``N`` commands (both tools: a ``start``/``done`` kernel over
+array ports, so a unit's latency is the count minus ``N``; neither tool can
+make a port-to-port combinational or a bare registered unit, U1 F3/P1).
+Area: RTLGen's own QoR model on ``u55c`` at 300 MHz; AMC via Vivado 2022.1 out
+of context at 3.333 ns. The two are not like for like.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 42 42
+
+   * - unit / form
+     - RTLGen (``allo-rtlgen`` 13b55a63)
+     - AMC (fe60c121)
+   * - ``sfu`` S1 ``bits``
+     - **match** 462,144/462,144. II=1, N+4 cycles (16,388 for 16,384). Est.
+       1,130 LUT, 343 FF, 2 DSP, **4 BRAM36**, fmax 339 MHz. H2: the two
+       2,048-entry tables become ``(* ram_style = "block" *) reg [31:0]
+       rom_gelu[0:2047]`` with an ``initial`` block of 2,048 assignments
+       (``storage='bram'``, ``rom=False``, 1 read port each); the 32-entry
+       PWL tables ``storage='rom'`` (finding D4)
+     - **finding** (bug, silent, high): builds and simulates, II=1, N+8
+       cycles (72 for 64) once pipelined, 513 for 64 unpipelined -- and
+       **wrong**: 62/128 on a stride sample, every table-dependent result 0.
+       ``rom-allocation`` makes one ``amc.memory`` per table with a ``dyn
+       r(1)`` port per reader (the ``rom_1r`` shape), and ``amc-to-hw`` drops
+       the contents (A-D1). The frontend is right: ``llvm`` target 640/640
+   * - ``xlu_reduction_tree`` T1 ``bits``, n16 (400 wavefronts)
+     - ``call`` form (one nested ``@kernel`` per node, the natural form):
+       **finding** -- no pipelined region (II none), 40,401 cycles (~101 per
+       wavefront), est. 38,543 LUT / 8,699 FF, and **832/1,472 defined**:
+       every payload 0 (D1, silent; D2). ``inline`` form (the node body
+       repeated 15 times as text): II=4 -- "16 slots of a resource serving 4
+       per cycle", the lane-array port (D3) -- latency 1,621 for 400; cosim
+       **pending at the time of writing** (section 6)
+     - **blocked** (bug, crash): the frontend is right (``llvm`` 1,472/1,472),
+       ``amc`` aborts in ``LoopSchedule/Utils.cpp:442`` (unscheduled) or
+       ``SCFToLoopSchedule.cpp:2274`` (pipelined). Minimal repro: a shift
+       chain of **three** carried registers (A-D2); the tree has 9 + 5 + 4x5
+   * - same, n64 (once)
+     - ``inline``: 63 nodes; run launched, **pending** (section 6)
+     - **blocked** (A-D2, same construct)
+   * - ``mxu_pe`` P1 ``bits`` (60,090 cycles)
+     - **match** 360,202/360,202 defined, per cycle. II=1, N+4 cycles
+       (60,094). Est. 4,000 LUT, 1,355 FF, 1 DSP; **fmax 175 MHz**: 7 paths
+       miss 3.33 ns, worst 5.70 ns into ``align_shift`` -- the adder's stage 1
+       (classify, align, add) is a one-cycle loop-carried recurrence through
+       ``product_q``/``psum_q``, as in the RTL (D6)
+     - **match** 360,202/360,202 defined, per cycle, on both schedules:
+       unpipelined 360,547 cycles (6 per command), pipelined **II=1, N+12**
+       (60,102) -- after one workaround: a carried scalar must be a
+       1-element array read once at the top and written once at the bottom
+       of the iteration, or AMC refuses with ``port binding: more concurrent
+       accesses than the group's count`` (A-D3). Vivado OOC at 3.333 ns:
+       1,327 LUT, 898 FF, 1 DSP, **WNS -2.43 ns** (48 failing endpoints,
+       about 174 MHz) -- the same recurrence RTLGen prices at 175 MHz
+
+Latency, II and the unit's declared latency (D-10): the tools report a
+kernel latency (``N + k``), not a port-to-port one. For the SFU the RTL's 5
+is the depth of its registers; RTLGen's ``k = 4`` and AMC's ``k = 8`` (at
+II=1) are the pipeline depths their schedulers chose for the same function at
+the same clock, which are the numbers a ``latency.json`` adapter would
+report for these backends. For the PE the per-cycle trace is matched, so the
+form carries the RTL's register structure and the kernel depth is the
+``start``/``done`` overhead only (4 and 12). The tree's pipes are data (track
+A), so its depth is likewise inside the form. Nothing here constrains a
+latency; nothing is pinned.
+
+2. Hypotheses
+=============
+
+* **H1** (S1 matches first time): RTLGen **yes** -- the only edits before the
+  first run were the frontend's typed-constant rule for constant-branch
+  ternaries (U1 note). AMC's frontend **yes** (``llvm`` 640/640 at the first
+  build); AMC's hardware **no**, by a tool bug the unit cannot see (A-D1).
+* **H2** (2,048-entry constant ROMs): **RTLGen infers block storage from a
+  mutable global** (the frontend emits ``memref.global ... constant=false``;
+  nothing is written to it, and the microarch report prices it as 4 BRAM36
+  with its contents in an ``initial`` block; ``rom=False`` in the report, so
+  the "ROM" is a BRAM that is never written). **AMC infers a ROM** -- exactly
+  the ``rom_1r`` question: ``rom-allocation`` rewrites every ``get_global``
+  into an ``amc.memory`` with one registered read port per use and a
+  ``BankedAllocOp`` carrying the dense initializer -- **and loses the
+  contents** at ``amc-to-hw`` (A-D1): the shipped ``hdl/systemverilog/
+  rom_1r.sv`` ("TODO: Add init") is not even instantiated; an inline
+  ``sfu_rom_4_impl.sv`` with ``reg [31:0] mem0[0:2047]`` and no initializer
+  is. Both tools widen a 16-bit table to the 32 bits it was declared with
+  (D4); neither offers "ROM from a file" (plan H2's missing abstraction) --
+  a numpy array bound to a kernel-local name is the only form in both, and
+  it is the same form as Allo's (track A A1).
+* **H6** (P1 matches ``mxu_pe_trace`` per cycle): **yes on both tools**, at
+  II=1, with no change to the function. The per-cycle match holds because the
+  registers are written as data (checkpoint 6), so a tool's own pipelining
+  only adds depth around the kernel.
+
+3. Findings
+===========
+
+Classified per D-9. Repros are self-contained scripts in the record directory.
+
+RTLGen
+------
+
+**D1 -- bug, silent miscompile (high).** A shift pipe of loop-carried
+scalars (``q1 = q0; q0 = n; O[t] = q1``) collapses to one stage when the loop
+body is decomposed into sub-regions -- which happens as soon as the body
+holds a nested ``@kernel`` call or an inner ``for``. ``repro_pipe_nest.py`` /
+``repro_call_2d.py``: ``carried_inline`` (perfect loop) is right at II=1;
+``oned_call_pipe``, ``pipe_before_call``, ``pipe_innerloop`` (II=1 reported!)
+deliver the value one iteration early; ``pipe3_call`` (three stages) delivers
+it **two** early -- every chain becomes one register. No warning beyond the
+usual ``Detected imperfect nest, decomposing into sub-regions scheduled in
+program order``. The tree's ``call`` form hit a worse case of the same
+class (every payload 0 with a 9-deep pipe); the repro is the 2- and 3-deep
+pipe. *Proposal:* when a loop is decomposed, carried values must be renamed
+per sub-region (or the decomposition refused when the body carries a copy
+chain); the ``csim`` golden would have caught it had the cosim compared
+against it by default.
+
+**D2 -- workaround (the composition question, C10's shape).** A node written
+as a nested ``@kernel`` and called 15 times is 15 scheduled instances
+(``tree.node_op``, ``.1`` .. ``.14``, 6 cycles each) sequenced in program
+order with no cyclic region: ~101 cycles per wavefront, 38.5 k LUT, and D1 on
+top. The function boundary is the unit of scheduling, not of reuse. The only
+II=1 route is textual inlining (``tree_rtlgen.py inline``: the generator
+repeats the body, assigning rather than redeclaring, because an annotated
+local may be declared once per scope). This is the exploration record's
+per-instruction fill/drain property seen from inside one unit.
+
+**D3 -- missing abstraction / QoR (wide ports).** A lane-array port ``D:
+u16[N, 16]`` (P-8) is a memory with a fixed number of read ports; 16 lane
+reads per wavefront cost **II=4** ("one iteration takes 16 slots of a
+resource serving 4 per cycle. Banking or replicating what this access
+reaches is what lowers that bound"). A 256-bit word port cannot be stated
+either (RTLGen has no type above 64 b, as numpy has none), so the tree
+cannot be the RTL's one-wavefront-per-cycle unit in this frontend without a
+port directive it does not have. Track A's lane-array decision (P-8) is
+right for Allo's backends and wrong for this one.
+
+**D4 -- QoR, minor (U1 F5 again).** Table words declared ``i32`` are stored
+32 bits wide (``reg [31:0] rom_gelu``), twice the 16-bit entries; the 21-bit
+PWL words likewise. Nothing narrows a constant's storage to its values.
+
+**D5 -- frontend notes (no class).** (i) The constant-branch ternary rule
+(U1) also bites ``res = 0 if sign == 1 else x`` -- a typed name per constant
+(``ZERO``) is the idiom. (ii) ``K16 - a`` widens to ``i33``, so a ternary
+``(K16 - a) if s else (a ^ S15)`` is refused as ``int33 vs int32``; the
+``if`` form is accepted. (iii) ``r`` is a fine name for a reset, until a
+body copy declares ``r`` for a round bit: declare every local once at the
+top of the loop body when generating text. (iv) The scheduler's time is
+sensitive to the body's shape: one inline form of the max select (a 5-way
+if/elif) had not finished scheduling after 40 min; the key-compare form
+exported in 1.5 s and then spent over 15 min in HW emission (section 6).
+
+**D6 -- timing, not a finding against the tool.** The PE's stage 1 is a
+one-cycle recurrence (``product_q``/``psum_q`` -> classify, align, add ->
+``s1w``) in the RTL and in the form; RTLGen reports it at 5.70 ns (fmax
+175 MHz) and Vivado on AMC's RTL at WNS -2.43 ns at 3.333 ns (about 174
+MHz). Both say the same thing about the design at this clock on this FPGA
+fabric; MiniTPU's own target is the ASIC flow. The SFU's longest chain is
+``fp32_abs_q7``'s shift-and-saturate (2.95 ns).
+
+AMC
+---
+
+**A-D1 -- bug, silent miscompile (high).** A constant table reaches
+SystemVerilog **without its contents**. ``rom-allocation``
+(``lib/Transforms/RomAllocation.cpp``) turns the ``memref.global`` into an
+``amc.memory`` whose ``amc.banked_alloc`` carries the dense initializer
+(``BankedAllocOp.init``; ``BankLowering.cpp`` even re-slices it per bank);
+``lib/Transforms/AmcToHW.cpp:1546`` then creates the ``seq.hlmem`` from the
+shape and element type alone and never reads ``init``, so the emitted
+``*_rom_*_impl.sv`` declares ``reg [31:0] mem0[0:2047]`` with no ``initial``
+and no ``$readmemh``. Verilator reads zeros; ``vgelu``/``vexp`` return 0 and
+``vrecip``/``vrsqrt`` decode a zero PWL word. ``repro_rom_init.py``: an
+8-entry lookup, ``llvm`` right, ``amc`` all zeros. Nothing warns. *Proposal:*
+pass ``init`` to the ``seq.hlmem`` (or emit an ``initial`` block / ``$readmemh``
+from it), and refuse an initialized memory the lowering cannot initialize.
+Consequence for the SFU's Vivado numbers: the empty ROMs are optimised away,
+so 181 LUT / 313 FF / 2 DSP / 0 BRAM at WNS +1.18 ns is **not the unit's
+area** and is recorded only for the method.
+
+**A-D2 -- bug, crash (blocks the tree).** A shift chain of **three or more**
+loop-carried registers written as 1-element arrays (``q{k} = q{k-1}`` ..
+``q0 = x``, each read once at the top and stored once at the bottom of the
+iteration) aborts the compiler: unscheduled,
+``circt/lib/Dialect/LoopSchedule/Utils.cpp:442
+getChainingSharedOperatorsProblem(scf::WhileOp ..): Assertion
+'succeeded(depInserted)' failed``; pipelined, ``SCFToLoopSchedule.cpp:2274
+createLoopSchedulePipeline: Assertion 'definingOp != nullptr' failed``.
+``repro_reg_chain.py``: K=2 builds and is right on both targets, K=3 aborts.
+The tree's valid and payload pipes are 9, 5 and 4x5 deep (n16), so both
+geometries are blocked. The PE's chain ``product_valid_q -> s1v -> s2v ->
+vout`` is also three deep but conditional (``if r == 0 / else``), and builds
+-- the trigger is the unconditional copy chain. *Proposal:* a dependence
+between two accesses of the same memory inside one iteration is inserted
+twice (the read-after-write of the copy and the write-after-read of the
+shift); dedupe, or promote 1-element memories to registers before analysis.
+
+**A-D3 -- bug, then a workaround (carried scalars).** A loop-carried scalar
+written as a plain local (``active: int32 = 0`` before the loop, updated in
+it) is a ``memref<1xi32>`` memory the frontend never promotes; with several
+reads and a conditional write per iteration the unscheduled lowering fails
+with ``error: port binding: more concurrent accesses than the group's
+count; the schedule violates the declared port capacity`` (the allocator had
+given each ``static rw(1, 1) x 2``). The PE's 15 registers were rewritten as
+1-element arrays with exactly one load at the top and one store at the
+bottom of the iteration (``pe_gen.py``, the ``amc`` branch), after which
+both schedules match. A register is expressible only by this discipline,
+which is also what makes A-D2 reachable. Same family as U1 R1 (rank-0
+scalars) and the U2 pipes (``amcMemory1`` with seven ports).
+
+**A-D4 -- E1 again.** ``get_resource_estimates()`` is still broken; area and
+timing come from Vivado OOC on the dump (``synth_u3d.tcl``, U1's script with
+the top name and the hand-written ``int_arith_pipe.v`` / ``*_impl.sv``
+modules added to the file list).
+
+**A-D5 -- method notes.** The frontend bugs of U1 (A1-A8) were avoided by
+construction (two-operand booleans, no bit indexing, no scalar-returning
+calls, no flag loops) and none new appeared; ``1 if c else 0`` is accepted
+here while RTLGen refuses it. AMC prints ``cycle time: <n>`` per call;
+``rpt["cycles"]`` carries it. ``TMPDIR`` must be a local disk (U1).
+
+4. What the open stack does with a MiniTPU unit today
+=====================================================
+
+* **A leaf arithmetic unit (SFU, PE) goes through both tools bit-exact at
+  II=1** once written on integer locals with masks and its registers as
+  data. RTLGen needs no directive; AMC needs ``s.pipeline`` and the
+  register discipline (A-D3). Neither can make the unit the RTL is (a bare
+  pipeline with valid in / valid out): both wrap it in ``start``/``done``
+  over array ports (U1 F3/P1), so the manifest number is a kernel depth.
+* **Tables**: a ROM is a constant array in both; RTLGen keeps the contents,
+  AMC loses them (A-D1). No "ROM from file" abstraction anywhere (H2).
+* **Composition inside a unit**: a nested kernel is a sequenced call in
+  RTLGen (D2) and a crash site in AMC (U1 A4); the tree had to be generated
+  as text in both. A unit library of composable nodes (``compose.unit``,
+  track A's T2) has no counterpart in either frontend.
+* **Wide ports**: lane arrays (P-8) are memories with few ports in RTLGen
+  (II=4 for 16 lanes, D3) and BRAM ports in AMC (16 reads per command on one
+  argument memory, serialized unscheduled; the pipelined case was not
+  reached because of A-D2).
+* **Register pipes** (the form that made every per-cycle match possible) are
+  the weakest point of both tools: collapsed by RTLGen under decomposition
+  (D1), a crash in AMC at depth 3 (A-D2).
+
+5. Provisional calls made (D-9)
+===============================
+
+* **P-D1.** The tools are fed the oracle ``.npz`` dumps, not the harness:
+  the RTL response and masks are frozen once in the Allo env and compared in
+  the tools' envs. *Reason:* three incompatible MLIR builds; the comparison
+  is the same ``defined slot`` rule ``check.py`` applies.
+* **P-D2.** The tree's RTLGen verdict is taken on the ``inline`` form and
+  the ``call`` form is recorded as a finding, not a verdict. *Reason:* the
+  call form is wrong by a tool bug (D1) and sequenced (D2); the function
+  under test is the same.
+* **P-D3.** The PE's AMC form uses the 1-element-array register discipline
+  (A-D3) and is still called ``bits``: the function and the register
+  structure are unchanged, only the spelling of "a register". *Reason:* the
+  per-cycle trace matches, which is what the form is for.
+* **P-D4.** AMC's SFU and tree cells are **finding** and **blocked**, not
+  "n/a": both tools were tried on every unit (D-9's rule). The SFU's Vivado
+  numbers are recorded with the caveat (A-D1) and not carried into any
+  comparison.
+* **P-D5.** No ASIC ``Device`` for RTLGen and no DC run on either tool's
+  RTL: area and timing are each tool's FPGA model (RTLGen) or Vivado OOC
+  (AMC), as U1/U2 did. *Reason:* track C owns the same-flow DC comparison.
+
+6. Pending at the time of writing / not done
+============================================
+
+* RTLGen ``inline`` tree, n16, 400 wavefronts: scheduled (II=4, latency
+  1,621); the HW emission had run for over 15 minutes when this record was
+  written. n64 (63 nodes) launched behind it. Their cosim lines are appended
+  to ``logs/tree_n16_inline_400_f300.log`` / ``logs/tree_n64_inline_400_f300.log``
+  when they finish, and section 1 is updated in the same commit or the next.
+* AMC tree: blocked by A-D2 at both geometries; no pipelined numbers.
+* No full-trace tree run on either tool (400 of 60,660 / 19,861 cycles): the
+  RTLGen cosim cost at II=4 and the pending emission; the prefix covers the
+  ``lane-leak`` and the start of ``corners``.
+* No ``sfu_group`` (16 lanes sharing valid/op), no RTLGen CP-SAT scheduler,
+  no AMC ``amc-designware`` target, no 2 ns clock.
