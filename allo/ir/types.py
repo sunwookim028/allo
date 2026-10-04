@@ -437,11 +437,15 @@ class Wire(AlloType):
             dtype, shape = dtype.dtype, tuple(dtype.shape)
         return cls(dtype=dtype, shape=shape, comb=flag is comb)
 
+    # `comb` is the keyword the docs promise (`Wire(T, (), comb=True)`);
+    # it shadows the module-level marker on purpose.
+    # pylint: disable-next=redefined-outer-name
     def __init__(self, dtype, shape, comb=False):
         assert isinstance(dtype, AlloType), f"dtype must be an AlloType, got {dtype}"
         self.dtype = dtype
         self.shape = shape  # element shape (() for a scalar wire)
         # (`bool` is UInt(1) in this module, so no bool() call here)
+        # pylint: disable-next=simplifiable-if-expression
         self.comb = True if comb else False  # declared same-cycle output (D-13)
         super().__init__(0, 0, f"wire<{dtype}{', comb' if self.comb else ''}>")
 
