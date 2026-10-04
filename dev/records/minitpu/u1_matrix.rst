@@ -320,6 +320,17 @@ joins ``compose-engines``; the ``@df.unit`` type-parameter form is queued
 front-end work. Drafts 3-5 (schedules that travel, optional modules, derived
 legality) will be README D-18..D-20.
 
+**Checkpoint 15, 2026-10-04:** D-18 (schedules travel with the function)
+**approved** with the carried-directive edit; implementation joins
+``compose-engines``. ``minitpu-comp`` follow-up: the owner decided **for v2
+only** -- vrecip saturates the exponent and rounds (ISA-N03; today's worst
+case 0.71 %, ``vrecip(1.0) = 0x3F7F``), vmax/vmin follow IEEE
+``maxNum``/``minNum`` so a NaN operand loses (ISA-X02; matches
+``arith.maxnumf``). v1-course keeps today's behaviour, so our ``b3ba0a4d``
+references stay correct. v2's resource budgets are sized against the U280
+FPGA (minitpu-tmp PRs #31/#32) -- relevant to RTLGen (FPGA-only), not to the
+Catapult/DC ASIC columns.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*

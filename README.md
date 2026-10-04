@@ -372,6 +372,28 @@ parameters, channels and engines.**
   (two PE instances, bf16 and int8 engines, in one region: simulator
   512/512 + 512/512, csim 256/256 + 256/256); `u1_alu` C9/C11.
 
+**D-18 (2026-10-04). A schedule belongs to the function that needs it and
+travels with it.**
+- A function or engine that needs a directive to meet its declared latency
+  carries that directive (`Engine.directives`); every unit that binds it
+  applies it, through `Architecture.directives`, without naming the
+  function's internals. A region's `schedule()` names only what the region
+  adds.
+- A function the front end builds as its own `func.func` has nameable loops
+  (`leading_zeros19:offset`), so one directive covers every caller; an
+  inlined function does not, and a directive on it is refused, not dropped
+  (D-1).
+- The SystemC emitter carries `pipeline` (Catapult's II pragma), `unroll`
+  (`hls_unroll`), `partition` (`hls_resource [Register]`) and `latency=`
+  (the I/O cycle constraint); any other directive is refused naming the
+  function. A backend that cannot honour a carried directive refuses it the
+  same way.
+- The front-end form, a schedule attribute on the function itself applied
+  when the function is built, follows as separate work.
+- Evidence: `dev/records/minitpu/u3_composition_design_2026-10-04.rst` §3
+  (one unroll on the shared `leading_zeros19` covers every PE instance);
+  `u1_alu` C10; `u3_track_a` A7/H4; the C-W1 fix.
+
 ## Milestones
 
 Each milestone passes on **one acceptance check** and names the tools it uses
