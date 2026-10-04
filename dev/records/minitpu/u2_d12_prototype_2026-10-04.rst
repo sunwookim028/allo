@@ -348,7 +348,7 @@ rather than as fall-backs:
   ``bench_isa`` ALL EXACT; ``stress_isa`` 492/492; ``act_compile --gate``
   12/12; ``systemc_csim.py 3`` SYSTEMC CSIM OK.
 * ``pytest tests/dataflow/test_systemc*.py tests/test_memory.py
-  tests/dataflow/test_compose_memory_ports.py``: 116 passed after the two
+  tests/dataflow/test_compose_memory_ports.py``: **117 passed** after the two
   test fixes below (the first run: 4 of this record's own tests failed --
   ``Architecture.build("simulator")`` went through ``Schedule.build``, which
   has no simulator target, and the Wire-form csim test required one offset
