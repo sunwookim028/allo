@@ -173,12 +173,22 @@ single-threaded outside characterization). Configs in ``openram/``.
        Output: ``.v .lib .lef .gds .sp .html``; LEF ``SIZE 263.275 BY
        107.475`` (28,295.5 um^2, the Liberty ``area``); the macro core
        without power ring or escape pins. **This is the setting used.**
+   * - 512 x 64 b, both routers off
+     - **1,151 s**
+     - 839 s in ``bitcell_array.create_instances`` -> ``connect_pin`` ->
+       ``__eq__`` (a linear pin search per connection), 300 s routing.
+       103,782.1 um^2 (410.3 x 252.9 um).
+   * - 1,024 x 64 b, both routers off
+     - **3,190 s**
+     - 2,698 s submodules, 474 s routing. 182,918.1 um^2 (411.7 x 444.3 um;
+       2.79 um^2/bit). ``openram/sram_2rw_64x1024_*``; no instance uses it
+       yet.
    * - 4,096 x 64 b (``mid``), both routers off
-     - see s.2
-     - ``bitcell_array.create_instances`` -> ``connect_pin`` -> ``__eq__``
-       (a linear pin search per connection over 262,144 cells) is where the
-       first half hour went; the 512 x 64 and 1,024 x 64 fallbacks were
-       started beside it.
+     - **not finished**
+     - still in the bitcell array's pin connection after 76 min when this
+       record closed (the scaling above says hours); killed by its 4 h
+       timeout. One ``mid`` macro is a job for a faster pin connection or
+       OpenRAM's ``num_banks``; eight ``w512`` banks are the alternative.
 
 The ``.v`` is a behavioural model (inputs registered at ``posedge``, read
 and write at ``negedge``, ``#(DELAY)`` on the read data, ``$display``
@@ -338,11 +348,10 @@ one array, ELAB-366); the ``ifdef`` would otherwise hand DC the XPM.
      - 111,122.8
      - 151,674.8 (33,602)
      - --
-   * - Allo ``registers`` (Catapult area score 205,477, 560 s; DC running
-       at commit time -- filled by the follow-up commit if it lands)
-     - W512_A_TOTAL
-     - W512_A_COMB
-     - W512_A_SEQ
+   * - Allo ``registers`` (Catapult area score 205,477, 560 s; DC 1,604 s)
+     - **438,411.6**
+     - 112,722.3
+     - 325,689.3 (66,263)
      - --
    * - Allo ``sram`` (OpenRAM 2RW macro, II=2)
      - **105,968.1**
@@ -453,12 +462,13 @@ REGRESS_RESULT; TinyTPU emission unchanged (``vhls`` sha256 ``6bc774bc…``
   is the thing to try when a design can live with it; MiniTPU's VMEM cannot.
   RTLGen/AMC (M2) are the other place to ask, as D-12 s.6 said.
 * **``mid`` (4,096 x 64 b) as one macro** did not build in this record's time
-  (OpenRAM's pin connection is O(cells x pins); the 512-word macro took 19
-  min, 1,024 is running); eight ``w512`` banks under Catapult's
-  ``-BLOCK_SIZE`` decomposition is the next step, or OpenRAM with
-  ``num_banks``.
-* **The ``registers`` lowering's flop count** is 1.6-1.8x MiniTPU's for the
-  same bits (s.2.4): the unreset ``sc_signal`` array form carries more than
+  (OpenRAM's pin connection is O(cells x pins); 512 words took 19 min,
+  1,024 words 53 min, 4,096 was still connecting pins after 76 min); eight
+  ``w512`` or four ``w1024`` banks under Catapult's ``-BLOCK_SIZE``
+  decomposition is the next step, or OpenRAM with ``num_banks``.
+* **The ``registers`` lowering's flop count** is 1.8x MiniTPU's for the
+  same bits (66,263 against 33,602 sequential cells at 512 words, 4,335
+  against 2,402 at 32; s.2.4): the unreset ``sc_signal`` array form carries more than
   the storage. Worth a look before any area comparison leans on it.
 * **Power ring, escape routing, DRC/LVS** are off on every macro here
   (routers do not finish; no NCSU PDK). The Liberty area is the core.

@@ -1,0 +1,32 @@
+ 
+****************************************
+Report : area
+Design : wa_d12g
+Version: W-2024.09
+Date   : Sun Oct  4 12:37:22 2026
+****************************************
+
+Information: Updating design information... (UID-85)
+Warning: Design 'wa_d12g' contains 1 high-fanout nets. A fanout number of 1000 will be used for delay calculations involving these nets. (TIM-134)
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                         2608
+Number of nets:                        159188
+Number of cells:                       157206
+Number of combinational cells:          90427
+Number of sequential cells:             66263
+Number of macros/black boxes:               0
+Number of buf/inv:                      12256
+Number of references:                       5
+
+Combinational area:             112722.291095
+Buf/Inv area:                     9179.659793
+Noncombinational area:          325689.336292
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                438411.627387
+Total area:                 undefined
+1
