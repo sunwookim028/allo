@@ -1,0 +1,54 @@
+ 
+****************************************
+Report : cell
+Design : wa_d12g
+Version: W-2024.09
+Date   : Sun Oct  4 11:34:25 2026
+****************************************
+
+Attributes:
+    b - black box (unknown)
+   cg - clock gating logic
+    h - hierarchical
+    n - noncombinational
+    r - removable
+   so - sizing only
+    u - contains unmapped logic
+
+Cell                      Reference       Library             Area  Attributes
+--------------------------------------------------------------------------------
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_0_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_1_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_2_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_3_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_4_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_5_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_6_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_7_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_8_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_9_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_10_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_11_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_12_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_13_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_14_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_15_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_16_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_17_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_18_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_19_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_20_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_21_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_22_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_23_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_24_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_25_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_26_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_27_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_28_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_29_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_30_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_wr_inst/mgc_stateful_vmem_mem_0_mem_1_31_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+--------------------------------------------------------------------------------
+Total 32 cells                                            127.680000
+1
