@@ -5366,6 +5366,17 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
       maxTotal = std::max(maxTotal, a.total);
     for (auto &m : memArrays)
       maxTotal = std::max(maxTotal, m.total);
+    // A5: with memory-port outputs as well, the last sink's sc_stop() must
+    // not land before the kernels have finished: a kernel whose last
+    // iteration pushes its stream words and then stores to a memory had
+    // those stores cut off (only the first of them landed). The memories are
+    // read out after the run, so the last sink waits for the DUT's done, lets
+    // in-flight writes settle as the memory-only path does, then stops.
+    bool hasMemOut = false;
+    for (auto &m : memArrays)
+      if (m.dir != 'i')
+        hasMemOut = true;
+    int settleCycles = memInsts.empty() ? 64 : 256;
     if (hasStreamOut) {
       indent(); os << "int _snk_done = 0;  // stream sinks drained; the last one sc_stop()s\n";
     }
@@ -5424,7 +5435,16 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
              << "; ++f) _f << (" << (tbIntKind(a.ctype) == 'u' ? "unsigned long long" : "long long")
              << ")(ch_" << a.member
              << ".Pop()) << \"\\n\"; }\n";
-        indent(); os << "if (++_snk_done == " << numStreamOut << ") sc_stop();\n";
+        if (hasMemOut) {
+          indent();
+          os << "if (++_snk_done == " << numStreamOut
+             << ") { while (!done_sig.read()) wait(); for (int _w = 0; _w < "
+             << settleCycles
+             << "; ++_w) wait(); sc_stop(); }  // memory outputs: DUT done, "
+                "writes settled\n";
+        } else {
+          indent(); os << "if (++_snk_done == " << numStreamOut << ") sc_stop();\n";
+        }
         reduceIndent();
         indent(); os << "}\n";
       }
@@ -5499,7 +5519,9 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
       indent();
       os << "  std::cerr << \"TB DEADLOCK: stream outputs not drained after \" "
             "<< ALLO_TB_MAX_CYCLES << \" cycles (\" << t._snk_done << \" of "
-         << numStreamOut << " sinks done)\" << std::endl;\n";
+         << numStreamOut << " sinks done"
+         << (hasMemOut ? "; then waiting for the DUT's done" : "")
+         << ")\" << std::endl;\n";
       indent(); os << "  return 1;\n";
       indent(); os << "}\n";
     } else {
@@ -5512,7 +5534,7 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
       os << "for (long long _c = 0; _c < " << capCycles
          << "LL && !t.done_sig.read(); ++_c) sc_start(1, SC_NS); // until DUT done\n";
       indent();
-      os << "sc_start(" << (memInsts.empty() ? 64 : 256)
+      os << "sc_start(" << settleCycles
          << ", SC_NS); // settle in-flight memory writes\n";
     }
     // Read each OUTPUT array out to output<k>.data (into B by hls.py). Shared-
