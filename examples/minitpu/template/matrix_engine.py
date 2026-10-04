@@ -36,10 +36,10 @@ from dataclasses import dataclass
 import numpy as np
 
 import allo.dataflow as df
-from allo.compose import Architecture, Channel, Memory, Unit, unit
+from allo.compose import Architecture, Channel, Instance, Memory, Unit, unit
 
-from examples.minitpu.template.engines import BF16_ACC24, INT8_INT32, Engine
-from examples.minitpu.template.instantiate import instance
+from allo.compose import Engine
+from examples.minitpu.template.engines import BF16_ACC24, INT8_INT32
 
 
 def _pow2(p):
@@ -55,8 +55,10 @@ def _pow2(p):
     memories=("W",),
     reads=("me_lhs",),
     writes=("me_out",),
-    parameters=("N_ROWS", "DIM", "MAC_IN", "MAC_IN_BITS", "MAC_ACC",
-                "MAC_OUT_BITS", "MAC_MUL", "MAC_ADD", "MAC_PACK"),
+    parameters=("N_ROWS", "DIM"),
+    engines=("MAC_IN", "MAC_IN_BITS", "MAC_ACC", "MAC_OUT_BITS", "MAC_MUL",
+             "MAC_ADD", "MAC_PACK"),
+    order="sequential",
 )
 def systolic_engine(w_tile: UInt(32)[DIM * DIM]):
     for work in range(N_ROWS):
@@ -79,8 +81,10 @@ def systolic_engine(w_tile: UInt(32)[DIM * DIM]):
     memories=("W",),
     reads=("me_lhs",),
     writes=("me_out",),
-    parameters=("N_ROWS", "DIM", "MAC_IN", "MAC_IN_BITS", "MAC_ACC",
-                "MAC_OUT_BITS", "MAC_MUL", "MAC_ADD", "MAC_PACK"),
+    parameters=("N_ROWS", "DIM"),
+    engines=("MAC_IN", "MAC_IN_BITS", "MAC_ACC", "MAC_OUT_BITS", "MAC_MUL",
+             "MAC_ADD", "MAC_PACK"),
+    order="tree",
     legality=_pow2,
 )
 def tree_engine(w_tile: UInt(32)[DIM * DIM]):
@@ -105,23 +109,24 @@ def tree_engine(w_tile: UInt(32)[DIM * DIM]):
 @dataclass(frozen=True)
 class MatrixEngine:
     """What a matrix engine declares beyond its MAC engine: its accumulate
-    order (part of the function), and a latency model (a booking, D-10)."""
+    order (part of the function: the unit's ``order=``, which the composite
+    holds to its own, README D-15), and a latency model (a booking, D-10)."""
 
     name: str
-    order: str
     unit: Unit
     latency_model: callable   # (DIM, mac: Engine) -> edges, push -> result
 
-    def __post_init__(self):
-        assert self.order in ("sequential", "tree")
+    @property
+    def order(self) -> str:
+        return self.unit.order
 
 
 SYSTOLIC = MatrixEngine(
-    "systolic", "sequential", systolic_engine,
+    "systolic", systolic_engine,
     # Phase 0: push -> output_valid = 2 + DIM*(PE + 1), PE = 1 + add_latency
     latency_model=lambda dim, mac: 2 + dim * (1 + mac.add_latency + 1))
 TREE = MatrixEngine(
-    "tree", "tree", tree_engine,
+    "tree", tree_engine,
     # products in one stage, log2(DIM) adder levels, one pack stage
     latency_model=lambda dim, mac: 1 + max(1, mac.mul_latency)
     + mac.add_latency * int(math.log2(dim)) + 1)
@@ -133,7 +138,8 @@ MATRIX_ENGINES = {m.name: m for m in (SYSTOLIC, TREE)}
 @unit(
     memories=("A",),
     writes=("me_lhs",),
-    parameters=("N_ROWS", "DIM", "MAC_IN", "MAC_IN_BITS"),
+    parameters=("N_ROWS", "DIM"),
+    engines=("MAC_IN", "MAC_IN_BITS"),
 )
 def me_feed(a_mem: UInt(32)[N_ROWS * DIM]):
     for work in range(N_ROWS):
@@ -148,7 +154,8 @@ def me_feed(a_mem: UInt(32)[N_ROWS * DIM]):
 @unit(
     memories=("OUT",),
     reads=("me_out",),
-    parameters=("N_ROWS", "DIM", "MAC_OUT_BITS"),
+    parameters=("N_ROWS", "DIM"),
+    engines=("MAC_OUT_BITS",),
 )
 def me_sink(out_mem: UInt(32)[N_ROWS * DIM]):
     for work in range(N_ROWS):
@@ -162,10 +169,15 @@ def me_sink(out_mem: UInt(32)[N_ROWS * DIM]):
 
 
 def mxu_rig(matrix: MatrixEngine, mac: Engine, dim: int, n_rows: int,
-            name=None) -> Architecture:
-    params = {"N_ROWS": n_rows, "DIM": dim, "QD": 4} | mac.namespace()
+            name=None, order="sequential", accepts=("tree",)) -> Architecture:
+    """The composite's contract reference takes ``order`` (MiniTPU's:
+    sequential); this rig also ``accepts`` the tree, as a DIFFERENT function
+    verified against the reference with that order (``reference_order``).
+    ``accepts=()`` is MiniTPU's instance, which refuses the tree."""
+    params = {"N_ROWS": n_rows, "DIM": dim, "QD": 4}
     return Architecture(
         name=name or f"mxu_{matrix.name}_{mac.name}_d{dim}", parameters=params,
+        engines={"MAC": mac}, order=order, accepts=accepts,
         memories=(Memory("A", "UInt(32)[N_ROWS * DIM]"),
                   Memory("W", "UInt(32)[DIM * DIM]"),
                   Memory("OUT", "UInt(32)[N_ROWS * DIM]")),
@@ -173,8 +185,7 @@ def mxu_rig(matrix: MatrixEngine, mac: Engine, dim: int, n_rows: int,
                           carries="one row of DIM operands"),
                   Channel("me_out", depth="QD", lanes="DIM", lane_bits="MAC_OUT_BITS",
                           carries="one row of DIM results")),
-        units=(me_feed, instance(matrix.unit, "matrix_engine", directives=mac.directives),
-               me_sink))
+        units=(me_feed, Instance(matrix.unit, "matrix_engine"), me_sink))
 
 
 # --- the contract reference, with the order as an argument -----------------
@@ -182,7 +193,15 @@ def mxu_rig(matrix: MatrixEngine, mac: Engine, dim: int, n_rows: int,
 def matrix_rows(A, W, mac: Engine, order: str):
     """Every row of ``A`` (``[n, DIM]``) against ``W`` (``[DIM, DIM]``) in the
     MAC engine's own arithmetic, accumulated in ``order``, packed once.
-    ``order="sequential"`` at the bf16 engine is ``ref_mxu.mxu_row``."""
+    ``order="sequential"`` at the bf16 engine is ``ref_mxu.mxu_row``. Now
+    ``compose.Engine.dot``; kept as the name the gate imports."""
+    if order not in ("sequential", "tree"):
+        raise ValueError(order)
+    return mac.dot(A, W, order)
+
+
+def _matrix_rows_prototype(A, W, mac: Engine, order: str):
+    """The prototype's loop, kept to hold ``Engine.dot`` to it."""
     A = np.asarray(A, dtype=np.int64)
     W = np.asarray(W, dtype=np.int64)
     n, D = A.shape
@@ -237,6 +256,8 @@ def run_rig(matrix: MatrixEngine, mac: Engine, dim: int, n_rows: int, seed=0, ex
     out = np.zeros(n_rows * dim, dtype=np.uint32)
     mod(A.reshape(-1).astype(np.uint32), W.reshape(-1).astype(np.uint32), out)
     got = out.reshape(n_rows, dim).astype(np.int64)
-    want = matrix_rows(_signed_in(mac, A), _signed_in(mac, W), mac, matrix.order)
+    # The composite's verdict order: its own, or the accepted one the bound
+    # matrix engine changed it to (README D-15).
+    want = matrix_rows(_signed_in(mac, A), _signed_in(mac, W), mac, arch.reference_order)
     mask = (1 << mac.OUT_BITS) - 1
     return got, want & mask

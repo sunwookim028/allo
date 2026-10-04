@@ -1,0 +1,340 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+###########################################################################
+U3: engines, instances, carried directives, options and geometries in
+``allo/compose.py`` (README D-15, D-17, D-18, D-19, D-20)
+###########################################################################
+
+.. note::
+
+   zhang-21, 2026-10-04, branch ``compose-engines`` from ``u1-pilot`` at
+   ``d0dc62a8``, worktree ``scratch/wt-eng`` with the bindings of
+   ``wt-u1`` copied in (Python-only change). Env:
+   ``examples/minitpu/harness/env-zhang21.sh``. The owner is away; the API
+   calls below that README D-15 leaves open are **provisional** (D-9), each
+   with its reason. Inputs: README D-1, D-9, D-10, D-12, D-15;
+   ``u3_composition_design_2026-10-04.rst`` §1; the prototype
+   ``examples/minitpu/template/``; ``u1_alu_2026-10-02.rst`` C1/C2/C10/C11.
+
+D-15: what landed
+=================
+
+``compose.Engine`` (frozen, keyword-only): ``IN``/``ACC``/``OUT`` with
+``IN_BITS``/``ACC_BITS``/``OUT_BITS`` (held to each other), ``mul``/``add``/
+``pack``, ``latency={"mul": L, "add": L, "pack": L}``, ``order``
+(``sequential`` | ``tree``), ``ref_mul``/``ref_add``/``ref_pack``,
+``directives``. ``Engine.namespace(slot)``, ``Engine.names(slot)``,
+``Engine.accumulate(terms, order)`` and ``Engine.dot(A, W, order)`` -- the
+contract reference with the order as an argument (equal to the prototype's
+``matrix_rows`` at both orders, bf16, DIM 8).
+
+``Unit(engines=, order=)``: ``engines`` are the slot names the body binds,
+``<slot>_<field>``; ``order`` is the order of a unit that IS an engine
+(``systolic_engine``, ``tree_engine``). ``Unit.check`` refuses: a slot not
+of that form; an engine name declared in ``parameters`` instead; a body slot
+(``MUL``/``ADD``/``PACK``) used other than as a call.
+
+``Architecture(engines={slot: Engine}, order=, accepts=)``. ``_check``
+refuses: a slot no engine is bound to; an engine bound to no slot; a Python
+function bound as a bare parameter (D-15 "never a bare function"); a value a
+body annotates with an engine type moved on a channel of another type; a
+packed channel whose ``lane_bits`` is not the engine width the body slices it
+by; a part (engine record or engine unit) whose order is neither the
+composite's ``order`` nor in ``accepts``. ``reference_order`` is the order
+the verdict uses. ``Architecture.directives`` applies, after each unit's own
+directives, those of every engine the unit binds (``ctx.unit``,
+``ctx.engine``). ``region()`` binds the engines' names.
+
+Provisional calls
+-----------------
+
+P1. **Latency is a dict keyed by body**, ``latency={"mul": 0, "add": 3}``:
+    the shape of D-10's ``configs["latency"] = {kernel: L}``, applied to
+    bodies. ``0`` = no register inside the body (the PE registers the
+    product); a missing entry = unconstrained, reported by the backend.
+    ``mul_latency``/``add_latency`` remain as properties for the prototype's
+    latency models. *Reason:* D-15 says "a D-10 ``latency=`` on those
+    bodies", and the bodies are plain functions (no decorator carries it).
+P2. **Who declares the order.** An engine record and an engine unit declare
+    the order they ARE; the composite (``Architecture``) declares the order
+    its contract reference takes and ``accepts`` others. A part in an
+    accepted order makes ``reference_order`` that order; two different
+    non-declared orders are refused. A sequential MAC record bound into a
+    tree unit is not refused (the record's arithmetic is what the tree
+    folds; the composite's order decides). *Reason:* D-15 puts the order on
+    "a matrix engine", which in ``compose`` is a unit; a per-slot check of
+    the MAC record against the matrix unit would refuse the prototype's
+    bf16 tree, which D-15 says is a valid, different function.
+P3. **Type-to-channel check** reads ``x: T = ch.get()`` and ``ch.put(x)``
+    with ``x`` annotated, and fires only when ``T`` names an engine slot;
+    every other channel is left as before (TinyTPU's emission unchanged).
+P4. **Directives ran once per binding unit** at the D-15 commit. Two units
+    binding the bf16 engine unrolled ``leading_zeros19:offset`` twice; the
+    second was accepted (measured). Superseded by D-18 below (once per
+    distinct engine).
+P5. **Track B's ``mxu_pe_unit.py`` / ``mxu_unit.py`` are not migrated:**
+    they have no engine slot (the bf16 MAC is written inline, line for line
+    against ``mxu_pe.sv``). Binding them to an engine is a source change of
+    the unit, the owner's call at P2.
+
+Migration
+=========
+
+``template/engines.py`` builds ``BF16_ACC24``/``INT8_INT32`` as
+``compose.Engine`` (the prototype's dataclass is gone; ``np_*`` dtypes,
+unused, dropped). ``mac_pe.py``: ``mac_pe``/``pe_feed``/``pe_sink`` declare
+``engines=``; ``pe_rig`` binds ``engines={"MAC": e}`` (no
+``directives=`` override: the engine's travel by itself); ``pe_rig_two``
+binds ``MAC__a``/``MAC__b`` through ``instantiate.engine_bind``.
+``matrix_engine.py``: the two engines are units with ``order=``;
+``MatrixEngine.order`` reads the unit's; ``mxu_rig`` declares
+``order="sequential", accepts=("tree",)`` (``accepts=()`` is MiniTPU's
+instance, which refuses the tree), and ``run_rig`` verifies against
+``arch.reference_order``. ``instantiate.instance`` carries ``engines``
+and ``order``.
+
+Checks
+======
+
+.. list-table::
+   :header-rows: 1
+   :widths: 50 25 25
+
+   * - check
+     - before (``d0dc62a8``)
+     - after
+   * - ``run_u3e`` (track E gate)
+     - 26 OK, 1 finding, GATE OK (85 s)
+     - 26 OK, 1 finding, GATE OK (77 s)
+   * - ``tests/test_compose_engines.py`` (new; csim not skipped)
+     - --
+     - 10 passed
+   * - TinyTPU emitted Vitis, sha256
+     - ``6bc774bc...b2ef95``
+     - ``6bc774bc...b2ef95`` (identical)
+   * - TinyTPU emitted Catapult, sha256
+     - ``ade1ab5d...88e038``
+     - ``ade1ab5d...88e038`` (identical)
+   * - ``gen_isa.py --check`` / ``lift_units.py --check``
+     - --
+     - ISA OK / UNITS OK
+   * - ``bench_isa.py`` / ``stress_isa.py``
+     - --
+     - ALL EXACT / STRESS OK 640/640
+   * - ``act_compile.py --gate``
+     - --
+     - ACT GATE OK 12/12
+   * - ``pytest tests/test_compose*.py tests/dataflow/test_compose_memory_ports.py``
+     - --
+     - 26 passed (66 s)
+   * - ``examples/minitpu/run.py --quick``
+     - --
+     - PASS (16x16x16 EXACT vs model)
+
+The new tests: the record (widths, order, latency keys refused); the
+reference with the order as an argument (bf16 orders differ on random data,
+agree on exact sums); one PE source at bf16 and int8 in ONE region on the
+simulator (128/128 each) and in SystemC csim (64/64 each); type mismatch
+(``lhs: UInt(16)`` at int8) refused and accepted at bf16; ``lane_bits='16'``
+vs ``MAC_IN_BITS = 8`` refused; order mismatch refused for an engine unit
+(``tree_engine`` in a sequential composite) and an engine record
+(``int8_tree``), accepted with ``accepts=("tree",)`` and
+``reference_order == "tree"``; the tree MXU verified against the tree
+reference; slot rules; the bf16 directive emitted as ``#pragma HLS unroll``
+inside ``leading_zeros19`` only when ``Architecture.directives`` ran.
+
+D-17: what landed
+=================
+
+``compose.Instance(unit, name, bind)`` (a ``Unit`` subclass, record §2
+option C): the body is emitted under ``name`` with ``_Rename`` (lifted from
+``template/instantiate.py``) applied to every name in ``bind``; ``reads``,
+``writes``, ``parameters``, ``isa``, ``engines``, ``memories`` and the
+``instances`` expressions are renamed with it. ``bind`` may name only free
+names of the body and the unit's memories; anything else is refused at
+construction, naming the free set. ``legality`` runs on
+``bound_parameters`` -- the architecture's set as the unit sees it through
+its binding. An ``Instance`` of an ``Instance`` composes into one binding of
+the original unit (needed by optional modules that rewire a neighbour).
+``Engine.rebind(slot, new)`` is the binding of an engine slot.
+``Unit.check`` refuses a slice whose bounds are only free names
+(``w[0:W_BITS]``), with the "Cannot infer the bitwidth of the slice"
+message and the typed-assignment workaround; bounds that name a bound index
+(``meta_for``) are accepted. Swept over the 68 ``compose`` units in
+``examples/`` (TinyTPU ``ip/``, MiniTPU units and template): none refused.
+
+Provisional calls
+-----------------
+
+P6. **Memories are bindable** (``A -> A_a``, ``vreg.ra -> vreg_a.ra``),
+    though they are not free names of the body (they bind its positional
+    parameters). *Reason:* two instances of a unit that owns a boundary array
+    need two arrays; the prototype did it with a ``memories=`` override,
+    which would leave a second path to rename a unit.
+P7. **No overrides.** ``Instance`` takes no ``directives=``/``legality=``
+    replacements (the prototype's ``**overrides``): with D-15 an engine's
+    directives travel by binding, and a different legality is a different
+    unit.
+
+Migration
+---------
+
+``template/instantiate.py`` is deleted; ``mac_pe.pe_rig_two``,
+``matrix_engine.mxu_rig`` and ``optional.assemble`` use ``compose.Instance``
+(``pe_rig_two`` binds per unit only the names that unit takes).
+
+D-18: what landed
+=================
+
+``Architecture.directives`` runs, after each unit's own directives, the
+directives of every engine the unit binds, **once per distinct engine**
+(record §3 option B): the loop an engine's directive names sits in one
+``func.func`` shared by every caller, so one application covers every unit
+binding it. ``ctx.unit``/``ctx.engine`` name the first binding. The engine's
+directive sees the schedule through ``_CarriedSchedule``, which checks every
+target it names: ``<function>:<loop>`` of a function the module holds as its
+own ``func.func`` and not marked ``inline``. A target with no function, an
+absent function (inlined by the front end, or never called), and a function
+marked to be inlined are refused naming the function (D-1: refused, not
+dropped).
+
+Measured (``tests/test_compose_directives.py``): ``pe_rig`` at bf16, no
+region schedule: before ``directives`` the MLIR holds one ``loop_name =
+"offset"`` with no ``unroll``, after it the same one loop with ``unroll =
+0``. ``pe_rig_two`` with the bf16 engine bound to both PEs (six units bind
+it): the directive runs once, from ``pe_feed_a``. The front-end form (a
+schedule attribute on the function) and the SystemC emitter's handling of
+carried directives (D-18 third bullet) are not part of this change.
+
+D-19: what landed
+=================
+
+``compose.Option(name, units, channels, memories, rebind, isa, parameters,
+engines)`` and ``Architecture.with_options(base, *options)`` (lifted from
+``template/optional.py``'s ``assemble``): an option's units, channels,
+memories, parameters and engines are added, its ``rebind`` (``{unit:
+{name: new}}``) is applied to the named neighbours as ``Instance``\ s (D-17),
+and its ``isa`` slots are added to the base's ``Architecture(slots=)``.
+Legality is the existing netlist rules on the result. Also refused: a rebind
+of a unit the architecture lacks, an option composed twice, a slot two
+modules bring, a parameter or engine slot an option re-sets differently.
+``isa_slots(arch)`` -> ``{slot: module}`` (base first, then each option) is
+what an assembler or ``gen_isa --check`` consumes (``examples/tinytpu/
+gen_isa.py`` unchanged; TinyTPU's spec stays as is).
+``check_program(arch, program, known=())`` refuses an instruction whose
+module is not composed in, naming the module when a known option brings it.
+
+``Unit(calls=)`` (provisional, P8): the module-level functions a body calls
+as part of the unit itself (``add_bits``, ``mul_bits``, ``bf16_gt``,
+``gelu_addr``, ``exp_addr``, ``sfu_bits``), resolved from the body's own
+module and added to the region's namespace; refused if not a function, if
+two units call different functions under one name, if an ``Instance`` binds
+one. *Reason:* a compose unit could call no helper before (every free name
+had to be an architecture parameter), and D-15 refuses a function bound as a
+parameter; a fixed helper is neither swappable nor the architecture's.
+
+The use case: ``template/vpu_lane.py``, one VPU lane from real units --
+``issue -> alu -> writeback``, the ALU U1's ``bits`` composition
+(``units/alu.py`` ``composed``, line for line), and the option ``SFU``:
+track A's S1 ``bits`` SFU (``units/sfu.py``: ROMs and PWL tables bound to
+kernel-local constants, ``sfu_bits``), channel ``sfu_out``, slots
+``vgelu``/``vexp``/``vrecip``/``vrsqrt``, rebind ``writeback: alu_out ->
+sfu_out``. As in ``vpu.sv:88`` the SFU's operand is VREG port A (the ALU
+forwards it on ``alu_out``) and the result is chosen by the op tag
+(``:157-184``). Untimed: the SFU's declared latency 5 and the ALU's 3 are
+not modelled by these streams.
+
+.. list-table:: ``tests/test_compose_options.py`` (oracles ``ref.vpu_alu``, ``ref.sfu``)
+   :header-rows: 1
+   :widths: 46 18 18 18
+
+   * - instance
+     - simulator
+     - SystemC csim
+     - slots
+   * - base lane (no SFU), random ALU ops, random bf16 bit patterns
+     - 512/512
+     - 128/128
+     - 6 (``base``)
+   * - lane + ``SFU``, random ALU and SFU ops
+     - 512/512
+     - 128/128
+     - 6 + 4 (``sfu``)
+   * - ``vgelu`` in a program for the base lane
+     - refused: "its module 'sfu' is not composed in"
+     - --
+     - --
+   * - SFU without the rebind / rebind without the SFU
+     - refused: "channel 'alu_out' reads in both writeback and sfu" /
+       "nothing reads 'alu_out'"
+     - --
+     - --
+
+``template/optional.py`` (the stub lane) now uses ``Option``,
+``with_options`` and ``isa_slots``; ``run_u3e``'s output is unchanged but for
+the H10 label (``compose.Instance``).
+
+D-20: what landed
+=================
+
+``Architecture(parameters=<record>)``: a geometry record with
+``namespace()`` (``MxuGeometry``/``TreeGeometry``) is bound through it;
+``Architecture.geometry`` keeps the record. A namespace key that names a
+property of the record must equal the property, refused otherwise naming
+the key. The units' ``legality`` runs on the namespace as on any parameter
+set (``tests/test_compose_geometry.py``): ``MxuGeometry()`` binds
+``PUSH_TO_VALID`` 82 and ``PE_LATENCY`` 4, with a 5-cycle adder 114; a record
+that declares ``PUSH_TO_VALID=82`` as a field beside a 5-cycle adder is
+refused by ``mxu_legality`` naming ``PUSH_TO_VALID`` (``must be 2 +
+DIM*(PE_LATENCY+1) = 114``). The harness side of D-20 (manifest vs booking)
+is another agent's; ``harness/latency.py`` untouched.
+
+Impact at each step
+===================
+
+Run by ``scratch/eng_work/eng_impact.sh`` in a detached worktree at the
+commit named (same bindings, same host and env), so the measured tree is a
+commit, not a working copy.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 20 20 20
+
+   * - check
+     - D-15 ``f4608647``
+     - D-17 ``00156415``
+     - D-20 ``1f14df42`` (HEAD)
+   * - TinyTPU emitted Vitis / Catapult, sha256
+     - ``6bc774bc...b2ef95`` / ``ade1ab5d...88e038``
+     - identical
+     - identical
+   * - ``gen_isa --check``, ``lift_units --check``
+     - ISA OK, UNITS OK
+     - ISA OK, UNITS OK
+     - ISA OK, UNITS OK
+   * - ``bench_isa``, ``stress_isa``
+     - ALL EXACT, 640/640
+     - ALL EXACT, 640/640
+     - ALL EXACT, 640/640
+   * - ``act_compile --gate``
+     - 12/12
+     - 12/12
+     - 12/12
+   * - ``pytest tests/test_compose*.py tests/dataflow/test_compose_memory_ports.py``
+     - 26 passed
+     - 32 passed
+     - 47 passed (csim not skipped)
+   * - ``examples/minitpu/run.py --quick``
+     - PASS
+     - PASS
+     - PASS
+   * - ``run_u3e``
+     - 26 OK, 1 finding, GATE OK
+     - 26 OK, 1 finding, GATE OK
+     - 26 OK, 1 finding, GATE OK
+
+The D-18 commit (``c5c8c670``) was checked by the compose tests only (20
+passed); HEAD carries it through every row. ``instantiate.engine_bind``,
+named in the D-15 migration above, went with ``instantiate.py`` at D-17
+(``Engine.rebind``).

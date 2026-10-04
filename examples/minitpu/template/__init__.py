@@ -5,8 +5,8 @@
 
 ``engines.py``      the MAC plug-in: an ``Engine`` record (types, latency,
                     accumulate order, bodies, numpy references, directives)
-``instantiate.py``  per-instance binding of a ``compose.Unit`` (names, channels,
-                    parameters) by AST rename -- the C9 workaround at compose level
+(``instantiate.py``, the per-instance AST rename, is now ``compose.Instance``,
+README D-17)
 ``mac_pe.py``       one PE source, two MAC engines; each in its own region and
                     both in one
 ``matrix_engine.py`` systolic chain and adder tree behind one interface that

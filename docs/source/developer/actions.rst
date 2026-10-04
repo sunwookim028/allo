@@ -218,6 +218,148 @@ exact: what the model was missing was **a lane count, not addressed state**.
 A channel has no rows, no bank map and no collision rule, and a fold needs
 none of them.
 
+An engine carries the arithmetic
+================================
+
+The table above says a composed region declares what a unit is wired to and
+never what it computes. README D-15 moves one part of that line: a
+*swappable* arithmetic -- the MAC of a PE, the matrix engine of an MXU -- is
+a declared record, ``compose.Engine``, and a unit binds it through slots.
+
+.. code-block:: python
+
+   BF16_ACC24 = Engine(
+       name="bf16_acc24",
+       IN=UInt(16), IN_BITS=16, ACC=UInt(24), ACC_BITS=24, OUT=UInt(16), OUT_BITS=16,
+       mul=mul_acc24_bits, add=acc24_add_bits, pack=pack_bf16_bits,
+       latency={"mul": 0, "add": 3, "pack": 0},   # D-10 latency= of each body
+       order="sequential",                         # the order it is exact for
+       ref_mul=..., ref_add=..., ref_pack=...,     # the same arithmetic in numpy
+       directives=lambda s, ctx: s.unroll("leading_zeros19:offset"))
+
+   @unit(reads=("lhs", "wq", "psum_in"), writes=("psum_out",),
+         parameters=("N_WORK",),
+         engines=("MAC_IN", "MAC_ACC", "MAC_MUL", "MAC_ADD"))
+   def mac_pe(): ...                               # names no type
+
+   Architecture(..., engines={"MAC": BF16_ACC24}, order="sequential")
+
+What composition checks (``tests/test_compose_engines.py``):
+
+* **Slots.** An engine name in a body is ``<slot>_<field>`` (``MAC_IN``,
+  ``MAC_IN_BITS``, ``MAC_ADD`` ...) and is declared in ``engines=``, never in
+  ``parameters=``; a body (``MUL``/``ADD``/``PACK``) is only called. A
+  Python function bound as a bare parameter is refused: an engine is never a
+  bare function. Every slot a unit binds has an engine; every engine is
+  bound by a unit.
+* **Types on channels.** A value a body annotates with an engine type and
+  moves on a channel (``a: MAC_IN = lhs.get()``, ``psum_out.put(south)``)
+  must travel on a channel of that type; a packed channel's ``lane_bits`` is
+  the engine width the body slices it by (``lane_bits == IN_BITS``). A
+  channel declared ``UInt(16)`` passes at the bf16 engine and is refused at
+  the int8 one.
+* **Order.** An engine record declares ``order`` (``sequential`` |
+  ``tree``), and so does a unit that IS an engine (``systolic_engine``:
+  ``order="sequential"``; ``tree_engine``: ``order="tree"``). The composite
+  declares the order its contract reference takes,
+  ``Architecture(order=, accepts=)``. A part of another order is refused,
+  naming the slot or unit and both orders, unless the composite accepts it;
+  then ``Architecture.reference_order`` is that order and the verdict uses
+  the reference evaluated with it (``Engine.dot(A, W, order)``). At bf16 the
+  two orders differ on 74 of 8,192 outputs at DIM 16 on random data, so a
+  swap that changes the order is a different function, never "the same MXU".
+* **Directives** (README D-18). ``Architecture.directives`` applies, after
+  each unit's own, the directives of every engine the unit binds -- once
+  per distinct engine, since the loop they name sits in one ``func.func``
+  shared by every caller (``ctx.unit``, ``ctx.engine`` name the first
+  binding). C10's ``leading_zeros19`` unroll now travels with the bf16
+  engine and no region schedule names it. An engine's directive must name
+  ``<function>:<loop>`` of a function the module holds as its own
+  ``func.func``; one naming an absent function, or one marked to be inlined
+  (``s.inline``), is refused naming the function, never dropped.
+
+The latencies are bookings: what a composite's timing is derived from
+(``legality.py``), never a constant a body consumes; what a backend built is
+``latency.json`` (D-10). What the record does not do: it does not make the
+Action model's compute ports derive (``actions.py`` still declares them);
+it only makes the arithmetic a composition carries a stated, checked thing.
+
+An instance binds a unit's names
+================================
+
+README D-17. ``compose.Instance(unit, name, bind)`` puts one ``Unit`` in a
+region under ``name``, with ``bind`` renaming the free names of its body --
+parameters, channels, engine slots (``Engine.rebind("MAC", "MAC__a")``) --
+and the memories it binds. ``Architecture.units`` takes instances beside
+bare units, so one ``Unit`` object composes any number of times:
+
+.. code-block:: python
+
+   for sfx, eng in (("a", BF16_ACC24), ("b", INT8_INT32)):
+       engines[f"MAC__{sfx}"] = eng
+       units.append(Instance(mac_pe, f"mac_pe_{sfx}",
+                             Engine.rebind("MAC", f"MAC__{sfx}")
+                             | {"lhs": f"lhs_{sfx}", ...}))
+
+A binding of a name the body does not take from outside is refused. Every
+check runs per instance: the declaration against the renamed body, one owner
+per channel and port, ``legality`` on the parameter set as the unit sees it
+through its binding. Re-binding an instance (an optional module rewiring a
+neighbour) composes into one binding of the original unit.
+
+A parameter in a slice bound (``word[0:MAC_IN_BITS]``) is refused at
+``Unit.check``: the front end cannot infer the slice's width and widens it
+to 32 bits (:ref:`tinytpu-library-symbolic-slice`). Inside ``meta_for`` the
+bound names a bound index and folds, and is accepted; elsewhere a bound unit
+converts by typed assignment (``a: MAC_IN = word``). The front-end form,
+``@df.unit`` type parameters, is separate work and subsumes this renaming.
+
+An optional module is a declared delta
+======================================
+
+README D-19. ``compose.Option`` names what one module brings: units,
+channels, memories, parameters, engines, the ``rebind`` of its neighbours'
+names when it is present (``{"writeback": {"alu_out": "sfu_out"}}``, applied
+as an ``Instance``), and the ISA slots that exist only with it.
+``Architecture.with_options(base, *options)`` composes them; the base
+declares its own slots (``Architecture(slots=...)``).
+
+.. code-block:: python
+
+   SFU = Option(name="sfu", units=(sfu,),
+                channels=(Channel("sfu_out", "UInt(64)", "QD"),),
+                rebind={"writeback": {"alu_out": "sfu_out"}},
+                isa=("vgelu", "vexp", "vrecip", "vrsqrt"))
+   lane = Architecture.with_options(base(n), SFU)
+   isa_slots(lane)          # {"vadd": "base", ..., "vgelu": "sfu", ...}
+   check_program(base(n), ["vadd", "vgelu"], known=(SFU,))   # refused, naming 'sfu'
+
+Composition is legal iff the netlist rules pass on the result, so the two
+conditional-form hazards are refused naming the channel: the SFU without the
+rebind (``channel 'alu_out' reads in both writeback and sfu``) and the
+rebind without the SFU (``nothing reads 'alu_out'``). ``isa_slots(arch)`` is
+the instance's ISA derived from its composition, for an assembler or
+``gen_isa --check`` to consume. The first use is MiniTPU's SFU over a lane
+of real units, U1's ``bits`` ALU and track A's ``bits`` SFU
+(``examples/minitpu/template/vpu_lane.py``, ``tests/test_compose_options.py``).
+
+A unit's own helper functions are declared ``calls=("add_bits", ...)``:
+resolved from the body's module, never bound by the architecture, never
+renamed by an instance. A function an architecture chooses is an engine
+slot (D-15).
+
+A geometry record is a parameter set
+====================================
+
+README D-20. ``Architecture(parameters=MxuGeometry(...))`` binds the
+record's ``namespace()``: derived numbers (``PE_LATENCY``,
+``PUSH_TO_VALID``) are properties computed from the declared ones and the
+bound engine's latencies, so they bind without being typed in, and each
+unit's ``legality`` runs on them. A namespace key that names a property of
+the record must equal it; a declared copy beside a derived number
+(``PUSH_TO_VALID=82`` with a 5-cycle adder) is refused by the unit's
+legality, naming the parameter (``tests/test_compose_geometry.py``).
+
 What is still true
 ==================
 

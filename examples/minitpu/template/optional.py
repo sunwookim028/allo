@@ -10,7 +10,9 @@ the ISA slot that dispatched to it must stop assembling. Two hazards, both
 silent in the conditional form: a channel left declared with one endpoint,
 and a program that names a unit the machine does not have.
 
-An ``Option`` names everything one module brings: units, channels, the
+(``Option``, ``with_options`` and ``isa_slots`` are now ``allo/compose.py``,
+README D-19; the real-unit lane is ``vpu_lane.py``.) An ``Option`` names
+everything one module brings: units, channels, the
 rebinding of a neighbour's port when the module is present, and the ISA
 slots that exist only with it. ``assemble(base, *options)`` composes an
 ``Architecture`` from a base and its options and lets ``compose``'s netlist
@@ -24,56 +26,20 @@ The demonstration rig is one VPU lane: ``issue -> alu -> writeback``, with
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
-from allo.compose import Architecture, Channel, Memory, Unit, unit
-
-from examples.minitpu.template.instantiate import instance
+from allo.compose import Architecture, Channel, Memory, Option, isa_slots, unit
 
 
-@dataclass(frozen=True)
-class Base:
-    name: str
-    parameters: dict
-    memories: tuple
-    channels: tuple
-    units: tuple
-    isa: tuple = ()           # the slots the base machine always has
 
-
-@dataclass(frozen=True)
-class Option:
-    """One optional module: what it adds and what it rebinds."""
-
-    name: str
-    units: tuple = ()
-    channels: tuple = ()
-    rebind: dict = field(default_factory=dict)   # {unit name: {free name: new name}}
-    isa: tuple = ()           # the slots that exist only with this module
-    parameters: dict = field(default_factory=dict)
-
-
-def assemble(base: Base, *options: Option, name=None):
+def assemble(base: Architecture, *options: Option, name=None):
     """The architecture of ``base`` with ``options`` present, and the ISA
-    slots it may assemble. ``compose`` refuses a channel with a missing
-    endpoint, so an option that forgets a rebind is refused here, not
-    silently built."""
-    units = list(base.units)
-    channels = list(base.channels)
-    params = dict(base.parameters)
-    isa = list(base.isa)
-    for opt in options:
-        params.update(opt.parameters)
-        channels += list(opt.channels)
-        isa += list(opt.isa)
-        for i, u in enumerate(units):
-            if u.name in opt.rebind:
-                units[i] = instance(u, u.name, opt.rebind[u.name])
-        units += list(opt.units)
-    arch = Architecture(name=name or f"{base.name}_{'_'.join(o.name for o in options) or 'base'}",
-                        parameters=params, memories=base.memories,
-                        channels=tuple(channels), units=tuple(units))
-    return arch, tuple(isa)
+    slots it may assemble -- now ``compose.Architecture.with_options`` and
+    ``compose.isa_slots`` (README D-19). ``compose`` refuses a channel with
+    a missing endpoint, so an option that forgets a rebind is refused here,
+    not silently built."""
+    arch = Architecture.with_options(
+        base, *options,
+        name=name or f"{base.name}_{'_'.join(o.name for o in options) or 'base'}")
+    return arch, tuple(isa_slots(arch))
 
 
 def assemble_program(program, isa):
@@ -137,15 +103,15 @@ def writeback(out_mem: UInt(32)[N_OPS]):
         out_mem[i] = word[0:16]
 
 
-def vpu_lane_base(n_ops: int) -> Base:
-    return Base(
+def vpu_lane_base(n_ops: int) -> Architecture:
+    return Architecture(
         name="vpu_lane",
         parameters={"N_OPS": n_ops, "QD": 4, "OP_ADD": OP_ADD, "OP_GELU": OP_GELU},
         memories=(Memory("OPS", "UInt(32)[N_OPS]"), Memory("A", "UInt(32)[N_OPS]"),
                   Memory("B", "UInt(32)[N_OPS]"), Memory("OUT", "UInt(32)[N_OPS]")),
         channels=(Channel("to_alu", "UInt(64)", "QD"), Channel("alu_out", "UInt(64)", "QD")),
         units=(issue, alu, writeback),
-        isa=("vadd",))
+        slots=("vadd",))
 
 
 SFU_OPTION = Option(

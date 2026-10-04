@@ -5,13 +5,15 @@
 ``mac_pe`` is the MAC datapath of a weight-stationary PE: per work item it
 takes an operand, a weight and the partial sum from the north and hands
 ``MAC_ADD(MAC_MUL(a, w), psum)`` south. The engine is bound at composition:
-``MAC_IN``.. ``MAC_ADD`` are PARAMETERS of the unit (an ``Engine.namespace()``),
-exactly as ``RED_IN``/``RED_ACC`` are parameters of ``reduce_tree``. Nothing
-in the body names bf16 or int8.
+``MAC_IN``.. ``MAC_ADD`` are the unit's ENGINE SLOTS (``engines=``, README
+D-15), and the architecture binds a ``compose.Engine`` to slot ``MAC``
+(``Architecture(engines={"MAC": BF16_ACC24})``), which also applies the
+engine's directives for the unit and holds its types to the channels.
+Nothing in the body names bf16 or int8.
 
 Three rigs: the PE at the bf16->acc24 engine, at the int8->int32 engine, and
 BOTH in one region (two instances of one unit, each at its own engine, via
-``instantiate.instance``). The weight-bank bookkeeping of ``mxu_pe.sv``
+``compose.Instance``, README D-17). The weight-bank bookkeeping of ``mxu_pe.sv``
 (two pending banks, commit, forwards) is track B's P2, not this file's.
 """
 
@@ -20,16 +22,17 @@ from __future__ import annotations
 import numpy as np
 
 import allo.dataflow as df
-from allo.compose import Architecture, Channel, Memory, unit
+from allo.compose import Architecture, Channel, Instance, Memory, unit
 
-from examples.minitpu.template.engines import BF16_ACC24, INT8_INT32, Engine
-from examples.minitpu.template.instantiate import bound, instance
+from allo.compose import Engine
+from examples.minitpu.template.engines import BF16_ACC24
 
 
 @unit(
     reads=("lhs", "wq", "psum_in"),
     writes=("psum_out",),
-    parameters=("N_WORK", "MAC_IN", "MAC_ACC", "MAC_MUL", "MAC_ADD"),
+    parameters=("N_WORK",),
+    engines=("MAC_IN", "MAC_ACC", "MAC_MUL", "MAC_ADD"),
 )
 def mac_pe():
     for work in range(N_WORK):
@@ -44,7 +47,8 @@ def mac_pe():
 @unit(
     memories=("A", "W", "P"),
     writes=("lhs", "wq", "psum_in"),
-    parameters=("N_WORK", "MAC_IN", "MAC_ACC"),
+    parameters=("N_WORK",),
+    engines=("MAC_IN", "MAC_ACC"),
 )
 def pe_feed(a_mem: UInt(32)[N_WORK], w_mem: UInt(32)[N_WORK], p_mem: UInt(32)[N_WORK]):
     for work in range(N_WORK):
@@ -65,7 +69,8 @@ def pe_feed(a_mem: UInt(32)[N_WORK], w_mem: UInt(32)[N_WORK], p_mem: UInt(32)[N_
 @unit(
     memories=("OUT",),
     reads=("psum_out",),
-    parameters=("N_WORK", "MAC_ACC"),
+    parameters=("N_WORK",),
+    engines=("MAC_ACC",),
 )
 def pe_sink(out_mem: UInt(32)[N_WORK]):
     for work in range(N_WORK):
@@ -76,43 +81,45 @@ def pe_sink(out_mem: UInt(32)[N_WORK]):
 
 def _channels(suffix=""):
     s = f"_{suffix}" if suffix else ""
-    return (Channel(f"lhs{s}", f"MAC_IN{'__' + suffix if suffix else ''}", "4"),
-            Channel(f"wq{s}", f"MAC_IN{'__' + suffix if suffix else ''}", "4"),
-            Channel(f"psum_in{s}", f"MAC_ACC{'__' + suffix if suffix else ''}", "4"),
-            Channel(f"psum_out{s}", f"MAC_ACC{'__' + suffix if suffix else ''}", "4"))
+    slot = f"MAC__{suffix}" if suffix else "MAC"
+    return (Channel(f"lhs{s}", f"{slot}_IN", "4"),
+            Channel(f"wq{s}", f"{slot}_IN", "4"),
+            Channel(f"psum_in{s}", f"{slot}_ACC", "4"),
+            Channel(f"psum_out{s}", f"{slot}_ACC", "4"))
 
 
 def pe_rig(engine: Engine, n: int, name=None) -> Architecture:
     """The PE at one engine, in its own region."""
-    params = {"N_WORK": n, "QD": 4} | engine.namespace()
     return Architecture(
-        name=name or f"pe_{engine.name}", parameters=params,
+        name=name or f"pe_{engine.name}", parameters={"N_WORK": n, "QD": 4},
+        engines={"MAC": engine},
         memories=(Memory("A", "UInt(32)[N_WORK]"), Memory("W", "UInt(32)[N_WORK]"),
                   Memory("P", "UInt(32)[N_WORK]"), Memory("OUT", "UInt(32)[N_WORK]")),
         channels=_channels(),
-        units=(pe_feed, instance(mac_pe, "mac_pe", directives=engine.directives), pe_sink))
+        units=(pe_feed, mac_pe, pe_sink))
 
 
 def pe_rig_two(eng_a: Engine, eng_b: Engine, n: int, name="pe_two") -> Architecture:
     """Two PEs, two engines, ONE region: each instance binds its own engine
-    names and its own channels; the feed and sink are instantiated twice too."""
-    params = {"N_WORK": n, "QD": 4}
-    units, channels, memories = [], [], []
+    slot (``MAC__a``/``MAC__b``) and its own channels; the feed and sink are
+    instantiated twice too."""
+    units, channels, memories, engines = [], [], [], {}
     for suffix, eng in (("a", eng_a), ("b", eng_b)):
-        ns, bind = bound(eng.namespace(), suffix)
-        params.update(ns)
+        slot = f"MAC__{suffix}"
+        engines[slot] = eng
+        bind = Engine.rebind("MAC", slot)
         chan = {c: f"{c}_{suffix}" for c in ("lhs", "wq", "psum_in", "psum_out")}
         mems = {m: f"{m}_{suffix}" for m in ("A", "W", "P", "OUT")}
         memories += [Memory(mems[m], "UInt(32)[N_WORK]") for m in ("A", "W", "P", "OUT")]
         channels += _channels(suffix)
-        units += [
-            instance(pe_feed, f"pe_feed_{suffix}", bind | chan,
-                     memories=tuple(mems[m] for m in ("A", "W", "P"))),
-            instance(mac_pe, f"mac_pe_{suffix}", bind | chan, directives=eng.directives),
-            instance(pe_sink, f"pe_sink_{suffix}", bind | chan, memories=(mems["OUT"],)),
-        ]
-    return Architecture(name=name, parameters=params, memories=tuple(memories),
-                        channels=tuple(channels), units=tuple(units))
+        for u in (pe_feed, mac_pe, pe_sink):
+            # bind only what the unit takes from outside (README D-17)
+            mine = {k: v for k, v in (bind | chan | mems).items()
+                    if k in u.free_names() or k in u.memories}
+            units.append(Instance(u, f"{u.name}_{suffix}", mine))
+    return Architecture(name=name, parameters={"N_WORK": n, "QD": 4}, engines=engines,
+                        memories=tuple(memories), channels=tuple(channels),
+                        units=tuple(units))
 
 
 # --- stimulus and reference ---------------------------------------------------
