@@ -1,0 +1,11 @@
+RTL mxu_systolic_array:dim4: 40220 cycles in 4 traces, 79851 defined slots, RTL vs reference on defined: 79851/79851 (24.8s)
+UNIT-MATCH mxu_systolic_array:dim4 streams simulator 79849/79849 defined (589 masked: reset fill=581, uninit=8; allo==rtl on 582) cycle=order-only (build 16.5s, run 4.3s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+Info: /OSCI/SystemC: Simulation stopped by user.
+[14:24:24] Compiling with g++ ...
+[14:24:33] Running simulation ...
+UNIT-MATCH mxu_systolic_array:dim4 streams systemc 79849/79849 defined (589 masked: reset fill=581, uninit=8; allo==rtl on 582) cycle=per-iteration, time unchecked (build 8.3s, run 35.1s)
+EXIT 0
