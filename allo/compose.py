@@ -18,6 +18,7 @@ What the front end refuses, and why this is the shape that works today, is on
 from __future__ import annotations
 
 import ast
+import re
 import inspect
 import json
 import linecache
@@ -158,6 +159,77 @@ class Port:
 
 
 @dataclass(frozen=True)
+class Sram:
+    """An SRAM macro a ``Memory`` is lowered onto: ``Memory(impl=Sram(...))``,
+    the ``sram`` lowering (README D-12; ``asic_memories_2026-10-04.rst``).
+
+    ``module`` is the macro's module and Catapult library name; ``verilog``
+    its behavioural model and ``liberty`` its ``.lib`` (area, timing), both
+    files; ``rows`` x ``width`` its geometry; ``ports`` the kinds of its
+    physical ports (``("rw", "rw")`` for a 2RW macro); ``read_latency`` the
+    edges from address to data (>= 1: an SRAM's read is synchronous) and
+    ``visible`` the edges until a write is seen by any port. ``catapult_lib``
+    is the compiled Catapult library (the Memory Generator's ``.lib``) when
+    one is already built; otherwise the SystemC build makes it on a Catapult
+    host. ``from_openram`` reads all of it from an OpenRAM ``.v`` + ``.lib``.
+    """
+
+    module: str
+    verilog: str
+    liberty: str
+    rows: int
+    width: int
+    ports: tuple = ("rw", "rw")
+    read_latency: int = 1
+    visible: int = 1
+    catapult_lib: str = None
+
+    def __post_init__(self):
+        assert self.module.isidentifier(), f"sram {self.module!r}: not a module name"
+        assert self.ports and all(k in PORT_KINDS for k in self.ports), (
+            f"sram {self.module}: ports {self.ports} are not kinds from {PORT_KINDS}")
+        assert isinstance(self.read_latency, int) and self.read_latency >= 1, (
+            f"sram {self.module}: read_latency={self.read_latency!r}; an SRAM's "
+            f"read is synchronous (>= 1 edge)")
+        assert isinstance(self.visible, int) and self.visible >= 1, (
+            f"sram {self.module}: visible={self.visible!r} is not a count of edges")
+        assert self.rows > 0 and self.width > 0, f"sram {self.module}: rows x width"
+
+    @property
+    def area_um2(self):
+        """The Liberty ``area`` (OpenRAM: layout width x height, um^2), or None."""
+        try:
+            with open(self.liberty, encoding="utf-8") as f:
+                m = re.search(r"^\s*area\s*:\s*([\d.]+)\s*;", f.read(), re.M)
+        except OSError:
+            return None
+        return float(m.group(1)) if m else None
+
+    @classmethod
+    def from_openram(cls, verilog, liberty, catapult_lib=None):
+        """An OpenRAM macro from its behavioural ``.v`` (module name,
+        ``DATA_WIDTH``, ``ADDR_WIDTH``, the ``// Port i: RW|R|W`` lines) and
+        its ``.lib``. OpenRAM's model registers its inputs at the rising edge
+        and reads or writes at the falling edge: read latency 1, a write
+        visible to the next cycle's read on any port."""
+        with open(verilog, encoding="utf-8") as f:
+            v = f.read()
+        module = re.search(r"^module\s+(\w+)\s*\(", v, re.M).group(1)
+        width = int(re.search(r"parameter DATA_WIDTH = (\d+)", v).group(1))
+        aw = int(re.search(r"parameter ADDR_WIDTH = (\d+)", v).group(1))
+        kinds = tuple(k.lower() for k in re.findall(r"// Port \d+: (RW|R|W)\n", v))
+        assert kinds, f"{verilog}: no `// Port i: RW|R|W` lines; not an OpenRAM model"
+        return cls(module, verilog, liberty, 1 << aw, width, kinds, 1, 1, catapult_lib)
+
+    def manifest(self) -> dict:
+        return {"module": self.module, "rows": self.rows, "width": self.width,
+                "ports": list(self.ports), "read_latency": self.read_latency,
+                "visible": self.visible, "area_um2": self.area_um2,
+                "verilog": self.verilog, "liberty": self.liberty,
+                "catapult_lib": self.catapult_lib}
+
+
+@dataclass(frozen=True)
 class Memory:
     """An array the units address.
 
@@ -174,7 +246,11 @@ class Memory:
     ``Architecture(obligations=...)``) or ``undefined`` (masked in verdicts).
     ``reset=False`` declares storage that survives reset (README D-14).
     ``dtype`` is the element type; ``rows`` an expression over the
-    architecture's parameters.
+    architecture's parameters. ``impl`` names the lowering the memory is
+    built through -- ``"registers"`` (a flop array with combinational read
+    muxes; the default), ``"replica"`` (one copy per read port, FPGA-only),
+    or an ``Sram`` (the macro path) -- and ``region(lowering=...)`` can still
+    override it per build.
     """
 
     name: str
@@ -183,13 +259,24 @@ class Memory:
     ports: tuple = ()
     collision: str = "refuse"
     reset: bool = True
+    impl: object = None
 
     def __post_init__(self):
         if self.rows is None:
             assert not self.ports, (
                 f"memory {self.name}: ports need rows= (a memory without rows "
                 f"is a boundary array with its one m_axi port)")
+            assert self.impl is None, (
+                f"memory {self.name}: impl= needs rows= and ports= (a boundary "
+                f"array has no on-chip implementation)")
             return
+        if self.impl is not None and not isinstance(self.impl, Sram):
+            assert self.impl in LOWERINGS or self.impl in LOWERING_ALIASES, (
+                f"memory {self.name}: impl={self.impl!r} is not one of "
+                f"{LOWERINGS} or an Sram")
+            assert self.impl != "sram", (
+                f"memory {self.name}: impl='sram' names no macro; pass the "
+                f"macro itself, impl=Sram(...) (or Sram.from_openram(...))")
         assert self.ports, f"memory {self.name}: declare its ports"
         names = [p.name for p in self.ports]
         assert len(set(names)) == len(names), (
@@ -209,6 +296,17 @@ class Memory:
     @property
     def ported(self) -> bool:
         return self.rows is not None
+
+    @property
+    def lowering(self):
+        """The lowering ``impl`` names (``sram`` for an ``Sram``), or None."""
+        if isinstance(self.impl, Sram):
+            return "sram"
+        return LOWERING_ALIASES.get(self.impl, self.impl)
+
+    @property
+    def sram(self):
+        return self.impl if isinstance(self.impl, Sram) else None
 
     def port(self, name: str) -> Port:
         for p in self.ports:
@@ -859,14 +957,27 @@ def port_uses(u, pname, mem, port, tree=None):
     return {"loads": loads, "stores": stores, "loop": loop, "tree": tree}
 
 
-LOWERINGS = ("local", "replica", "server", "shared")
-# The lowering a multi-owner ported memory gets when the caller names none.
-# `server` is the general one (rw ports, any read latency) and holds ONE
-# storage: on the regfile both it and `replica` matched MiniTPU per cycle on
-# Catapult, but the replica's three copies cost a Catapult area score of 8,576
-# against the server's 3,877 (DC then merges the equal registers, OPT-1215, so
-# its area alone hides the cost; record u2_d12_prototype_2026-10-04.rst).
-DEFAULT_LOWERING = "server"
+# `registers`: one flop array in a generated server kernel, every read a
+# combinational mux (latency 0) or a pipe written as data (L >= 1); the ASIC
+# form, and the general one (rw ports, any read latency). `sram`: the same
+# server with its storage mapped onto a declared SRAM macro (Memory(impl=
+# Sram(...))). `replica`: one copy per read port, the one writer broadcasting
+# -- the LUTRAM form, FPGA-only: on the regfile both it and `registers`
+# matched MiniTPU per cycle on Catapult, but the three copies cost a Catapult
+# area score of 8,576 against 3,877 (DC then merges the equal registers,
+# OPT-1215, so its area alone hides the cost; u2_d12_prototype_2026-10-04.rst),
+# and an ASIC has no LUTRAM to make them cheap. `local`: one owner of every
+# port, today's kernel-local array. `shared`: kept to record D-11's refusal.
+LOWERINGS = ("local", "replica", "registers", "sram", "shared")
+LOWERING_ALIASES = {"server": "registers"}  # the D-12 prototype's name
+DEFAULT_LOWERING = "registers"
+FPGA_ONLY = ("replica",)
+SERVER_LOWERINGS = ("registers", "sram")  # one storage in a generated kernel
+TECHNOLOGIES = ("asic", "fpga")
+# What a target says about its technology when the caller does not:
+# Vitis is an FPGA flow; SystemC's target is Catapult on an ASIC library
+# (README D-1); the simulator and an unnamed target say nothing.
+TARGET_TECHNOLOGY = {"vhls": "fpga", "systemc": "asic"}
 
 
 def _stmts(text):
@@ -1297,24 +1408,33 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
     def _rows(self, m) -> int:
         return int(eval(str(m.rows), {}, dict(self.parameters)))  # pylint: disable=eval-used
 
-    def plan(self, target=None, lowering=None) -> dict:
+    def plan(self, target=None, lowering=None, technology=None) -> dict:
         """``{memory: lowering}`` for every memory with ports, checked.
 
         ``local``: one unit owns every port -- today's kernel-local array, the
         degenerate case. ``replica``: every read port's owner holds a copy and
         the one write port's owner sends each write to every copy (the
         write-broadcast replica; ``r`` ports at latency 0 and one ``w`` port
-        only). ``server``: one storage in a generated kernel; each port is a
-        bundle of links (address, data, enable) to its owner. ``shared``: one
-        region-scope ``Stateful`` the owners address directly -- refused by
-        D-11 unless premised, kept to record the refusal.
+        only); FPGA-only -- refused unless ``technology="fpga"`` or the target
+        is one (Vitis). ``registers`` (alias ``server``): one flop array in a
+        generated kernel; each port is a bundle of links (address, data,
+        enable) to its owner. ``sram``: that server with its storage mapped
+        onto the ``Sram`` the memory declares (``impl=``); each declared port
+        must be one the macro can honour, else refused naming the port.
+        ``shared``: one region-scope ``Stateful`` the owners address directly
+        -- refused by D-11 unless premised, kept to record the refusal.
 
-        Vitis refuses a memory with more than one owner (README D-12).
+        The choice is ``lowering[m]`` if given, else the memory's ``impl``,
+        else ``local`` for one owner and ``registers`` otherwise. Vitis
+        refuses a memory with more than one owner (README D-12).
         """
         lowering = dict(lowering or {})
         names = {m.name for m in self._ported()}
         for k in lowering:
             assert k in names, f"{self.name}: lowering names {k!r}, not a memory with ports"
+        assert technology is None or technology in TECHNOLOGIES, (
+            f"{self.name}: technology={technology!r} is not one of {TECHNOLOGIES}")
+        tech = technology or TARGET_TECHNOLOGY.get(target)
         out = {}
         for m in self._ported():
             owners = sorted({u.name for u, _ in self._owners(m).values()})
@@ -1324,15 +1444,27 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
                     f"({', '.join(owners)}); Vitis refuses a memory with more "
                     f"than one owner (README D-12). Build it with "
                     f'target="systemc" or "simulator"')
-            choice = lowering.get(m.name) or (
+            choice = lowering.get(m.name) or m.lowering or (
                 "local" if len(owners) == 1 else DEFAULT_LOWERING)
+            choice = LOWERING_ALIASES.get(choice, choice)
             assert choice in LOWERINGS, (
                 f"memory {m.name}: lowering {choice!r} is not one of {LOWERINGS}")
             if choice == "local":
                 assert len(owners) == 1, (
                     f"memory {m.name}: the local lowering needs one owner of "
                     f"every port; it has {owners}")
-            if choice in {"replica", "server"}:
+            if choice in FPGA_ONLY:
+                assert tech == "fpga", (
+                    f"memory {m.name}: the {choice} lowering is FPGA-only (LUTRAM-"
+                    f"style copies, one per read port; an ASIC flow pays every copy "
+                    f"in flops, u2_d12_prototype_2026-10-04.rst), and "
+                    + (f"target {target!r} is an ASIC target" if tech == "asic"
+                       else f"target {target!r} says nothing about its technology")
+                    + ": build with technology='fpga', or choose registers or an "
+                    "Sram (asic_memories_2026-10-04.rst)")
+            if choice == "sram":
+                self._check_sram(m)
+            if choice in {"replica", "registers", "sram"}:
                 for p in m.ports:
                     assert not p.writes or p.visible == 1, (
                         f"memory {m.name}: port {p.name} declares visible="
@@ -1352,16 +1484,84 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
             out[m.name] = choice
         return out
 
-    def port_kernels(self, target=None, lowering=None) -> list:
+    def sram_ports(self, m) -> dict:
+        """``{declared port: macro port index}`` -- each declared port on one
+        physical port of the macro that can honour it (its own kind first,
+        then an ``rw`` port), or an AssertionError naming the port."""
+        sram = m.sram
+        assert sram is not None, (
+            f"memory {m.name}: the sram lowering needs the macro: declare "
+            f"Memory(impl=Sram(...)) (or Sram.from_openram(<.v>, <.lib>))")
+        free = list(range(len(sram.ports)))
+        out = {}
+        for p in m.ports:
+            assert p.count == 1, (
+                f"memory {m.name}: port {p.name} declares count={p.count}; a "
+                f"macro port serves one access per cycle (declare {p.count} ports)")
+            pick = next((i for i in free if sram.ports[i] == p.kind), None)
+            if pick is None:
+                pick = next((i for i in free if sram.ports[i] == "rw"), None)
+            assert pick is not None, (
+                f"memory {m.name}: port {p.name} ({p.kind}) has no port of the "
+                f"macro {sram.module} left to honour it: it offers "
+                f"{list(sram.ports)} for {[q.name for q in m.ports]}")
+            free.remove(pick)
+            out[p.name] = pick
+        return out
+
+    def _check_sram(self, m):
+        """The declaration against the macro; refuses naming the port."""
+        sram = m.sram
+        self.sram_ports(m)
+        assert not m.reset, (
+            f"memory {m.name}: an SRAM macro ({sram.module}) is not reset; "
+            f"declare reset=False (README D-14) or lower it to registers")
+        rows = self._rows(m)
+        assert rows <= sram.rows, (
+            f"memory {m.name}: {rows} rows do not fit the macro {sram.module} "
+            f"({sram.rows} rows); banking is not lowered here")
+        width = self._width(m)
+        assert width is None or width <= sram.width, (
+            f"memory {m.name}: {width}-bit words are wider than the macro "
+            f"{sram.module}'s {sram.width}")
+        for p in m.ports:
+            if p.reads:
+                assert p.latency > 0, (
+                    f"memory {m.name}: port {p.name} declares latency=0 (an "
+                    f"asynchronous read); the macro {sram.module}'s read is "
+                    f"synchronous (latency {sram.read_latency}): an SRAM cannot "
+                    f"honour it. Declare latency >= {sram.read_latency} or lower "
+                    f"to registers")
+                assert p.latency >= sram.read_latency, (
+                    f"memory {m.name}: port {p.name} declares latency="
+                    f"{p.latency}, below the macro {sram.module}'s read "
+                    f"latency {sram.read_latency}")
+            if p.writes:
+                assert p.visible == sram.visible, (
+                    f"memory {m.name}: port {p.name} declares visible="
+                    f"{p.visible}; the macro {sram.module} shows a write after "
+                    f"{sram.visible}")
+
+    def _width(self, m):
+        """Bits of one word, or None when the type is not one of ours."""
+        try:
+            ns = dict(FRONTEND_NAMES)
+            ns.update(self.parameters)
+            t = eval(str(m.dtype), {}, ns)  # pylint: disable=eval-used
+            return int(t.bits)
+        except Exception:  # pylint: disable=broad-except
+            return None
+
+    def port_kernels(self, target=None, lowering=None, technology=None) -> list:
         """The kernels a ported memory's lowering consists of -- the owners of
         its ports and any generated server -- as emitted module names
         (``<kernel>_0``): the synthesis group of the memory."""
-        plan = self.plan(target, lowering)
+        plan = self.plan(target, lowering, technology)
         out = []
         for u in self.units:
             if any("." in mem for mem in u.memories):
                 out.append(f"{u.name}_0")
-        out += [f"{m}_mem_0" for m, c in plan.items() if c == "server"]
+        out += [f"{m}_mem_0" for m, c in plan.items() if c in SERVER_LOWERINGS]
         return out
 
     def _pin(self, m, pk, role, port, links):
@@ -1405,15 +1605,15 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
                 self._rewrite(plan[m.name], tree, pname, m, port, uses,
                               links, storage_attr, chans, region_decls)
         for m in self._ported():
-            if plan[m.name] in {"server", "replica"}:
+            if plan[m.name] in SERVER_LOWERINGS or plan[m.name] == "replica":
                 its = iters.get(m.name, {})
                 assert len(its) == 1, (
                     f"memory {m.name}: its owners iterate differently "
                     f"({its}); one iteration is one cycle of every port, so "
                     f"the {plan[m.name]} lowering needs one loop range")
-            if plan[m.name] == "server":
+            if plan[m.name] in SERVER_LOWERINGS:
                 servers.append(self._server(m, next(iter(iters[m.name])),
-                                            storage_attr))
+                                            storage_attr, plan[m.name] == "sram"))
         for u in self.units:
             if u.name not in trees:
                 continue
@@ -1538,14 +1738,17 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
                     new += [f"{pins['d']}.put(0)", f"{pins['e']}.put(0)"]
                 loop.body[0:0] = _stmts("\n".join(new))
 
-    def _server(self, m, loop_iter, storage_attr):
-        """The generated kernel that holds a `server`-lowered memory: per
-        iteration every port's address, then every read (latency 0: a
-        combinational put; L >= 1: a pipe of L registers, as data), then every
-        write -- so a read sees writes of earlier iterations only (visible=1)."""
+    def _server(self, m, loop_iter, storage_attr, sram=False):
+        """The generated kernel that holds a `registers`- or `sram`-lowered
+        memory: per iteration every port's address, then every read (latency
+        0: a combinational put; L >= 1: a pipe of L registers, as data), then
+        every write -- so a read sees writes of earlier iterations only
+        (visible=1). ``sram``: the storage is a plain array (the backend maps
+        it onto the declared macro; an unreset ``sc_signal`` array is not
+        RAM-mappable) and every ``rw`` port is written in the one-access form."""
         dt, rows = m.dtype, m.rows
         at = _addr_type(self._rows(m))
-        attr = storage_attr if not m.reset else ""
+        attr = storage_attr if not m.reset and not sram else ""
         head = ["@df.kernel(mapping=[1])", f"def {m.name}_mem():",
                 f"    mem: {dt}[{rows}]{attr}"]
         body, writes = [], []
@@ -1554,7 +1757,7 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
                 pk = p.name + (str(k) if p.count > 1 else "")
                 ch = f"{m.name}_{pk}"
                 body += [f"_{pk}_a: {at} = {ch}_a.get()", f"_{pk}_i: int32 = _{pk}_a"]
-                if p.kind == "rw" and p.latency and m.reset:
+                if p.kind == "rw" and p.latency and (m.reset or sram):
                     # RAM-mappable storage: one access per port per cycle, a
                     # write OR a read, as ONE if/else -- what Catapult needs to
                     # see the two as exclusive and use one RAM port, not two
@@ -1585,10 +1788,10 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
         lines = head + [f"    for _ in {loop_iter}:"] + [f"        {x}" for x in body + writes]
         return textwrap.indent("\n".join(lines), "    ")
 
-    def memory_manifest(self, target=None, lowering=None) -> dict:
+    def memory_manifest(self, target=None, lowering=None, technology=None) -> dict:
         """What each memory with ports was lowered to: ``memory.json``
         (README D-12), written beside ``latency.json``."""
-        plan = self.plan(target, lowering)
+        plan = self.plan(target, lowering, technology)
         links = "stream" if target == "simulator" else "declared"
         out = {}
         for m in self._ported():
@@ -1599,47 +1802,114 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
                        "SC_METHOD, no reset action (D-14)"
                        if not m.reset and links != "stream" and target != "vhls"
                        else "the backend's array (reset storage)")
+            if choice == "sram":
+                storage = (f"SRAM macro {m.sram.module} ({m.sram.rows} x {m.sram.width}, "
+                           f"ports {list(m.sram.ports)}), unreset by nature; the server's "
+                           f"array is mapped onto it (Catapult: MAP_TO_MODULE)")
             impl = {
                 "local": f"kernel-local array of {sorted({u.name for u, _ in owners.values()})[0]}"
                          " (one owner of every port: today's array)",
                 "replica": f"write-broadcast replica x{nread}: one copy per read port, "
-                           "inside its owner; every write sent to every copy",
-                "server": f"one storage in generated kernel {m.name}_mem; each port a "
-                          "bundle of links (address, data, enable) to its owner",
+                           "inside its owner; every write sent to every copy (FPGA-only)",
+                "registers": f"one flop array in generated kernel {m.name}_mem, reads as "
+                             "combinational muxes or a pipe as data; each port a bundle "
+                             "of links (address, data, enable) to its owner (the ASIC form)",
+                "sram": f"one storage in generated kernel {m.name}_mem mapped onto the "
+                        f"macro {m.sram.module if m.sram else '?'}; each port a bundle of "
+                        "links (address, data, enable) to its owner, on one macro port",
                 "shared": "one region-scope Stateful the owners address (D-11 refuses "
                           "it unless premised; no HLS backend builds it)",
             }[choice]
+            macro_ports = self.sram_ports(m) if choice == "sram" else {}
             ports = {}
             for p in m.ports:
                 d = p.manifest()
                 d["owner"] = owners[p.name][0].name
-                if choice in {"replica", "server"} and links != "stream":
+                if choice in {"replica", "registers"} and links != "stream":
                     if p.reads:
                         d["read"] = ("combinational (D-13 comb links)" if p.latency == 0
                                      else f"registered link + {p.latency}-deep pipe as data")
                     if p.writes:
                         d["write"] = "comb pins into a clock-edge write: seen next cycle"
+                if choice == "sram":
+                    i = macro_ports[p.name]
+                    d["macro_port"] = {"index": i, "kind": m.sram.ports[i]}
+                    if p.reads:
+                        d["read"] = (f"macro read, latency {m.sram.read_latency}, inside a "
+                                     f"{p.latency}-deep pipe as data; the achieved latency "
+                                     f"is measured on the RTL (D-10), not assumed")
+                    if p.writes:
+                        d["write"] = f"macro write, visible after {m.sram.visible}"
                 ports[p.name] = d
             out[m.name] = {
                 "rows": self._rows(m), "dtype": m.dtype, "reset": m.reset,
                 "collision": m.collision, "lowering": choice,
                 "implementation": impl, "storage": storage,
                 "target": target or "declared", "links": links, "ports": ports,
+                "technology": technology or TARGET_TECHNOLOGY.get(target),
                 "status": "untimed" if target == "simulator" else "lowered",
             }
+            if choice == "sram":
+                out[m.name]["macro"] = m.sram.manifest()
             if m.name in self.obligations:
                 out[m.name]["obligation"] = self.obligations[m.name]
         return out
 
-    def build(self, target="simulator", lowering=None, schedule=None, **kwargs):
+    def sram_configs(self, target, lowering=None, technology=None, configs=None) -> list:
+        """The Catapult side of every ``sram``-lowered memory: one entry per
+        memory with the library to add (``solution library add <module> -file
+        <catapult_lib>``) and the server's array resource to map onto it
+        (``directive set <rsc> -MAP_TO_MODULE <module>.<module>``). The
+        resource path follows what is synthesized: the ``synth_group`` top,
+        the server itself as ``synth_top``, or the region's top. A macro
+        without a compiled Catapult library is refused here, naming the file
+        the Memory Generator makes (``allo.backend.catapult.build_memory_library``)."""
+        plan = self.plan(target, lowering, technology)
+        configs = configs or {}
+        group = (configs.get("synth_group") or {}).get("name")
+        out = []
+        for m in self._ported():
+            if plan[m.name] != "sram":
+                continue
+            kernel = f"{m.name}_mem_0"
+            root = group if group else ("" if configs.get("synth_top") == kernel else self.name)
+            rsc = f"/{root}/{kernel}/run/mem:rsc" if root else f"/{kernel}/run/mem:rsc"
+            out.append({"memory": m.name, "library": m.sram.module,
+                        "file": m.sram.catapult_lib, "module": m.sram.module,
+                        "rsc": rsc, "sram": m.sram})
+        return out
+
+    def build(self, target="simulator", lowering=None, schedule=None, technology=None,
+              **kwargs):
         """Customize, schedule and build the region for ``target``; with a
-        ``project``, write ``memory.json`` there (README D-12)."""
-        region = self.region(target, lowering)
-        manifest = self.memory_manifest(target, lowering)
+        ``project``, write ``memory.json`` there (README D-12). An ``sram``
+        lowering on the SystemC target adds the macro's Catapult library and
+        the ``MAP_TO_MODULE`` directive to ``configs`` (``run.tcl``), building
+        the library first when ``Sram.catapult_lib`` is unset."""
+        region = self.region(target, lowering, technology)
+        manifest = self.memory_manifest(target, lowering, technology)
         if target == "simulator":
             for name, d in manifest.items():
                 print(f"[memory] {name}: {d['lowering']}, untimed (the simulator "
                       f"keeps the order of accesses, not latency or visibility)")
+        srams = self.sram_configs(target, lowering, technology, kwargs.get("configs"))
+        if srams and target == "systemc":
+            configs = dict(kwargs.get("configs") or {})
+            for e in srams:
+                if e["file"] is None:
+                    from allo.backend.catapult import build_memory_library  # noqa: PLC0415
+                    outdir = os.path.join(kwargs.get("project") or ".", "memgen")
+                    e["file"] = build_memory_library(
+                        e["sram"], outdir, clock=float(configs.get("clock_period", 3.33)))
+            configs["memories"] = [{k: v for k, v in e.items() if k != "sram"} for e in srams]
+            kwargs["configs"] = configs
+            for e in srams:
+                manifest[e["memory"]]["catapult"] = {k: v for k, v in e.items() if k != "sram"}
+        elif srams and target not in (None, "simulator"):
+            raise NotImplementedError(
+                f"{self.name}: the sram lowering of {[e['memory'] for e in srams]} is "
+                f"built only by target='systemc' (Catapult maps the server's array onto "
+                f"the macro); target {target!r} has no macro path yet")
         if target == "simulator":
             assert schedule is None, "the simulator takes no schedule"
             mod = df.build(region, target="simulator", **kwargs)
@@ -1655,12 +1925,12 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
                 json.dump(manifest, f, indent=2, sort_keys=True)
         return mod
 
-    def source(self, target=None, lowering=None) -> str:
+    def source(self, target=None, lowering=None, technology=None) -> str:
         """The region's text. ``target="simulator"`` emits every link as a
         Stream (the simulator is untimed and refuses Wire); a memory with
         ports is lowered as ``plan`` says."""
         links = "stream" if target == "simulator" else None
-        plan = self.plan(target, lowering)
+        plan = self.plan(target, lowering, technology)
         srcs, extra, region_decls, servers = (
             self._lower(plan, links or "declared") if plan else ({}, [], [], []))
         head = [f"def {self.name}("]
@@ -1676,18 +1946,19 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
             parts += ["", s]
         return "\n".join(parts) + "\n"
 
-    def region(self, target=None, lowering=None):
+    def region(self, target=None, lowering=None, technology=None):
         """The ``@df.region()``-decorated function, built from `source`.
 
         Registered in ``linecache`` under a stable pseudo-path because Allo
         reads a region back with ``inspect.getsourcelines``.
         ``ALLO_DUMP_COMPOSED=<dir>`` also writes the text out, to read or diff.
         """
-        key = (target, tuple(sorted((lowering or {}).items())))
+        key = (target, tuple(sorted((lowering or {}).items())) + (
+            (("technology", technology),) if technology else ()))
         if key == (None, ()) and self._region is not None:
             return self._region
         if key not in self._regions:
-            src = self.source(target, lowering)
+            src = self.source(target, lowering, technology)
             path = f"<composed {self.name}>" if key == (None, ()) else \
                 f"<composed {self.name} {target} {dict(key[1])}>"
             linecache.cache[path] = (len(src), None, src.splitlines(True), path)

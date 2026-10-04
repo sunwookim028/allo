@@ -362,6 +362,19 @@ A row marked **unpinned** is an open defect.
    * - Kai Shao's ACT (reference)
      - ``kai/act`` ``3c1ad38``
      - ``ATTRIBUTION.md``
+   * - OpenRAM (zhang-21, the SRAM-macro path)
+     - ``b2b069ce119d1488cbe6883b2240bceb5c7ce29a`` (``v1.2.48-41``, 2026-08-16),
+       cloned at ``/work/shared/users/phd/sk3463/tools/OpenRAM``; FreePDK45 as
+       bundled with it (``technology/freepdk45``; no NCSU PDK, DRC/LVS off);
+       its conda env ``tools/envs/openram`` (Python 3.11.16, numpy 2.4.6,
+       scipy 1.17.1, scikit-learn 1.9.1, ngspice 41) pinned by URL and md5 in
+       ``dev/records/minitpu/asic_memories_2026-10-04/openram_env/``
+     - ``dev/records/minitpu/asic_memories_2026-10-04.rst``
+   * - Catapult Memory Generator (``/MemGen/MemoryGenerator_BuildLib``), Library Compiler
+     - part of Catapult 2024.2/1130128 (plain Catapult licence);
+       ``lc_shell`` W-2024.09-SP5-3 (``/opt/synopsys/lc/W-2024.09-SP5-3``; the
+       W-2024.09 and V-2023.12 builds fail on this host's ``libkrb5``)
+     - ``asic_memories_2026-10-04/scripts/memgen_spec.py``, ``dc/``
    * - MiniTPU (``~/core/minitpu``)
      - ``b3ba0a4d4fb69d39091c55f5f00d1f237082a4f1`` (2026-09-30)
      - README (design target)

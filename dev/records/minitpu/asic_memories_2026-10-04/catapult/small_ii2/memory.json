@@ -1,0 +1,35 @@
+{
+  "vmem": {
+    "collision": "obligation",
+    "dtype": "UInt(W)",
+    "implementation": "one storage in generated kernel vmem_mem; each port a bundle of links (address, data, enable) to its owner",
+    "links": "declared",
+    "lowering": "server",
+    "obligation": "MiniTPU issue #21: the program keeps compute and DMA off one word in one cycle (asserted in simulation only, vpu_vmem_simd.sv:121); masked in verdicts",
+    "ports": {
+      "c": {
+        "count": 1,
+        "kind": "rw",
+        "latency": 3,
+        "owner": "port_c",
+        "read": "registered link + 3-deep pipe as data",
+        "visible": 1,
+        "write": "comb pins into a clock-edge write: seen next cycle"
+      },
+      "d": {
+        "count": 1,
+        "kind": "rw",
+        "latency": 2,
+        "owner": "port_d",
+        "read": "registered link + 2-deep pipe as data",
+        "visible": 1,
+        "write": "comb pins into a clock-edge write: seen next cycle"
+      }
+    },
+    "reset": true,
+    "rows": 32,
+    "status": "lowered",
+    "storage": "the backend's array (reset storage)",
+    "target": "systemc"
+  }
+}

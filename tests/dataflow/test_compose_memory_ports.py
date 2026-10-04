@@ -106,8 +106,9 @@ def _refused(fn, *needles):
 
 def test_accepts_regfile():
     a = d.architecture(8)
-    assert a.plan("systemc") == {"vreg": "server"}
-    assert a.plan("systemc", {"vreg": "replica"}) == {"vreg": "replica"}
+    assert a.plan("systemc") == {"vreg": "registers"}
+    assert a.plan("systemc", {"vreg": "server"}) == {"vreg": "registers"}  # the D-12 prototype's name
+    assert a.plan("systemc", {"vreg": "replica"}, technology="fpga") == {"vreg": "replica"}
     assert a.port_kernels("systemc") == [
         "rd_a_0",
         "rd_b_0",
@@ -122,9 +123,9 @@ def test_accepts_regfile():
     assert "vreg_ra_q: Wire[UInt(W), comb]" in src  # latency 0: a comb read
     sim = a.source("simulator", {"vreg": "server"})
     assert "Wire" not in sim and "Stateful" not in sim
-    rep = a.source("systemc", {"vreg": "replica"})
+    rep = a.source("systemc", {"vreg": "replica"}, technology="fpga")
     assert rep.count("@ Stateful(reset=False)") == 3  # one copy per read port
-    m = a.memory_manifest("systemc", {"vreg": "replica"})["vreg"]
+    m = a.memory_manifest("systemc", {"vreg": "replica"}, technology="fpga")["vreg"]
     assert m["lowering"] == "replica" and m["ports"]["ra"]["owner"] == "rd_a"
     assert m["ports"]["w"]["visible"] == 1 and m["ports"]["ra"]["latency"] == 0
 
@@ -219,7 +220,7 @@ def test_word_array_two_rw_ports():
     from examples.minitpu.units import vpu_word_array_d12 as w
 
     a = w.architecture(8)
-    assert a.plan("systemc") == {"vmem": "server"}
+    assert a.plan("systemc") == {"vmem": "registers"}  # `server` is this lowering's old name
     assert a.port_kernels("systemc") == ["port_c_0", "port_d_0", "vmem_mem_0"]
     m = a.memory_manifest("systemc")["vmem"]
     assert m["collision"] == "obligation" and "issue #21" in m["obligation"]
@@ -240,7 +241,7 @@ def test_word_array_two_rw_ports():
     )
     # the replica lowering takes one `w` port only
     _refused(
-        lambda: a.plan("systemc", {"vmem": "replica"}),
+        lambda: a.plan("systemc", {"vmem": "replica"}, technology="fpga"),
         "replica lowering takes one `w` port",
     )
     _refused(lambda: a.region("vhls"), "Vitis refuses")
@@ -280,7 +281,7 @@ def test_regfile_simulator(lowering):
     n = 48
     ins = _trace(n, 1)
     outs = [np.zeros(n, dtype=np.uint16) for _ in range(3)]
-    mod = d.architecture(n).build("simulator", {"vreg": lowering})
+    mod = d.architecture(n).build("simulator", {"vreg": lowering}, technology="fpga")
     mod(*ins, *outs)
     assert _check(outs, _model(*ins))
 
@@ -296,11 +297,12 @@ def test_group_synthesis_emission(lowering, holders):
     design-wide; the ``UInt`` storage is unsigned; the testbench's state save
     is under ``#ifndef __SYNTHESIS__`` (Catapult parses ``sc_main``)."""
     a = d.architecture(8)
-    kernels = a.port_kernels("systemc", {"vreg": lowering})
+    kernels = a.port_kernels("systemc", {"vreg": lowering}, technology="fpga")
     with tempfile.TemporaryDirectory() as tmp:
         a.build(
             "systemc",
             {"vreg": lowering},
+            technology="fpga",
             mode="csyn",
             project=tmp,
             configs={"synth_group": {"name": "rf_g", "kernels": kernels}},
@@ -337,7 +339,7 @@ def test_regfile_csim(lowering):
         import allo.dataflow as df
 
         mod = df.build(
-            a.region("simulator", {"vreg": lowering}),
+            a.region("simulator", {"vreg": lowering}, technology="fpga"),
             target="systemc",
             mode="csim",
             project=os.path.join(tmp, "s"),
@@ -346,9 +348,9 @@ def test_regfile_csim(lowering):
         assert _check(outs, want)
         outs = [np.zeros(n, dtype=np.uint16) for _ in range(3)]
         prj = os.path.join(tmp, "w")
-        mod = a.build("systemc", {"vreg": lowering}, mode="csim", project=prj)
+        mod = a.build("systemc", {"vreg": lowering}, mode="csim", project=prj, technology="fpga")
         manifest = json.load(open(os.path.join(prj, "memory.json")))
-        assert manifest["vreg"]["lowering"] == lowering
+        assert manifest["vreg"]["lowering"] == {"server": "registers"}.get(lowering, lowering)
         mod(*ins, *outs)
         offs = []
         for j in range(3):  # per port: the comb form measured +3/+2/+2 (csim_offset.py)
