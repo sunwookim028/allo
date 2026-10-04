@@ -224,6 +224,160 @@ class Memory:
         return f"{self.name}: {self.dtype},"
 
 
+# ---------------------------------------------------------------------------
+# Engines (README D-15): a swappable arithmetic is a declared record, and the
+# accumulate order it is exact for is part of the function.
+# ---------------------------------------------------------------------------
+
+#: The names an engine binds into a unit, ``<SLOT>_<FIELD>`` (``MAC_IN``,
+#: ``MAC_ADD``, ...). Types first, then their widths, then the bodies.
+ENGINE_FIELDS = ("IN", "IN_BITS", "ACC", "ACC_BITS", "OUT", "OUT_BITS",
+                 "MUL", "ADD", "PACK")
+_ENGINE_BODIES = {"MUL": "mul", "ADD": "add", "PACK": "pack"}
+ORDERS = ("sequential", "tree")
+
+
+def engine_slot(name: str):
+    """``"MAC_IN_BITS" -> ("MAC", "IN_BITS")``; ``None`` if ``name`` is not an
+    engine slot name. The longest field wins, so ``_IN_BITS`` is not ``_IN``."""
+    for f in sorted(ENGINE_FIELDS, key=len, reverse=True):
+        if name.endswith("_" + f) and len(name) > len(f) + 1:
+            return name[: -len(f) - 1], f
+    return None
+
+
+def _type_sig(t):
+    """What two Allo types must share to be one type: kind, width, fraction."""
+    return (type(t).__name__, getattr(t, "bits", None), getattr(t, "fracs", None))
+
+
+@dataclass(frozen=True, kw_only=True)
+class Engine:  # pylint: disable=too-many-instance-attributes
+    """A swappable arithmetic engine, declared (README D-15).
+
+    ``IN``/``ACC``/``OUT`` are Allo types, ``IN_BITS``/``ACC_BITS``/``OUT_BITS``
+    their widths (one to annotate with, one to slice with; held to each
+    other). ``mul``/``add``/``pack`` are module-level Allo functions.
+    ``latency`` is the D-10 ``latency=`` of each body, ``{"mul": L, "add": L,
+    "pack": L}`` in edges, ``0`` meaning no register inside the body and a
+    missing or ``None`` entry meaning unconstrained (the backend reports what
+    it built in ``latency.json``); it is what a composition BOOKS, and no
+    body consumes it. ``order`` is the accumulate order the engine is exact
+    for (``sequential``: one rounding per term in ascending index; ``tree``:
+    one per level of a balanced tree) -- different orders are different
+    functions. ``ref_mul``/``ref_add``/``ref_pack`` are the same arithmetic in
+    numpy, so a composite's contract reference is evaluated in the engine's
+    own arithmetic (``dot``). ``directives(s, ctx)`` is what the engine needs
+    of a schedule; ``Architecture.directives`` applies it once for every unit
+    that binds the engine, with ``ctx.unit`` and ``ctx.engine`` set.
+
+    A unit binds an engine's names as ``engines=`` slots (``MAC_IN``,
+    ``MAC_ADD``, ...), never as a bare function in ``parameters``.
+    """
+
+    name: str
+    IN: object
+    IN_BITS: int
+    ACC: object
+    ACC_BITS: int
+    OUT: object
+    OUT_BITS: int
+    mul: callable
+    add: callable
+    pack: callable
+    order: str
+    ref_mul: callable
+    ref_add: callable
+    ref_pack: callable
+    latency: dict = field(default_factory=dict)
+    directives: callable = None
+
+    def __post_init__(self):
+        for width, dtype in (("IN_BITS", "IN"), ("ACC_BITS", "ACC"),
+                             ("OUT_BITS", "OUT")):
+            got = getattr(getattr(self, dtype), "bits", None)
+            assert getattr(self, width) == got, (
+                f"engine {self.name}: {width}={getattr(self, width)} but {dtype} "
+                f"is {getattr(self, dtype)} ({got} bits); a unit that slices a "
+                f"different width from the one it computes in reads the wrong "
+                f"bits without failing (README D-15)")
+        assert self.order in ORDERS, (
+            f"engine {self.name}: order {self.order!r} is not one of {ORDERS}")
+        for body in ("mul", "add", "pack"):
+            assert callable(getattr(self, body)), (
+                f"engine {self.name}: {body} is not a function")
+        for key, lat in self.latency.items():
+            assert key in {"mul", "add", "pack"}, (
+                f"engine {self.name}: latency names {key!r}; an engine's bodies "
+                f"are mul, add and pack")
+            assert lat is None or (isinstance(lat, int) and lat >= 0), (
+                f"engine {self.name}: latency[{key!r}]={lat!r} is not a count "
+                f"of edges (D-10: None leaves it to the backend)")
+
+    @property
+    def mul_latency(self):
+        return self.latency.get("mul")
+
+    @property
+    def add_latency(self):
+        return self.latency.get("add")
+
+    @property
+    def pack_latency(self):
+        return self.latency.get("pack")
+
+    def namespace(self, slot: str = "MAC") -> dict:
+        """The names a unit binds through slot ``slot``: ``MAC_IN``, ..."""
+        out = {}
+        for f in ENGINE_FIELDS:
+            out[f"{slot}_{f}"] = getattr(self, _ENGINE_BODIES.get(f, f))
+        return out
+
+    @staticmethod
+    def names(slot: str = "MAC") -> tuple:
+        return tuple(f"{slot}_{f}" for f in ENGINE_FIELDS)
+
+    def accumulate(self, terms, order: str = None):
+        """Fold ``terms`` (ACC values, numpy) with ``ref_add`` in ``order``
+        (default: the engine's): ``sequential`` is ``add(t[r], acc)`` from a
+        zero accumulator in ascending ``r``; ``tree`` is a balanced binary
+        tree, left child first, over a power-of-two count."""
+        import numpy as np  # noqa: PLC0415
+
+        order = order or self.order
+        assert order in ORDERS, f"order {order!r} is not one of {ORDERS}"
+        terms = list(terms)
+        if order == "sequential":
+            acc = np.zeros_like(np.asarray(terms[0], dtype=np.int64))
+            for t in terms:
+                acc = self.ref_add(t, acc)
+            return acc
+        n = len(terms)
+        assert n >= 1 and n & (n - 1) == 0, (
+            f"engine {self.name}: a balanced tree over {n} terms needs a power of two")
+        while len(terms) > 1:
+            terms = [self.ref_add(terms[2 * k], terms[2 * k + 1])
+                     for k in range(len(terms) // 2)]
+        return terms[0]
+
+    def dot(self, A, W, order: str = None):
+        """The contract reference of a dot-product composite with the order
+        as an argument (README D-15): every row of ``A`` (``[n, K]``) against
+        ``W`` (``[K, M]``) in this engine's numpy arithmetic, accumulated in
+        ``order``, packed once."""
+        import numpy as np  # noqa: PLC0415
+
+        A = np.asarray(A, dtype=np.int64)
+        W = np.asarray(W, dtype=np.int64)
+        n, K = A.shape
+        out = np.zeros((n, W.shape[1]), dtype=np.int64)
+        for i in range(n):
+            prods = [self.ref_mul(np.full(W.shape[1], A[i, r]), W[r])
+                     for r in range(K)]
+            out[i] = self.ref_pack(self.accumulate(prods, order))
+        return out
+
+
 @dataclass(frozen=True)
 class Unit:
     """One kernel: a body, the instances it is replicated into, and every name
@@ -244,6 +398,13 @@ class Unit:
     ``instances`` is the emitted ``mapping=``, as expressions over the
     architecture's parameters (``("T", "T")`` for a T x T array). ``memories``
     names the region arguments the body's own parameters bind to, positionally.
+
+    ``engines`` names the engine slots the body binds (``MAC_IN``,
+    ``MAC_ADD``, ...: ``<slot>_<field>``, README D-15); the architecture binds
+    an ``Engine`` to each slot. ``order`` is the accumulate order the body
+    itself implements, for a unit that IS an engine (a matrix engine:
+    ``sequential`` for a systolic chain, ``tree`` for an adder tree); the
+    composite's ``Architecture(order=, accepts=)`` holds it, like an engine's.
     """
 
     body: callable
@@ -255,6 +416,8 @@ class Unit:
     isa: tuple[str, ...] = ()
     directives: callable = None
     legality: callable = None
+    engines: tuple[str, ...] = ()
+    order: str = None
 
     @property
     def name(self) -> str:
@@ -263,7 +426,17 @@ class Unit:
     @property
     def declared_names(self) -> set[str]:
         return set(self.reads) | set(self.writes) | set(self.parameters) \
-            | set(self.isa)
+            | set(self.isa) | set(self.engines)
+
+    @property
+    def engine_slots(self) -> dict:
+        """``{slot: {field, ...}}`` of the engine names the unit binds."""
+        out = {}
+        for name in self.engines:
+            slot = engine_slot(name)
+            if slot is not None:
+                out.setdefault(slot[0], set()).add(slot[1])
+        return out
 
     def source(self) -> str:
         """The body's text, with its own decorators stripped, ready to nest."""
@@ -340,11 +513,38 @@ class Unit:
         assert len(self.memories) == len(inspect.signature(self.body).parameters), (
             f"unit {self.name}: {len(self.memories)} memories declared for "
             f"{len(inspect.signature(self.body).parameters)} body parameters")
+        for name in self.engines:
+            assert engine_slot(name) is not None, (
+                f"unit {self.name}: engine slot {name!r} is not "
+                f"<slot>_<field> with a field in {ENGINE_FIELDS} (README D-15)")
         free, declared = self.free_names(), self.declared_names
         assert free == declared, (
             f"unit {self.name}: the body uses {sorted(free - declared)} "
             f"without declaring them and declares "
             f"{sorted(declared - free)} without using them")
+        self._check_engines()
+
+    def _check_engines(self):
+        """README D-15: the engine names the body binds are declared as slots,
+        each one ``<slot>_<field>``, and a body is only CALLED."""
+        assert self.order is None or self.order in ORDERS, (
+            f"unit {self.name}: order {self.order!r} is not one of {ORDERS}")
+        slots = self.engine_slots
+        for name in self.parameters:
+            hit = engine_slot(name)
+            assert hit is None or hit[0] not in slots, (
+                f"unit {self.name}: {name!r} names engine slot {hit[0]!r} but "
+                f"is declared a parameter; a unit binds an engine's names as "
+                f"engines=, never as a bare parameter (README D-15)")
+        tree = ast.parse(self.source()).body[0]
+        called = {id(n.func) for n in ast.walk(tree) if isinstance(n, ast.Call)}
+        for n in ast.walk(tree):
+            if isinstance(n, ast.Name) and n.id in self.engines \
+                    and engine_slot(n.id)[1] in _ENGINE_BODIES:
+                assert id(n) in called, (
+                    f"unit {self.name}: engine body {n.id!r} is used other "
+                    f"than as a call (line {n.lineno}); an engine body is "
+                    f"called, never passed on (README D-15)")
 
 
 # ---------------------------------------------------------------------------
@@ -483,6 +683,10 @@ class Directives:
 
     top: str
     parameters: dict
+    # Set while an engine's directives run (README D-15): the unit binding it
+    # and the slot it is bound through.
+    unit: str = None
+    engine: str = None
 
     def instance(self, unit_name: str, *pid: int) -> str:
         return "_".join([unit_name] + [str(p) for p in (pid or (0,))])
@@ -492,7 +696,7 @@ class Directives:
 
 
 @dataclass
-class Architecture:
+class Architecture:  # pylint: disable=too-many-instance-attributes
     """A set of units, the channels that wire them, and the parameters they are
     all instantiated at. Emits the region, and applies the units' directives.
 
@@ -510,6 +714,18 @@ class Architecture:
     # the premise a `collision="obligation"` memory needs (README D-12). Like
     # `deadlock_free_because`, nothing checks it; a stress cosim discharges it.
     obligations: dict = field(default_factory=dict)
+    # README D-15. {slot: Engine}: the engine bound to every unit slot
+    # ``<slot>_<field>``. ``order`` is the accumulate order the composite's
+    # contract reference takes; ``accepts`` the other orders it admits, each
+    # a DIFFERENT function verified against the reference with that order
+    # (``reference_order``). With no ``order``, nothing is declared and the
+    # bound orders must agree among themselves.
+    engines: dict = field(default_factory=dict)
+    order: str = None
+    accepts: tuple = ()
+    #: The order the composite's verdict uses: ``order``, or the accepted
+    #: order a bound part changed it to. Set by ``_check``.
+    reference_order: str = field(default=None, init=False)
     _region: object = field(default=None, init=False, repr=False)
     _regions: dict = field(default_factory=dict, init=False, repr=False)
 
@@ -522,12 +738,18 @@ class Architecture:
         memories = {m.name for m in self.memories if not m.ported}
         ported = {m.name: m for m in self.memories if m.ported}
         writer, reader, owner = {}, {}, {}
+        self._check_engines()
         for u in self.units:
             u.check()
             for name in u.parameters + u.isa:
                 assert name in self.parameters, (
                     f"{self.name}: unit {u.name} needs {name!r}, which this "
                     f"architecture does not define")
+                assert not inspect.isfunction(self.parameters[name]), (
+                    f"{self.name}: unit {u.name} binds function "
+                    f"{self.parameters[name].__name__!r} as bare parameter "
+                    f"{name!r}; declare a compose.Engine and bind its slots "
+                    f"with engines= (README D-15)")
             if u.legality is not None:
                 u.legality(self.parameters)
             for role, names, seen in (("writes", u.writes, writer),
@@ -597,6 +819,146 @@ class Architecture:
             assert name in ported, (
                 f"{self.name}: obligations name {name!r}, which is not a "
                 f"memory with ports")
+
+    # -- engines (README D-15) -------------------------------------------------
+
+    def _engine_namespace(self) -> dict:
+        out = {}
+        for slot, eng in self.engines.items():
+            out.update(eng.namespace(slot))
+        return out
+
+    def _check_engines(self):
+        """Every slot a unit binds has an engine, every engine is bound, the
+        values the bodies move in an engine's types travel on channels of
+        those types, and every order agrees with the composite's."""
+        for slot, eng in self.engines.items():
+            assert isinstance(eng, Engine), (
+                f"{self.name}: engines[{slot!r}] is {eng!r}, not a compose.Engine")
+            for n in Engine.names(slot):
+                assert n not in self.parameters, (
+                    f"{self.name}: {n!r} is both a parameter and a name of the "
+                    f"engine bound to slot {slot!r}")
+        used = set()
+        for u in self.units:
+            for slot in u.engine_slots:
+                assert slot in self.engines, (
+                    f"{self.name}: unit {u.name} binds engine slot {slot!r} "
+                    f"({', '.join(sorted(n for n in u.engines if n.startswith(slot + '_')))}), "
+                    f"but this architecture binds no engine to it "
+                    f"(Architecture(engines={{{slot!r}: <Engine>}}), README D-15)")
+                used.add(slot)
+        for slot, eng in self.engines.items():
+            assert slot in used, (
+                f"{self.name}: engine {eng.name} is bound to slot "
+                f"{slot!r}, which no unit binds")
+        if self.engines:
+            self._check_engine_channels()
+        self.reference_order = self._check_order()
+
+    def _check_engine_channels(self):
+        """README D-15: a value a body annotates with an engine's type travels
+        on a channel of that type; a packed channel's ``lane_bits`` is the
+        engine width the body slices it by (``lane_bits == IN_BITS``)."""
+        ns = dict(FRONTEND_NAMES)
+        ns.update(self.parameters)
+        ns.update(self._engine_namespace())
+        chans = {c.name: c for c in self.channels}
+
+        def ev(text, what):
+            try:
+                return eval(text, {}, ns)  # pylint: disable=eval-used
+            except Exception as e:
+                raise AssertionError(f"{self.name}: {what} {text!r} does not "
+                                     f"evaluate: {e}") from e
+
+        def method_on_channel(n, method):
+            return isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) \
+                and n.func.attr == method and chan_of(n) is not None
+
+        def chan_of(call):
+            v = call.func.value if isinstance(call.func, ast.Attribute) else None
+            while isinstance(v, ast.Subscript):
+                v = v.value
+            return v.id if isinstance(v, ast.Name) and v.id in chans else None
+
+        for u in self.units:
+            slots = set(u.engine_slots)
+            if not slots:
+                continue
+            tree = ast.parse(u.source()).body[0]
+            ann = {n.target.id: n.annotation for n in ast.walk(tree)
+                   if isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name)}
+            sites = []
+            for n in ast.walk(tree):
+                if isinstance(n, ast.AnnAssign) and method_on_channel(n.value, "get"):
+                    sites.append((chan_of(n.value), n.annotation, n.lineno))
+                elif method_on_channel(n, "put") and n.args \
+                        and isinstance(n.args[0], ast.Name) and n.args[0].id in ann:
+                    sites.append((chan_of(n), ann[n.args[0].id], n.lineno))
+            for ch, a, line in sites:
+                hits = [engine_slot(x.id) for x in ast.walk(a)
+                        if isinstance(x, ast.Name) and x.id in u.engines]
+                hits = [h for h in hits if h and h[0] in slots]
+                if not hits:
+                    continue
+                c = chans[ch]
+                if c.lane_bits:  # the specific rule first: lane width vs engine width
+                    lb = ev(c.lane_bits, f"channel {ch} lane_bits")
+                    for slot, f in hits:
+                        if f.endswith("_BITS"):
+                            eb = getattr(self.engines[slot], f)
+                            assert lb == eb, (
+                                f"{self.name}: channel {ch!r} declares lane_bits="
+                                f"{c.lane_bits!r} ({lb}), but unit {u.name} slices "
+                                f"it by {slot}_{f} = {eb} (engine "
+                                f"{self.engines[slot].name}; README D-15)")
+                want, got = ev(ast.unparse(a), f"unit {u.name} annotation"), \
+                    ev(c.dtype, f"channel {ch} dtype")
+                assert _type_sig(want) == _type_sig(got), (
+                    f"{self.name}: unit {u.name} line {line} moves "
+                    f"`{ast.unparse(a)}` ({want}, engine "
+                    f"{', '.join(sorted({self.engines[h[0]].name for h in hits}))}) on "
+                    f"channel {ch!r}, which carries {c.dtype!r} ({got}) (README D-15)")
+
+    def _check_order(self):
+        """README D-15: the composite's contract reference takes ``order``.
+        An engine (or a unit that is one) of another order is refused unless
+        the composite ``accepts`` it; then the verdict uses the reference
+        with THAT order. Returns the order the verdict uses."""
+        parts = [(f"engine slot {s!r} ({e.name})", e.order)
+                 for s, e in self.engines.items()]
+        parts += [(f"unit {u.name}", u.order) for u in self.units if u.order]
+        if self.order is None:
+            assert not self.accepts, (
+                f"{self.name}: accepts={self.accepts} without order=: declare "
+                f"the order the contract reference takes")
+            orders = {o for _, o in parts}
+            assert len(orders) <= 1, (
+                f"{self.name}: {'; '.join(f'{p} accumulates in {o!r}' for p, o in parts)}: "
+                f"a composite of two orders computes neither reference; declare "
+                f"Architecture(order=, accepts=) (README D-15)")
+            return orders.pop() if orders else None
+        assert self.order in ORDERS, (
+            f"{self.name}: order {self.order!r} is not one of {ORDERS}")
+        for o in self.accepts:
+            assert o in ORDERS and o != self.order, (
+                f"{self.name}: accepts {o!r}, not another of {ORDERS}")
+        allowed = {self.order} | set(self.accepts)
+        for part, o in parts:
+            assert o in allowed, (
+                f"{self.name}: {part} accumulates in order {o!r}, but the "
+                f"composite's contract reference takes {self.order!r}"
+                + (f" and accepts only {tuple(self.accepts)}" if self.accepts
+                   else " and accepts no other")
+                + f". A swap that changes the order is a different function: "
+                f"declare accepts=({o!r},) to verify it against the reference "
+                f"with order {o!r} (README D-15)")
+        changed = sorted({o for _, o in parts} - {self.order})
+        assert len(changed) <= 1, (
+            f"{self.name}: parts in orders {changed}; one composite has one "
+            f"reference order")
+        return changed[0] if changed else self.order
 
     # -- memories with ports (README D-12) -----------------------------------
 
@@ -1019,6 +1381,7 @@ class Architecture:
                     f.write(src)
             namespace = dict(FRONTEND_NAMES)
             namespace.update(self.parameters)
+            namespace.update(self._engine_namespace())
             exec(compile(src, path, "exec"), namespace)  # pylint: disable=exec-used
             self._regions[key] = namespace[self.name]
             if key == (None, ()):
@@ -1045,9 +1408,16 @@ class Architecture:
         return structure(self, name)
 
     def directives(self, s):
-        """Apply every unit's Vitis directives to a built schedule."""
+        """Apply every unit's Vitis directives to a built schedule, then, for
+        every unit binding an engine, the engine's (README D-15), with
+        ``ctx.unit`` and ``ctx.engine`` naming the binding."""
         ctx = Directives(top=s.top_func_name, parameters=self.parameters)
         for u in self.units:
             if u.directives is not None:
                 u.directives(s, ctx)
+            for slot in sorted(u.engine_slots):
+                eng = self.engines[slot]
+                if eng.directives is not None:
+                    eng.directives(s, Directives(top=ctx.top, parameters=ctx.parameters,
+                                                 unit=u.name, engine=slot))
         return s

@@ -218,6 +218,67 @@ exact: what the model was missing was **a lane count, not addressed state**.
 A channel has no rows, no bank map and no collision rule, and a fold needs
 none of them.
 
+An engine carries the arithmetic
+================================
+
+The table above says a composed region declares what a unit is wired to and
+never what it computes. README D-15 moves one part of that line: a
+*swappable* arithmetic -- the MAC of a PE, the matrix engine of an MXU -- is
+a declared record, ``compose.Engine``, and a unit binds it through slots.
+
+.. code-block:: python
+
+   BF16_ACC24 = Engine(
+       name="bf16_acc24",
+       IN=UInt(16), IN_BITS=16, ACC=UInt(24), ACC_BITS=24, OUT=UInt(16), OUT_BITS=16,
+       mul=mul_acc24_bits, add=acc24_add_bits, pack=pack_bf16_bits,
+       latency={"mul": 0, "add": 3, "pack": 0},   # D-10 latency= of each body
+       order="sequential",                         # the order it is exact for
+       ref_mul=..., ref_add=..., ref_pack=...,     # the same arithmetic in numpy
+       directives=lambda s, ctx: s.unroll("leading_zeros19:offset"))
+
+   @unit(reads=("lhs", "wq", "psum_in"), writes=("psum_out",),
+         parameters=("N_WORK",),
+         engines=("MAC_IN", "MAC_ACC", "MAC_MUL", "MAC_ADD"))
+   def mac_pe(): ...                               # names no type
+
+   Architecture(..., engines={"MAC": BF16_ACC24}, order="sequential")
+
+What composition checks (``tests/test_compose_engines.py``):
+
+* **Slots.** An engine name in a body is ``<slot>_<field>`` (``MAC_IN``,
+  ``MAC_IN_BITS``, ``MAC_ADD`` ...) and is declared in ``engines=``, never in
+  ``parameters=``; a body (``MUL``/``ADD``/``PACK``) is only called. A
+  Python function bound as a bare parameter is refused: an engine is never a
+  bare function. Every slot a unit binds has an engine; every engine is
+  bound by a unit.
+* **Types on channels.** A value a body annotates with an engine type and
+  moves on a channel (``a: MAC_IN = lhs.get()``, ``psum_out.put(south)``)
+  must travel on a channel of that type; a packed channel's ``lane_bits`` is
+  the engine width the body slices it by (``lane_bits == IN_BITS``). A
+  channel declared ``UInt(16)`` passes at the bf16 engine and is refused at
+  the int8 one.
+* **Order.** An engine record declares ``order`` (``sequential`` |
+  ``tree``), and so does a unit that IS an engine (``systolic_engine``:
+  ``order="sequential"``; ``tree_engine``: ``order="tree"``). The composite
+  declares the order its contract reference takes,
+  ``Architecture(order=, accepts=)``. A part of another order is refused,
+  naming the slot or unit and both orders, unless the composite accepts it;
+  then ``Architecture.reference_order`` is that order and the verdict uses
+  the reference evaluated with it (``Engine.dot(A, W, order)``). At bf16 the
+  two orders differ on 74 of 8,192 outputs at DIM 16 on random data, so a
+  swap that changes the order is a different function, never "the same MXU".
+* **Directives.** ``Architecture.directives`` applies, after each unit's own,
+  the directives of every engine the unit binds (``ctx.unit``,
+  ``ctx.engine`` name the binding). C10's ``leading_zeros19`` unroll now
+  travels with the bf16 engine and no region schedule names it.
+
+The latencies are bookings: what a composite's timing is derived from
+(``legality.py``), never a constant a body consumes; what a backend built is
+``latency.json`` (D-10). What the record does not do: it does not make the
+Action model's compute ports derive (``actions.py`` still declares them);
+it only makes the arithmetic a composition carries a stated, checked thing.
+
 What is still true
 ==================
 

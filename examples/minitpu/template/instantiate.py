@@ -66,9 +66,20 @@ def instance(unit: Unit, name: str, bind: dict = None, **overrides) -> Instance:
     fields = dict(body=unit.body, instances=unit.instances, memories=unit.memories,
                   reads=sub(unit.reads), writes=sub(unit.writes),
                   parameters=sub(unit.parameters), isa=sub(unit.isa),
-                  directives=unit.directives, legality=unit.legality)
+                  directives=unit.directives, legality=unit.legality,
+                  engines=sub(unit.engines), order=unit.order)
     fields.update(overrides)
     return Instance(instance_name=name, bind=bind, **fields)
+
+
+def engine_bind(slot: str, suffix: str):
+    """``("MAC", "a") -> ("MAC__a", {"MAC_IN": "MAC__a_IN", ...})``: the slot
+    one instance binds its engine through, and the ``bind`` map that points
+    the unit's ``engines=`` names at it (``compose.Engine``, README D-15)."""
+    from allo.compose import Engine  # noqa: PLC0415
+
+    new = f"{slot}__{suffix}"
+    return new, dict(zip(Engine.names(slot), Engine.names(new)))
 
 
 def bound(namespace: dict, suffix: str) -> dict:

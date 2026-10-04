@@ -1,0 +1,143 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+######################################################################
+U3: compose engines (README D-15), implemented in ``allo/compose.py``
+######################################################################
+
+.. note::
+
+   zhang-21, 2026-10-04, branch ``compose-engines`` from ``u1-pilot`` at
+   ``d0dc62a8``, worktree ``scratch/wt-eng`` with the bindings of
+   ``wt-u1`` copied in (Python-only change). Env:
+   ``examples/minitpu/harness/env-zhang21.sh``. The owner is away; the API
+   calls below that README D-15 leaves open are **provisional** (D-9), each
+   with its reason. Inputs: README D-1, D-9, D-10, D-12, D-15;
+   ``u3_composition_design_2026-10-04.rst`` §1; the prototype
+   ``examples/minitpu/template/``; ``u1_alu_2026-10-02.rst`` C1/C2/C10/C11.
+
+D-15: what landed
+=================
+
+``compose.Engine`` (frozen, keyword-only): ``IN``/``ACC``/``OUT`` with
+``IN_BITS``/``ACC_BITS``/``OUT_BITS`` (held to each other), ``mul``/``add``/
+``pack``, ``latency={"mul": L, "add": L, "pack": L}``, ``order``
+(``sequential`` | ``tree``), ``ref_mul``/``ref_add``/``ref_pack``,
+``directives``. ``Engine.namespace(slot)``, ``Engine.names(slot)``,
+``Engine.accumulate(terms, order)`` and ``Engine.dot(A, W, order)`` -- the
+contract reference with the order as an argument (equal to the prototype's
+``matrix_rows`` at both orders, bf16, DIM 8).
+
+``Unit(engines=, order=)``: ``engines`` are the slot names the body binds,
+``<slot>_<field>``; ``order`` is the order of a unit that IS an engine
+(``systolic_engine``, ``tree_engine``). ``Unit.check`` refuses: a slot not
+of that form; an engine name declared in ``parameters`` instead; a body slot
+(``MUL``/``ADD``/``PACK``) used other than as a call.
+
+``Architecture(engines={slot: Engine}, order=, accepts=)``. ``_check``
+refuses: a slot no engine is bound to; an engine bound to no slot; a Python
+function bound as a bare parameter (D-15 "never a bare function"); a value a
+body annotates with an engine type moved on a channel of another type; a
+packed channel whose ``lane_bits`` is not the engine width the body slices it
+by; a part (engine record or engine unit) whose order is neither the
+composite's ``order`` nor in ``accepts``. ``reference_order`` is the order
+the verdict uses. ``Architecture.directives`` applies, after each unit's own
+directives, those of every engine the unit binds (``ctx.unit``,
+``ctx.engine``). ``region()`` binds the engines' names.
+
+Provisional calls
+-----------------
+
+P1. **Latency is a dict keyed by body**, ``latency={"mul": 0, "add": 3}``:
+    the shape of D-10's ``configs["latency"] = {kernel: L}``, applied to
+    bodies. ``0`` = no register inside the body (the PE registers the
+    product); a missing entry = unconstrained, reported by the backend.
+    ``mul_latency``/``add_latency`` remain as properties for the prototype's
+    latency models. *Reason:* D-15 says "a D-10 ``latency=`` on those
+    bodies", and the bodies are plain functions (no decorator carries it).
+P2. **Who declares the order.** An engine record and an engine unit declare
+    the order they ARE; the composite (``Architecture``) declares the order
+    its contract reference takes and ``accepts`` others. A part in an
+    accepted order makes ``reference_order`` that order; two different
+    non-declared orders are refused. A sequential MAC record bound into a
+    tree unit is not refused (the record's arithmetic is what the tree
+    folds; the composite's order decides). *Reason:* D-15 puts the order on
+    "a matrix engine", which in ``compose`` is a unit; a per-slot check of
+    the MAC record against the matrix unit would refuse the prototype's
+    bf16 tree, which D-15 says is a valid, different function.
+P3. **Type-to-channel check** reads ``x: T = ch.get()`` and ``ch.put(x)``
+    with ``x`` annotated, and fires only when ``T`` names an engine slot;
+    every other channel is left as before (TinyTPU's emission unchanged).
+P4. **Directives run once per binding unit.** Two units binding the bf16
+    engine unroll ``leading_zeros19:offset`` twice; the second is accepted
+    (measured). Superseded by D-18 if it lands (once per distinct engine).
+P5. **Track B's ``mxu_pe_unit.py`` / ``mxu_unit.py`` are not migrated:**
+    they have no engine slot (the bf16 MAC is written inline, line for line
+    against ``mxu_pe.sv``). Binding them to an engine is a source change of
+    the unit, the owner's call at P2.
+
+Migration
+=========
+
+``template/engines.py`` builds ``BF16_ACC24``/``INT8_INT32`` as
+``compose.Engine`` (the prototype's dataclass is gone; ``np_*`` dtypes,
+unused, dropped). ``mac_pe.py``: ``mac_pe``/``pe_feed``/``pe_sink`` declare
+``engines=``; ``pe_rig`` binds ``engines={"MAC": e}`` (no
+``directives=`` override: the engine's travel by itself); ``pe_rig_two``
+binds ``MAC__a``/``MAC__b`` through ``instantiate.engine_bind``.
+``matrix_engine.py``: the two engines are units with ``order=``;
+``MatrixEngine.order`` reads the unit's; ``mxu_rig`` declares
+``order="sequential", accepts=("tree",)`` (``accepts=()`` is MiniTPU's
+instance, which refuses the tree), and ``run_rig`` verifies against
+``arch.reference_order``. ``instantiate.instance`` carries ``engines``
+and ``order``.
+
+Checks
+======
+
+.. list-table::
+   :header-rows: 1
+   :widths: 50 25 25
+
+   * - check
+     - before (``d0dc62a8``)
+     - after
+   * - ``run_u3e`` (track E gate)
+     - 26 OK, 1 finding, GATE OK (85 s)
+     - 26 OK, 1 finding, GATE OK (77 s)
+   * - ``tests/test_compose_engines.py`` (new; csim not skipped)
+     - --
+     - 10 passed
+   * - TinyTPU emitted Vitis, sha256
+     - ``6bc774bc...b2ef95``
+     - ``6bc774bc...b2ef95`` (identical)
+   * - TinyTPU emitted Catapult, sha256
+     - ``ade1ab5d...88e038``
+     - ``ade1ab5d...88e038`` (identical)
+   * - ``gen_isa.py --check`` / ``lift_units.py --check``
+     - --
+     - ISA OK / UNITS OK
+   * - ``bench_isa.py`` / ``stress_isa.py``
+     - --
+     - ALL EXACT / STRESS OK 640/640
+   * - ``act_compile.py --gate``
+     - --
+     - ACT GATE OK 12/12
+   * - ``pytest tests/test_compose*.py tests/dataflow/test_compose_memory_ports.py``
+     - --
+     - 26 passed (66 s)
+   * - ``examples/minitpu/run.py --quick``
+     - --
+     - PASS (16x16x16 EXACT vs model)
+
+The new tests: the record (widths, order, latency keys refused); the
+reference with the order as an argument (bf16 orders differ on random data,
+agree on exact sums); one PE source at bf16 and int8 in ONE region on the
+simulator (128/128 each) and in SystemC csim (64/64 each); type mismatch
+(``lhs: UInt(16)`` at int8) refused and accepted at bf16; ``lane_bits='16'``
+vs ``MAC_IN_BITS = 8`` refused; order mismatch refused for an engine unit
+(``tree_engine`` in a sequential composite) and an engine record
+(``int8_tree``), accepted with ``accepts=("tree",)`` and
+``reference_order == "tree"``; the tree MXU verified against the tree
+reference; slot rules; the bf16 directive emitted as ``#pragma HLS unroll``
+inside ``leading_zeros19`` only when ``Architecture.directives`` ran.
