@@ -1,0 +1,38 @@
+RTL sfu: 462144 vectors, latency [5] (declared 5), 0.2s
+UNIT-MATCH sfu bits simulator 462144/462144 latency=untimed (rtl 5) (build 0.3s, run 0.0s)
+kernel.cpp: In member function ‘void sfu_k_0::run()’:
+kernel.cpp:905:28: error: invalid conversion from ‘const int32_t*’ {aka ‘const int*’} to ‘int32_t*’ {aka ‘int*’} [-fpermissive]
+  905 |       sfu_bits(v234, v235, rom_gelu, rom_exp, recip_pwl, rsqrt_pwl, &v236); // L432
+      |                            ^~~~~~~~
+      |                            |
+      |                            const int32_t* {aka const int*}
+kernel.cpp:547:11: note:   initializing argument 3 of ‘void sfu_bits(int32_t, int32_t, int32_t*, int32_t*, int32_t*, int32_t*, int32_t*)’
+  547 |   int32_t v28[2048],
+      |   ~~~~~~~~^~~~~~~~~
+kernel.cpp:905:38: error: invalid conversion from ‘const int32_t*’ {aka ‘const int*’} to ‘int32_t*’ {aka ‘int*’} [-fpermissive]
+  905 |       sfu_bits(v234, v235, rom_gelu, rom_exp, recip_pwl, rsqrt_pwl, &v236); // L432
+      |                                      ^~~~~~~
+      |                                      |
+      |                                      const int32_t* {aka const int*}
+kernel.cpp:548:11: note:   initializing argument 4 of ‘void sfu_bits(int32_t, int32_t, int32_t*, int32_t*, int32_t*, int32_t*, int32_t*)’
+  548 |   int32_t v29[2048],
+      |   ~~~~~~~~^~~~~~~~~
+kernel.cpp:905:47: error: invalid conversion from ‘const int32_t*’ {aka ‘const int*’} to ‘int32_t*’ {aka ‘int*’} [-fpermissive]
+  905 |       sfu_bits(v234, v235, rom_gelu, rom_exp, recip_pwl, rsqrt_pwl, &v236); // L432
+      |                                               ^~~~~~~~~
+      |                                               |
+      |                                               const int32_t* {aka const int*}
+kernel.cpp:549:11: note:   initializing argument 5 of ‘void sfu_bits(int32_t, int32_t, int32_t*, int32_t*, int32_t*, int32_t*, int32_t*)’
+  549 |   int32_t v30[32],
+      |   ~~~~~~~~^~~~~~~
+kernel.cpp:905:58: error: invalid conversion from ‘const int32_t*’ {aka ‘const int*’} to ‘int32_t*’ {aka ‘int*’} [-fpermissive]
+  905 |       sfu_bits(v234, v235, rom_gelu, rom_exp, recip_pwl, rsqrt_pwl, &v236); // L432
+      |                                                          ^~~~~~~~~
+      |                                                          |
+      |                                                          const int32_t* {aka const int*}
+kernel.cpp:550:11: note:   initializing argument 6 of ‘void sfu_bits(int32_t, int32_t, int32_t*, int32_t*, int32_t*, int32_t*, int32_t*)’
+  550 |   int32_t v31[32],
+      |   ~~~~~~~~^~~~~~~
+[06:13:22] Compiling with g++ ...
+UNIT-FAIL  sfu bits systemc: RuntimeError: Failed to compile with g++. Check if g++ is installed and ac_types headers are correct.
+== exit=1

@@ -1,0 +1,16 @@
+legal 4x4: composed, 5 unit declarations, instances [('1',), ('TAP_BASE - N',), ('SUB',), ('SUB - 1',), ('1',)]
+legal 16x4: composed
+refused        ADD_LATENCY 3 (a slower adder, latencies not re-derived)
+               -> MAX_LATENCY=2 must equal the adder unit's ADD_LATENCY=3: the max select is paced to the adder so an op-mixed wavefront stays aligned (xlu_reduction_tr
+refused        MAX_LATENCY 1 (max path faster than the adder)
+               -> MAX_LATENCY=1 must equal the adder unit's ADD_LATENCY=2: the max select is paced to the adder so an op-mixed wavefront stays aligned (xlu_reduction_tr
+refused        ROOT_LATENCY 13 at 16 leaves (the shipped constant, wrong geometry)
+               -> ROOT_LATENCY=13 must be 1 + LEVELS*ADD_LATENCY = 9 (VPU_REDUCE_LATENCY is this number, not a constant)
+refused        TAP_LEVEL 3 at 4 lanes (tap one level up)
+               -> TAP_LEVEL=3 must be log2(LANES) = 2: the tap is the level whose nodes each cover one sublane; a level declared on its own reduces a rotated window (Mi
+refused        TAP_BASE 20 (tap base declared on its own)
+               -> TAP_BASE=20 must be 2*N - 2*SUB = 24: where the tap level's nodes sit in the heap numbering; derived from the leaf mapping
+refused        LEVELS 5 at 16 leaves
+               -> LEVELS=5 must be log2(N) = 4
+refused        N 12 (not LANES*SUB)
+               -> N=12 must be LANES*SUB = 16: the leaves are the lanes of every sublane (vpu_pkg's elaboration $error, as a legality)

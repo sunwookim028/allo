@@ -1,0 +1,11 @@
+RTL xlu_transpose:t16x4: 60092 cycles in 7 traces, 95783 defined slots, RTL vs reference on defined: 95783/95783 (20.8s)
+UNIT-MATCH xlu_transpose:t16x4 trace simulator 95783/95783 defined (24401 masked: no valid=24401; allo==rtl on 24392) cycle=order-only (build 0.6s, run 0.7s)
+Connections Clock: t.clk Period: 1 ns
+[06:21:53] Compiling with g++ ...
+[06:21:58] Running simulation ...
+UNIT-MATCH xlu_transpose:t16x4 trace systemc 95783/95783 defined (24401 masked: no valid=24401; allo==rtl on 24392) cycle=per-iteration, time unchecked (build 0.6s, run 25.2s)
+UNIT-MATCH xlu_transpose:t16x4 trace_unreset simulator 95783/95783 defined (24401 masked: no valid=24401; allo==rtl on 24392) cycle=order-only (build 0.6s, run 0.8s)
+loc("-":63:13): error: unreset storage `tile` (tx_0): the kernel has a non-Wire argument (argument 0); the write runs at every clock edge, which matches the kernel's iterations only when every port is a Wire (README D-14: its write is a clock-edge process with no reset action)
+UNIT-FAIL  xlu_transpose trace_unreset systemc: RuntimeError: Failed to emit HLS code. Check error messages above for details. Common issues: nested functions with multi-dimensional arrays when wrap_io=False.
+loc("-":63:13): error: unreset storage `tile` (tx_0): the kernel has a non-Wire argument (argument 0); the write runs at every clock edge, which matches the kernel's iterations only when every port is a Wire (README D-14: its write is a clock-edge process with no reset action)
+== exit=1

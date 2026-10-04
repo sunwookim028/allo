@@ -201,6 +201,37 @@ the FIFOs, ``u2_word_array_2026-10-02.rst``, ``u2_fifo_2026-10-02.rst``):
 - ``d14-followups`` merged into ``u1-pilot``; ``d12-ports`` conflicts with it
   in ``hls.py`` and ``EmitSystemC.cpp`` -- resolved on ``u1-pilot-sync2``.
 
+**U3 track E landed** (``u3_composition_design_2026-10-04.rst``, branch
+``u3-compose``): drafts **D-15..D-19** for the owner (engine interface;
+parameters at instantiation; schedules that travel; optional modules;
+derived-parameter legality), each with a prototype in
+``examples/minitpu/template/`` (gate ``run_u3e``: 27 OK / 1 finding / 0 fail).
+Measured: one PE source with two MAC engines matches in one region on the
+simulator and csim (H10 holds); systolic and adder-tree engines behind one
+declaration, each bit-exact against the contract reference *with its own
+order* -- and 74/8,192 differ between orders at bf16 DIM 16 on random data, 0
+on exact-sum data, 0 at int8 (H11: the order is part of the function);
+twelve derived geometry numbers equal Phase 0's; five wrong declarations
+refused. New tool findings E1-E6, the first a **silent bug**: a plain
+``@df.kernel`` region builds and runs a ``Stream`` with one or no endpoint
+and SystemC emits it (the ``@df.unit`` path refuses). Provisional: O3
+answered as "MiniTPU instance ``sequential`` only; DotTree declares ``tree``".
+
+**U3 track A landed** (``u3_track_a_2026-10-04.rst``, branch ``u3-xlu-sfu``):
+SFU ``bits``/``staged`` match 462,144/462,144 on simulator and csim; the
+reduction tree matches as one unit (N=16 and N=64) **and as 15 / 63 composed
+adder units** (T2), with seven wrong latency sets refused by the derived
+legality (H5); the transpose matches with a reset tile (recorded deviation;
+its unreset form is refused in csim because D-14's lowering is Wire-only,
+A6). H1 held: no vector ever differed; every failure was a tool finding.
+Findings: **A3 bug** -- ``allo/passes.py:471`` erases any user symbol whose
+name starts with ``gelu``/``layernorm``/``tril``; **A5 silent bug** -- csim
+drops all but the first of the last iteration's stores to a 2-D output when
+they come last; A2 constant globals missing from helper scope; A4 const array
+to non-const callee param; **A7 missing abstraction** -- ``compose.Unit``
+has no latency, so a composed tree's adder latency is a trusted parameter
+(the D-10/D-15 hook). X2 ``ported`` blocked until D-12 is in the tree.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*

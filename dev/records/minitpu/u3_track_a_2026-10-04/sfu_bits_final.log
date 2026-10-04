@@ -1,0 +1,8 @@
+RTL sfu: 462144 vectors, latency [5] (declared 5), 0.2s
+UNIT-MATCH sfu bits simulator 462144/462144 latency=untimed (rtl 5) (build 0.3s, run 0.0s)
+Connections Clock: t.clk Period: 1 ns
+Info: /OSCI/SystemC: Simulation stopped by user.
+[06:16:54] Compiling with g++ ...
+[06:16:58] Running simulation ...
+UNIT-MATCH sfu bits systemc 462144/462144 latency=unchecked (rtl 5) (build 0.3s, run 7.2s)
+== exit=0
