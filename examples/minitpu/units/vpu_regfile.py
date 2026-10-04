@@ -783,3 +783,13 @@ VARIANTS = {
     "comb": (comb_read, _run_flat),
     "comb_unreset": (comb_unreset, _run_flat),
 }
+
+# README D-12 prototype (``vpu_regfile_d12.py``): three reader units and one
+# writeback unit on one ``compose.Memory`` with declared ports. ``*_wire`` is
+# the SystemC/Catapult port shape (Wire links, comb read data); the plain
+# names are the same composition with every link a Stream (simulator, csim).
+from examples.minitpu.units import vpu_regfile_d12 as _d12  # noqa: E402
+
+for _low in ("server", "replica"):
+    VARIANTS[f"d12_{_low}"] = (_d12.make(_low, "simulator"), _run_flat)
+    VARIANTS[f"d12_{_low}_wire"] = (_d12.make(_low, "systemc"), _run_flat)

@@ -358,7 +358,7 @@ def resolve_ppa_testbench(configs):
     return tb
 
 
-def unreset_directives(kernels, top, design_top):
+def unreset_directives(kernels, top, design_top, group=None):
     """``run.tcl`` lines for unreset storage (README D-14), one per kernel.
 
     ``kernels`` are the SC_MODULEs holding ``@ Stateful(reset=False)`` storage
@@ -372,13 +372,19 @@ def unreset_directives(kernels, top, design_top):
     the same kernel's thread (u2_d14_followups_2026-10-04.rst, A1); scoped,
     the thread's RTL is byte-identical to a build with no directive. Catapult
     resolves a block by its module name below the region top (``/top/rf_0/wr``),
-    or as the top itself (``/rf_0/wr``) when it is ``synth_top``; a kernel
-    outside the synthesized design gets no line.
+    or as the top itself (``/rf_0/wr``) when it is ``synth_top``, or below a
+    ``synth_group`` top (``/rf_d12g/srv_0/wr``, README D-12: a ported memory's
+    server or replicas hold the unreset storage, and the group is what is
+    synthesized); a kernel outside the synthesized design gets no line.
     """
     out = ""
     for k in kernels or ():
         if design_top == k:
             path = f"/{k}/wr"
+        elif group and design_top == group["name"]:
+            if k not in group["kernels"]:
+                continue
+            path = f"/{design_top}/{k}/wr"
         elif design_top == top:
             path = f"/{top}/{k}/wr"
         else:
@@ -582,7 +588,9 @@ go analyze
         out_str += "\n"
 
     out_str += "go compile\n"
-    out_str += unreset_directives(configs.get("unreset_storage"), top, design_top)
+    out_str += unreset_directives(
+        configs.get("unreset_storage"), top, design_top, configs.get("synth_group")
+    )
 
 
     if mode == "csim":

@@ -45,12 +45,16 @@ class TestMemoryClass:
         assert mem.storage_type == "RAM_2P"
 
     def test_memory_all_options(self):
-        """Test Memory with all options specified."""
-        mem = Memory(resource="URAM", storage_type="RAM_T2P", latency=3, depth=1024)
+        """`latency` and `depth` are refused (README D-12): no backend honoured
+        them. Port timing is `allo.compose.Memory(rows=, ports=...)`."""
+        mem = Memory(resource="URAM", storage_type="RAM_T2P")
         assert mem.resource == "URAM"
         assert mem.storage_type == "RAM_T2P"
-        assert mem.latency == 3
-        assert mem.depth == 1024
+        assert mem.latency is None and mem.depth is None
+        with pytest.raises(NotImplementedError, match="README D-12"):
+            Memory(resource="URAM", storage_type="RAM_T2P", latency=3, depth=1024)
+        with pytest.raises(NotImplementedError, match="README D-12"):
+            Memory(resource="URAM", depth=1024)
 
     def test_memory_case_insensitive(self):
         """Test that resource and storage_type are case insensitive."""
@@ -73,11 +77,10 @@ class TestMemoryClass:
         mem = Memory(resource="URAM")
         assert 'resource="URAM"' in repr(mem)
 
-        mem2 = Memory(resource="BRAM", storage_type="RAM_2P", latency=2)
+        mem2 = Memory(resource="BRAM", storage_type="RAM_2P")
         repr_str = repr(mem2)
         assert 'resource="BRAM"' in repr_str
         assert 'storage_type="RAM_2P"' in repr_str
-        assert "latency=2" in repr_str
 
     def test_memory_equality(self):
         """Test Memory equality comparison."""

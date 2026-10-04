@@ -19,18 +19,23 @@ from __future__ import annotations
 
 import ast
 import inspect
+import json
 import linecache
+import math
 import os
 import textwrap
 from dataclasses import dataclass, field
 
 import allo
 import allo.dataflow as df
-from allo.ir.types import Stream, UInt, int8, int16, int32
+from allo.ir.types import (Stateful, Stream, UInt, Wire, comb, int8, int16,
+                           int32, uint1)
 
 # Names every unit body may use without declaring them: the front end itself.
 FRONTEND_NAMES = {"allo": allo, "df": df, "Stream": Stream, "UInt": UInt,
-                  "int8": int8, "int16": int16, "int32": int32}
+                  "int8": int8, "int16": int16, "int32": int32,
+                  "uint1": uint1, "Wire": Wire, "comb": comb,
+                  "Stateful": Stateful}
 _BUILTINS = {"range", "len", "min", "max", "abs", "int", "bool"}
 
 
@@ -50,6 +55,10 @@ class Channel:
     carries: str = ""
     lanes: str = ""
     lane_bits: str = ""
+    # "stream" (default), "wire" or "comb" (README D-13). A Wire link is
+    # SystemC-only; ``Architecture.region(target="simulator")`` emits every
+    # link as a Stream, since the simulator is untimed and refuses Wire.
+    kind: str = "stream"
 
     def __post_init__(self):
         """A packed word declares how many lanes it carries and how wide one
@@ -71,23 +80,147 @@ class Channel:
         assert self.dtype, (
             f"channel {self.name}: declare a dtype, or the lanes and the "
             f"lane width to derive one from")
+        assert self.kind in {"stream", "wire", "comb"}, (
+            f"channel {self.name}: kind {self.kind!r} is not stream, wire or comb")
+        assert self.kind == "stream" or not self.shape, (
+            f"channel {self.name}: an array of {self.kind} links is not supported")
 
     @property
     def declaration(self) -> str:
+        return self.declaration_as(self.kind)
+
+    def declaration_as(self, kind: str) -> str:
         dims = f"[{', '.join(self.shape)}]" if self.shape else ""
-        line = f"{self.name}: Stream[{self.dtype}, {self.depth}]{dims}"
+        if kind == "stream":
+            line = f"{self.name}: Stream[{self.dtype}, {self.depth}]{dims}"
+        elif kind == "wire":
+            line = f"{self.name}: Wire[{self.dtype}]"
+        else:
+            line = f"{self.name}: Wire[{self.dtype}, comb]"
         return f"{line}    # {self.carries}" if self.carries else line
+
+
+PORT_KINDS = ("r", "w", "rw")
+COLLISIONS = ("refuse", "obligation", "undefined")
+
+
+@dataclass(frozen=True)
+class Port:
+    """One port of an on-chip ``Memory`` (README D-12).
+
+    ``kind`` is ``r``, ``w`` or ``rw``. ``latency`` is the read latency in
+    edges from address to data, ``0`` meaning asynchronous (a combinational
+    read, D-13); a ``w`` port has none. ``visible`` is the edges from a write
+    on this port until a read on ANY port sees it. ``count`` gives that many
+    interchangeable ports (AMC's port ``count``): a unit binding the port may
+    make up to ``count`` accesses of each direction per iteration.
+    """
+
+    name: str
+    kind: str
+    latency: int = None
+    visible: int = 1
+    count: int = 1
+
+    def __post_init__(self):
+        assert self.name.isidentifier(), f"port {self.name!r}: not an identifier"
+        assert self.kind in PORT_KINDS, (
+            f"port {self.name}: kind {self.kind!r} is not one of {PORT_KINDS}")
+        if self.kind == "w":
+            assert self.latency is None, (
+                f"port {self.name}: a write port has no read latency "
+                f"(got latency={self.latency})")
+        else:
+            assert isinstance(self.latency, int) and self.latency >= 0, (
+                f"port {self.name}: a {self.kind!r} port declares its read "
+                f"latency in edges (latency=0 is asynchronous); got "
+                f"{self.latency!r}")
+        assert isinstance(self.visible, int) and self.visible >= 0, (
+            f"port {self.name}: visible={self.visible!r} is not a count of edges")
+        assert isinstance(self.count, int) and self.count >= 1, (
+            f"port {self.name}: count={self.count!r} must be >= 1")
+
+    @property
+    def reads(self) -> bool:
+        return self.kind in {"r", "rw"}
+
+    @property
+    def writes(self) -> bool:
+        return self.kind in {"w", "rw"}
+
+    def manifest(self) -> dict:
+        out = {"kind": self.kind, "count": self.count}
+        if self.reads:
+            out["latency"] = self.latency
+        if self.writes:
+            out["visible"] = self.visible
+        return out
 
 
 @dataclass(frozen=True)
 class Memory:
-    """One array at the region boundary -- off-chip, one ``m_axi`` port."""
+    """An array the units address.
+
+    Without ``rows`` it is one array at the region boundary -- off-chip, one
+    ``m_axi`` port -- and a unit binds it by name, as before.
+
+    With ``rows`` and ``ports`` it is an on-chip memory that declares its
+    ports (README D-12): a unit binds a PORT (``memories=("vreg.ra",)``),
+    each port has exactly one owner, and the composition checks every body
+    against its ports' direction and accesses per iteration. ``collision``
+    states what a same-word access on two write-capable ports in one cycle
+    means: ``refuse`` (only legal with at most one write-capable port),
+    ``obligation`` (the composition states why it cannot happen:
+    ``Architecture(obligations=...)``) or ``undefined`` (masked in verdicts).
+    ``reset=False`` declares storage that survives reset (README D-14).
+    ``dtype`` is the element type; ``rows`` an expression over the
+    architecture's parameters.
+    """
 
     name: str
     dtype: str
+    rows: str = None
+    ports: tuple = ()
+    collision: str = "refuse"
+    reset: bool = True
+
+    def __post_init__(self):
+        if self.rows is None:
+            assert not self.ports, (
+                f"memory {self.name}: ports need rows= (a memory without rows "
+                f"is a boundary array with its one m_axi port)")
+            return
+        assert self.ports, f"memory {self.name}: declare its ports"
+        names = [p.name for p in self.ports]
+        assert len(set(names)) == len(names), (
+            f"memory {self.name}: port names repeat: {names}")
+        assert self.collision in COLLISIONS, (
+            f"memory {self.name}: collision={self.collision!r} is not one of "
+            f"{COLLISIONS}")
+        writers = [p.name for p in self.ports if p.writes]
+        nw = sum(p.count for p in self.ports if p.writes)
+        assert not (nw > 1 and self.collision == "refuse"), (
+            f"memory {self.name}: {nw} write-capable ports ({', '.join(writers)}) "
+            f"with collision='refuse': two ports may write one word in one cycle "
+            f"and nothing can refuse it statically. Declare collision="
+            f"'obligation' (and state why it cannot happen) or 'undefined' "
+            f"(README D-12)")
+
+    @property
+    def ported(self) -> bool:
+        return self.rows is not None
+
+    def port(self, name: str) -> Port:
+        for p in self.ports:
+            if p.name == name:
+                return p
+        raise AssertionError(
+            f"memory {self.name} has no port {name!r} (its ports: "
+            f"{', '.join(p.name for p in self.ports)})")
 
     @property
     def declaration(self) -> str:
+        assert not self.ported, f"memory {self.name} is on chip; it has no argument"
         return f"{self.name}: {self.dtype},"
 
 
@@ -214,6 +347,126 @@ class Unit:
             f"{sorted(declared - free)} without using them")
 
 
+# ---------------------------------------------------------------------------
+# Memory ports (README D-12): what a body does through a port, and how a
+# ported memory is lowered into the region's source.
+# ---------------------------------------------------------------------------
+
+
+def _is_site(node, pname):
+    return isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name) \
+        and node.value.id == pname
+
+
+def port_uses(u, pname, mem, port, tree=None):
+    """The accesses unit ``u`` makes through body parameter ``pname``, bound
+    to port ``mem`` (``"vreg.ra"``), checked against the port.
+
+    Returns ``{"loads": [(Subscript, stmt)], "stores": [(address, value,
+    enable or None, stmt)], "loop": For, "tree": FunctionDef}`` on the given
+    (or a fresh) parse of the body. Refused, naming the port:
+
+    * a use of the parameter other than ``p[address]``;
+    * an access outside the unit's one top-level ``for`` loop (one iteration
+      is one cycle of the port), or under control flow -- an access is made
+      exactly once per iteration, except a write, which may sit alone under
+      ``if <enable>:`` (the enable is a pin of the port; the S6 shape);
+    * a read through a ``w`` port or a write through an ``r`` port;
+    * more accesses of one direction per iteration than ``count``;
+    * on an ``rw`` port, a read and a write at different addresses (one
+      access = one address).
+    """
+    tree = tree if tree is not None else ast.parse(u.source()).body[0]
+    where = f"unit {u.name} (port {mem}, kind {port.kind!r})"
+    names = sum(1 for n in ast.walk(tree)
+                if isinstance(n, ast.Name) and n.id == pname)
+    sites = [n for n in ast.walk(tree) if _is_site(n, pname)]
+    assert names == len(sites), (
+        f"{where}: `{pname}` is used other than as `{pname}[address]`; a port "
+        f"is reached only by subscript (README D-12)")
+    assert sites, f"{where}: binds the port and never accesses it"
+    loops = [st for st in tree.body if isinstance(st, ast.For)]
+    in_loop = {id(n) for lp in loops for n in ast.walk(lp)}
+    assert len(loops) == 1 and all(id(n) in in_loop for n in sites), (
+        f"{where}: every access to a memory port sits in the unit's one "
+        f"top-level `for` loop, whose iteration is one cycle of the port "
+        f"(README D-12)")
+    loop = loops[0]
+    loads, stores = [], []
+    for st in loop.body:
+        inner = [n for n in ast.walk(st) if _is_site(n, pname)]
+        if not inner:
+            continue
+        if isinstance(st, ast.If) and not st.orelse and len(st.body) == 1 \
+                and isinstance(st.body[0], ast.Assign) \
+                and len(st.body[0].targets) == 1 \
+                and _is_site(st.body[0].targets[0], pname) \
+                and len(inner) == 1:
+            tgt = st.body[0].targets[0]
+            stores.append((tgt.slice, st.body[0].value, st.test, st))
+            continue
+        assert not isinstance(st, (ast.If, ast.For, ast.While, ast.With)), (
+            f"{where}: line {st.lineno} accesses the port under control flow. "
+            f"An access is made exactly once per iteration; only a write may "
+            f"sit, alone, under `if <enable>:` (README D-12)")
+        assert not isinstance(st, ast.AugAssign), (
+            f"{where}: line {st.lineno} reads and writes through the port in "
+            f"one statement; write the read and the write separately")
+        if isinstance(st, ast.Assign) and len(st.targets) == 1 \
+                and _is_site(st.targets[0], pname):
+            assert len(inner) == 1, (
+                f"{where}: line {st.lineno} reads and writes through the port "
+                f"in one statement; write the read and the write separately")
+            stores.append((st.targets[0].slice, st.value, None, st))
+            continue
+        assert all(isinstance(n.ctx, ast.Load) for n in inner), (
+            f"{where}: line {st.lineno}: an unsupported write through the port")
+        loads += [(n, st) for n in inner]
+    if loads:
+        assert port.reads, (
+            f"{where}: reads through a write-only port (line "
+            f"{loads[0][1].lineno}); direction is part of the port (README D-12)")
+    if stores:
+        assert port.writes, (
+            f"{where}: writes through a read-only port (line "
+            f"{stores[0][3].lineno}); direction is part of the port (README D-12)")
+    for what, got in (("reads", loads), ("writes", stores)):
+        assert len(got) <= port.count, (
+            f"{where}: {len(got)} {what} per iteration through a port that "
+            f"serves count={port.count} (README D-12: accesses per iteration)")
+    if port.kind == "rw":
+        for k in range(min(len(loads), len(stores))):
+            ra, wa = ast.unparse(loads[k][0].slice), ast.unparse(stores[k][0])
+            assert ra == wa, (
+                f"{where}: access {k} reads `{pname}[{ra}]` and writes "
+                f"`{pname}[{wa}]`; one access of an rw port has one address")
+    return {"loads": loads, "stores": stores, "loop": loop, "tree": tree}
+
+
+LOWERINGS = ("local", "replica", "server", "shared")
+# The lowering a multi-owner ported memory gets when the caller names none.
+# `server` is the general one (rw ports, any read latency) and holds ONE
+# storage: on the regfile both it and `replica` matched MiniTPU per cycle on
+# Catapult, but the replica's three copies cost a Catapult area score of 8,576
+# against the server's 3,877 (DC then merges the equal registers, OPT-1215, so
+# its area alone hides the cost; record u2_d12_prototype_2026-10-04.rst).
+DEFAULT_LOWERING = "server"
+
+
+def _stmts(text):
+    return ast.parse(textwrap.dedent(text)).body
+
+
+def _addr_type(rows):
+    return f"UInt({max(1, math.ceil(math.log2(max(2, rows))))})"
+
+
+def _rename(tree, old, new):
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Name) and n.id == old:
+            n.id = new
+
+
 def unit(**kwargs):
     """Declare a unit: ``@unit(instances=..., reads=..., writes=..., ...)``."""
 
@@ -253,7 +506,12 @@ class Architecture:
     memories: tuple[Memory, ...]
     channels: tuple[Channel, ...]
     units: tuple[Unit, ...]
+    # {memory: why no two write-capable ports write one word in one cycle}:
+    # the premise a `collision="obligation"` memory needs (README D-12). Like
+    # `deadlock_free_because`, nothing checks it; a stress cosim discharges it.
+    obligations: dict = field(default_factory=dict)
     _region: object = field(default=None, init=False, repr=False)
+    _regions: dict = field(default_factory=dict, init=False, repr=False)
 
     def __post_init__(self):
         self._check()
@@ -261,7 +519,8 @@ class Architecture:
     def _check(self):
         declared = {c.name for c in self.channels}
         shape = {c.name: c.shape for c in self.channels}
-        memories = {m.name for m in self.memories}
+        memories = {m.name for m in self.memories if not m.ported}
+        ported = {m.name: m for m in self.memories if m.ported}
         writer, reader, owner = {}, {}, {}
         for u in self.units:
             u.check()
@@ -286,7 +545,30 @@ class Architecture:
                         f"{self.name}: channel {ch!r} {role} in both "
                         f"{seen[ch]} and {u.name}")
                     seen[ch] = u.name
-            for mem in u.memories:
+            params = list(inspect.signature(u.body).parameters)
+            for pname, mem in zip(params, u.memories):
+                if "." in mem:  # a port of an on-chip memory (README D-12)
+                    mname, pport = mem.split(".", 1)
+                    assert mname in ported, (
+                        f"{self.name}: unit {u.name} binds port {mem!r}, but "
+                        f"{mname!r} is not a memory with ports"
+                        + (" (it is a boundary array: bind it by name)"
+                           if mname in memories else ""))
+                    port = ported[mname].port(pport)
+                    assert mem not in owner, (
+                        f"{self.name}: port {mem!r} is bound by both "
+                        f"{owner[mem]} and {u.name}; each port has exactly "
+                        f"one owner (README D-12). A port several units "
+                        f"share in hardware is owned by one unit fed over "
+                        f"channels")
+                    owner[mem] = u.name
+                    port_uses(u, pname, mem, port)
+                    continue
+                assert mem not in ported, (
+                    f"{self.name}: unit {u.name} binds memory {mem!r} itself; "
+                    f"a memory with ports is reached through a port: bind one "
+                    f"of {', '.join(f'{mem}.{p.name}' for p in ported[mem].ports)} "
+                    f"(README D-12)")
                 assert mem in memories, (
                     f"{self.name}: unit {u.name} names {mem!r}, which is not a "
                     f"region argument")
@@ -297,37 +579,451 @@ class Architecture:
         for ch in sorted(declared):
             assert ch in writer, f"{self.name}: nothing writes {ch!r}"
             assert ch in reader, f"{self.name}: nothing reads {ch!r}"
+        for m in ported.values():
+            for p in m.ports:
+                assert f"{m.name}.{p.name}" in owner, (
+                    f"{self.name}: port {m.name}.{p.name} has no owner; a "
+                    f"port nobody binds is refused, like a channel nobody "
+                    f"reads (README D-12)")
+            nw = sum(p.count for p in m.ports if p.writes)
+            if nw > 1 and m.collision == "obligation":
+                assert self.obligations.get(m.name), (
+                    f"{self.name}: memory {m.name} has {nw} write-capable "
+                    f"ports and collision='obligation': state why no two of "
+                    f"them write one word in one cycle, "
+                    f"Architecture(obligations={{{m.name!r}: '<why>'}}) "
+                    f"(README D-12; a stress cosim discharges it)")
+        for name in self.obligations:
+            assert name in ported, (
+                f"{self.name}: obligations name {name!r}, which is not a "
+                f"memory with ports")
 
-    def source(self) -> str:
-        head = [f"def {self.name}("]
-        head += [f"    {m.declaration}" for m in self.memories]
-        head += ["):"]
-        parts = ["@df.region()", "\n".join(head),
-                 "\n".join(f"    {c.declaration}" for c in self.channels)]
+    # -- memories with ports (README D-12) -----------------------------------
+
+    def _ported(self):
+        return [m for m in self.memories if m.ported]
+
+    def _owners(self, m):
+        """``{port name: (unit, body parameter)}`` of one ported memory."""
+        out = {}
         for u in self.units:
-            parts += ["", u.kernel_source()]
+            params = list(inspect.signature(u.body).parameters)
+            for pname, mem in zip(params, u.memories):
+                if mem.startswith(m.name + "."):
+                    out[mem.split(".", 1)[1]] = (u, pname)
+        return out
+
+    def _rows(self, m) -> int:
+        return int(eval(str(m.rows), {}, dict(self.parameters)))  # pylint: disable=eval-used
+
+    def plan(self, target=None, lowering=None) -> dict:
+        """``{memory: lowering}`` for every memory with ports, checked.
+
+        ``local``: one unit owns every port -- today's kernel-local array, the
+        degenerate case. ``replica``: every read port's owner holds a copy and
+        the one write port's owner sends each write to every copy (the
+        write-broadcast replica; ``r`` ports at latency 0 and one ``w`` port
+        only). ``server``: one storage in a generated kernel; each port is a
+        bundle of links (address, data, enable) to its owner. ``shared``: one
+        region-scope ``Stateful`` the owners address directly -- refused by
+        D-11 unless premised, kept to record the refusal.
+
+        Vitis refuses a memory with more than one owner (README D-12).
+        """
+        lowering = dict(lowering or {})
+        names = {m.name for m in self._ported()}
+        for k in lowering:
+            assert k in names, f"{self.name}: lowering names {k!r}, not a memory with ports"
+        out = {}
+        for m in self._ported():
+            owners = sorted({u.name for u, _ in self._owners(m).values()})
+            if target == "vhls" and len(owners) > 1:
+                raise NotImplementedError(
+                    f"{self.name}: memory {m.name} has {len(owners)} owners "
+                    f"({', '.join(owners)}); Vitis refuses a memory with more "
+                    f"than one owner (README D-12). Build it with "
+                    f'target="systemc" or "simulator"')
+            choice = lowering.get(m.name) or (
+                "local" if len(owners) == 1 else DEFAULT_LOWERING)
+            assert choice in LOWERINGS, (
+                f"memory {m.name}: lowering {choice!r} is not one of {LOWERINGS}")
+            if choice == "local":
+                assert len(owners) == 1, (
+                    f"memory {m.name}: the local lowering needs one owner of "
+                    f"every port; it has {owners}")
+            if choice in {"replica", "server"}:
+                for p in m.ports:
+                    assert not p.writes or p.visible == 1, (
+                        f"memory {m.name}: port {p.name} declares visible="
+                        f"{p.visible}; only visible=1 has a lowering (a write "
+                        f"at a clock edge, seen from the next cycle)")
+            if choice == "replica":
+                ws = [p for p in m.ports if p.writes]
+                assert len(ws) == 1 and ws[0].kind == "w" and ws[0].count == 1, (
+                    f"memory {m.name}: the replica lowering takes one `w` port "
+                    f"(count 1); it has {[p.name for p in ws]}. Two write ports "
+                    f"need N_R x N_W copies and a live-value table: refused")
+                for p in m.ports:
+                    assert p.kind != "r" or p.latency == 0, (
+                        f"memory {m.name}: the replica lowering reads a copy "
+                        f"combinationally; port {p.name} declares latency "
+                        f"{p.latency}")
+            out[m.name] = choice
+        return out
+
+    def port_kernels(self, target=None, lowering=None) -> list:
+        """The kernels a ported memory's lowering consists of -- the owners of
+        its ports and any generated server -- as emitted module names
+        (``<kernel>_0``): the synthesis group of the memory."""
+        plan = self.plan(target, lowering)
+        out = []
+        for u in self.units:
+            if any("." in mem for mem in u.memories):
+                out.append(f"{u.name}_0")
+        out += [f"{m}_mem_0" for m, c in plan.items() if c == "server"]
+        return out
+
+    def _pin(self, m, pk, role, port, links):
+        """One link of a port's bundle: name and declaration."""
+        name = f"{m.name}_{pk}_{role}"
+        dtype = {"a": _addr_type(self._rows(m)), "q": m.dtype, "d": m.dtype,
+                 "e": "uint1"}[role[0]]
+        if links == "stream":
+            kind = "stream"
+        elif role == "q" and port.latency:
+            kind = "wire"  # registered at the owner's edge, then the pipe
+        else:
+            kind = "comb"  # same-cycle pin: address, data, enable; latency-0 data
+        return name, Channel(name, dtype, depth="2", kind=kind).declaration_as(kind)
+
+    def _lower(self, plan, links):
+        """Rewrite every port-owning unit for its memories' lowering.
+
+        Returns ``(unit sources by name, extra channel declarations,
+        region-scope declarations, generated kernel sources)``."""
+        storage_attr = "" if links == "stream" else " @ Stateful(reset=False)"
+        bindings = {}  # unit name -> [(pname, memory, port)]
+        for m in self._ported():
+            for pport, (u, pname) in self._owners(m).items():
+                bindings.setdefault(u.name, []).append((pname, m, m.port(pport)))
+        chans, region_decls, servers, srcs = [], [], [], {}
+        iters = {}  # memory -> {loop iter text: [units]}
+        trees = {}
+        for u in self.units:
+            if u.name not in bindings:
+                continue
+            assert tuple(u.instances) == ("1",), (
+                f"unit {u.name} owns a memory port and is replicated "
+                f"(instances={u.instances}); each port has one owner")
+            tree = ast.parse(u.source()).body[0]
+            trees[u.name] = tree
+            for pname, m, port in bindings[u.name]:
+                uses = port_uses(u, pname, f"{m.name}.{port.name}", port, tree)
+                iters.setdefault(m.name, {}).setdefault(
+                    ast.unparse(uses["loop"].iter), []).append(u.name)
+                self._rewrite(plan[m.name], tree, pname, m, port, uses,
+                              links, storage_attr, chans, region_decls)
+        for m in self._ported():
+            if plan[m.name] in {"server", "replica"}:
+                its = iters.get(m.name, {})
+                assert len(its) == 1, (
+                    f"memory {m.name}: its owners iterate differently "
+                    f"({its}); one iteration is one cycle of every port, so "
+                    f"the {plan[m.name]} lowering needs one loop range")
+            if plan[m.name] == "server":
+                servers.append(self._server(m, next(iter(iters[m.name])),
+                                            storage_attr))
+        for u in self.units:
+            if u.name not in trees:
+                continue
+            tree = trees[u.name]
+            ported_params = {p for p, _, _ in bindings[u.name]}
+            keep = [(a, mem) for a, mem in zip(tree.args.args, u.memories)
+                    if a.arg not in ported_params]
+            tree.args.args = [a for a, _ in keep]
+            tree.decorator_list = []
+            args = [mem for _, mem in keep]
+            deco = f"@df.kernel(mapping=[{', '.join(u.instances)}]" + (
+                f", args=[{', '.join(args)}])" if args else ")")
+            srcs[u.name] = textwrap.indent(deco + "\n" + ast.unparse(tree), "    ")
+        return srcs, chans, region_decls, servers
+
+    def _rewrite(self, choice, tree, pname, m, port, uses, links,
+                 storage_attr, chans, region_decls):
+        loop = uses["loop"]
+        rows, dt = m.rows, m.dtype
+        at = _addr_type(self._rows(m))
+        attr = storage_attr if not m.reset else ""
+        if choice in {"local", "shared"}:
+            name = m.name
+            _rename(tree, pname, name)
+            decl = f"{name}: {dt}[{rows}]" + (
+                attr if choice == "local" else
+                (" @ Stateful(reset=False)" if not m.reset else " @ Stateful"))
+            if choice == "local":
+                if not any(isinstance(s, ast.AnnAssign) and getattr(s.target, "id", "") == name
+                           for s in tree.body):
+                    tree.body[:0] = _stmts(decl)
+            elif decl not in region_decls:
+                region_decls.append(decl)
+            return
+        if choice == "replica" and port.kind == "r":
+            copy_name = f"_{m.name}_{port.name}"
+            _rename(tree, pname, copy_name)
+            tree.body[:0] = _stmts(f"{copy_name}: {dt}[{rows}]{attr}")
+            w = next(p for p in m.ports if p.writes)
+            pre = f"_{m.name}_{port.name}_w"
+            names = {}
+            for role in ("a", "d", "e"):  # declared by the writer's side
+                names[role] = self._pin(m, w.name, f"{role}_{port.name}", w, links)[0]
+            loop.body += _stmts(f"""
+                {pre}a: {at} = {names['a']}.get()
+                {pre}i: int32 = {pre}a
+                {pre}d: {dt} = {names['d']}.get()
+                {pre}e: uint1 = {names['e']}.get()
+                if {pre}e:
+                    {copy_name}[{pre}i] = {pre}d
+                """)
+            return
+        if choice == "replica":  # the one write port: broadcast to every copy
+            readers = [p for p in m.ports if p.kind == "r"]
+            sets = []
+            for r in readers:
+                pins = {}
+                for role in ("a", "d", "e"):
+                    nm, decl = self._pin(m, port.name, f"{role}_{r.name}", port, links)
+                    pins[role] = nm
+                    chans.append(decl)
+                sets.append(pins)
+            addr, value, enable, st = uses["stores"][0]
+            pre = f"_{m.name}_{port.name}_"
+            new = [f"{pre}a: {at} = {ast.unparse(addr)}",
+                   f"{pre}d: {dt} = {ast.unparse(value)}",
+                   f"{pre}e: uint1 = {ast.unparse(enable) if enable is not None else 1}"]
+            for pins in sets:
+                new += [f"{pins['a']}.put({pre}a)", f"{pins['d']}.put({pre}d)",
+                        f"{pins['e']}.put({pre}e)"]
+            i = loop.body.index(st)
+            loop.body[i:i + 1] = _stmts("\n".join(new))
+            return
+        # server: each access becomes a pin bundle to the memory's server kernel
+        for k in range(port.count):
+            pk = port.name + (str(k) if port.count > 1 else "")
+            pre = f"_{m.name}_{pk}_"
+            pins = {}
+            roles = ["a"] + (["q"] if port.reads else []) + (["d", "e"] if port.writes else [])
+            for role in roles:
+                nm, decl = self._pin(m, pk, role, port, links)
+                pins[role] = nm
+                chans.append(decl)
+            load = uses["loads"][k] if k < len(uses["loads"]) else None
+            store = uses["stores"][k] if k < len(uses["stores"]) else None
+            if load is not None:
+                node, st = load
+                new = [f"{pre}a: {at} = {ast.unparse(node.slice)}",
+                       f"{pins['a']}.put({pre}a)",
+                       f"{pre}q: {dt} = {pins['q']}.get()"]
+                if port.writes and store is None:
+                    new += [f"{pins['d']}.put(0)", f"{pins['e']}.put(0)"]
+                i = loop.body.index(st)
+                loop.body[i:i] = _stmts("\n".join(new))
+                # the load itself becomes the data the server returned
+                for parent in ast.walk(st):
+                    for fld, val in ast.iter_fields(parent):
+                        if val is node:
+                            setattr(parent, fld, ast.Name(id=f"{pre}q", ctx=ast.Load()))
+                        elif isinstance(val, list):
+                            for j, v in enumerate(val):
+                                if v is node:
+                                    val[j] = ast.Name(id=f"{pre}q", ctx=ast.Load())
+            if store is not None:
+                addr, value, enable, st = store
+                new = []
+                if load is None:
+                    new += [f"{pre}a: {at} = {ast.unparse(addr)}", f"{pins['a']}.put({pre}a)"]
+                    if port.reads:
+                        new += [f"{pre}q: {dt} = {pins['q']}.get()"]
+                new += [f"{pre}d: {dt} = {ast.unparse(value)}",
+                        f"{pins['d']}.put({pre}d)",
+                        f"{pre}e: uint1 = {ast.unparse(enable) if enable is not None else 1}",
+                        f"{pins['e']}.put({pre}e)"]
+                i = loop.body.index(st)
+                loop.body[i:i + 1] = _stmts("\n".join(new))
+            if load is None and store is None:  # an unused pin of a count > 1 port
+                new = [f"{pins['a']}.put(0)"]
+                if port.reads:
+                    new += [f"{pre}q: {dt} = {pins['q']}.get()"]
+                if port.writes:
+                    new += [f"{pins['d']}.put(0)", f"{pins['e']}.put(0)"]
+                loop.body[0:0] = _stmts("\n".join(new))
+
+    def _server(self, m, loop_iter, storage_attr):
+        """The generated kernel that holds a `server`-lowered memory: per
+        iteration every port's address, then every read (latency 0: a
+        combinational put; L >= 1: a pipe of L registers, as data), then every
+        write -- so a read sees writes of earlier iterations only (visible=1)."""
+        dt, rows = m.dtype, m.rows
+        at = _addr_type(self._rows(m))
+        attr = storage_attr if not m.reset else ""
+        head = ["@df.kernel(mapping=[1])", f"def {m.name}_mem():",
+                f"    mem: {dt}[{rows}]{attr}"]
+        body, writes = [], []
+        for p in m.ports:
+            for k in range(p.count):
+                pk = p.name + (str(k) if p.count > 1 else "")
+                ch = f"{m.name}_{pk}"
+                body += [f"_{pk}_a: {at} = {ch}_a.get()", f"_{pk}_i: int32 = _{pk}_a"]
+                if p.kind == "rw" and p.latency and m.reset:
+                    # RAM-mappable storage: one access per port per cycle, a
+                    # write OR a read, as ONE if/else -- what Catapult needs to
+                    # see the two as exclusive and use one RAM port, not two
+                    # (u2_word_array_2026-10-02.rst). A read of a write cycle
+                    # is undefined (MiniTPU masks it); a read of a word another
+                    # port writes this cycle is the collision obligation.
+                    head.append(f"    _{pk}_p: {dt}[{p.latency}]")
+                    body += [f"_{pk}_d: {dt} = {ch}_d.get()",
+                             f"_{pk}_e: uint1 = {ch}_e.get()"]
+                    body += [f"_{pk}_p[{j}] = _{pk}_p[{j - 1}]"
+                             for j in range(p.latency - 1, 0, -1)]
+                    body += [f"if _{pk}_e:", f"    mem[_{pk}_i] = _{pk}_d",
+                             "else:", f"    _{pk}_p[0] = mem[_{pk}_i]",
+                             f"{ch}_q.put(_{pk}_p[{p.latency - 1}])"]
+                    continue
+                if p.reads and p.latency == 0:
+                    body.append(f"{ch}_q.put(mem[_{pk}_i])")
+                elif p.reads:
+                    head.append(f"    _{pk}_p: {dt}[{p.latency}]")
+                    body += [f"_{pk}_p[{j}] = _{pk}_p[{j - 1}]"
+                             for j in range(p.latency - 1, 0, -1)]
+                    body += [f"_{pk}_p[0] = mem[_{pk}_i]",
+                             f"{ch}_q.put(_{pk}_p[{p.latency - 1}])"]
+                if p.writes:
+                    writes += [f"_{pk}_d: {dt} = {ch}_d.get()",
+                               f"_{pk}_e: uint1 = {ch}_e.get()",
+                               f"if _{pk}_e:", f"    mem[_{pk}_i] = _{pk}_d"]
+        lines = head + [f"    for _ in {loop_iter}:"] + [f"        {x}" for x in body + writes]
+        return textwrap.indent("\n".join(lines), "    ")
+
+    def memory_manifest(self, target=None, lowering=None) -> dict:
+        """What each memory with ports was lowered to: ``memory.json``
+        (README D-12), written beside ``latency.json``."""
+        plan = self.plan(target, lowering)
+        links = "stream" if target == "simulator" else "declared"
+        out = {}
+        for m in self._ported():
+            choice = plan[m.name]
+            owners = self._owners(m)
+            nread = sum(p.count for p in m.ports if p.reads)
+            storage = ("registers (sc_signal array), unreset: clock-edge write "
+                       "SC_METHOD, no reset action (D-14)"
+                       if not m.reset and links != "stream" and target != "vhls"
+                       else "the backend's array (reset storage)")
+            impl = {
+                "local": f"kernel-local array of {sorted({u.name for u, _ in owners.values()})[0]}"
+                         " (one owner of every port: today's array)",
+                "replica": f"write-broadcast replica x{nread}: one copy per read port, "
+                           "inside its owner; every write sent to every copy",
+                "server": f"one storage in generated kernel {m.name}_mem; each port a "
+                          "bundle of links (address, data, enable) to its owner",
+                "shared": "one region-scope Stateful the owners address (D-11 refuses "
+                          "it unless premised; no HLS backend builds it)",
+            }[choice]
+            ports = {}
+            for p in m.ports:
+                d = p.manifest()
+                d["owner"] = owners[p.name][0].name
+                if choice in {"replica", "server"} and links != "stream":
+                    if p.reads:
+                        d["read"] = ("combinational (D-13 comb links)" if p.latency == 0
+                                     else f"registered link + {p.latency}-deep pipe as data")
+                    if p.writes:
+                        d["write"] = "comb pins into a clock-edge write: seen next cycle"
+                ports[p.name] = d
+            out[m.name] = {
+                "rows": self._rows(m), "dtype": m.dtype, "reset": m.reset,
+                "collision": m.collision, "lowering": choice,
+                "implementation": impl, "storage": storage,
+                "target": target or "declared", "links": links, "ports": ports,
+                "status": "untimed" if target == "simulator" else "lowered",
+            }
+            if m.name in self.obligations:
+                out[m.name]["obligation"] = self.obligations[m.name]
+        return out
+
+    def build(self, target="simulator", lowering=None, schedule=None, **kwargs):
+        """Customize, schedule and build the region for ``target``; with a
+        ``project``, write ``memory.json`` there (README D-12)."""
+        region = self.region(target, lowering)
+        manifest = self.memory_manifest(target, lowering)
+        if target == "simulator":
+            for name, d in manifest.items():
+                print(f"[memory] {name}: {d['lowering']}, untimed (the simulator "
+                      f"keeps the order of accesses, not latency or visibility)")
+        if target == "simulator":
+            assert schedule is None, "the simulator takes no schedule"
+            mod = df.build(region, target="simulator", **kwargs)
+        else:
+            s = df.customize(region)
+            if schedule is not None:
+                schedule(s)
+            mod = s.build(target=target, **kwargs)
+        project = kwargs.get("project")
+        if project and manifest:
+            os.makedirs(project, exist_ok=True)
+            with open(os.path.join(project, "memory.json"), "w", encoding="utf-8") as f:
+                json.dump(manifest, f, indent=2, sort_keys=True)
+        return mod
+
+    def source(self, target=None, lowering=None) -> str:
+        """The region's text. ``target="simulator"`` emits every link as a
+        Stream (the simulator is untimed and refuses Wire); a memory with
+        ports is lowered as ``plan`` says."""
+        links = "stream" if target == "simulator" else None
+        plan = self.plan(target, lowering)
+        srcs, extra, region_decls, servers = (
+            self._lower(plan, links or "declared") if plan else ({}, [], [], []))
+        head = [f"def {self.name}("]
+        head += [f"    {m.declaration}" for m in self.memories if not m.ported]
+        head += ["):"]
+        decls = [c.declaration_as(links or c.kind) for c in self.channels]
+        decls += extra + region_decls
+        parts = ["@df.region()", "\n".join(head),
+                 "\n".join(f"    {d}" for d in decls)]
+        for u in self.units:
+            parts += ["", srcs.get(u.name) or u.kernel_source()]
+        for s in servers:
+            parts += ["", s]
         return "\n".join(parts) + "\n"
 
-    def region(self):
+    def region(self, target=None, lowering=None):
         """The ``@df.region()``-decorated function, built from `source`.
 
         Registered in ``linecache`` under a stable pseudo-path because Allo
         reads a region back with ``inspect.getsourcelines``.
         ``ALLO_DUMP_COMPOSED=<dir>`` also writes the text out, to read or diff.
         """
-        if self._region is None:
-            src = self.source()
-            path = f"<composed {self.name}>"
+        key = (target, tuple(sorted((lowering or {}).items())))
+        if key == (None, ()) and self._region is not None:
+            return self._region
+        if key not in self._regions:
+            src = self.source(target, lowering)
+            path = f"<composed {self.name}>" if key == (None, ()) else \
+                f"<composed {self.name} {target} {dict(key[1])}>"
             linecache.cache[path] = (len(src), None, src.splitlines(True), path)
             dump = os.environ.get("ALLO_DUMP_COMPOSED")
             if dump:
-                with open(os.path.join(dump, f"{self.name}.py"), "w") as f:
+                suffix = "" if key == (None, ()) else \
+                    "_" + "_".join([str(target)] + [f"{a}-{b}" for a, b in key[1]])
+                with open(os.path.join(dump, f"{self.name}{suffix}.py"), "w",
+                          encoding="utf-8") as f:
                     f.write(src)
             namespace = dict(FRONTEND_NAMES)
             namespace.update(self.parameters)
             exec(compile(src, path, "exec"), namespace)  # pylint: disable=exec-used
-            self._region = namespace[self.name]
-        return self._region
+            self._regions[key] = namespace[self.name]
+            if key == (None, ()):
+                self._region = self._regions[key]
+        return self._regions[key]
 
     def machine(self, name=None):
         """This architecture's STRUCTURE as an ``allo.actions.Machine``: the

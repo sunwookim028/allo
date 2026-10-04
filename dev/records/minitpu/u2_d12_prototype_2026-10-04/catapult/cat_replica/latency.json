@@ -1,0 +1,77 @@
+{
+ "clock_period_ns": 3.33,
+ "definition": "latency: rising edges from the input-accepting edge to the edge after which the output is visible, no stall; ii: cycles between iterations of the I/O loop",
+ "solution": "/work/shared/users/phd/sk3463/scratch/d12/cat_replica/build/Catapult/rf_d12g.v1",
+ "tool": "catapult",
+ "units": {
+  "rd_a_0": {
+   "ii": 1,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 1,
+   "port_style": "wire",
+   "ports": {
+    "v19": "comb"
+   },
+   "process": "/rf_d12g/rd_a_0/run",
+   "process_latency": null,
+   "status": "scheduled",
+   "storage": {
+    "__stateful_rd_a_0__vreg_ra_1": "unreset"
+   }
+  },
+  "rd_b_0": {
+   "ii": 1,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 1,
+   "port_style": "wire",
+   "ports": {
+    "v39": "comb"
+   },
+   "process": "/rf_d12g/rd_b_0/run",
+   "process_latency": null,
+   "status": "scheduled",
+   "storage": {
+    "__stateful_rd_b_0__vreg_rb_1": "unreset"
+   }
+  },
+  "rd_c_0": {
+   "ii": 1,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 1,
+   "port_style": "wire",
+   "ports": {
+    "v59": "comb"
+   },
+   "process": "/rf_d12g/rd_c_0/run",
+   "process_latency": null,
+   "status": "scheduled",
+   "storage": {
+    "__stateful_rd_c_0__vreg_rc_1": "unreset"
+   }
+  },
+  "wb_0": {
+   "ii": 1,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 1,
+   "port_style": "wire",
+   "ports": {
+    "v81": "comb",
+    "v82": "comb",
+    "v83": "comb",
+    "v84": "comb",
+    "v85": "comb",
+    "v86": "comb",
+    "v87": "comb",
+    "v88": "comb",
+    "v89": "comb"
+   },
+   "process": "/rf_d12g/wb_0/run",
+   "process_latency": null,
+   "status": "scheduled"
+  }
+ }
+}

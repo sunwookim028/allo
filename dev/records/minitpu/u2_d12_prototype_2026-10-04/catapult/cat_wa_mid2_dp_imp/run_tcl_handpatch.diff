@@ -1,0 +1,5 @@
+30a31
+> directive set /wa_d12g/vmem_mem_0/run/mem:rsc -MAP_TO_MODULE ccs_sample_mem.ccs_ram_sync_dualport  ;# [hand-patch]
+31a33,34
+> go architect
+> ignore_memory_precedences -from *write_mem(mem:rsc* -to *read_mem(mem:rsc*  ;# [hand-patch]

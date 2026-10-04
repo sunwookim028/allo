@@ -194,6 +194,19 @@ class Memory:
         else:
             self.storage_type = None
 
+        # README D-12: every backend dropped `latency` and `depth` (the U2
+        # regfile record's H3: never in the IR, the SystemC emission
+        # byte-identical, Vitis' bind_storage without latency) -- a D-1
+        # violation. Refused until they return as the one-port shorthand of
+        # `compose.Memory(rows=, ports=(Port(name, kind, latency, visible),))`.
+        if latency is not None or depth is not None:
+            raise NotImplementedError(
+                f"Memory(latency={latency}, depth={depth}): no backend honours "
+                "`latency` or `depth`, so they are refused (README D-12) rather "
+                "than dropped. Declare a memory's port timing with "
+                "`allo.compose.Memory(rows=, ports=(Port(name, kind, latency, "
+                "visible),))`; give a FIFO its depth with `Stream[T, depth]`."
+            )
         self.latency = latency
         self.depth = depth
 
