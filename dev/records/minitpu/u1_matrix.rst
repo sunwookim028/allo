@@ -217,6 +217,21 @@ refused. New tool findings E1-E6, the first a **silent bug**: a plain
 and SystemC emits it (the ``@df.unit`` path refuses). Provisional: O3
 answered as "MiniTPU instance ``sequential`` only; DotTree declares ``tree``".
 
+**U3 track A landed** (``u3_track_a_2026-10-04.rst``, branch ``u3-xlu-sfu``):
+SFU ``bits``/``staged`` match 462,144/462,144 on simulator and csim; the
+reduction tree matches as one unit (N=16 and N=64) **and as 15 / 63 composed
+adder units** (T2), with seven wrong latency sets refused by the derived
+legality (H5); the transpose matches with a reset tile (recorded deviation;
+its unreset form is refused in csim because D-14's lowering is Wire-only,
+A6). H1 held: no vector ever differed; every failure was a tool finding.
+Findings: **A3 bug** -- ``allo/passes.py:471`` erases any user symbol whose
+name starts with ``gelu``/``layernorm``/``tril``; **A5 silent bug** -- csim
+drops all but the first of the last iteration's stores to a 2-D output when
+they come last; A2 constant globals missing from helper scope; A4 const array
+to non-const callee param; **A7 missing abstraction** -- ``compose.Unit``
+has no latency, so a composed tree's adder latency is a trusted parameter
+(the D-10/D-15 hook). X2 ``ported`` blocked until D-12 is in the tree.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
