@@ -394,6 +394,34 @@ travels with it.**
   (one unroll on the shared `leading_zeros19` covers every PE instance);
   `u1_alu` C10; `u3_track_a` A7/H4; the C-W1 fix.
 
+**D-19 (2026-10-04). An optional module is a declared delta, and an
+instance's ISA is the slots its modules bring.**
+- An optional module is an `Option`: the units and channels it adds, the
+  rebinding of its neighbours' ports when it is present, and the ISA slots
+  that exist only with it. An architecture is a base plus options; no unit
+  list is built by a Python conditional. This is `generate if` with the ISA
+  attached: the form Rocket Chip's and Gemmini's configuration parameters
+  take, which MiniTPU's RTL does not yet have (its SFU is a fixed stage).
+- Composition is legal iff the netlist rules pass on the result: a module
+  left out whose channel stays declared, or added without its rebind, is
+  refused at composition, naming the channel.
+- The assembler of an instance refuses an instruction whose module is not
+  composed in, naming the module; `gen_isa --check` holds the instance's
+  spec to its options, so the ISA table is derived from the composition
+  rather than written beside it.
+- The front end holds every region to the netlist rules, nested kernels
+  counted as endpoints (E1, in fix batch 3, is the gap).
+- Use cases in the two designs on hand: MiniTPU's SFU (`vpu.sv:88`, one
+  `sfu_group` per sublane fed from VREG port A, tag pipe `:157-184`; slots
+  `vexp`/`vgelu`/`vrecip`/`vrsqrt`), transpose (`vpu.sv:132`; `vtranspose`),
+  reduction tree (`vreduce`/`vlanered`) and `perf_counters`
+  (`minitpu_core.sv:137`); TinyTPU's accumulator file (`ip/units/accumulator`,
+  channels `c_acc`/`ac2sp`), which MiniTPU lacks. The SFU is the first
+  implementation. The RTL-side counterpart (`generate if` in `vpu.sv`, the
+  decoder's refusal) is synced with the `minitpu-comp` session's v2 work.
+- Evidence: `dev/records/minitpu/u3_composition_design_2026-10-04.rst` §4
+  (H15); prototype `examples/minitpu/template/optional.py`.
+
 ## Milestones
 
 Each milestone passes on **one acceptance check** and names the tools it uses

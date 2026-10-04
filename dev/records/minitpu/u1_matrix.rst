@@ -331,6 +331,14 @@ references stay correct. v2's resource budgets are sized against the U280
 FPGA (minitpu-tmp PRs #31/#32) -- relevant to RTLGen (FPGA-only), not to the
 Catapult/DC ASIC columns.
 
+**Checkpoint 16, 2026-10-04:** D-19 (optional modules as declared deltas)
+**approved**; the owner asked for real use cases -- found: MiniTPU's SFU,
+transpose, reduction tree, perf_counters; TinyTPU's accumulator file. The
+SFU is the first implementation (``compose-engines``), with track A's S1
+unit and U1's ALU in a VPU lane. RTL-side ``generate if`` + decoder refusal
+to be synced with ``minitpu-comp`` later. One draft left: derived-parameter
+legality (README D-20).
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
