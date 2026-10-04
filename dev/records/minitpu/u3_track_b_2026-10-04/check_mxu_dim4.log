@@ -1,0 +1,11 @@
+RTL mxu:dim4: 31071 cycles in 13 traces, 111067 defined slots, RTL vs reference on defined: 111067/111067 (60.3s)
+UNIT-MATCH mxu:dim4 lockstep simulator 111067/111067 defined (13217 masked: bank overwrite=98, before reset=4, no valid=13115; allo==rtl on 13162) cycle=order-only (build 16.4s, run 5.2s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+Info: /OSCI/SystemC: Simulation stopped by user.
+[14:33:06] Compiling with g++ ...
+[14:33:16] Running simulation ...
+UNIT-MATCH mxu:dim4 lockstep systemc 111067/111067 defined (13217 masked: bank overwrite=98, before reset=4, no valid=13115; allo==rtl on 13161) cycle=per-iteration, time unchecked (build 9.4s, run 30.3s)
+EXIT 0
