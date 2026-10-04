@@ -19,11 +19,18 @@ from ..netlist import (
     Channel,
     Instance,
     Netlist,
+    NetlistError,
     REGISTRY,
     UnitSpec,
     _evaluate_annotation,
     as_stream,
     stream_uses,
+    Violation,
+    _root_name,
+    READS,
+    WRITES,
+    IN,
+    OUT,
 )
 
 
@@ -167,6 +174,78 @@ def _as_kernel(spec, name, bindings, mapping):
     return tree
 
 
+def _check_kernel_streams(node, global_vars):
+    """Refuse a stream that the nested kernels of a unit-free region leave
+    unconnected (E1).
+
+    The ``@df.unit`` path refuses this with the rest of its netlist; a region
+    of plain ``@df.kernel`` functions was accepted: a stream no kernel touched
+    built and ran, one only written built (and blocks once full), and SystemC
+    emitted both. Refused here: a stream no kernel uses, and a stream with
+    one end only that a *blocking* ``put``/``get`` uses -- that end blocks
+    forever (or once full). A stream with one end used only through
+    ``try_put``/``try_get``/``full``/``empty`` never blocks, and is legal (a
+    probe of the non-blocking ops, a self-FIFO's refusal). Only this rule:
+    single-producer-single-consumer is not applied here. Kernels are found
+    anywhere in the body (inside ``meta_if`` or loops too); an annotation that
+    cannot be evaluated here is not a stream to this check.
+    """
+    channels = _channels(node.body, global_vars)
+    if not channels:
+        return
+    users = {}  # stream -> {direction: [kernel]}
+    blocking = {}  # stream -> [(kernel, op)]
+    for statement in node.body:
+        for inner in ast.walk(statement):
+            if not (isinstance(inner, ast.FunctionDef) and _decorator(inner, "kernel")):
+                continue
+            for call in ast.walk(inner):
+                if not (
+                    isinstance(call, ast.Call)
+                    and isinstance(call.func, ast.Attribute)
+                    and call.func.attr in READS + WRITES
+                ):
+                    continue
+                name, _ = _root_name(call.func.value)
+                if name not in channels:
+                    continue
+                direction = IN if call.func.attr in READS else OUT
+                who = users.setdefault(name, {}).setdefault(direction, [])
+                if inner.name not in who:
+                    who.append(inner.name)
+                if call.func.attr in ("put", "get"):
+                    blocking.setdefault(name, []).append((inner.name, call.func.attr))
+    found = []
+    for name in channels:
+        ends = users.get(name, {})
+        writers, readers = ends.get(OUT, []), ends.get(IN, [])
+        if writers and readers:
+            continue
+        if not writers and not readers:
+            missing = "no writer and no reader: no kernel uses it"
+        elif not blocking.get(name):
+            continue
+        else:
+            kernel, op = blocking[name][0]
+            if not writers:
+                missing = f"no writer, and {kernel} blocks on {name}.{op}()"
+            else:
+                missing = (
+                    f"no reader, and {kernel} blocks on {name}.{op}() once it is full"
+                )
+        found.append(
+            Violation(
+                "unconnected-stream",
+                f"{node.name}.{name}",
+                f"stream {name!r} has {missing}",
+                "put to it in one kernel and get from it in another (or the "
+                "same), or delete the declaration",
+            )
+        )
+    if found:
+        raise NetlistError(f"region {node.name!r}", found)
+
+
 def expand_region_units(node, global_vars):
     """Rewrite a region body's unit instantiations into nested kernels.
 
@@ -180,6 +259,7 @@ def expand_region_units(node, global_vars):
         (statement, _instantiation(statement, global_vars)) for statement in node.body
     ]
     if not any(instance is not None for _, instance in found):
+        _check_kernel_streams(node, global_vars)
         return None
 
     netlist = Netlist(

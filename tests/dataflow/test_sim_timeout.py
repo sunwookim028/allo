@@ -13,8 +13,8 @@ runs even while every PE is spinning. When it fires it prints a report to
 stderr and lets the run continue: it never kills the process and never raises
 from the timer thread, because a blocking C call cannot be safely interrupted.
 
-The region below deadlocks on purpose -- a consumer gets from a stream nobody
-ever puts to -- so this test runs it in a subprocess that is killed on
+The region below deadlocks on purpose -- two kernels each wait for the other's
+first token -- so this test runs it in a subprocess that is killed on
 timeout. A test that hangs is worse than a test that fails.
 """
 
@@ -43,25 +43,30 @@ WAIT_SEC = 90
 
 
 def _run_deadlocked_region():
-    """A region whose consumer blocks forever on a stream nobody feeds."""
+    """A region whose two kernels each block on the other's first token."""
 
     @df.region()
     def stuck(A: int32[NELEM], B: int32[NELEM]):
-        # `fed` is written and read; `starved` is read and never written.
+        # Every stream has a writer and a reader (a region refuses one that
+        # does not, at its definition), but the two kernels wait on each
+        # other: the producer gets `back` before its first put, and the
+        # consumer puts to `back` only after a get from `fed`.
         fed: Stream[int32, 2]
-        starved: Stream[int32, 2]
+        back: Stream[int32, 2]
 
         @df.kernel(mapping=[1], args=[A])
         def producer(local_A: int32[NELEM]):
             for i in range(NELEM):
-                fed.put(local_A[i])
+                token: int32 = back.get()
+                fed.put(local_A[i] + token)
 
         @df.kernel(mapping=[1], args=[B])
         def consumer(local_B: int32[NELEM]):
             for i in range(NELEM):
-                # The second get can never be satisfied: nothing puts to
-                # `starved`, so this PE spins until the process is killed.
-                local_B[i] = fed.get() + starved.get()
+                # Never satisfied: nothing reaches `fed` until `back` has a
+                # token, so both PEs spin until the process is killed.
+                local_B[i] = fed.get()
+                back.put(local_B[i])
 
     A = np.arange(NELEM, dtype=np.int32)
     B = np.zeros(NELEM, dtype=np.int32)

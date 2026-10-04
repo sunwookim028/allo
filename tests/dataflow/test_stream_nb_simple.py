@@ -47,12 +47,11 @@ def test_try_put_try_get_sim():
     """
     Two-kernel test: producer sends via try_put (spin-until-success),
     consumer receives via try_get (spin-until-success).
-    Result is accumulated in an output stream then checked.
+    Result is written to an output array then checked.
     """
     @df.region()
     def top_nb(out: int32[4]):
         S: Stream[int32, 4][1]
-        res: Stream[int32, 4][1]
 
         @df.kernel(mapping=[1])
         def producer():
