@@ -1618,9 +1618,18 @@ void SystemCModuleEmitter::emitGetSlice(allo::GetIntSliceOp op) {  // override (
   emitValue(num);
   os << ";\n";
   indent();
-  os << rn << " = _bs_" << rn << ".slc<" << w << ">(";
-  emitValue(op.getLo());
-  os << ");";
+  // A slice narrower than its result is zero-extended, as the LLVM lowering
+  // does; the temp is signed, so the slice is taken as unsigned first (E2).
+  if (unsigned sw = getSliceNarrowWidth(op)) {
+    os << rn << " = ac_int<" << sw << ", false>(_bs_" << rn << ".slc<" << sw
+       << ">(";
+    emitValue(op.getLo());
+    os << "));";
+  } else {
+    os << rn << " = _bs_" << rn << ".slc<" << w << ">(";
+    emitValue(op.getLo());
+    os << ");";
+  }
   emitInfoAndNewLine(op);
 }
 
@@ -1629,10 +1638,11 @@ void SystemCModuleEmitter::emitSetSlice(allo::SetIntSliceOp op) {  // override (
   Value num = op.getNum();
   unsigned nw = num.getType().getIntOrFloatBitWidth();
   // ac_int::set_slc(lo, val) requires an ac_int val (its width = #bits set);
-  // the emitted val may be a plain C int -> wrap it in an ac_int of the val's
-  // bit width so the right number of bits is written. The dst likewise needs an
-  // ac_int temp (a native int32_t has no .set_slc).
-  unsigned vw = op.getVal().getType().getIntOrFloatBitWidth();
+  // the emitted val may be a plain C int -> wrap it in an ac_int of the
+  // slice's width (setSliceValueWidth, E2) so the right number of bits is
+  // written. The dst likewise needs an ac_int temp (a native int32_t has no
+  // .set_slc).
+  unsigned vw = setSliceValueWidth(op);
   indent();
   emitValue(result); // "<T> <res>"
   os << ";\n";

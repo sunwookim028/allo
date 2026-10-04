@@ -61,6 +61,18 @@ public:
   void emitNarrowCastSuffix(Value src, Value dst) override;
 
 protected:
+  /// Width of the ac_int that set_slc writes for `op`: the slice's own width
+  /// (hi - lo + 1) when both bounds are constants and the value is wider,
+  /// else the value's width. set_slc writes exactly its argument's width, so
+  /// a value wider than the slice clobbered the bits above it, or, at the top
+  /// of the word, failed ac_int's "Out of bounds set_slc" assertion (E2).
+  static unsigned setSliceValueWidth(allo::SetIntSliceOp op);
+  /// The slice's own width (hi - lo + 1) when both bounds are constants and
+  /// it is narrower than the result type, else 0. The builder types a slice
+  /// whose bounds fold only after meta_for expansion with the word's width;
+  /// slc<result width>(lo) then read the bits above the slice too (the next
+  /// lane of a packed word), or past the top of the word (E2).
+  static unsigned getSliceNarrowWidth(allo::GetIntSliceOp op);
   void emitValue(Value val, unsigned rank = 0, bool isPtr = false,
                  std::string name = "") override;
   // Catapult-specific type names (ac_int/ac_fixed/...).
