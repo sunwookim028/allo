@@ -1,0 +1,152 @@
+# s.6 port-kind / II=1 probes (sram_csyn.py; scratch asicmem2_cat/<probe>). Per probe: the macro, RDWRRESOLUTION, hand-patch lines, and the result.
+
+== p1_rwr_1rw1r_ii1
+MAP_TO_MODULE sram_1rw1r_64x32_freepdk45
+RDWRRESOLUTION   UNKNOWN
+CATAPULT_EXIT 2 WALL 43s
+# Error: Schedule failed, please check the following constraints. (SCHD-30)
+# $PROJECT_HOME/../kernel.cpp(829):    from operation MEMORYREAD "while:v102:read_mem(mem:rsc.@)" with delay 0cy+1.93900000ns (SCHD-6)
+# $PROJECT_HOME/../kernel.cpp(809):    from operation MEMORYWRITE "while:if:write_mem(mem:rsc.@)" with delay 0cy+0.10000000ns (SCHD-6)
+
+== p2_rw_1r1w_ii1
+MAP_TO_MODULE sram_1r1w_64x32_freepdk45
+RDWRRESOLUTION   UNKNOWN
+CATAPULT_EXIT 2 WALL 41s
+# Error: Schedule failed, please check the following constraints. (SCHD-30)
+# $PROJECT_HOME/../kernel.cpp(795):    from operation MEMORYREAD "while:v85:read_mem(mem:rsc.@)" with delay 0cy+1.93900000ns (SCHD-6)
+# $PROJECT_HOME/../kernel.cpp(817):    from operation MEMORYWRITE "while:if:write_mem(mem:rsc.@)" with delay 0cy+0.10000000ns (SCHD-6)
+
+== p5_rw_1rw1r_ii1
+MAP_TO_MODULE sram_1rw1r_64x32_freepdk45
+RDWRRESOLUTION   UNKNOWN
+CATAPULT_EXIT 2 WALL 42s
+# Error: Schedule failed, please check the following constraints. (SCHD-30)
+# $PROJECT_HOME/../kernel.cpp(795):    from operation MEMORYREAD "while:v85:read_mem(mem:rsc.@)" with delay 0cy+1.93900000ns (SCHD-6)
+# $PROJECT_HOME/../kernel.cpp(817):    from operation MEMORYWRITE "while:if:write_mem(mem:rsc.@)" with delay 0cy+0.10000000ns (SCHD-6)
+
+== q0_rwrw_2rw_rbw_ii1
+MAP_TO_MODULE sram_2rw_64x32_freepdk45
+RDWRRESOLUTION   RBW
+CATAPULT_EXIT 2 WALL 41s
+# Error: Schedule failed, please check the following constraints. (SCHD-30)
+# $PROJECT_HOME/../kernel.cpp(857):    from operation MEMORYWRITE "while:if#1:write_mem(mem:rsc.@)" with delay 0cy+0.10000000ns (SCHD-6)
+# $PROJECT_HOME/../kernel.cpp(828):    from operation MEMORYWRITE "while:if:write_mem(mem:rsc.@)" with delay 0cy+0.10000000ns (SCHD-6)
+
+== q1_rwr_1rw1r_rbw_ii1
+MAP_TO_MODULE sram_1rw1r_64x32_freepdk45
+RDWRRESOLUTION   RBW
+CATAPULT_EXIT 2 WALL 41s
+# Error:  insufficient resources 'sram_1rw1r_64x32_freepdk45.sram_1rw1r_64x32_freepdk45_rwport(1,64,5,32,64)' to schedule '/wa_d12g/vmem_mem_0/run'. 2 are needed, but only 1 instances are available (SCHD-4)
+
+== q2_rw_1r1w_rbw_ii1
+MAP_TO_MODULE sram_1r1w_64x32_freepdk45
+RDWRRESOLUTION   RBW
+CATAPULT_EXIT 0 WALL 46s
+      .csb1(mem_rsc_csb1),
+{'port_c_r_0': (1, 1), 'port_d_w_0': (1, 1), 'vmem_mem_0': (1, 2)}
+
+== q5_rw_1rw1r_rbw_ii1
+MAP_TO_MODULE sram_1rw1r_64x32_freepdk45
+RDWRRESOLUTION   RBW
+CATAPULT_EXIT 2 WALL 44s
+# Error:  insufficient resources 'sram_1rw1r_64x32_freepdk45.sram_1rw1r_64x32_freepdk45_rwport(1,64,5,32,64)' to schedule '/wa_d12g/vmem_mem_0/run'. 2 are needed, but only 1 instances are available (SCHD-4)
+
+== q5b_rw_1rw1r_rfirst_ii1
+MAP_TO_MODULE sram_1rw1r_64x32_freepdk45
+CATAPULT_EXIT 2 WALL 37s
+# Error:  insufficient resources 'sram_1rw1r_64x32_freepdk45.sram_1rw1r_64x32_freepdk45_rwport(1,64,5,32,64)' to schedule '/wa_d12g/vmem_mem_0/run'. 2 are needed, but only 1 instances are available (SCHD-4)
+
+== w512_rw_1rw1r_ii1
+MAP_TO_MODULE sram_1rw1r_64x512_freepdk45
+RDWRRESOLUTION   RBW
+CATAPULT_EXIT 2 WALL 41s
+# Error:  insufficient resources 'sram_1rw1r_64x512_freepdk45.sram_1rw1r_64x512_freepdk45_rwport(1,64,9,512,64)' to schedule '/wa_d12g/vmem_mem_0/run'. 2 are needed, but only 1 instances are available (SCHD-4)
+
+== w512_rwr_1rw1r_ii1
+MAP_TO_MODULE sram_1rw1r_64x512_freepdk45
+RDWRRESOLUTION   RBW
+CATAPULT_EXIT 2 WALL 43s
+# Error:  insufficient resources 'sram_1rw1r_64x512_freepdk45.sram_1rw1r_64x512_freepdk45_rwport(1,64,9,512,64)' to schedule '/wa_d12g/vmem_mem_0/run'. 2 are needed, but only 1 instances are available (SCHD-4)
+
+== w512_rwr_1rw1r_ii2
+MAP_TO_MODULE sram_1rw1r_64x512_freepdk45
+RDWRRESOLUTION   RBW
+CATAPULT_EXIT 0 WALL 48s
+      .csb1(1'b1),
+{'port_c_0': (2, 2), 'port_d_r_0': (2, 2), 'vmem_mem_0': (2, 3)}
+
+== q0w_rwrw_2rw_rbw_ww_ii1
+MAP_TO_MODULE sram_2rw_64x32_freepdk45
+RDWRRESOLUTION   RBW
+ignore_memory_precedences -from *write_mem(mem:rsc* -to *write_mem(mem:rsc*  ;# [hand-patch]
+CATAPULT_EXIT 2 WALL 33s
+# Error:  insufficient resources 'sram_2rw_64x32_freepdk45.sram_2rw_64x32_freepdk45_rwport(1,64,5,32,64)' to schedule '/wa_d12g/vmem_mem_0/run'. 3 are needed, but only 2 instances are available (SCHD-4)
+
+== q0a_rwrw_2rw_rbw_all_ii1
+MAP_TO_MODULE sram_2rw_64x32_freepdk45
+RDWRRESOLUTION   RBW
+ignore_memory_precedences -from *write_mem(mem:rsc* -to *write_mem(mem:rsc*  ;# [hand-patch]
+ignore_memory_precedences -from *write_mem(mem:rsc* -to *read_mem(mem:rsc*  ;# [hand-patch]
+ignore_memory_precedences -from *read_mem(mem:rsc* -to *write_mem(mem:rsc*  ;# [hand-patch]
+CATAPULT_EXIT 0 WALL 38s
+      .csb1(mem_rsc_csb1),
+{'port_c_0': (1, 1), 'port_d_0': (1, 1), 'vmem_mem_0': (1, 2)}
+
+== q0x_rwrw_2rw_rbw_cross_ii1
+MAP_TO_MODULE sram_2rw_64x32_freepdk45
+RDWRRESOLUTION   RBW
+ignore_memory_precedences -from *if:write_mem(mem:rsc* -to *if#1:write_mem(mem:rsc*  ;# [hand-patch]
+ignore_memory_precedences -from *if#1:write_mem(mem:rsc* -to *if:write_mem(mem:rsc*  ;# [hand-patch]
+ignore_memory_precedences -from *if:write_mem(mem:rsc* -to *else#1:*read_mem(mem:rsc*  ;# [hand-patch]
+ignore_memory_precedences -from *if#1:write_mem(mem:rsc* -to *else:*read_mem(mem:rsc*  ;# [hand-patch]
+ignore_memory_precedences -from *else:*read_mem(mem:rsc* -to *if#1:write_mem(mem:rsc*  ;# [hand-patch]
+ignore_memory_precedences -from *else#1:*read_mem(mem:rsc* -to *if:write_mem(mem:rsc*  ;# [hand-patch]
+CATAPULT_EXIT 0 WALL 35s
+      .csb1(mem_rsc_csb1),
+{'port_c_0': (1, 1), 'port_d_0': (1, 1), 'vmem_mem_0': (1, 2)}
+
+== q0u_rwrw_2rw_unknown_cross_ii1
+MAP_TO_MODULE sram_2rw_64x32_freepdk45
+RDWRRESOLUTION   RBW
+ignore_memory_precedences -from *if:write_mem(mem:rsc* -to *if#1:write_mem(mem:rsc*  ;# [hand-patch]
+ignore_memory_precedences -from *if#1:write_mem(mem:rsc* -to *if:write_mem(mem:rsc*  ;# [hand-patch]
+ignore_memory_precedences -from *if:write_mem(mem:rsc* -to *else#1:*read_mem(mem:rsc*  ;# [hand-patch]
+ignore_memory_precedences -from *if#1:write_mem(mem:rsc* -to *else:*read_mem(mem:rsc*  ;# [hand-patch]
+ignore_memory_precedences -from *else:*read_mem(mem:rsc* -to *if#1:write_mem(mem:rsc*  ;# [hand-patch]
+ignore_memory_precedences -from *else#1:*read_mem(mem:rsc* -to *if:write_mem(mem:rsc*  ;# [hand-patch]
+CATAPULT_EXIT 0 WALL 38s
+      .csb1(mem_rsc_csb1),
+{'port_c_0': (1, 1), 'port_d_0': (1, 1), 'vmem_mem_0': (1, 2)}
+
+== mid_sram_rbw_ii1
+MAP_TO_MODULE sram_2rw_64x512_freepdk45
+RDWRRESOLUTION   RBW
+CATAPULT_EXIT 2 WALL 37s
+# Error: Schedule failed, please check the following constraints. (SCHD-30)
+# $PROJECT_HOME/../kernel.cpp(857):    from operation MEMORYWRITE "while:if#1:write_mem(mem:rsc(0)(0).@)" with delay 0cy+0.10000000ns (SCHD-6)
+# $PROJECT_HOME/../kernel.cpp(828):    from operation MEMORYWRITE "while:if:write_mem(mem:rsc(0)(0).@)" with delay 0cy+0.10000000ns (SCHD-6)
+
+== E_small_1rw1r_rwr_ii1
+MAP_TO_MODULE sram_1rw1r_64x32_freepdk45
+RDWRRESOLUTION   UNKNOWN
+ignore_memory_precedences -from *:if:write_mem(mem:rsc* -to *while:v*read_mem(mem:rsc*
+ignore_memory_precedences -from *while:v*read_mem(mem:rsc* -to *:if:write_mem(mem:rsc*
+CATAPULT_EXIT 2 WALL 33s
+# Error:  insufficient resources 'sram_1rw1r_64x32_freepdk45.sram_1rw1r_64x32_freepdk45_rwport(1,64,5,32,64)' to schedule '/wa_d12g/vmem_mem_0/run'. 2 are needed, but only 1 instances are available (SCHD-4)
+
+== F_small_1rw1r_rw_ii1
+MAP_TO_MODULE sram_1rw1r_64x32_freepdk45
+RDWRRESOLUTION   UNKNOWN
+ignore_memory_precedences -from *while:v*read_mem(mem:rsc* -to *:if:write_mem(mem:rsc*
+ignore_memory_precedences -from *:if:write_mem(mem:rsc* -to *while:v*read_mem(mem:rsc*
+CATAPULT_EXIT 2 WALL 33s
+# Error:  insufficient resources 'sram_1rw1r_64x32_freepdk45.sram_1rw1r_64x32_freepdk45_rwport(1,64,5,32,64)' to schedule '/wa_d12g/vmem_mem_0/run'. 2 are needed, but only 1 instances are available (SCHD-4)
+
+== G_small_1rw1r_rwr_ii2
+MAP_TO_MODULE sram_1rw1r_64x32_freepdk45
+RDWRRESOLUTION   UNKNOWN
+ignore_memory_precedences -from *:if:write_mem(mem:rsc* -to *while:v*read_mem(mem:rsc*
+ignore_memory_precedences -from *while:v*read_mem(mem:rsc* -to *:if:write_mem(mem:rsc*
+CATAPULT_EXIT 0 WALL 37s
+      .csb1(1'b1),
+{'port_c_0': (2, 2), 'port_d_r_0': (2, 2), 'vmem_mem_0': (2, 3)}
