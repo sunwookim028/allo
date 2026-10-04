@@ -339,6 +339,14 @@ unit and U1's ALU in a VPU lane. RTL-side ``generate if`` + decoder refusal
 to be synced with ``minitpu-comp`` later. One draft left: derived-parameter
 legality (README D-20).
 
+**Checkpoint 17, 2026-10-04:** D-20 (derived parameters as properties;
+relations as legality; bookings vs manifest) **approved as drafted**. All five
+composition drafts are now decisions: D-15 engines, D-17 instantiation, D-18
+schedules travel, D-19 optional modules, D-20 derived legality (D-16 is the
+ISA-version pin). Implementation: ``compose-engines`` (D-15/17/18/19 and
+D-20's ``Architecture.parameters`` record); harness manifest-vs-booking on
+``harness-bookings``.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*

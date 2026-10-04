@@ -422,6 +422,26 @@ instance's ISA is the slots its modules bring.**
 - Evidence: `dev/records/minitpu/u3_composition_design_2026-10-04.rst` §4
   (H15); prototype `examples/minitpu/template/optional.py`.
 
+**D-20 (2026-10-04). A derived parameter is a property, and every relation it
+rests on is a legality condition.**
+- A geometry is a frozen record whose derived numbers (`LEVELS`, the tap
+  level, the switch span, push->valid, a composite's latency) are properties
+  computed from the declared ones and the bound engines' declared latencies;
+  none is a field, so none can be typed in beside the number it must equal.
+- Each relation a unit's correctness rests on is a `legality` on that unit,
+  run at composition, naming the parameter and the consequence; never an
+  assertion in a testbench (MiniTPU's own tap relation lived only there,
+  `UNITS.md` §5, §8.3).
+- A derived latency is a booking (D-10): the harness compares it with the
+  manifest's measured value per (unit, backend, clock) and a difference is a
+  recorded verdict. The assembler reads the booking from the composed
+  instance, never a constant. This is what makes a later re-pin (D-16) safe:
+  a changed adder latency moves every dependent number through one relation.
+- Evidence: `dev/records/minitpu/u3_composition_design_2026-10-04.rst` §5;
+  prototype `examples/minitpu/template/legality.py` -- twelve derived numbers
+  equal Phase 0's measurements (push->valid 12/22/82, span 5/15/75, PE 4,
+  `vmatpush` 85, tree 13/9 and 9/5), five wrong declarations refused.
+
 ## Milestones
 
 Each milestone passes on **one acceptance check** and names the tools it uses
