@@ -347,6 +347,23 @@ ISA-version pin). Implementation: ``compose-engines`` (D-15/17/18/19 and
 D-20's ``Architecture.parameters`` record); harness manifest-vs-booking on
 ``harness-bookings``.
 
+**U3 track D landed** (``u3_track_d_2026-10-04.rst``, branch ``u3-openhls``):
+RTLGen matches the SFU (462,144/462,144, II=1) and the PE (360,202/360,202
+per cycle, II=1) and the tree at N=16 only in a textually inlined form
+(II=4: 16 lane reads on a 4-port memory); AMC matches the PE (II=1 after
+rewriting carried scalars as 1-element arrays; Vivado OOC 1,327 LUT, ~174
+MHz on the adder recurrence) and is **blocked** on the tree (compiler
+assertion on any chain of >= 3 carried registers). H2: neither tool has a
+"ROM from file" -- RTLGen keeps table contents as a BRAM-style ``initial``
+block widened to 32 b; **AMC emits the ROM empty** (contents dropped). New
+**silent miscompiles**: RTLGen D1 -- a loop-carried shift pipe collapses to
+one stage whenever the body is decomposed (nested call or inner ``for``),
+even at reported II=1; AMC A-D1 -- constant-table contents dropped. Also
+AMC A-D2 (crash: >= 3 carried registers), RTLGen D2/D3 (nested kernels are
+sequenced instances; lane-array ports become few-port memories). Recorded,
+not filed (P-10). All RTLGen/AMC numbers are FPGA estimates (u55c / Vivado
+OOC); no ASIC run of their SV yet.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
