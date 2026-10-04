@@ -1,0 +1,375 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+###########################################################################
+U3 track B: the matrix path -- ``mxu_pe``, ``mxu_systolic_array``, ``mxu``
+###########################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-04.** zhang-21, branch ``u3-mxu``
+   from ``u1-pilot`` at ``dab9e7b4`` (Phase 0 merged), worktree
+   ``scratch/wt-u3b`` with its own bindings build. MiniTPU at
+   ``b3ba0a4d``, read only. Verilator 5.052; the RTL oracles and their
+   Verilator builds are Phase 0's (``u3_phase0_2026-10-04.rst``), unchanged.
+   Backends: the Allo simulator and SystemC csim (track C owns Catapult).
+   Nothing under ``allo/`` or ``mlir/`` changed. The owner is away: every
+   call below is *provisional* under D-9 and listed for review in
+   "Decisions taken here"; the plan is ``u3_plan_2026-10-04.rst`` (track B =
+   P1, P2, A1, M1; hypotheses H6, H7, H9, H12).
+
+Reproduce (``source examples/minitpu/harness/env-zhang21.sh`` first; the
+Verilator caches for the three units exist from Phase 0)::
+
+   $ALLO_PYTHON -m examples.minitpu.harness.check mxu_pe --backend simulator --backend systemc   # bits, unit (~2 min)
+   $ALLO_PYTHON -m examples.minitpu.harness.check mxu_systolic_array --inst dim4 --backend simulator --backend systemc
+   $ALLO_PYTHON -m examples.minitpu.harness.check mxu --inst dim4 --backend simulator --backend systemc
+   $ALLO_PYTHON dev/records/minitpu/u3_track_b_2026-10-04/repros/compose_nested_def.py
+
+Logs: ``u3_track_b_2026-10-04/check_*.log`` (one per unit, instance and
+variant, the ``UNIT-MATCH`` lines are the verdicts).
+
+Files:
+
+* ``examples/minitpu/units/mxu_pe.py``: variants ``bits`` (P1) and ``unit``
+  (P2, the standalone wrapper), ``WIDTH``, ``RESP_SHIFT``.
+* ``examples/minitpu/units/mxu_pe_unit.py`` (new): ``pe_unit`` (the PE as a
+  ``compose.unit``), ``pe_channels``, the PE driver/sink and the array
+  driver/sink units.
+* ``examples/minitpu/units/mxu_systolic_array.py``: variant ``streams``
+  (A1), ``random_trace_fwd``, ``TRACES``.
+* ``examples/minitpu/units/mxu_unit.py`` (new): ``mxu_front``, ``mxu_back``,
+  ``mxu_channels`` (M1).
+* ``examples/minitpu/units/mxu.py``: variant ``lockstep`` (M1).
+* ``examples/minitpu/harness/check.py``: a per-variant trace set
+  (``TRACES``) and a negative ``RESP_SHIFT``.
+
+The one idea: the cycle model in token time
+===========================================
+
+Every Allo form here runs **one kernel iteration per RTL cycle** and carries
+**one token per link per cycle**, and a unit emits its registered state
+*before* it applies the cycle's update. Then the token a neighbour gets at
+iteration ``t`` is the register the RTL neighbour sees during cycle ``t``,
+and a grid of such units over ``Stream`` links is the RTL's cycle model
+with the cycle replaced by the token index. On the simulator (order-only)
+and in SystemC csim (per iteration) that is exactly what ``check.py``
+compares, so the PE, the array and the whole MXU are held to Phase 0's
+per-cycle oracles -- the PE and array to their cycle models, the MXU to its
+push / commit / pop contract -- and **match on every defined slot**. What a
+tool makes of a token in real cycles (Catapult: ~3 cycles per Stream link,
+``u3_fifo_composed``) is where the plan's H7 mismatch lives, and that is
+track C's column. This is checkpoint 6's "pipe-as-data is the reference
+form of a registered pipeline" applied to a whole composition.
+
+Results
+=======
+
+Every ``UNIT-MATCH`` below is on every defined slot of the joined trace
+(Phase 0's directed + random traces, and for ``mxu:dim2`` the
+``tb_mxu_single_port`` seed), masked slots counted; "masked equal" is how
+many masked slots matched anyway.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 12 12 16 38
+
+   * - unit:instance / variant
+     - simulator
+     - SystemC csim
+     - defined slots
+     - masked (equal) and notes
+   * - ``mxu_pe`` / ``bits`` (P1)
+     - **match**
+     - **match**
+     - 360,202 (7 traces, 60,090 cycles)
+     - 338 reset-fill (337); every output per cycle, mid-stream resets included
+   * - ``mxu_pe`` / ``unit`` (P2)
+     - **match**
+     - **match**
+     - 360,196
+     - 338 (337); 6 fewer slots: the first token of each port is the pre-reset state (shift -1)
+   * - ``mxu_systolic_array:dim2`` / ``streams`` (A1)
+     - **match**
+     - **match**
+     - 79,983 (4 traces, 40,136 cycles)
+     - 287 (284); tiles + forward-consistent random
+   * - ``mxu_systolic_array:dim4`` / ``streams``
+     - **match**
+     - **match**
+     - 79,849 (40,220 cycles)
+     - 589 = 581 reset-fill + 8 uninit (582); build 16.5 s / 8.3 s
+   * - ``mxu_systolic_array:dim16`` / ``streams``
+     - **match**
+     - not run (P-4: shipped geometry once, on the simulator)
+     - 13,110 (4 traces, 6,738 cycles)
+     - 364 = 320 reset-fill + 44 uninit (333); 256 PE kernels: **build 346 s, run 92 s**
+   * - ``mxu:dim2`` / ``lockstep`` (M1)
+     - **match**
+     - **match**
+     - 151,172 (14 traces, 42,115 cycles)
+     - 17,288 masked = 17,139 no valid + 145 bank overwrite + 4 before reset (17,245 equal);
+       the 7 legal, 3 illegal and 3 random programs and the seed
+   * - ``mxu:dim4`` / ``lockstep``
+     - **match**
+     - **match**
+     - 111,067 (13 traces, 31,071 cycles)
+     - 13,217 masked = 13,115 no valid + 98 bank overwrite + 4 before reset (13,162); build 16 s / 9 s, run 5 s / 30 s
+   * - ``mxu:dim16`` / ``lockstep``
+     - **match**
+     - not run (P-4)
+     - 33,063 (13 traces, 9,924 cycles)
+     - 6,633 masked = 6,508 no valid + 121 bank overwrite + 4 before reset (6,507); **build 367 s, run 205 s**
+
+Hypotheses (plan section 4): **H6** holds on both columns (P1 bit-exact per
+cycle; the simulator and csim are function-only columns, latency unchecked
+by design of ``check.py``). **H7** did *not* appear on these columns: in
+token time the Stream grid IS the cycle model (above); the mismatch is
+deferred to a timed backend, where it is expected. **H9**: the overflow
+program's drop is reproduced on every lane (the ``overflow`` slots are
+defined and match), by an explicit ring with ``vpu_fifo``'s rules rather
+than by ``try_put`` (finding 3). **H12**: no wide-port finding recurred --
+every region port is a lane array (P-8), and the 64-bit *internal* streams
+(``wx``) read back exactly in csim (S8 is a region-port testbench problem).
+
+The three expressions
+=====================
+
+``mxu_pe`` / ``bits`` (P1)
+--------------------------
+
+One ``@df.kernel`` over the 9 input and 6 output port arrays of the trace.
+Every register of ``mxu_pe.sv`` is a kernel-local scalar: the two pending
+banks, the active weight, ``lhs_q``/``product_q``/``psum_q``, the valid and
+commit forwards, and the acc24 adder's stage registers packed as
+``mxu_acc24_add_pipe.sv`` holds them (20-bit magnitude, 9-bit exponent,
+sign, 2-bit special class in one ``uint32``, as U1's ``staged`` packs them).
+Per iteration: stage 3 from the s2 registers, stage 2 from s1, stage 1 from
+``product_q``/``psum_q``, the multiplier (U1's ``mul_acc24.bits`` inline)
+from ``lhs_i`` and the *old* active weight, then the edge: under reset the
+special-class stages and valids clear and the result is 0 while the payload
+flows (D-14, P-9) -- which is why 337 of the 338 "reset fill" slots the
+reference masks match too. Workarounds carried: S6 (every port read
+unconditional), B1 (spare top bit on unsigned compares, from U1).
+
+``mxu_pe`` / ``unit`` (P2) and ``mxu_pe_unit.pe_unit``
+-------------------------------------------------------
+
+The same datapath as a ``compose.unit`` body with three stream port arrays::
+
+   lhsx[i, j] -> lhsx[i, j+1]   UInt(32): lhs[0:16] lhs_valid[16] commit[17] bank[18] rst_n[19]
+   wx[i, j]   -> wx[i+1, j]     UInt(64): pending0[0:16] pending1[16:32] weight_valid[32:34]
+   px[i, j]   -> px[i+1, j]     UInt(32): psum[0:24] psum_valid[24]
+
+Per iteration it gets its three tokens, puts the three tokens of its
+registered state (plus ``rst_n`` and ``weight_valid`` passed through
+combinationally: the RTL's global reset and the array's column broadcast),
+then computes and updates. Three choices, all inside ``mxu.sv``'s
+implementation freedom:
+
+* **The bank bit rides east with the commit.** ``mxu_systolic_array.sv``
+  takes ``weight_commit_bank_i[r][c]`` per PE; ``mxu.sv`` drives it from
+  ``commit_bank_skew[r*PE + c]``, a pure delay line of ``loaded_bank_q``
+  that a PE reads only with a commit. A PE that registers the bank with the
+  commit and forwards both sees ``commit_bank_skew[r*PE](t - c)`` --
+  the same value at every cycle. The array variant's random traces are
+  generated with that property (``random_trace_fwd``) and the RTL takes
+  them as any trace; the tiles already have it.
+* **``ROW0_PSUM_ZERO``** wires row 0's partial sum to ``'0`` with
+  ``psum_valid = lhs_valid`` (``meta_if(i > 0 or ROW0_PSUM_ZERO == 0)``),
+  so the standalone check can still drive ``psum_i``.
+* **``EDGE_OUT``** makes the last column and bottom row emit their east and
+  south tokens (the standalone sink reads them; in the array nothing does).
+
+The standalone check composes driver -> ``pe_unit`` (1 x 1) -> sink with
+``Architecture`` over the trace's port arrays as ``compose.Memory``\ s. The
+sink's token ``t`` is the PE's state during cycle ``t`` = the RTL's post
+output of ``t - 1``, hence ``RESP_SHIFT = -1`` on every port.
+
+``mxu_systolic_array`` / ``streams`` (A1)
+-----------------------------------------
+
+``Architecture(units=(array_drive, pe_unit, array_sink))`` with
+``pe_unit.instances = ("D", "D")``: the driver turns a cycle of the array's
+ports into D west and D north tokens (``meta_for``), the sink reads the
+bottom row's D psum tokens. ``mapping=[16, 16]`` builds and runs (below).
+The trace set is the variant's own (``TRACES["streams"]``: the two tiles
+traces and two forward-consistent random traces of the same length); the
+reference is unchanged.
+
+``mxu`` / ``lockstep`` (M1)
+---------------------------
+
+``Architecture(units=(mxu_front, pe_unit, mxu_back))`` plus a ``ctl``
+stream (``rst_n``) from front to back.
+
+* **``mxu_front``** reads the push ports, keeps the input FIFO as the one-word
+  head register it is in use (``u3_fifo_composed`` Part A: never more than one
+  word; so ``input_ready_o`` = 1 and ``input_accept_o(t)`` = ``push(t-1)``),
+  the activation skew lines as two arrays shifted every cycle (payload
+  unreset, valids reset: ``mxu.sv:208-228``), the commit skew and the
+  bank skew as the RTL's shift registers, and the load/loaded bank toggle.
+  Row ``r``'s west token at ``t`` is ``(lhs_skew_data_q[r][r*PE],
+  lhs_skew_valid_q[r][r*PE], weight_switch_skew[r*PE], commit_bank_skew[r*PE],
+  rst_n)``; column ``c``'s north token is ``(lane_input_data[c]`` in both
+  banks, ``rhs_beat && load_bank_q == b)``.
+* **``mxu_back``** gets the bottom row's psum tokens (``array_result`` during
+  cycle ``t``), gathers ``NUM_SUBLANES`` ``pack_bf16`` results per lane into a
+  64-bit group (``gather_index_q`` reset, ``gather_q`` payload), and keeps one
+  explicit ring of 16 groups per lane with ``vpu_fifo``'s rules: a push on
+  full without a pop is **dropped** (``mxu.sv:44``), a pop while not valid
+  is ignored, pointers clear on reset, storage does not. Its outputs are
+  the state before the edge (the contract's ``"pre"``): ``output_valid_o``
+  = AND of lane non-empty, ``output_data_o`` = every lane's head group.
+* Ports are lane arrays: ``input_data_i`` as ``UInt(16)[N * D]``,
+  ``output_data_o`` as ``UInt(16)[N * D * SUB]`` (sublane ``s`` of lane ``c``
+  at ``s*D + c``, the RTL's ``[sublane][lane]`` packing).
+
+Why not the Stream FIFOs of ``u3_fifo_composed``'s recommendation: finding 3.
+
+Findings
+========
+
+1. **``compose.Unit.check`` reports a nested helper ``def`` as undeclared
+   free names** (``repros/compose_nested_def.py``: "the body uses
+   ['helper', 'v'] without declaring them"). ``free_names`` binds only
+   ``Name`` stores, function arguments and ``with ... as``, so a nested
+   ``FunctionDef``'s name and its own parameters leak. Class: **bug**
+   (compose, minor); workaround: the leading-zero count is an inline loop
+   in ``pe_unit`` where ``bits`` keeps U1's ``leading_zeros19`` helper.
+   Proposed fix: in ``Unit.free_names``, add ``FunctionDef.name`` and the
+   nested function's ``args`` to ``bound``. No patch here (``allo/``).
+2. **A unit body's annotations must be lazy** (``from __future__ import
+   annotations``), because ``UInt(16)[N * D]`` names a parameter bound only
+   when the ``Architecture`` emits the region; a unit in a module with eager
+   annotations fails at import (``NameError: N``). TinyTPU's unit files
+   already do this; it is the reason ``pe_unit`` lives in ``mxu_pe_unit.py``
+   rather than beside ``bits``. Class: **workaround** (documentation gap in
+   ``compose``; the trace variants' ``@df.region`` need eager annotations).
+3. **The FIFOs-as-Streams composite cannot be held to a cycle on the
+   untimed simulator** (semantic mismatch, by design -- the finding of
+   ``u3_fifo_composed`` ("``try_*`` are scheduling-dependent") carried up to
+   the composite). A front that ``try_get``\ s an input Stream every cycle,
+   or a pop engine that polls ``empty()`` on the lane Streams, reads a
+   FIFO's *occupancy*, and on a simulator where each kernel runs as far as
+   its streams allow, occupancy at "iteration ``t``" is whatever the
+   scheduler made it. The contract fixes ``output_valid_o`` to a cycle
+   (``2 + DIM*(PE+1)`` after the last push) and defines ``output_data_o`` on
+   **every** valid cycle, not only on pops -- the latter needs the head
+   visible without a pop, which a Stream has no peek for (H6 of the FIFO
+   record). So M1 keeps the lane FIFOs as explicit rings in the back kernel
+   (the U2 ``trace`` form, bit-exact on the overflow drop) and the input
+   FIFO as the head register it is in use. A Stream form is a probe for a
+   timed backend (track C), with the contract compared on pop data in order
+   and the push -> valid distance reported (P-3), as the FIFO record did.
+   Making the Stream form deterministic on the simulator would need a
+   per-cycle handshake token between the gather and the pop kernel (a
+   "cycle" the simulator does not have) and a head register per lane.
+
+   **Measured** (``repros/probe_streams_fifo.py`` with
+   ``repros/mxu_streams_units.py``: the same front and grid, a gather that
+   ``try_put``\ s each finished group into ``laneq[c]: Stream[UInt(64), 16]``,
+   a pop engine that polls ``empty()`` and ``get``\ s on a pop; DIM 2, five
+   programs; ``probe_streams_fifo.log``):
+
+   .. list-table::
+      :header-rows: 1
+      :widths: 14 18 22 22 24
+
+      * - program
+        - pops (RTL)
+        - simulator: pops delivered / first valid
+        - csim: pops delivered / first valid (RTL 19)
+        - drops (reference)
+      * - identity
+        - 1
+        - 0 / never
+        - 0 / never
+        - 0 / 0 (0)
+      * - fifo-full-exact
+        - 16
+        - 0 / never
+        - 1 / 92
+        - 0 / 0 (0)
+      * - waiting-pops
+        - 4
+        - 0 / never
+        - 0 / never
+        - 0 / 0 (0)
+      * - overflow
+        - 16
+        - 0 / never
+        - 2 / 92
+        - sim 2 / csim 0 (2)
+      * - random-0
+        - 2,423
+        - 0 / never
+        - 943 / 96
+        - sim 4,814 / csim 2,924 (0)
+
+   On the simulator the pop engine ran all its iterations before the gather
+   pushed anything (``empty()`` was 1 at every poll), so no pop ever fired
+   and the lanes then overflowed; the two ``overflow`` drops agree with the
+   reference only because nothing was popped either way. In csim the pop
+   engine's iteration ``t`` runs some 70 clocks ahead of the gather's: the
+   first group is seen at 92, a pop fires only where the program happens to
+   hold ``output_pop_i`` long enough, and every group popped is the right
+   one in order (943/943) -- the *contract* data is intact, the *cycle* is
+   gone, as the FIFO record found for one FIFO.
+4. **Scale (simulator)**: build and run times are in the table and logs;
+   the simulator builds the 256-kernel array in 346 s and runs 6,738 cycles in 92 s (DIM 4: 16.5 s / 4.3 s), csim at DIM 4 in 8 s / 35 s. Linear in PE count for the build, so the shipped geometry is a once-per-variant run (P-4), not a gate.
+5. **``Architecture._check`` refuses a dangling channel** -- composing the
+   front with a recording sink and no grid was refused with "nothing writes
+   'px'" (the probe had to drop the channel). That is H15's question
+   answered on this path: an optional module removed without its channel is
+   refused, not silently accepted.
+6. **Harness**: ``check.py``'s ``RESP_SHIFT`` loop could not take a negative
+   shift (``range(k, n)`` with ``k < 0`` compared ``got[0]`` with
+   ``rtl[-1]``); it now iterates ``range(max(0, k), n + min(0, k))``. A
+   per-variant trace set (``TRACES``) was added for A1's forward-consistent
+   random traces; the RTL is run once per distinct trace set.
+7. **One modelling slip, caught by the oracle**: the first M1 front toggled
+   ``loaded_bank <= load_bank`` after updating ``load_bank`` (a blocking
+   read of a non-blocking pair), so every tile committed the empty bank
+   and ``identity`` returned zeros. The per-token probe of the front alone
+   (``scratch``: west/north tokens against the expected edge signals) found
+   it in one dump; worth keeping as the method for a composite.
+8. The simulator warns ``Input type mismatch: ui8 vs ui1`` once per build
+   for a ``uint1[n]`` region argument fed a ``numpy.uint8`` array; benign
+   (U2 did the same), noted so no one chases it.
+
+Decisions taken here (provisional, D-9; for the owner)
+=====================================================
+
+* **P-11 (new). A Stream-linked composition is judged as the RTL's cycle
+  model in token time on the simulator and in csim**: each unit emits its
+  registered state before its update, one token per link per cycle. Under
+  it the array A1 gets a cycle-model verdict on these two columns (not only
+  a contract verdict at ``mxu``, as P-2 anticipated), and the H7 mismatch
+  is located precisely in the timed backends. *Reason:* it is checkpoint
+  6's pipe-as-data at the composition level, and it is the only form in
+  which an untimed simulator can be held to Phase 0's per-cycle oracles at
+  all (finding 3). Relates to O1.
+* **P-12 (new). M1's FIFOs are explicit rings / a head register, not
+  Streams, for the simulator/csim verdict** (finding 3); the Stream form
+  (``u3_fifo_composed``'s recommendation) is track C's probe with the
+  contract compared in pop order. *Reason:* the contract defines
+  ``output_data_o`` on every valid cycle and fixes ``output_valid_o`` to a
+  cycle; neither is observable through a Stream on an untimed simulator.
+* **P-13 (new). The PE's bank bit rides east with the commit.** *Reason:*
+  equal to ``mxu.sv``'s delay line at every cycle (above); it removes the
+  D x D per-PE input from the array's interface and D x D streams from the
+  front. The array's random stimulus is restricted to forward-consistent
+  bank bits, which is what any ``mxu.sv``-driven array ever sees.
+* P-5 holds: the acc24 chain and one ``pack_bf16`` are bit-exact on every
+  program; no float32 anywhere.
+* P-8 holds: every region port is a lane array; nothing wider than 64 bits
+  crosses the region boundary; 64-bit internal streams are fine in csim.
+
+Not done
+========
+
+* The Stream-FIFO form of M1 (finding 3) and its Catapult run (track C).
+* Catapult and DC on any of the three (track C); RTLGen / AMC (track D).
+* A2 (Wire-locked grid, expected blocked, H8) was not attempted here.
+* ``mxu`` with a non-default ``NUM_SUBLANES`` or output depth (as Phase 0).

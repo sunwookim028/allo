@@ -1,0 +1,3 @@
+RTL mxu_systolic_array:dim16: 6738 cycles in 4 traces, 13112 defined slots, RTL vs reference on defined: 13112/13112 (5.4s)
+UNIT-MATCH mxu_systolic_array:dim16 streams simulator 13110/13110 defined (364 masked: reset fill=320, uninit=44; allo==rtl on 333) cycle=order-only (build 346.5s, run 91.6s)
+EXIT 0

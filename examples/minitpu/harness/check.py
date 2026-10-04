@@ -27,6 +27,12 @@ counted by reason (owner decision: masked and counted, not refused)::
 ``cycle=`` says what an iteration is on that backend: on the simulator an
 *order* only; in SystemC csim the check compares values per iteration and
 does not look at time; per-cycle timing is checked on Catapult RTL only.
+
+A unit may give a variant its own trace set (``TRACES = {variant: fn(inst)}``,
+U3: a Stream-linked composite cannot see a mid-trace reset) and a per-port
+shift ``RESP_SHIFT = {variant: {port: k}}``: ``got[t]`` is held against the
+RTL's row ``t + k`` (``k < 0`` for a token that is the state DURING cycle
+``t``, i.e. the RTL's post output of ``t - 1``).
 """
 
 import argparse
@@ -77,11 +83,13 @@ def classify(stim, got, want, explain):
 CYCLE_SEEN = {"simulator": "order-only", "systemc": "per-iteration, time unchecked"}
 
 
-def _trace_all(u, inst, n_max=0):
-    """Every trace of the instance joined end to end, with label spans."""
+def _trace_all(u, inst, n_max=0, variant=None):
+    """Every trace of the instance joined end to end, with label spans. A
+    variant listed in ``u.TRACES`` gets that trace set instead of ``u.traces``."""
     from examples.minitpu.harness.traces import concat
 
-    parts = [(lab, c) for lab, c, _legal in u.traces(inst)]
+    traces = getattr(u, "TRACES", {}).get(variant, u.traces)
+    parts = [(lab, c) for lab, c, _legal in traces(inst)]
     for lab, sinst, c, _seen, _legal in (u.seeds() if hasattr(u, "seeds") else []):
         if sinst == inst:
             parts.append((lab, c))
@@ -103,19 +111,26 @@ def check_trace(u, args):
     inst = args.inst or u.DEFAULT
     unit = u.INSTANCES[inst]
     w = u.WIDTH[inst]
-    cmd, spans = _trace_all(u, inst, args.n)
-    n = len(next(iter(cmd.values())))
-    packed = {p: rtl.pack(cmd[p], wd) for p, wd in unit.inputs}
-    t = time.time()
-    rtl_out = rtl.run_trace(unit, packed, seed=1)
-    want, reason, _ = u.REF(inst, packed)
-    ndef = sum(int((reason[p] == "").sum()) for p in want)
-    bad_ref = sum(int(((reason[p] == "") & (rtl_out[p] != want[p]).any(axis=1)).sum()) for p in want)
-    print(f"RTL {unit.top}:{inst}: {n} cycles in {len(spans)} traces, {ndef} defined slots, "
-          f"RTL vs reference on defined: {ndef - bad_ref}/{ndef} ({time.time() - t:.1f}s)", flush=True)
-    rtl_int = {p: rtl.unpack(rtl_out[p]) for p in want}
-    bad_any = bad_ref != 0
+    bad_any = False
+    rtl_cache = {}  # trace-set id -> (cmd, spans, rtl_int, want, reason)
     for variant in args.variant or list(u.VARIANTS):
+        key = id(getattr(u, "TRACES", {}).get(variant, u.traces))
+        if key not in rtl_cache:
+            cmd, spans = _trace_all(u, inst, args.n, variant)
+            n = len(next(iter(cmd.values())))
+            packed = {p: rtl.pack(cmd[p], wd) for p, wd in unit.inputs}
+            t = time.time()
+            rtl_out = rtl.run_trace(unit, packed, seed=1)
+            want, reason, _ = u.REF(inst, packed)
+            ndef = sum(int((reason[p] == "").sum()) for p in want)
+            bad_ref = sum(int(((reason[p] == "") & (rtl_out[p] != want[p]).any(axis=1)).sum()) for p in want)
+            print(f"RTL {unit.top}:{inst}: {n} cycles in {len(spans)} traces, {ndef} defined slots, "
+                  f"RTL vs reference on defined: {ndef - bad_ref}/{ndef} ({time.time() - t:.1f}s)", flush=True)
+            rtl_int = {p: rtl.unpack(rtl_out[p]) for p in want}
+            bad_any |= bad_ref != 0
+            rtl_cache[key] = (cmd, spans, rtl_int, want, reason)
+        cmd, spans, rtl_int, want, reason = rtl_cache[key]
+        n = len(next(iter(cmd.values())))
         for backend in args.backend or ["simulator"]:
             t = time.time()
             prj = os.path.join(args.project, f"{args.unit}_{inst}_{variant}_{backend}")
@@ -145,7 +160,7 @@ def check_trace(u, args):
                 g = [int(x) for x in got[p]]
                 r = rtl_int[p]
                 k_shift = shift.get(p, 0)
-                for i in range(k_shift, n):
+                for i in range(max(0, k_shift), n + min(0, k_shift)):
                     why = reason[p][i]
                     if why:
                         masked += 1

@@ -1,0 +1,10 @@
+simulator identity         pops: rtl 1 allo 0 data-in-order 0/1 | output_valid per cycle 25/26 | first valid rtl 19 allo None | drops allo 0 ref 0
+simulator fifo-full-exact  pops: rtl 16 allo 0 data-in-order 0/16 | output_valid per cycle 25/105 | first valid rtl 19 allo None | drops allo 0 ref 0
+simulator waiting-pops     pops: rtl 4 allo 0 data-in-order 0/4 | output_valid per cycle 43/47 | first valid rtl 19 allo None | drops allo 0 ref 0
+simulator overflow         pops: rtl 16 allo 0 data-in-order 0/16 | output_valid per cycle 26/110 | first valid rtl 19 allo None | drops allo 2 ref 2
+simulator random-0         pops: rtl 2423 allo 0 data-in-order 0/2423 | output_valid per cycle 5601/13883 | first valid rtl 20 allo None | drops allo 4814 ref 0
+systemc   identity         pops: rtl 1 allo 0 data-in-order 0/1 | output_valid per cycle 25/26 | first valid rtl 19 allo None | drops allo 0 ref 0
+systemc   fifo-full-exact  pops: rtl 16 allo 1 data-in-order 1/16 | output_valid per cycle 20/105 | first valid rtl 19 allo 92 | drops allo 0 ref 0
+systemc   waiting-pops     pops: rtl 4 allo 0 data-in-order 0/4 | output_valid per cycle 43/47 | first valid rtl 19 allo None | drops allo 0 ref 0
+systemc   overflow         pops: rtl 16 allo 2 data-in-order 2/16 | output_valid per cycle 25/110 | first valid rtl 19 allo 92 | drops allo 0 ref 2
+systemc   random-0         pops: rtl 2423 allo 943 data-in-order 943/2423 | output_valid per cycle 8517/13883 | first valid rtl 20 allo 96 | drops allo 2924 ref 0

@@ -35,9 +35,15 @@ parameter; ``NUM_SUBLANES = 4`` and the output depth (64 rows = 16 groups)
 come from ``vpu_pkg`` defaults.
 """
 
+import numpy as np
+
+from allo.compose import Architecture, Memory
+
 from examples.minitpu.harness import ref_mxu, rtl
 from examples.minitpu.harness.traces import Trace, rng_for
 from examples.minitpu.units.mxu_pe import bf16
+from examples.minitpu.units.mxu_pe_unit import pe_channels, pe_unit
+from examples.minitpu.units.mxu_unit import mxu_back, mxu_channels, mxu_front
 
 SOURCES = ["src/core/vpu/vpu_pkg.sv", "src/core/vpu/vpu_fifo.sv",
            "src/core/mxu/mxu_bf16_mul_acc24.sv", "src/core/mxu/mxu_acc24_add_pipe.sv",
@@ -396,4 +402,49 @@ def seeds():
     return [("tb_mxu_single_port", "dim2", cmd, seen, True)]
 
 
-VARIANTS = {}
+# ---------------------------------------------------------------------------
+# Allo variant (U3 track B, ``dev/records/minitpu/u3_track_b_2026-10-04.rst``).
+#
+# ``lockstep`` (plan M1, composed): ``mxu_unit.mxu_front`` (input head
+# register, skew lines as data) -> ``mxu_pe_unit.pe_unit`` D x D grid over
+# Streams (plan A1) -> ``mxu_unit.mxu_back`` (gather, ``pack_bf16``, one
+# explicit ring per lane, the pop), composed by ``allo.compose.Architecture``;
+# one token per link per cycle, judged per cycle on the contract
+# (``ref_mxu.mxu_trace``), illegal programs included (the ring drops as
+# ``vpu_fifo`` does). Ports are lane arrays (P-8): ``input_data_i`` as
+# ``UInt(16)[N * D]``, ``output_data_o`` as ``UInt(16)[N * D * SUB]`` with
+# sublane ``s`` of lane ``c`` at ``s * D + c``, the RTL's packing.
+# ---------------------------------------------------------------------------
+
+WIDTH = dict(DIMS)
+
+
+def run_lockstep(mod, cmd, n, w):
+    D = w
+    data = [(int(v) >> (16 * c)) & 0xFFFF for v in cmd["input_data_i"][:n] for c in range(D)]
+    ins = [np.asarray(cmd["rst_ni"][:n], dtype=np.uint8), np.asarray(cmd["input_push_i"][:n], dtype=np.uint8),
+           np.asarray(cmd["input_kind_i"][:n], dtype=np.uint8), np.asarray(data, dtype=np.uint16),
+           np.asarray(cmd["weight_commit_i"][:n], dtype=np.uint8), np.asarray(cmd["output_pop_i"][:n], dtype=np.uint8)]
+    rdy, acc, vld = (np.zeros(n, dtype=np.uint8) for _ in range(3))
+    od = np.zeros(n * D * SUB, dtype=np.uint16)
+    mod(*ins, rdy, acc, vld, od)
+    k = D * SUB
+    out = [sum(int(od[t * k + i]) << (16 * i) for i in range(k)) for t in range(n)]
+    return {"input_ready_o": rdy, "input_accept_o": acc, "output_valid_o": vld, "output_data_o": out}
+
+
+def lockstep(n, w, inst):
+    D = DIMS[inst]
+    PE = ref_mxu.PE_LATENCY
+    mems = (Memory("RST", "UInt(1)[N]"), Memory("PUSH", "UInt(1)[N]"), Memory("KIND", "UInt(1)[N]"),
+            Memory("DATA", "UInt(16)[N * D]"), Memory("CMT", "UInt(1)[N]"), Memory("POP", "UInt(1)[N]"),
+            Memory("RDY", "UInt(1)[N]"), Memory("ACC", "UInt(1)[N]"), Memory("VLD", "UInt(1)[N]"),
+            Memory("ODATA", "UInt(16)[N * D * SUB]"))
+    params = {"N": n, "D": D, "PE": PE, "SUB": SUB, "ENTRIES": ENTRIES, "SKEW": (D - 1) * PE + 1,
+              "SPAN": ref_mxu.switch_span(D), "ROW0_PSUM_ZERO": 1, "EDGE_OUT": 0}
+    arch = Architecture(name=f"mxu_{inst}", parameters=params, memories=mems,
+                        channels=mxu_channels(pe_channels()), units=(mxu_front, pe_unit, mxu_back))
+    return arch.region()
+
+
+VARIANTS = {"lockstep": (lockstep, run_lockstep)}

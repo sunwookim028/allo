@@ -1,0 +1,3 @@
+RTL mxu:dim16: 9924 cycles in 13 traces, 33063 defined slots, RTL vs reference on defined: 33063/33063 (25.1s)
+UNIT-MATCH mxu:dim16 lockstep simulator 33063/33063 defined (6633 masked: bank overwrite=121, before reset=4, no valid=6508; allo==rtl on 6507) cycle=order-only (build 367.1s, run 204.9s)
+EXIT 0

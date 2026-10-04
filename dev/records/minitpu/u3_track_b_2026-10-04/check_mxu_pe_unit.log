@@ -1,0 +1,11 @@
+RTL mxu_pe:pe: 60090 cycles in 7 traces, 360202 defined slots, RTL vs reference on defined: 360202/360202 (38.3s)
+UNIT-MATCH mxu_pe:pe unit simulator 360196/360196 defined (338 masked: reset fill=338; allo==rtl on 337) cycle=order-only (build 1.5s, run 2.1s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+Info: /OSCI/SystemC: Simulation stopped by user.
+[06:21:09] Compiling with g++ ...
+[06:21:16] Running simulation ...
+UNIT-MATCH mxu_pe:pe unit systemc 360196/360196 defined (338 masked: reset fill=338; allo==rtl on 337) cycle=per-iteration, time unchecked (build 0.9s, run 9.8s)
+EXIT 0

@@ -27,9 +27,14 @@ an activation entering row ``r`` reaches ``result_o[0]`` after
 the bottom row, after 4.
 """
 
+import numpy as np
+
+from allo.compose import Architecture, Memory
+
 from examples.minitpu.harness import ref_mxu, rtl
 from examples.minitpu.harness.traces import Trace, rng_for
 from examples.minitpu.units.mxu_pe import bf16
+from examples.minitpu.units.mxu_pe_unit import array_drive, array_sink, pe_channels, pe_unit
 
 SOURCES = ["src/core/vpu/vpu_pkg.sv", "src/core/mxu/mxu_bf16_mul_acc24.sv",
            "src/core/mxu/mxu_acc24_add_pipe.sv", "src/core/mxu/mxu_pe.sv",
@@ -158,4 +163,91 @@ def probes(inst):
     return res
 
 
-VARIANTS = {}
+# ---------------------------------------------------------------------------
+# Allo variant (U3 track B, ``dev/records/minitpu/u3_track_b_2026-10-04.rst``).
+#
+# ``streams`` (plan A1)
+#     ``mapping=[D, D]`` of ``mxu_pe_unit.pe_unit`` (plan P2) over ``Stream``
+#     links, composed by ``allo.compose.Architecture`` with a driver and a
+#     sink unit at the edges. Each PE emits its registered state BEFORE its
+#     update, so token ``t`` on every link is the register the RTL neighbour
+#     sees during cycle ``t``: the grid is the RTL's cycle model in TOKEN time
+#     (the simulator and csim compare per iteration, so it is judged on
+#     ``mxu_systolic_array_trace``; what a tool makes of a token in real
+#     cycles is Catapult's, track C). Outputs are the bottom row's psum tokens
+#     at ``t``, the RTL's post ``result_o`` of ``t - 1`` (``RESP_SHIFT`` -1).
+#     The per-PE ``weight_commit_bank_i`` rides east with the commit, so the
+#     variant's trace set (``TRACES``) is the tiles plus random traces whose
+#     bank bits are forward-consistent (``fwd_bank``); the RTL takes them as
+#     any other trace.
+# ---------------------------------------------------------------------------
+
+WIDTH = dict(DIMS)  # check.py's ``w`` is the DIM
+
+
+def random_trace_fwd(inst, n, seed, p_rst=0.002):
+    """``random_trace`` with ``weight_commit_bank_i[r][c](t) = bank_row[r](t - c)``:
+    the bank bit the forwarded-commit PE sees at (r, c) when a commit issued
+    into row ``r`` reaches it. Same generator draws as ``random_trace``."""
+    D = DIMS[inst]
+    rng = rng_for("mxu_array", inst, seed, "fwd")
+    t = Trace(_defaults(D))
+    t.idle(2, rst_ni=0)
+    hist = [[0] * D for _ in range(D)]  # per row: bank_row at t - 0 .. t - (D-1)
+    for _ in range(n):
+        row_bank = [rng.getrandbits(1) for _ in range(D)]
+        for r in range(D):
+            hist[r] = [row_bank[r]] + hist[r][:-1]
+        bank = sum(hist[r][c] << (r * D + c) for r in range(D) for c in range(D))
+        t.cycle(rst_ni=int(rng.random() > p_rst),
+                weight_commit_i=sum(int(rng.random() < 0.1) << r for r in range(D)),
+                weight_commit_bank_i=bank,
+                lhs_i=_join16(bf16(rng) for _ in range(D)),
+                lhs_valid_i=sum(int(rng.random() < 0.7) << r for r in range(D)),
+                rhs_i=_join16(bf16(rng) for _ in range(D)),
+                rhs_valid_i=sum(int(rng.random() < 0.2) << i for i in range(BANKS * D)))
+    return t.cmd()
+
+
+def traces_streams(inst):
+    n = {"dim2": 20000, "dim4": 20000, "dim16": 3000}[inst]
+    tr = [(f"tiles-{s}", tile_trace(inst, s), True) for s in range(2)]
+    tr += [(f"random-fwd-{s}", random_trace_fwd(inst, n, s), True) for s in range(2)]
+    return tr
+
+
+def _split16(vals, D):
+    return [(int(v) >> (16 * r)) & 0xFFFF for v in vals for r in range(D)]
+
+
+def run_streams(mod, cmd, n, w):
+    D = w
+    ins = [np.asarray(cmd["rst_ni"][:n], dtype=np.uint8),
+           np.asarray(cmd["weight_commit_i"][:n], dtype=np.uint16),
+           # the bank bit of column 0 of each row: bit r*D of the per-PE word
+           np.asarray([sum(((int(b) >> (r * D)) & 1) << r for r in range(D)) for b in cmd["weight_commit_bank_i"][:n]],
+                      dtype=np.uint16),
+           np.asarray(_split16(cmd["lhs_i"][:n], D), dtype=np.uint16),
+           np.asarray(cmd["lhs_valid_i"][:n], dtype=np.uint16),
+           np.asarray(_split16(cmd["rhs_i"][:n], D), dtype=np.uint16),
+           np.asarray(cmd["rhs_valid_i"][:n], dtype=np.uint32)]
+    res = np.zeros(n * D, dtype=np.uint32)
+    rsv = np.zeros(n, dtype=np.uint16)
+    mod(*ins, res, rsv)
+    result = [sum(int(res[t * D + c]) << (24 * c) for c in range(D)) for t in range(n)]
+    return {"result_o": result, "result_valid_o": [int(v) & ((1 << D) - 1) for v in rsv]}
+
+
+def streams(n, w, inst):
+    D = DIMS[inst]
+    mems = (Memory("RST", "UInt(1)[N]"), Memory("CMT", "UInt(16)[N]"), Memory("CBK", "UInt(16)[N]"),
+            Memory("LHS", "UInt(16)[N * D]"), Memory("LHV", "UInt(16)[N]"), Memory("RHS", "UInt(16)[N * D]"),
+            Memory("RHV", "UInt(32)[N]"), Memory("RES", "UInt(32)[N * D]"), Memory("RSV", "UInt(16)[N]"))
+    arch = Architecture(name=f"mxu_array_{inst}", parameters={"N": n, "D": D, "ROW0_PSUM_ZERO": 1, "EDGE_OUT": 0},
+                        memories=mems, channels=pe_channels(), units=(array_drive, pe_unit, array_sink))
+    return arch.region()
+
+
+TRACES = {"streams": traces_streams}
+RESP_SHIFT = {"streams": {"result_o": -1, "result_valid_o": -1}}
+VARIANTS = {"streams": (streams, run_streams)}
