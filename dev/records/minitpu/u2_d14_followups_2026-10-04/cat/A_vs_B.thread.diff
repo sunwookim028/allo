@@ -1,0 +1,27 @@
+34d33
+<   wire[15:0] while_v30_mux_nl;
+36a36
+>   wire[15:0] while_v30_mux_nl;
+64d63
+<       v17 <= 16'b0000000000000000;
+65a65
+>       v17 <= 16'b0000000000000000;
+70d69
+<       v17 <= MUX_v_16_2_2(16'b0000000000000000, while_v30_mux_nl, (fsm_output[1]));
+71a71
+>       v17 <= MUX_v_16_2_2(16'b0000000000000000, while_v30_mux_nl, (fsm_output[1]));
+93,94c93,97
+<   always @(posedge clk) begin
+<     if ( v15 ) begin
+---
+>   always @(posedge clk or negedge rst) begin
+>     if ( ~ rst ) begin
+>       while_v25_sva <= 16'b0000000000000000;
+>     end
+>     else if ( v15 ) begin
+125,126d127
+<   assign while_v30_mux_nl = MUX_v_16_4_2(mgc_stateful_rf_0_tag_2_0_sva_mx1, mgc_stateful_rf_0_tag_2_1_sva_mx1,
+<       mgc_stateful_rf_0_tag_2_2_sva_mx1, mgc_stateful_rf_0_tag_2_3_sva_mx1, v12[1:0]);
+128a130,131
+>   assign while_v30_mux_nl = MUX_v_16_4_2(mgc_stateful_rf_0_tag_2_0_sva_mx1, mgc_stateful_rf_0_tag_2_1_sva_mx1,
+>       mgc_stateful_rf_0_tag_2_2_sva_mx1, mgc_stateful_rf_0_tag_2_3_sva_mx1, v12[1:0]);

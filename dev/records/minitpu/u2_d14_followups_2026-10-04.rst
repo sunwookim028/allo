@@ -1,0 +1,388 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+################################################################################
+U2: D-14 follow-ups -- reset directive scoped, ``UInt`` ``Stateful`` unsigned
+################################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-04.** zhang-21, branch
+   ``d14-followups`` (worktree ``scratch/wt-d14f`` from ``origin/u1-pilot`` at
+   ``d1e729b4``, which merges ``main`` ``9d48a90f``: core-stateful and
+   core-uint-index), its own ``mlir/build`` (configured as ``main``'s).
+   Catapult Ultra Synthesis 2024.2/1130128, ``nangate-45nm_beh``, 3.33 ns;
+   Verilator 5.052; the ``allo`` env's python. Scratch (Catapult projects,
+   Verilator builds, emission dumps; not kept): ``scratch/d14f/``. Record files:
+   ``u2_d14_followups_2026-10-04/``.
+
+Two follow-ups to README D-14 that ``u2_unreset_impl_2026-10-02.rst`` left
+open: **H5**, ``-RESET_CLEARS_ALL_REGS no`` is design-wide, so a mixed design
+(reset and unreset storage in one kernel) was unmeasured; **H4**, a ``UInt``
+``Stateful`` was declared signed by every emitter (``ac_int<16, true>``,
+``int16_t``).
+
+**Result.** (a) The directive admits a *process* as its object
+(``Allowed Object: Solution,Design,Process``, Catapult User and Reference
+Manual 2024.2 p. 1371), and the write method ``wr`` is a process from ``go
+compile`` on. ``run.tcl`` now sets ``directive set /<top>/<kernel>/wr
+-RESET_CLEARS_ALL_REGS no`` after ``go compile``, one line per kernel with
+unreset storage, instead of the design-wide line before ``go analyze``. On a
+mixed design (unreset ``mem[32]``, reset ``tag[4]``, reset counter ``cnt``, all
+in one kernel) the scoped form gives **0 ``if ( rst )`` in the storage, and the
+kernel thread's RTL byte-identical to a build with no directive**; the
+design-wide form had **also dropped the reset of a thread register**
+(``while_v25_sva``, the ``if (we)`` data register) -- the H5 hazard, real. A
+Verilator trace with a mid-run reset pulse: ``mem`` keeps 32/32 words, ``tag``
+reads 0, ``cnt`` restarts (scoped and design-wide alike; without the directive
+``mem`` is reset, with Catapult's active-high ``if ( rst )``). No per-variable
+form exists (``Unknown path`` for every spelling), and no refusal of mixing is
+needed (D-1): the scoped form honours both declarations. (b) The ``memref.global``
+and every ``memref.get_global`` of a ``UInt`` ``Stateful`` now carry the
+``unsigned`` attribute, as a local alloc does; the SystemC emitter reads the
+sign before it reads the type. ``UInt`` storage is ``ac_int<W, false>`` /
+``uint16_t`` on SystemC, Vitis and the Catapult C++ flow. TinyTPU's vhls,
+catapult and systemc emissions are **byte-identical** (``6bc774bc...``,
+``ade1ab5d...``, ``06d36533...``): it has no ``UInt`` ``Stateful``. Of the 104
+MiniTPU unit-variant emissions, 4 change (``vpu_regfile`` ``stateful``
+systemc+vhls, ``wire_stateful``, ``comb_unreset``), each by the storage's
+declared sign only; every harness verdict is unchanged. Also found and fixed:
+the D-11 state save in ``sc_main`` was not guarded by ``__SYNTHESIS__``, so
+Catapult's ``go analyze`` **aborted on every ``@ Stateful`` design** since
+core-stateful merged (CRD-135, B3).
+
+Reproduce (``source examples/minitpu/harness/env-zhang21.sh`` first; ``R`` is
+this record's directory, ``S`` a scratch directory)::
+
+   $ALLO_PYTHON -m pytest tests/dataflow/test_systemc_unreset.py -q    # 14 tests, 4 need csim
+   # the mixed design through Catapult: the test's _mixed(64), synth_top rf_0 (or top)
+   $ALLO_PYTHON $R/emit_mixed.py $S/G --top rf_0 && (cd $S/G && mkdir -p build && cd build && catapult -shell -f ../run.tcl)
+   grep -c 'if ( rst' $S/G/build/Catapult/rf_0.v1/concat_rtl.v          # 0
+   bash $R/vl/run.sh $S/G/build/Catapult/rf_0.v1/concat_sim_rtl.v $S/vl_G  # MIXED-RESET PASS
+   # the variants: edit run.tcl as the table says (A: design-wide before go analyze; B: no line; P: probes)
+   # emission hashes, base vs branch (same bindings, same recipe as u2_unreset_impl)
+   $ALLO_PYTHON $R/emit_units.py <tree> $S/units > $S/units.txt
+   $ALLO_PYTHON dev/records/minitpu/u2_unreset_impl_2026-10-02/logs/tinytpu_hash.py <tree> $S
+
+A. The reset directive, scoped
+==============================
+
+**What the tool says.** ``$MGC_HOME/shared/pdfdocs/catapult_useref.pdf`` (via
+``pdftotext``), "RESET_CLEARS_ALL_REGS", p. 1371, verbatim::
+
+   This directive informs Catapult on whether all registers in the design are
+   required to have a reset pin.
+   If use_library, Catapult uses the value listed in the base technology library.
+     - For ASIC technologies, this directive is typically set to yes.
+     - For FPGA technologies, this directive is typically set to no since the
+       registers for most FPGA technologies are reset on startup.
+   If yes, all the registers in a design are to be reset.
+   If no, only registers that need to be reset for correct simulation results
+   are reset. This value should be set to 'yes' to guarantee that the C++ and
+   RTL simulations match.
+   Allowed Values: use_library, yes, no      Default Values: use_library
+   Allowed Object: Solution,Design,Process   Last State Allowed: schedule
+
+and p. 49: "If there is an area difference between reset and non-reset
+registers in your technology, this directive can be turned off and
+non-essential registers will not be reset." ``RESET_KIND`` (sync/async) and the
+``reset_clears_all_regs`` example are the only other mentions; there is no
+per-variable form. The shell has no directive help: ``help directive`` and
+``help directive RESET_CLEARS_ALL_REGS`` both answer ``help: bad operator
+"directive": must be command or message``; ``directive set
+-RESET_CLEARS_ALL_REGS -help`` answers ``directive set: not a valid enumeration
+value`` (``cat/help.log``).
+
+**The design** (``tests/dataflow/test_systemc_unreset.py::_mixed``, n = 64): one
+Wire-only kernel ``rf`` with ``mem: UInt(16)[32] @ Stateful(reset=False)``
+(comb read port ``w_qa``), ``tag: UInt(16)[4] @ Stateful = 0`` written by the
+thread from the same ``if e:``, ``cnt: UInt(16)[1] @ Stateful = 0``
+incremented every iteration; ``src`` and ``sink`` kernels on Wires. Emitted
+once (every variant's ``kernel.cpp`` is identical); only ``run.tcl`` differs.
+Catapult messages verbatim from ``csyn.log``; "thread" is the module
+``rf_0_run``, "wr" the module ``rf_0_wr`` of ``concat_rtl.v``; the Verilator
+trace is ``vl/tb.cpp`` (write all 32 words of ``mem`` and ``tag``, read back,
+pulse ``rst`` low for 3 cycles with inputs idle, read back again).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 3 30 67
+
+   * - id
+     - ``run.tcl``
+     - Catapult 2024.2, RTL, Verilator
+   * - A
+     - ``directive set -RESET_CLEARS_ALL_REGS no`` before ``go analyze``
+       (the shipped form until this record), ``synth_top rf_0``
+     - exit 0, 37 s. ``if ( rst )`` x0; ``Warning: Input port 'rst' is never
+       used. (OPT-4)``. **But the thread lost a reset too**: ``rf_0_run`` is 175
+       lines against B's 178; the diff is exactly ``always @(posedge clk) begin
+       if ( v15 ) begin`` where B has ``always @(posedge clk or negedge rst)
+       begin if ( ~ rst ) begin while_v25_sva <= 16'b0; end else if ( v15 )
+       begin`` -- the ``d`` data register behind ``if (we)``, which feeds the
+       ``tag`` write mux. Verilator: ``PRE-RESET mem 32/32 ok, tag nonzero 32/32,
+       cnt=68``; ``POST-RESET mem 32/32 kept, tag nonzero 0/30 (want 0), cnt
+       first=0 max=30 (pre-reset 68)``; **MIXED-RESET PASS** (the lost reset is
+       not observable at the ports: the register is a don't-care until ``we``)
+   * - B
+     - no directive
+     - exit 0, 37 s. ``if ( rst )`` x32, every ``mem`` flop ``always @(posedge
+       clk) begin if ( rst ) begin mgc_stateful_rf_0_mem_1_k <= 16'b0`` -- the
+       F3 form c: Catapult's own reset, synchronous and **active high** on a
+       design whose ``rst`` is active low. Verilator: ``PRE-RESET mem 0/32 ok``
+       (rst is held high during operation, so the storage is cleared every
+       cycle), ``POST-RESET mem 0/32 kept``; **MIXED-RESET FAIL**. Thread: 178
+       lines, 7 ``negedge rst`` blocks (FSM, ``tag`` x4, ``cnt``,
+       ``while_v25_sva``), ``done``
+   * - **C**
+     - ``directive set /rf_0/wr -RESET_CLEARS_ALL_REGS no`` **after ``go
+       compile``** (the process does not exist before: the directive's last
+       state is ``schedule``), ``synth_top rf_0``
+     - exit 0, 37 s. ``/rf_0/wr/RESET_CLEARS_ALL_REGS no``; ``if ( rst )`` x0;
+       OPT-4 as A. **wr byte-identical to A's** (md5 ``15945e45``), **thread
+       byte-identical to B's** (``b40a41f8``): the storage unreset, every other
+       reset kept. Verilator: as A, **MIXED-RESET PASS**
+   * - D
+     - ``synth_top`` the region ``top``; probes ``catch {directive set $p
+       -RESET_CLEARS_ALL_REGS no}`` after ``go compile``
+     - ``PROBE OK /top/rf_0/wr`` and ``PROBE OK /top/u1/wr`` (Catapult resolves
+       the block by its module name *or* its instance name ``u1`` in ``top``);
+       ``PROBE FAIL /top/rf_0/u1/wr : directive set: Unknown path
+       '/top/rf_0/u1'``; ``PROBE FAIL /rf_0/wr : directive set: Unknown path
+       '/rf_0'`` (the kernel is not the top). D0 (no line): ``if ( rst )`` x32;
+       D1 (``/top/u1/wr``) and D2 (``/top/rf_0/wr``): x0, exit 0, 40 s each
+   * - E, F
+     - **as emitted** by the new ``codegen_tcl`` (``run.tcl.emitted`` ==
+       ``run.tcl``): E ``synth_top rf_0`` -> ``/rf_0/wr``; F ``synth_top top`` ->
+       ``/top/rf_0/wr``
+     - E: as C (exit 0, 45 s, x0, PASS). F: exit 0, 48 s, x0; ``rf_0_run`` ==
+       D0's (``synth_top top`` with no directive), ``rf_0_wr`` == C's
+   * - G, H
+     - E and F re-emitted from the **final** tree (sign fix, ``__SYNTHESIS__``
+       guard, ``get_global`` attribute)
+     - G: exit 0, 41 s, ``if ( rst )`` x0, ``Final schedule of SEQUENTIAL
+       '/rf_0/wr': Latency = 1``, ``'/rf_0/run': Latency = 2``; wr == C's,
+       thread == B's; Verilator **MIXED-RESET PASS** (same three lines as A).
+       H: exit 0, 47 s, x0, wr == C's, thread == B's. ``sc_signal< ac_int<16,
+       false> >`` storage
+   * - P
+     - the per-variable spellings, and the *wrong* process, after ``go compile``
+     - ``PROBE FAIL ... : directive set: Unknown path`` for every one of
+       ``/rf_0/wr/__stateful_rf_0_mem_1:rsc``, ``/rf_0/__stateful_rf_0_mem_1:rsc``,
+       ``/rf_0/__stateful_rf_0_mem_1``, ``/rf_0/wr/__stateful_rf_0_mem_1``,
+       ``/rf_0/mem``; ``PROBE OK /rf_0/run``. RTL: ``if ( rst )`` x32 (wr ==
+       B's: the storage is still reset) and **thread == A's** (175 lines, the
+       ``while_v25_sva`` reset gone). So the object really is the process: the
+       directive on ``run`` strips the thread's non-essential reset and leaves
+       ``wr`` alone. Verilator: as B, **MIXED-RESET FAIL**
+
+Earlier attempts, for completeness: ``u2_comb_wire_impl_2026-10-02.rst`` F3 b
+(``-RESET_CLEARS_ALL_REGS false`` before ``go analyze``: ``SIF-24`` deprecation
+of booleans, and no effect on a thread's CIN-233), F3 e (``/rf_comb/mem`` and
+``/rf_comb/wr/mem:rsc`` after ``go compile``: not reached, CIN-233 aborts
+``go compile``), F3 d (a reset-less thread: CIN-194). None of them is a scoped
+form; the process form above is the first that is.
+
+**Implementation.** ``allo/backend/catapult.py``: ``unreset_directives(kernels,
+top, design_top)`` writes ``directive set /<design_top>/<kernel>/wr`` (or
+``/<kernel>/wr`` when the kernel is the ``synth_top``; nothing for a kernel
+outside the synthesized design) after ``go compile``; ``hls.py`` passes the
+kernels that hold the ``// allo unreset storage:`` marker
+(``unreset_storage_in``). ``docs/source/backends/systemc.rst`` says so. README
+D-14's bullet "``-RESET_CLEARS_ALL_REGS no`` for Catapult" stands as written;
+the scoped object is an implementation detail of that directive, recorded
+here (README is not edited by this record).
+
+B. ``UInt`` ``Stateful`` declared unsigned
+==========================================
+
+**Emission sites.** The ``memref.global`` of a ``Stateful`` has a signless
+element type; the sign of a ``UInt`` travelled nowhere. ``allo/ir/builder.py``
+now sets ``unsigned`` on the global (as on a local alloc) and on every
+``memref.get_global`` of it (both creation sites; ``stateful_unsigned`` on the
+context holds the symbols, propagated to nested kernels in ``visitor.py``).
+Sites that read it, checked one by one:
+
+* ``EmitSystemC.cpp`` ``emitKernelModule``: member declaration (``uint16_t
+  mem[32]`` plain, ``sc_signal< ac_int<16, false> > mem[32]`` for comb/unreset
+  signal storage), the D-11 ``__allo_state_save/_resume`` casts
+  (``(unsigned long long)``, ``(uint16_t)``, ``ac_int<16, false> _v``), the
+  reset-action loop and the ``get_global`` placeholder comment. Two of them
+  read the type **before** ``fixUnsignedType`` retyped the global (``auto at =
+  ... getType()`` first), so the attribute alone still gave ``int16_t``; the
+  order is swapped at both.
+* ``EmitVivadoHLS.cpp`` ``emitGlobal`` / ``emitGetGlobal`` and
+  ``EmitCatapultHLS.cpp`` (the C++ flow): already ``fixUnsignedType(...,
+  hasAttr("unsigned"))`` on the global and on the ``get_global``; they only
+  needed the attribute. ``static uint16_t __stateful_rf_0_mem_1[32] = {0, ...}``
+  now, ``// placeholder for const uint16_t __stateful_rf_0_mem_1``.
+* Loads and stores were already right: the result of a ``memref.load`` carries
+  its own ``unsigned`` and is materialised as a typed local (``uint16_t v31 =
+  __stateful_rf_0_mem_1[v30].read();``). That is why **csim cannot observe the
+  old bug**: a value >= 2^15 stored into ``ac_int<16, true>`` and read back
+  through ``uint16_t`` is bit-exact (H4's "bits unchanged"). The existing csim
+  tests already drive such values (``_trace``: ``wd`` uniform in [0, 2^16);
+  ``test_signal_storage_persists_across_csim_calls``: 80-bit values >= 2^79) and
+  passed before and after; the discriminating test is the emission test
+  ``test_uint_stateful_unsigned`` (IR attribute; systemc, vhls and catapult
+  declarations; no ``int16_t __stateful`` anywhere).
+
+**Impact.** ``emit_units.py``: every ``VARIANTS`` entry of every
+``examples/minitpu/units`` module at n = 8, systemc and vhls, sha256 of
+``hls_code``, base (``d1e729b4``, same bindings) vs branch: 104 lines, **4
+differ**, all ``vpu_regfile`` -- ``stateful`` systemc (``int16_t`` ->
+``uint16_t`` member and the state-IO casts) and vhls (``static int16_t`` ->
+``static uint16_t``), ``wire_stateful`` systemc (as ``stateful``),
+``comb_unreset`` systemc (``ac_int<16, true>`` -> ``ac_int<16, false>`` in the
+signal storage and in ``_resume``), each also in the ``get_global``
+placeholder comment and in the two lines of the ``__SYNTHESIS__`` guard (B3;
+a csim-only text change that every ``@ Stateful`` systemc emission gets --
+among the unit variants only these three: ``vpu_word_array``'s ``Stateful``
+variant is the D-11-refused ``shared``). The ``comb`` variant is unchanged: its
+``mem`` is a kernel-local alloc, which carried ``unsigned`` already. ``bf16_add``, ``alu``, ``mul_acc24``, the FIFOs and
+word arrays: byte-identical. TinyTPU (``customize(tinytpu_isa)`` +
+``schedule``, ``build(target=...)``, the recipe of ``u2_unreset_impl``): vhls
+``6bc774bc9d97...``, catapult ``ade1ab5dfd20...``, systemc ``06d365336c30...``
+(mode csim, project path replaced) on base and branch -- **identical**.
+
+Regression
+==========
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
+
+   * - check
+     - result
+   * - ``tests/dataflow/test_systemc_unreset.py`` (14: the scoped ``run.tcl``
+       for ``top``/``rf_0``/``src_0`` synth tops, the mixed design's emission
+       and csim, the sign on three backends, the ``__SYNTHESIS__`` guard; the
+       nine of the 2026-10-02 record)
+     - **14 passed** (59 s; ``logs/pytest_unreset.txt``)
+   * - ``test_systemc_backend.py``, ``test_systemc_comb.py``,
+       ``test_systemc_csim_regress.py``, ``test_stateful_semantics.py``,
+       ``test_region_stateful.py``, ``test_stateful_systemc.py``,
+       ``test_df_unit.py``, ``test_df_systemc_{self_fifo,tb_wide,wire_unroll}.py``
+     - **118 passed, 2 failed** (7:25). The two are
+       ``test_stateful_systemc.py::test_stateful_{scalar,array}_systemc``, which
+       run Xcelium cosim: ``xmsim: *F,VSPLIC: VSP Licensing Failure`` (licence
+       checkout, no RTL output), as in the 2026-10-02 record -- environmental.
+       Their Catapult stage now completes (``go analyze`` through RTL): before
+       the B3 guard it aborted on CRD-135 (``logs/pytest_suites.txt``)
+   * - ``check.py bf16_add --backend systemc``
+     - ``UNIT-DIFF native 249907/251936``, ``UNIT-MATCH bits 251936/251936``:
+       the two lines of ``u1_integration_2026-10-02/bf16_add.log``
+   * - ``check.py vpu_regfile --backend systemc`` (every variant, ``comb`` and
+       ``comb_unreset`` included)
+     - the 12 verdict lines of the 2026-10-03 merge check, unchanged:
+       ``UNIT-MATCH`` 180780/180780 for ``trace``, ``trace_raw``, ``stateful``,
+       ``ported``, ``annotated``; ``UNIT-FAIL`` (D-11 refusal) for ``shared``,
+       ``shared_sync``; ``UNIT-DIFF`` 21217/180780 for ``wire``,
+       ``wire_stateful`` and 23010/180780 for ``comb``, ``comb_unreset`` (the
+       per-iteration comparison of a Wire link, limitation 22; the offset-aligned
+       match is ``u2_unreset_impl``'s ``csim_offset.py``). The first pass of
+       ``comb_unreset`` crashed in the frontend: this record's docstring edit to
+       ``vpu_regfile.py`` landed while ``check.py`` was running and the frontend
+       re-reads the unit source per build; rerun clean
+   * - ``examples/tinytpu/systemc_csim.py 3``
+     - 3 runs, each ``wrong=0/16`` (``clobbered_outside`` 4057 / 4057 / 4065,
+       the recorded baseline); ``SYSTEMC CSIM OK``
+   * - ``examples/eva/cosim_eva_systemc.py``
+     - ``COSIM RESULT : PASS (bit-exact)``; ``examples/eva/generated`` restored
+   * - lint
+     - ``black --check``: the five touched Python files were not black-clean at
+       ``d1e729b4`` and are not reformatted here (``visitor.py`` is and stays
+       clean); ``clang-format`` likewise flags pre-existing lines of
+       ``EmitSystemC.cpp`` (``indent(); os << ...`` style)
+
+Findings
+========
+
+**A1 (Catapult, hazard confirmed, fixed).** ``-RESET_CLEARS_ALL_REGS no`` on
+the design strips the reset of *every* register the C semantics do not need
+reset, not only the unreset storage: on the mixed design, the thread's ``if
+(we)`` data register (``while_v25_sva``) lost its asynchronous reset (A vs B).
+Not observable at the ports here (the register is a don't-care until the
+first ``we``), but a silent change to a part of the design that declared
+nothing, which D-1 forbids. Scoped to ``/<top>/<kernel>/wr`` the thread's
+RTL is byte-identical to the no-directive build (C, E, F, G, H).
+
+**A2 (Catapult, match).** The scoped form honours both declarations in one
+kernel: ``mem`` 0 reset flops and 32/32 words kept across a mid-run reset
+pulse; ``tag`` and ``cnt`` reset (Verilator, G). No refusal of mixing is
+needed.
+
+**A3 (Catapult, info).** The directive's object is a Solution, a Design or a
+Process; every per-variable spelling is ``Unknown path`` (P), and the
+process must exist (after ``go compile``; before it, ``/rf_0/wr`` is unknown
+too). In a hierarchical build the block resolves by module name
+(``/top/rf_0/wr``) and by instance name (``/top/u1/wr``) alike; the emitter
+uses the module name.
+
+**B1 (frontend, bug, fixed).** A ``UInt`` ``Stateful`` global carried no sign;
+every emitter declared it signed (``u2_unreset_impl`` H4). Fixed at the
+source (the attribute on the global and its ``get_global``\ s), so the three
+HLS emitters agree without a per-emitter patch.
+
+**B2 (SystemC emitter, bug, fixed).** Two declaration sites read the global's
+type before applying its sign, so the attribute alone changed nothing there.
+
+**B3 (SystemC emitter, bug, fixed).** The D-11 state save in ``sc_main``
+(``t.dut.<k>.__allo_state_save(_f)``) was emitted outside ``#ifndef
+__SYNTHESIS__`` while the member is defined only inside it. Catapult parses
+``sc_main`` too: ``go analyze`` of **every** ``@ Stateful`` design aborted with
+``class has no member __allo_state_save`` (CRD-135) since core-stateful
+merged (``9d48a90f``). Found by the first Catapult run of this record; guarded
+now, and ``test_mixed_reset_emit`` asserts the guard.
+
+**B4 (SystemC, info).** csim cannot distinguish signed from unsigned storage of
+the same width: loads are materialised through typed locals. The sign is a
+declaration-level property (and Catapult's); the emission test holds it.
+
+Classification (D-9)
+====================
+
+.. list-table::
+   :header-rows: 1
+   :widths: 8 24 68
+
+   * - id
+     - class
+     - one line
+   * - A1
+     - hazard confirmed, fixed (Catapult/run.tcl)
+     - design-wide ``no`` dropped a thread register's reset; scoped form does not
+   * - A2
+     - match (Catapult)
+     - mixed design: unreset keeps 32/32 across a reset pulse, reset storage resets
+   * - A3
+     - info (Catapult)
+     - object = Solution/Design/Process; no per-variable form; after ``go compile``
+   * - B1
+     - bug, fixed (frontend)
+     - ``UInt`` ``Stateful`` carried no sign; declared signed by every emitter
+   * - B2
+     - bug, fixed (SystemC)
+     - type read before sign at two declaration sites
+   * - B3
+     - bug, fixed (SystemC)
+     - unguarded state save in ``sc_main`` aborted Catapult on every ``@ Stateful``
+   * - B4
+     - info (SystemC)
+     - csim cannot observe the storage's declared sign
+
+Files
+=====
+
+* ``emit_mixed.py``, ``mixed.py`` (the design as run; the test's ``_mixed`` is
+  the same source), ``emit_units.py``.
+* ``cat/``: ``G.run.tcl``, ``H.run.tcl`` (as emitted), ``P.run.tcl`` (the
+  probes); ``{A,B,C,G,P}.csyn.log.gz``; ``{A,B,G,P}.thread.v``,
+  ``{A,B,G}.wr.v`` (the ``rf_0_run`` / ``rf_0_wr`` modules of
+  ``concat_rtl.v``); ``A_vs_B.thread.diff``; ``help.log``.
+* ``vl/``: ``tb.cpp``, ``run.sh``, ``{A,B,C,E,G,P}.txt``.
+* ``hashes/``: ``units_base.txt``, ``units_branch.txt``, ``units.diff``,
+  ``tinytpu_base.txt``, ``tinytpu_branch.txt``.
+* ``logs/``: ``check_bf16_add.txt``, ``check_vpu_regfile.txt``,
+  ``tt_systemc_csim.txt``, ``eva.txt``, ``pytest_unreset.txt``,
+  ``pytest_suites.txt``.

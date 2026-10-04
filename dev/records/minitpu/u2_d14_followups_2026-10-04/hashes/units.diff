@@ -1,0 +1,14 @@
+71,72c71,72
+< vpu_regfile stateful systemc e4ee470c2d8bcb2d
+< vpu_regfile stateful vhls 1611ddef14f6dace
+---
+> vpu_regfile stateful systemc 4b7769f836aa3562
+> vpu_regfile stateful vhls bef661c7d5ec7981
+83c83
+< vpu_regfile wire_stateful systemc acb88b070a1c8380
+---
+> vpu_regfile wire_stateful systemc e37137a6f9444202
+87c87
+< vpu_regfile comb_unreset systemc dc84eef04209c987
+---
+> vpu_regfile comb_unreset systemc 4308fb3732581270
