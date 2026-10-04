@@ -405,6 +405,11 @@ class Unit:
     architecture's parameters (``("T", "T")`` for a T x T array). ``memories``
     names the region arguments the body's own parameters bind to, positionally.
 
+    ``calls`` names the module-level functions the body calls that are part
+    of the unit itself (``add_bits``, ``sfu_bits``): resolved from the
+    body's own module, never bound by the architecture and never swapped --
+    a swappable function is an engine slot (README D-15, D-19).
+
     ``engines`` names the engine slots the body binds (``MAC_IN``,
     ``MAC_ADD``, ...: ``<slot>_<field>``, README D-15); the architecture binds
     an ``Engine`` to each slot. ``order`` is the accumulate order the body
@@ -424,6 +429,7 @@ class Unit:
     legality: callable = None
     engines: tuple[str, ...] = ()
     order: str = None
+    calls: tuple[str, ...] = ()
 
     @property
     def name(self) -> str:
@@ -432,7 +438,7 @@ class Unit:
     @property
     def declared_names(self) -> set[str]:
         return set(self.reads) | set(self.writes) | set(self.parameters) \
-            | set(self.isa) | set(self.engines)
+            | set(self.isa) | set(self.engines) | set(self.calls)
 
     @property
     def engine_slots(self) -> dict:
@@ -529,7 +535,18 @@ class Unit:
             f"without declaring them and declares "
             f"{sorted(declared - free)} without using them")
         self._check_engines()
+        self._check_calls()
         self._check_slice_bounds(free)
+
+    def call_targets(self) -> dict:
+        """``{name: function}`` of ``calls``, from the body's own module."""
+        return {n: self.body.__globals__.get(n) for n in self.calls}
+
+    def _check_calls(self):
+        for n, fn in self.call_targets().items():
+            assert inspect.isfunction(fn), (
+                f"unit {self.name}: calls={n!r}, which is not a function of "
+                f"the body's module ({self.body.__module__})")
 
     def _check_slice_bounds(self, free):
         """README D-17: a bit slice whose bounds are only names from outside
@@ -650,6 +667,12 @@ class Instance(Unit):
             f"(free: {sorted(unit.free_names())}; memories: "
             f"{list(unit.memories)}). A binding renames only what the body "
             f"takes from outside (README D-17)")
+        called = sorted(set(bind) & set(unit.calls))
+        assert not called, (
+            f"Instance {name} of unit {unit.name}: bind renames {called}, "
+            f"which the unit calls as its own functions; a function an "
+            f"instance chooses is an engine slot (README D-15)")
+
         def sub(names):
             return tuple(bind.get(n, n) for n in names)
 
@@ -660,7 +683,8 @@ class Instance(Unit):
             "writes": sub(unit.writes), "parameters": sub(unit.parameters),
             "isa": sub(unit.isa), "directives": unit.directives,
             "legality": unit.legality, "engines": sub(unit.engines),
-            "order": unit.order, "unit": unit, "instance_name": name, "bind": bind}
+            "order": unit.order, "calls": unit.calls, "unit": unit,
+            "instance_name": name, "bind": bind}
         for k, v in fields.items():
             object.__setattr__(self, k, v)
 
@@ -683,6 +707,60 @@ class Instance(Unit):
             if v in parameters:
                 out[k] = parameters[v]
         return out
+
+
+# ---------------------------------------------------------------------------
+# Optional modules (README D-19): a declared delta over an architecture, with
+# the ISA slots that exist only with it.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Option:
+    """One optional module (README D-19): the units, channels and memories it
+    adds, the ``rebind`` of its neighbours' names when it is present
+    (``{unit name: {name: new name}}``, applied as an ``Instance``, D-17),
+    the parameters and engines it needs, and the ISA ``isa`` slots that exist
+    only with it. ``Architecture.with_options(base, *options)`` composes it."""
+
+    name: str
+    units: tuple = ()
+    channels: tuple = ()
+    memories: tuple = ()
+    rebind: dict = field(default_factory=dict)
+    isa: tuple = ()
+    parameters: dict = field(default_factory=dict)
+    engines: dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        assert self.name.isidentifier(), f"option {self.name!r}: not an identifier"
+
+
+def isa_slots(arch) -> dict:
+    """``{slot: module}`` of a composed instance, in order (README D-19): the
+    base machine's slots (module ``"base"``), then each option's. What an
+    assembler may emit and what ``gen_isa --check`` holds an instance's spec
+    to: the ISA table is derived from the composition."""
+    out = {s: "base" for s in arch.slots}
+    for o in arch.options:
+        out.update({s: o.name for s in o.isa})
+    return out
+
+
+def check_program(arch, program, known=()) -> list:
+    """Refuse a program naming an instruction whose module is not composed
+    into ``arch`` (README D-19), naming the module when one of ``known``
+    options brings it. Returns the program."""
+    slots = isa_slots(arch)
+    owner = {s: o.name for o in known for s in o.isa}
+    for op in program:
+        if op not in slots:
+            why = (f"its module {owner[op]!r} is not composed in" if op in owner
+                   else "no module of this instance brings it")
+            raise AssertionError(
+                f"{arch.name}: {op!r} is not an instruction of this instance: "
+                f"{why} (slots: {sorted(slots)}; README D-19)")
+    return list(program)
 
 
 # ---------------------------------------------------------------------------
@@ -861,6 +939,11 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
     engines: dict = field(default_factory=dict)
     order: str = None
     accepts: tuple = ()
+    # README D-19. ``slots``: the ISA slots the base machine always has;
+    # ``options``: the Option records composed in (``with_options``), whose
+    # slots exist only with them. ``isa_slots(arch)`` reads both.
+    slots: tuple = ()
+    options: tuple = ()
     #: The order the composite's verdict uses: ``order``, or the accepted
     #: order a bound part changed it to. Set by ``_check``.
     reference_order: str = field(default=None, init=False)
@@ -958,6 +1041,75 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
             assert name in ported, (
                 f"{self.name}: obligations name {name!r}, which is not a "
                 f"memory with ports")
+
+    # -- calls (README D-19: a unit's own functions) ---------------------------
+
+    def _call_namespace(self) -> dict:
+        out = {}
+        for u in self.units:
+            for n, fn in u.call_targets().items():
+                assert out.get(n, fn) is fn, (
+                    f"{self.name}: two units call different functions named "
+                    f"{n!r} ({out[n].__module__} and {fn.__module__}); one "
+                    f"region has one namespace")
+                assert n not in self.parameters, (
+                    f"{self.name}: {n!r} is both a parameter and a function "
+                    f"unit {u.name} calls")
+                out[n] = fn
+        return out
+
+    # -- optional modules (README D-19) ---------------------------------------
+
+    @classmethod
+    def with_options(cls, base: "Architecture", *options: "Option", name=None):
+        """``base`` with ``options`` composed in: each option's units,
+        channels, memories, parameters and engines added, its ``rebind``
+        applied to the neighbours it names (an ``Instance`` of each, README
+        D-17), and its ISA slots added. Legal iff the result passes the
+        netlist rules: an option added without its rebind, or a channel left
+        with one endpoint, is refused at composition, naming the channel."""
+        names = [o.name for o in base.options]
+        units = list(base.units)
+        channels, memories = list(base.channels), list(base.memories)
+        params, engines = dict(base.parameters), dict(base.engines)
+        slots = {s: "base" for s in base.slots}
+        for o in base.options:
+            slots.update({s: o.name for s in o.isa})
+        for o in options:
+            assert isinstance(o, Option), f"{base.name}: {o!r} is not a compose.Option"
+            assert o.name not in names, f"{base.name}: option {o.name!r} composed twice"
+            names.append(o.name)
+            for k, v in o.parameters.items():
+                assert params.get(k, v) is v or params.get(k, v) == v, (
+                    f"{base.name}: option {o.name} sets {k}={v!r}, which the "
+                    f"architecture already sets to {params[k]!r}")
+                params[k] = v
+            for k, v in o.engines.items():
+                assert engines.get(k, v) is v, (
+                    f"{base.name}: option {o.name} binds engine slot {k!r}, "
+                    f"which is already bound")
+                engines[k] = v
+            for s in o.isa:
+                assert s not in slots, (
+                    f"{base.name}: option {o.name} brings ISA slot {s!r}, which "
+                    f"{slots[s]} already brings")
+                slots[s] = o.name
+            have = {u.name: i for i, u in enumerate(units)}
+            for uname, bind in o.rebind.items():
+                assert uname in have, (
+                    f"{base.name}: option {o.name} rebinds unit {uname!r}, "
+                    f"which the architecture does not have "
+                    f"(units: {sorted(have)})")
+                units[have[uname]] = Instance(units[have[uname]], uname, bind)
+            channels += list(o.channels)
+            memories += list(o.memories)
+            units += list(o.units)
+        return cls(name=name or "_".join([base.name] + [o.name for o in options]),
+                   parameters=params, memories=tuple(memories),
+                   channels=tuple(channels), units=tuple(units),
+                   obligations=dict(base.obligations), engines=engines,
+                   order=base.order, accepts=base.accepts, slots=base.slots,
+                   options=tuple(base.options) + tuple(options))
 
     # -- engines (README D-15) -------------------------------------------------
 
@@ -1521,6 +1673,7 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
             namespace = dict(FRONTEND_NAMES)
             namespace.update(self.parameters)
             namespace.update(self._engine_namespace())
+            namespace.update(self._call_namespace())
             exec(compile(src, path, "exec"), namespace)  # pylint: disable=exec-used
             self._regions[key] = namespace[self.name]
             if key == (None, ()):
