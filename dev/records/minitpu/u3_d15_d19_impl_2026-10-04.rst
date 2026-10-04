@@ -289,3 +289,52 @@ that declares ``PUSH_TO_VALID=82`` as a field beside a 5-cycle adder is
 refused by ``mxu_legality`` naming ``PUSH_TO_VALID`` (``must be 2 +
 DIM*(PE_LATENCY+1) = 114``). The harness side of D-20 (manifest vs booking)
 is another agent's; ``harness/latency.py`` untouched.
+
+Impact at each step
+===================
+
+Run by ``scratch/eng_work/eng_impact.sh`` in a detached worktree at the
+commit named (same bindings, same host and env), so the measured tree is a
+commit, not a working copy.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 20 20 20
+
+   * - check
+     - D-15 ``f4608647``
+     - D-17 ``00156415``
+     - D-20 ``1f14df42`` (HEAD)
+   * - TinyTPU emitted Vitis / Catapult, sha256
+     - ``6bc774bc...b2ef95`` / ``ade1ab5d...88e038``
+     - identical
+     - identical
+   * - ``gen_isa --check``, ``lift_units --check``
+     - ISA OK, UNITS OK
+     - ISA OK, UNITS OK
+     - ISA OK, UNITS OK
+   * - ``bench_isa``, ``stress_isa``
+     - ALL EXACT, 640/640
+     - ALL EXACT, 640/640
+     - ALL EXACT, 640/640
+   * - ``act_compile --gate``
+     - 12/12
+     - 12/12
+     - 12/12
+   * - ``pytest tests/test_compose*.py tests/dataflow/test_compose_memory_ports.py``
+     - 26 passed
+     - 32 passed
+     - 47 passed (csim not skipped)
+   * - ``examples/minitpu/run.py --quick``
+     - PASS
+     - PASS
+     - PASS
+   * - ``run_u3e``
+     - 26 OK, 1 finding, GATE OK
+     - 26 OK, 1 finding, GATE OK
+     - 26 OK, 1 finding, GATE OK
+
+The D-18 commit (``c5c8c670``) was checked by the compose tests only (20
+passed); HEAD carries it through every row. ``instantiate.engine_bind``,
+named in the D-15 migration above, went with ``instantiate.py`` at D-17
+(``Engine.rebind``).
