@@ -161,6 +161,19 @@ the FIFOs, ``u2_word_array_2026-10-02.rst``, ``u2_fifo_2026-10-02.rst``):
   sets, 63 new tests passing). Upstream issue filed: cornell-zhang/allo
   #619 (unsigned index).
 
+**Owner's mandate for the absence of 2026-10-04** (~10 h):
+
+- **U3 starts fully** on provisional decisions recorded for review (an
+  explicit exception to "review each milestone before the next").
+- **``u1-pilot`` merges to main when clean** (same impact check as the fix
+  batches). ``main`` was synced into ``u1-pilot`` first (``d1e729b4``): one
+  semantic clash fixed (D-11 state save/load vs D-13/D-14 signal storage);
+  U1 verdicts 56/56 identical; U2 cells changed only where a merged fix
+  applies (S6, S8, D-11 refusals), and the B4/S6 workarounds are no longer
+  needed in the regfile.
+- **If D-12's prototype fails its reverses-if, iterate** on alternative
+  lowerings, recording each.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
