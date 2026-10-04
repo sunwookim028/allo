@@ -449,8 +449,28 @@ def analyze_arg_load_store(mod):
     return res
 
 
+# The builder declares a library call ``gelu(x)`` as a bodiless private
+# ``func.func @gelu_<abs(hash(node))>`` (``build_Call``); only those are
+# replaced. A user symbol that merely starts with the same letters
+# (``gelu_rom``, ``layernorm_step``) is the user's.
+_LIBRARY_DECL_RE = re.compile(r"^(gelu|layernorm|tril)_\d+$")
+
+
+def _library_decl_name(op):
+    """The library op's name if ``op`` is a builder-generated declaration."""
+    if not isinstance(op, func_d.FuncOp) or not op.is_external:
+        return None
+    m = _LIBRARY_DECL_RE.match(op.attributes["sym_name"].value)
+    return m.group(1) if m else None
+
+
 def decompose_library_function(module):
     with module.context, Location.unknown():
+        library_decls = {}
+        for op in module.body.operations:
+            name = _library_decl_name(op)
+            if name is not None:
+                library_decls[op.attributes["sym_name"].value] = name
         # get all functions from origin module and find the function to replace
         body_op_to_remove = []
         for op in module.body.operations:
@@ -462,15 +482,12 @@ def decompose_library_function(module):
                         body_op_to_remove.append(body_op)
                     if isinstance(body_op, func_d.CallOp):
                         callee_value = body_op.attributes["callee"].value
-                        if callee_value.startswith(("gelu", "layernorm", "tril")):
-                            name = callee_value.split("_")[0]
-                        else:
+                        name = library_decls.get(callee_value)
+                        if name is None:
                             continue
                         generate_call_module(body_op, op, name)
                         body_op_to_remove.append(body_op)
-            elif op.attributes["sym_name"].value.startswith(
-                ("gelu", "layernorm", "tril")
-            ):
+            elif _library_decl_name(op) is not None:
                 body_op_to_remove.append(op)
         # need to erase at the end
         for op in body_op_to_remove:
