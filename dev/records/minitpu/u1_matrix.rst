@@ -433,9 +433,12 @@ State: ``main`` = ``9b33ee03`` (ladder through U3 wave 1, D-12..D-20 decided,
 D-12/D-14/B3 code). ``u1-pilot`` = ``8ceb3011`` = main + ``compose-engines``
 (D-15..D-20 in ``allo/compose.py``) + ``asic-memories`` (``impl=`` lowerings,
 ``Sram``) + tracks C/D records; Python-only beyond main (no ``mlir/``
-change), so **not yet regressed for main as a whole**. In flight on their
-branches: ``core-fixes-3`` (A3/A5/E1/E2-E5, worktree ``wt-fix3`` +
-``fix3_base``), a Sonnet regression of the compose tip (``wt-reg4``, base
+change), so **not yet regressed for main as a whole**. **Done, not yet merged:** ``core-fixes-3`` @ ``39940f4e`` (based on
+``87420c94``; applies cleanly to ``9b33ee03``): A3, A2, A4, A5, E1, E2, E3,
+E5 (= E4) fixed in eight commits, 36 new tests; TinyTPU emission and gates
+identical, same failing sets as main; two existing tests edited under E1;
+draft upstream issues for A3/E5/E1 in ``dev/records/limitations/
+u3_fixes_2026-10-04.rst``. Merge it into ``u1-pilot`` first. Still in flight: a Sonnet regression of the compose tip (``wt-reg4``, base
 ``wt-reg4-base``; it does not cover ``asic-memories``), ``asic-memories-2``
 (banked 4,096-word VMEM; a 1R1W macro for II=1; ``wt-asicmem2``).
 Next session, in order: (1) read this file's checkpoints 11-18 and the
