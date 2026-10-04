@@ -384,6 +384,50 @@ be renamed per instance. Not done: the SystemC emitter half of D-18; the
 lane is untimed (SFU latency 5 not modelled); track B's PE/MXU units have
 no engine slot yet (the MAC is inline).
 
+**Checkpoint 18, 2026-10-04.** Owner approved the compose implementation's
+three calls: engine latency as a dict keyed by body; the engine declares the
+order it computes and the architecture the order its reference uses
+(mismatch refused unless ``accepts=``); ``Unit(calls=)`` declares a unit's
+helpers. Memory renaming per instance follows from D-17.
+
+**U3 track C landed** (``u3_track_c_2026-10-04.rst``, branch ``u3-catapult``):
+every U3 unit through Catapult at 3.33/2.0 ns and DC/FreePDK45 beside
+MiniTPU: SFU ``bits`` 462,144/462,144 at latency 5 cycle-equal, **0.74x**
+MiniTPU's area (Catapult trims the ROMs; H2: four ROM components inferred);
+tree N=16 1.63x; transpose 1.48x; PE ``bits`` 1.66x; array DIM 2/4 2.1-2.3x;
+composed MXU DIM 4 contract-exact, 1.32x, push->valid 1,631 cycles (vs 22:
+the token-time cost of Stream links, H7, reported to the manifest per
+checkpoint 11); composed tree T2 2.80x with a tail stall (last 4 rows never
+emitted). H4: one ``unroll`` on the shared helper suffices (C10 does not
+recur). **C9**: the polled-Stream FIFO MXU **fails the contract on RTL**
+(pops 0/2,423; valid from cycle 0; overflow 17 vs 16) -- a bug candidate in
+the ``empty()`` sideband; the explicit ring holds. C1-C8: 2-D lane arrays
+and conditional port access become RAM pins; manifest latency is Pop->Push
+while unit latency is rows + I/O (D-10 gap); free schedules put multi-output
+Pushes on different edges; ``Stateful`` arrays are RAMs unless partitioned.
+
+**SRAM-macro path landed** (``asic_memories_2026-10-04.rst``, branch
+``asic-memories``): OpenRAM ``b2b069ce`` pinned under ``tools/`` with its
+bundled FreePDK45 (own conda env; routers off: 32x64 in 56 s, 512x64 in 19
+min, 1024x64 in 53 min, 4096x64 one-macro unfinished), Catapult MemGen libs
+(plain licence), ``lc_shell`` for DC. D-12's two-port VMEM on OpenRAM 2RW
+macros: **II=1 refused on a RW port** (6 variants; same as the ccs model),
+II=2 cycle-exact at stretch 2. DC: 512x64 **macro 105,968 um^2 vs MiniTPU
+flop-mapped 262,798** (0.40x); 32x64 macro 30,474 vs 17,792. Lowerings as
+stated ``impl=``: ``registers`` (default), ``sram`` (refuses by port name
+what the macro cannot honour), ``replica`` FPGA-only. Open: bank the
+4,096-word VMEM 8 x w512; a 1R1W macro to reach II=1; the ``registers`` form
+carries 1.8x MiniTPU's flops.
+
+**E03 merged on MiniTPU master** (``f9812f3``, RTL ``3c0a5ce``,
+``docs/E03_PROTOTYPE.md``, bitstream ``0xB108D8C3`` on 3 boards): ``en_i``
+issue-time clock enable on sfu, vpu_alu, xlu_reduction_tree, xlu_transpose,
+vpu_bf16_add_pipe, vpu_bf16_mul (reset has priority; pipeline registers
+hold when low); VMEM and the MXU engines keep running; a VMEM landing ring
+of depth READ_LATENCY+1; latencies now count issue cycles; arithmetic and
+``isa_latency.json`` unchanged. Our pin (D-16) unaffected; E03 becomes a
+declared variant after U5 (``en_i`` as a declared port on those units).
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
