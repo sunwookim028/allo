@@ -51,7 +51,7 @@ def main(argv=None):
     (oa, wa), (ob, wb) = mac_pe.run_rig_two(mac_pe.pe_rig_two(BF16_ACC24, INT8_INT32, 512),
                                             BF16_ACC24, INT8_INT32, 512)
     verdict(np.array_equal(oa, wa) and np.array_equal(ob, wb),
-            "H10: one PE source, two engines, ONE region (instantiate.instance)",
+            "H10: one PE source, two engines, ONE region (compose.Instance)",
             f"{np.sum(oa == wa)}/512 + {np.sum(ob == wb)}/512")
 
     # (3) the engine's schedule directive travels with it

@@ -279,6 +279,36 @@ The latencies are bookings: what a composite's timing is derived from
 Action model's compute ports derive (``actions.py`` still declares them);
 it only makes the arithmetic a composition carries a stated, checked thing.
 
+An instance binds a unit's names
+================================
+
+README D-17. ``compose.Instance(unit, name, bind)`` puts one ``Unit`` in a
+region under ``name``, with ``bind`` renaming the free names of its body --
+parameters, channels, engine slots (``Engine.rebind("MAC", "MAC__a")``) --
+and the memories it binds. ``Architecture.units`` takes instances beside
+bare units, so one ``Unit`` object composes any number of times:
+
+.. code-block:: python
+
+   for sfx, eng in (("a", BF16_ACC24), ("b", INT8_INT32)):
+       engines[f"MAC__{sfx}"] = eng
+       units.append(Instance(mac_pe, f"mac_pe_{sfx}",
+                             Engine.rebind("MAC", f"MAC__{sfx}")
+                             | {"lhs": f"lhs_{sfx}", ...}))
+
+A binding of a name the body does not take from outside is refused. Every
+check runs per instance: the declaration against the renamed body, one owner
+per channel and port, ``legality`` on the parameter set as the unit sees it
+through its binding. Re-binding an instance (an optional module rewiring a
+neighbour) composes into one binding of the original unit.
+
+A parameter in a slice bound (``word[0:MAC_IN_BITS]``) is refused at
+``Unit.check``: the front end cannot infer the slice's width and widens it
+to 32 bits (:ref:`tinytpu-library-symbolic-slice`). Inside ``meta_for`` the
+bound names a bound index and folds, and is accepted; elsewhere a bound unit
+converts by typed assignment (``a: MAC_IN = word``). The front-end form,
+``@df.unit`` type parameters, is separate work and subsumes this renaming.
+
 What is still true
 ==================
 

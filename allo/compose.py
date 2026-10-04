@@ -337,6 +337,12 @@ class Engine:  # pylint: disable=too-many-instance-attributes
     def names(slot: str = "MAC") -> tuple:
         return tuple(f"{slot}_{f}" for f in ENGINE_FIELDS)
 
+    @staticmethod
+    def rebind(slot: str, new_slot: str) -> dict:
+        """The ``Instance`` binding that points a unit's ``<slot>_*`` names
+        at ``<new_slot>_*`` (README D-17): ``{"MAC_IN": "MAC__a_IN", ...}``."""
+        return dict(zip(Engine.names(slot), Engine.names(new_slot)))
+
     def accumulate(self, terms, order: str = None):
         """Fold ``terms`` (ACC values, numpy) with ``ref_add`` in ``order``
         (default: the engine's): ``sequential`` is ``add(t[r], acc)`` from a
@@ -523,6 +529,31 @@ class Unit:
             f"without declaring them and declares "
             f"{sorted(declared - free)} without using them")
         self._check_engines()
+        self._check_slice_bounds(free)
+
+    def _check_slice_bounds(self, free):
+        """README D-17: a bit slice whose bounds are only names from outside
+        the body (``word[0:MAC_IN_BITS]``) is refused. The front end cannot
+        infer its width ("Cannot infer the bitwidth of the slice, use
+        UInt(32) as default") and widens the extract to 32 bits -- a
+        different circuit, or ``trunci i32 -> i32`` and no build. Inside
+        ``meta_for`` (a bound index in the bound) the expression folds."""
+        tree = ast.parse(self.source()).body[0]
+        for n in ast.walk(tree):
+            if not (isinstance(n, ast.Subscript) and isinstance(n.slice, ast.Slice)):
+                continue
+            names = {x.id for b in (n.slice.lower, n.slice.upper) if b is not None
+                     for x in ast.walk(b) if isinstance(x, ast.Name)}
+            if names and names <= free:
+                raise AssertionError(
+                    f"unit {self.name} line {n.lineno}: slice "
+                    f"`{ast.unparse(n)}` has bounds that are only parameters "
+                    f"({', '.join(sorted(names))}); Allo cannot infer the "
+                    f"bitwidth of the slice (UInt(32) by default, "
+                    f"tinytpu_library.rst 'symbolic slice'). Convert by typed "
+                    f"assignment (`x: {sorted(names)[0].replace('_BITS', '')} = "
+                    f"word`) until the front end folds constants into slice "
+                    f"bounds (README D-17)")
 
     def _check_engines(self):
         """README D-15: the engine names the body binds are declared as slots,
@@ -545,6 +576,113 @@ class Unit:
                     f"unit {self.name}: engine body {n.id!r} is used other "
                     f"than as a call (line {n.lineno}); an engine body is "
                     f"called, never passed on (README D-15)")
+
+
+# ---------------------------------------------------------------------------
+# Instantiation (README D-17): one Unit, any number of times in one region,
+# each instance binding the body's free names to its own.
+# ---------------------------------------------------------------------------
+
+
+class _Rename(ast.NodeTransformer):
+    """Rename every ``Name`` in ``bind`` (loads and stores alike)."""
+
+    def __init__(self, bind):
+        self.bind = bind
+
+    def visit_Name(self, node):  # pylint: disable=invalid-name
+        if node.id in self.bind:
+            return ast.copy_location(ast.Name(id=self.bind[node.id], ctx=node.ctx), node)
+        return node
+
+
+def _rename_expr(text: str, bind: dict) -> str:
+    if not bind:
+        return text
+    tree = _Rename(bind).visit(ast.parse(text, mode="eval"))
+    return ast.unparse(ast.fix_missing_locations(tree))
+
+
+@dataclass(frozen=True, init=False)
+class Instance(Unit):
+    """``Instance(unit, name, bind)``: ``unit`` instantiated under ``name``
+    with a binding of its free names (README D-17).
+
+    ``bind`` maps a name of the unit to the name this instance uses in the
+    architecture: a parameter (``DIM -> DIM_a``), a channel (``lhs ->
+    lhs_a``), an engine slot name (``MAC_IN -> MAC__a_IN``; see
+    ``Engine.rebind``) or a memory the unit binds (``A -> A_a``,
+    ``vreg.ra -> vreg_a.ra``). Only free names of the body and the unit's
+    memories may be bound; ``Architecture`` refuses anything else. The body
+    is emitted under ``name`` with every bound name renamed, and every check
+    ``compose`` makes runs on the instance: the declaration against the
+    renamed body, one owner per channel and port, ``legality`` on the
+    parameter set as the unit sees it through the binding.
+    """
+
+    unit: Unit = None
+    instance_name: str = ""
+    bind: dict = None
+
+    def __init__(self, unit: Unit, name: str, bind: dict = None):  # pylint: disable=super-init-not-called,redefined-outer-name
+        assert isinstance(unit, Unit), (
+            f"Instance({name!r}): instantiate a compose.Unit, got {unit!r}")
+        assert isinstance(name, str) and name.isidentifier(), (
+            f"Instance of {unit.name}: name {name!r} is not an identifier")
+        bind = dict(bind or {})
+        if isinstance(unit, Instance):
+            # An instance re-bound (an option rebinding a neighbour, D-17):
+            # one binding of the original unit, the later one applied last.
+            extra = sorted(set(bind) - unit.free_names() - set(unit.memories))
+            assert not extra, (
+                f"Instance {name} of {unit.name}: bind names {extra}, which "
+                f"are not free in the instance (README D-17)")
+            merged = {k: bind.get(v, v) for k, v in unit.bind.items()}
+            for k, v in bind.items():
+                if k not in unit.bind.values():
+                    merged[k] = v
+            unit, bind = unit.unit, merged
+        allowed = unit.free_names() | set(unit.memories)
+        extra = sorted(set(bind) - allowed)
+        assert not extra, (
+            f"Instance {name} of unit {unit.name}: bind names {extra}, which "
+            f"{'is' if len(extra) == 1 else 'are'} not free in the body "
+            f"(free: {sorted(unit.free_names())}; memories: "
+            f"{list(unit.memories)}). A binding renames only what the body "
+            f"takes from outside (README D-17)")
+        def sub(names):
+            return tuple(bind.get(n, n) for n in names)
+
+        fields = {
+            "body": unit.body,
+            "instances": tuple(_rename_expr(e, bind) for e in unit.instances),
+            "memories": sub(unit.memories), "reads": sub(unit.reads),
+            "writes": sub(unit.writes), "parameters": sub(unit.parameters),
+            "isa": sub(unit.isa), "directives": unit.directives,
+            "legality": unit.legality, "engines": sub(unit.engines),
+            "order": unit.order, "unit": unit, "instance_name": name, "bind": bind}
+        for k, v in fields.items():
+            object.__setattr__(self, k, v)
+
+    @property
+    def name(self) -> str:
+        return self.instance_name
+
+    def source(self) -> str:
+        fn = ast.parse(Unit.source(self)).body[0]
+        fn.name = self.instance_name
+        fn.decorator_list = []
+        fn = _Rename(self.bind).visit(fn)
+        return ast.unparse(ast.fix_missing_locations(fn))
+
+    def bound_parameters(self, parameters: dict) -> dict:
+        """The parameter set as the unit sees it: each name it was written
+        with, at the value of the name the binding gave it."""
+        out = dict(parameters)
+        for k, v in self.bind.items():
+            if v in parameters:
+                out[k] = parameters[v]
+        return out
 
 
 # ---------------------------------------------------------------------------
@@ -751,7 +889,8 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
                     f"{name!r}; declare a compose.Engine and bind its slots "
                     f"with engines= (README D-15)")
             if u.legality is not None:
-                u.legality(self.parameters)
+                u.legality(u.bound_parameters(self.parameters)
+                           if isinstance(u, Instance) else self.parameters)
             for role, names, seen in (("writes", u.writes, writer),
                                       ("reads", u.reads, reader)):
                 for ch in names:

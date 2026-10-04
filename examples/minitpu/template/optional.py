@@ -26,9 +26,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from allo.compose import Architecture, Channel, Memory, Unit, unit
+from allo.compose import Architecture, Channel, Instance, Memory, Unit, unit
 
-from examples.minitpu.template.instantiate import instance
 
 
 @dataclass(frozen=True)
@@ -68,7 +67,7 @@ def assemble(base: Base, *options: Option, name=None):
         isa += list(opt.isa)
         for i, u in enumerate(units):
             if u.name in opt.rebind:
-                units[i] = instance(u, u.name, opt.rebind[u.name])
+                units[i] = Instance(u, u.name, opt.rebind[u.name])
         units += list(opt.units)
     arch = Architecture(name=name or f"{base.name}_{'_'.join(o.name for o in options) or 'base'}",
                         parameters=params, memories=base.memories,

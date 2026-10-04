@@ -36,11 +36,10 @@ from dataclasses import dataclass
 import numpy as np
 
 import allo.dataflow as df
-from allo.compose import Architecture, Channel, Memory, Unit, unit
+from allo.compose import Architecture, Channel, Instance, Memory, Unit, unit
 
 from allo.compose import Engine
 from examples.minitpu.template.engines import BF16_ACC24, INT8_INT32
-from examples.minitpu.template.instantiate import instance
 
 
 def _pow2(p):
@@ -186,7 +185,7 @@ def mxu_rig(matrix: MatrixEngine, mac: Engine, dim: int, n_rows: int,
                           carries="one row of DIM operands"),
                   Channel("me_out", depth="QD", lanes="DIM", lane_bits="MAC_OUT_BITS",
                           carries="one row of DIM results")),
-        units=(me_feed, instance(matrix.unit, "matrix_engine"), me_sink))
+        units=(me_feed, Instance(matrix.unit, "matrix_engine"), me_sink))
 
 
 # --- the contract reference, with the order as an argument -----------------

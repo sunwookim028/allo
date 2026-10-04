@@ -13,7 +13,7 @@ Nothing in the body names bf16 or int8.
 
 Three rigs: the PE at the bf16->acc24 engine, at the int8->int32 engine, and
 BOTH in one region (two instances of one unit, each at its own engine, via
-``instantiate.instance``). The weight-bank bookkeeping of ``mxu_pe.sv``
+``compose.Instance``, README D-17). The weight-bank bookkeeping of ``mxu_pe.sv``
 (two pending banks, commit, forwards) is track B's P2, not this file's.
 """
 
@@ -22,11 +22,10 @@ from __future__ import annotations
 import numpy as np
 
 import allo.dataflow as df
-from allo.compose import Architecture, Channel, Memory, unit
+from allo.compose import Architecture, Channel, Instance, Memory, unit
 
 from allo.compose import Engine
 from examples.minitpu.template.engines import BF16_ACC24
-from examples.minitpu.template.instantiate import engine_bind, instance
 
 
 @unit(
@@ -106,18 +105,18 @@ def pe_rig_two(eng_a: Engine, eng_b: Engine, n: int, name="pe_two") -> Architect
     instantiated twice too."""
     units, channels, memories, engines = [], [], [], {}
     for suffix, eng in (("a", eng_a), ("b", eng_b)):
-        slot, bind = engine_bind("MAC", suffix)
+        slot = f"MAC__{suffix}"
         engines[slot] = eng
+        bind = Engine.rebind("MAC", slot)
         chan = {c: f"{c}_{suffix}" for c in ("lhs", "wq", "psum_in", "psum_out")}
         mems = {m: f"{m}_{suffix}" for m in ("A", "W", "P", "OUT")}
         memories += [Memory(mems[m], "UInt(32)[N_WORK]") for m in ("A", "W", "P", "OUT")]
         channels += _channels(suffix)
-        units += [
-            instance(pe_feed, f"pe_feed_{suffix}", bind | chan,
-                     memories=tuple(mems[m] for m in ("A", "W", "P"))),
-            instance(mac_pe, f"mac_pe_{suffix}", bind | chan),
-            instance(pe_sink, f"pe_sink_{suffix}", bind | chan, memories=(mems["OUT"],)),
-        ]
+        for u in (pe_feed, mac_pe, pe_sink):
+            # bind only what the unit takes from outside (README D-17)
+            mine = {k: v for k, v in (bind | chan | mems).items()
+                    if k in u.free_names() or k in u.memories}
+            units.append(Instance(u, f"{u.name}_{suffix}", mine))
     return Architecture(name=name, parameters={"N_WORK": n, "QD": 4}, engines=engines,
                         memories=tuple(memories), channels=tuple(channels),
                         units=tuple(units))

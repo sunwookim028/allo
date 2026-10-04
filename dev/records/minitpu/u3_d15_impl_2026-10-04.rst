@@ -141,3 +141,43 @@ vs ``MAC_IN_BITS = 8`` refused; order mismatch refused for an engine unit
 ``reference_order == "tree"``; the tree MXU verified against the tree
 reference; slot rules; the bf16 directive emitted as ``#pragma HLS unroll``
 inside ``leading_zeros19`` only when ``Architecture.directives`` ran.
+
+D-17: what landed
+=================
+
+``compose.Instance(unit, name, bind)`` (a ``Unit`` subclass, record §2
+option C): the body is emitted under ``name`` with ``_Rename`` (lifted from
+``template/instantiate.py``) applied to every name in ``bind``; ``reads``,
+``writes``, ``parameters``, ``isa``, ``engines``, ``memories`` and the
+``instances`` expressions are renamed with it. ``bind`` may name only free
+names of the body and the unit's memories; anything else is refused at
+construction, naming the free set. ``legality`` runs on
+``bound_parameters`` -- the architecture's set as the unit sees it through
+its binding. An ``Instance`` of an ``Instance`` composes into one binding of
+the original unit (needed by optional modules that rewire a neighbour).
+``Engine.rebind(slot, new)`` is the binding of an engine slot.
+``Unit.check`` refuses a slice whose bounds are only free names
+(``w[0:W_BITS]``), with the "Cannot infer the bitwidth of the slice"
+message and the typed-assignment workaround; bounds that name a bound index
+(``meta_for``) are accepted. Swept over the 68 ``compose`` units in
+``examples/`` (TinyTPU ``ip/``, MiniTPU units and template): none refused.
+
+Provisional calls
+-----------------
+
+P6. **Memories are bindable** (``A -> A_a``, ``vreg.ra -> vreg_a.ra``),
+    though they are not free names of the body (they bind its positional
+    parameters). *Reason:* two instances of a unit that owns a boundary array
+    need two arrays; the prototype did it with a ``memories=`` override,
+    which would leave a second path to rename a unit.
+P7. **No overrides.** ``Instance`` takes no ``directives=``/``legality=``
+    replacements (the prototype's ``**overrides``): with D-15 an engine's
+    directives travel by binding, and a different legality is a different
+    unit.
+
+Migration
+---------
+
+``template/instantiate.py`` is deleted; ``mac_pe.pe_rig_two``,
+``matrix_engine.mxu_rig`` and ``optional.assemble`` use ``compose.Instance``
+(``pe_rig_two`` binds per unit only the names that unit takes).
