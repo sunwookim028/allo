@@ -465,6 +465,15 @@ private:
   // ap_int/ap_fixed while the body's uses print Catapult-native types.
   void emitStatefulGlobalElementType(Type type) override;
   static bool isStatefulGlobal(memref::GlobalOp g);
+  // A baked-in constant array (a memref.global with data that is not a
+  // written Stateful), emitted as `static const T name[...] = {...}` -- in a
+  // kernel's thread before its body, or once at file scope when a helper
+  // function reads it (A2: helpers are plain C++ functions with no other
+  // place to declare it). fileScopeConsts names the latter; a kernel that
+  // reads one of them uses the file-scope copy.
+  static bool isBakedConstGlobal(memref::GlobalOp g);
+  void emitStaticConstGlobal(memref::GlobalOp g);
+  llvm::StringSet<> fileScopeConsts;
   // One element of a dense initializer, as a C++ literal. Mirrors the base emitGlobal's
   // per-element formatting, which is only reachable there inside a full `= {...}` brace
   // list -- a reset action needs the values one at a time.
@@ -3067,37 +3076,19 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
     func.walk([&](memref::GetGlobalOp gg) {
       auto g = gg->getParentOfType<ModuleOp>()
                    .lookupSymbol<memref::GlobalOp>(gg.getName());
-      if (!g || !g.getInitialValue().has_value())
-        return;
       // Stateful globals: handled by the reset-action block above.
-      if (isStatefulGlobal(g) && !g->hasAttr("constant"))
+      if (!g || !isBakedConstGlobal(g))
+        return;
+      // Already declared at file scope for a helper (A2).
+      if (fileScopeConsts.contains(g.getSymName()))
         return;
       for (auto &e : constGlobals)
         if (e.getSymName() == g.getSymName())
           return;
       constGlobals.push_back(g);
     });
-    for (auto &g : constGlobals) {
-      // Emit as `static const`. These are read-only baked-in constants (e.g.
-      // `W: T[M,N] = np_W` weights). Plain locals live on the SC_THREAD
-      // coroutine stack, which is small (~64KB); a large weight array overflows
-      // it and segfaults at run time (test_mlp: W0[256][128] = 128KB crashes
-      // linear1_0::run in the initializer). `static` moves it to static
-      // storage; `const` is correct (never written) and lets multiple kernel
-      // instances share one copy. It also synthesizes as a ROM under Catapult.
-      // (Reuses emitGlobal's static/const attr hooks; attrs restored after.)
-      bool hadStatic = g->hasAttr("static");
-      bool hadConst = g->hasAttr("constant");
-      if (!hadStatic)
-        g->setAttr("static", UnitAttr::get(g->getContext()));
-      if (!hadConst)
-        g->setAttr("constant", UnitAttr::get(g->getContext()));
-      emitGlobal(g);
-      if (!hadStatic)
-        g->removeAttr("static");
-      if (!hadConst)
-        g->removeAttr("constant");
-    }
+    for (auto &g : constGlobals)
+      emitStaticConstGlobal(g);
   }
   // Single-shot: run the body EXACTLY ONCE, then idle. Free-running (while(1)
   // around the body) is safe for stream kernels (they re-block on an empty input
@@ -4440,6 +4431,34 @@ void SystemCModuleEmitter::emitTopModule(func::FuncOp func) {  // new (SystemC-o
 // emitModule — header + dispatch each func to kernel/top emission.
 //===----------------------------------------------------------------------===//
 
+bool SystemCModuleEmitter::isBakedConstGlobal(memref::GlobalOp g) {
+  if (!g.getInitialValue().has_value())
+    return false;
+  return !(isStatefulGlobal(g) && !g->hasAttr("constant"));
+}
+
+void SystemCModuleEmitter::emitStaticConstGlobal(memref::GlobalOp g) {
+  // Emit as `static const`. These are read-only baked-in constants (e.g.
+  // `W: T[M,N] = np_W` weights). Plain locals live on the SC_THREAD
+  // coroutine stack, which is small (~64KB); a large weight array overflows
+  // it and segfaults at run time (test_mlp: W0[256][128] = 128KB crashes
+  // linear1_0::run in the initializer). `static` moves it to static
+  // storage; `const` is correct (never written) and lets multiple kernel
+  // instances share one copy. It also synthesizes as a ROM under Catapult.
+  // (Reuses emitGlobal's static/const attr hooks; attrs restored after.)
+  bool hadStatic = g->hasAttr("static");
+  bool hadConst = g->hasAttr("constant");
+  if (!hadStatic)
+    g->setAttr("static", UnitAttr::get(g->getContext()));
+  if (!hadConst)
+    g->setAttr("constant", UnitAttr::get(g->getContext()));
+  emitGlobal(g);
+  if (!hadStatic)
+    g->removeAttr("static");
+  if (!hadConst)
+    g->removeAttr("constant");
+}
+
 void SystemCModuleEmitter::emitModule(ModuleOp module) {  // override (base emitter)
   // The SystemC backend is a DATAFLOW backend: it emits SC_MODULEs + a self-
   // contained sc_main testbench for @df.region / @df.kernel designs. A plain
@@ -5144,6 +5163,28 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
   // emitted first as plain C++ free functions (reusing the base emitter's
   // return-by-pointer convention, matching the `helper(a,b,&r)` call sites the
   // kernel bodies already emit). They must precede the modules that call them.
+  // A2: a helper is a plain C++ function, so a constant array it reads has no
+  // kernel thread to be declared in; declare each such array once at file
+  // scope, before the helpers. Kernels reading the same array use this copy.
+  {
+    bool any = false;
+    for (auto func : module.getOps<func::FuncOp>()) {
+      if (func.isExternal() || func->hasAttr("top") ||
+          func->hasAttr("df.kernel") || func->hasAttr("dataflow"))
+        continue;
+      func.walk([&](memref::GetGlobalOp gg) {
+        auto g = module.lookupSymbol<memref::GlobalOp>(gg.getName());
+        if (!g || !isBakedConstGlobal(g) ||
+            !fileScopeConsts.insert(g.getSymName()).second)
+          return;
+        emitStaticConstGlobal(g);
+        any = true;
+      });
+    }
+    if (any)
+      os << "\n";
+  }
+
   for (auto func : module.getOps<func::FuncOp>()) {
     // An external IP is a BODYLESS `func.func private`: its SC_MODULE lives in
     // the IP's own header, which copy_ext_libs brings in. Emitting it here would
