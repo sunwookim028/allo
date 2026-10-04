@@ -364,6 +364,26 @@ sequenced instances; lane-array ports become few-port memories). Recorded,
 not filed (P-10). All RTLGen/AMC numbers are FPGA estimates (u55c / Vivado
 OOC); no ASIC run of their SV yet.
 
+**D-15/17/18/19/20 implemented** (``u3_d15_d19_impl_2026-10-04.rst``, branch
+``compose-engines``, ``allo/compose.py`` only): ``Engine`` records and
+``Unit(engines=)`` slots with type/order checks; ``Instance(unit, name,
+bind)``; engine directives applied once per engine, directives on inlined
+functions refused; ``Option`` / ``with_options`` / ``isa_slots`` /
+``check_program``; ``Architecture(parameters=<geometry record>)``. First
+real optional module: ``template/vpu_lane.py`` = U1's ALU + track A's SFU,
+writeback rebound ``alu_out -> sfu_out``; bit-exact with and without the SFU
+(simulator 512/512, csim 128/128); ``vgelu`` refused without it; both
+malformed options refused naming the channel. TinyTPU emission and gates
+unchanged; ``run_u3e`` 26 OK / 1 finding. **Provisional calls for the
+owner**: engine latency is a dict keyed by body (``{"mul": 0, "add": 3}``);
+an engine or matrix-engine unit declares the order it computes, the
+architecture declares the order its reference uses; a new ``Unit(calls=)``
+declares a unit's helper functions (a compose unit could not call a helper
+before, and D-15 now refuses a bare function as a parameter); memories can
+be renamed per instance. Not done: the SystemC emitter half of D-18; the
+lane is untimed (SFU latency 5 not modelled); track B's PE/MXU units have
+no engine slot yet (the MAC is inline).
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
