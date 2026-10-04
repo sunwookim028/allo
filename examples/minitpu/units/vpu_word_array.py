@@ -18,12 +18,13 @@ Instances (``vpu_pkg`` defines and ``-G`` parameters):
 ``narrow_rl2``  the same with ``READ_LATENCY=2``
 ``narrow16``    ``MINITPU_NUM_SUBLANES=1`` too: 32 words of 16 b (added for the SystemC
                 csim column, whose testbench moves data through ``long long``)
-``mid``         ``MINITPU_NUM_LANES=1`` alone: 4096 words of 64 b (the Catapult RAM-mapping probe)
+``mid``         ``MINITPU_NUM_LANES=1`` alone: 4096 words of 64 b (the Catapult RAM-mapping probe;
+                on the ``sram`` lowering eight ``w512`` banks, ``asic_memories_2026-10-04.rst`` s.5)
 ``small``       ``MINITPU_NUM_LANES=1``, ``MINITPU_VMEM_ENTRIES_PER_LANE=64``: 32 words of
                 64 b -- the smallest OpenRAM 2RW macro, the SRAM path's dry run
                 (``asic_memories_2026-10-04.rst``)
 ``w512``        ``MINITPU_NUM_LANES=1``, ``MINITPU_VMEM_ENTRIES_PER_LANE=1024``: 512 words of
-                64 b -- the largest OpenRAM 2RW macro built there (one eighth of ``mid``)
+                64 b -- the largest OpenRAM 2RW macro built there, and ``mid``'s bank macro
 ``full``        the default geometry: 4096 words of 1024 b, latencies 3/2
 ``full_rl2``    ``READ_LATENCY=2``: what ``tb_vpu_word_array`` instantiates
 

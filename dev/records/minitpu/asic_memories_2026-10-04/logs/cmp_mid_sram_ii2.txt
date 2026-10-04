@@ -1,0 +1,16 @@
+RTL-TRACE vpu_word_array:mid H_mid_ii2 (stretch 2): defined 8244/8244 at output-row offset compute +1 rows vs MiniTPU 4129/4129, dma -1 rows vs MiniTPU 4115/4115; 16974 masked; 12609 cycles; 15.5s
+    first-3000 hits by L, compute_rdata_o: {0: 126, 1: 126, 2: 873, 3: 873, 4: 364, 5: 364, 6: 205, 7: 205, 8: 148, 9: 148, 10: 121, 11: 121, 12: 112, 13: 112, 14: 83, 15: 83, 16: 83, 17: 83, 18: 63, 19: 63}
+    first-3000 hits by L, dma_rdata_o: {0: 821, 1: 821, 2: 314, 3: 314, 4: 183, 5: 183, 6: 107, 7: 107, 8: 85, 9: 85, 10: 65, 11: 65, 12: 69, 13: 69, 14: 56, 15: 56, 16: 56, 17: 56, 18: 52, 19: 52}
+    PROBE read compute: declared 3; MiniTPU 3; Catapult 6
+    PROBE read dma: declared 2; MiniTPU 2; Catapult 2
+    PROBE write compute -> read compute (visibility): declared 1; MiniTPU 1; Catapult 2
+    PROBE write compute -> read dma (visibility): declared 1; MiniTPU 1; Catapult 2
+    PROBE write dma -> read compute (visibility): declared 1; MiniTPU 1; Catapult 0
+    PROBE write dma -> read dma (visibility): declared 1; MiniTPU 1; Catapult 2
+    kernel port-to-port latency, measured = read probe - (L - 1): {'compute': 4, 'dma': 1}
+    LATENCY-MISMATCH port_c_0: reported 2 ii=2 (scheduled), measured 4; unit declares 3
+    manifest port_c_0: latency=2, ii=2, status=scheduled, port_style=wire, process_latency=None, loop=while, loop_c_steps=2, ports={'v28': 'comb', 'v30': 'comb', 'v31': 'comb', 'v32': 'comb'}
+    LATENCY-MISMATCH port_d_0: reported 2 ii=2 (scheduled), measured 4; unit declares 3
+    manifest port_d_0: latency=2, ii=2, status=scheduled, port_style=wire, process_latency=None, loop=while, loop_c_steps=2, ports={'v55': 'comb', 'v57': 'comb', 'v58': 'comb', 'v59': 'comb'}
+    LATENCY-MISMATCH vmem_mem_0: reported 3 ii=2 (scheduled), measured 4; unit declares 3
+    manifest vmem_mem_0: latency=3, ii=2, status=scheduled, port_style=wire, process_latency=3, loop=while, loop_c_steps=3

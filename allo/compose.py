@@ -25,7 +25,7 @@ import linecache
 import math
 import os
 import textwrap
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace as _dc_replace
 
 import allo
 import allo.dataflow as df
@@ -172,6 +172,27 @@ class Sram:
     is the compiled Catapult library (the Memory Generator's ``.lib``) when
     one is already built; otherwise the SystemC build makes it on a Catapult
     host. ``from_openram`` reads all of it from an OpenRAM ``.v`` + ``.lib``.
+
+    ``banks`` declares how many copies of the macro the memory is built from
+    (``Sram.banked(n)``), each holding a contiguous block of ``rows`` words:
+    the high address bits pick the bank (Catapult's ``-BLOCK_SIZE rows`` on
+    the mapped array). Every bank keeps all of the macro's ports, so each
+    declared port stays on its own physical port in every bank. Never
+    inferred: a memory with more rows than one macro is refused until it
+    declares its banks (``asic_memories_2026-10-04.rst`` s.5).
+
+    ``port_map`` pins declared ports to macro ports (``Sram.mapped(c=0,
+    d=1)``); ports it leaves out are placed on a free macro port of their
+    own kind, else an ``rw`` one. Either way a placement must keep D-12's
+    port kinds: an ``r`` macro port serves only an ``r`` port, a ``w`` macro
+    port only a ``w`` port, and a declared ``rw`` port -- a read in some
+    cycles, a write in others, one address -- only an ``rw`` macro port
+    (s.6). ``memory.json`` states the placement.
+
+    ``rdwr`` is what the macro itself does when one port reads a word another
+    port writes in the same cycle (Catapult's ``RDWRRESOLUTION``, written into
+    its library): OpenRAM's model races there (``UNKNOWN``; measured
+    write-through, s.6).
     """
 
     module: str
@@ -183,9 +204,24 @@ class Sram:
     read_latency: int = 1
     visible: int = 1
     catapult_lib: str = None
+    banks: int = 1
+    port_map: tuple = ()
+    rdwr: str = "UNKNOWN"
 
     def __post_init__(self):
         assert self.module.isidentifier(), f"sram {self.module!r}: not a module name"
+        assert isinstance(self.banks, int) and self.banks >= 1, (
+            f"sram {self.module}: banks={self.banks!r} must be a count >= 1")
+        for name, i in self.port_map:
+            assert isinstance(i, int) and 0 <= i < len(self.ports), (
+                f"sram {self.module}: port_map puts {name} on port {i!r}; the "
+                f"macro has ports 0..{len(self.ports) - 1} ({list(self.ports)})")
+        assert self.rdwr in ("UNKNOWN", "RBW", "WBR"), (
+            f"sram {self.module}: rdwr={self.rdwr!r} is not UNKNOWN, RBW or WBR")
+        idx = [i for _, i in self.port_map]
+        assert len(set(idx)) == len(idx), (
+            f"sram {self.module}: port_map puts two ports on one macro port: "
+            f"{dict(self.port_map)} (a macro port serves one access per cycle)")
         assert self.ports and all(k in PORT_KINDS for k in self.ports), (
             f"sram {self.module}: ports {self.ports} are not kinds from {PORT_KINDS}")
         assert isinstance(self.read_latency, int) and self.read_latency >= 1, (
@@ -204,6 +240,20 @@ class Sram:
         except OSError:
             return None
         return float(m.group(1)) if m else None
+
+    @property
+    def total_area_um2(self):
+        """The Liberty area of every bank (``banks`` x ``area_um2``), or None."""
+        a = self.area_um2
+        return None if a is None else a * self.banks
+
+    def banked(self, banks):
+        """This macro, ``banks`` copies of it, each a contiguous block of rows."""
+        return _dc_replace(self, banks=banks)
+
+    def mapped(self, **ports):
+        """This macro with declared ports pinned to its ports by index."""
+        return _dc_replace(self, port_map=tuple(sorted(ports.items())))
 
     @classmethod
     def from_openram(cls, verilog, liberty, catapult_lib=None):
@@ -225,8 +275,30 @@ class Sram:
         return {"module": self.module, "rows": self.rows, "width": self.width,
                 "ports": list(self.ports), "read_latency": self.read_latency,
                 "visible": self.visible, "area_um2": self.area_um2,
+                "banks": self.banks, "banking": (
+                    f"{self.banks} x {self.rows} rows, contiguous blocks (the high "
+                    f"address bits pick the bank)" if self.banks > 1 else "one macro"),
+                "total_area_um2": self.total_area_um2,
+                "port_map": dict(self.port_map),
                 "verilog": self.verilog, "liberty": self.liberty,
                 "catapult_lib": self.catapult_lib}
+
+
+def _refuse_mixed_macros(srams):
+    """Catapult binds every access of a Memory Generator library whose macro
+    mixes ReadWrite with Read or Write ports to the ReadWrite port and ties
+    the others off (asic_memories_2026-10-04.rst s.6): refused, since it
+    would drop a declared port."""
+    for e in srams:
+        kinds = set(e["sram"].ports)
+        if "rw" in kinds and kinds - {"rw"}:
+            raise NotImplementedError(
+                f"memory {e['memory']}: the macro {e['module']} mixes ReadWrite and "
+                f"{'/'.join(sorted(kinds - {'rw'}))} ports ({list(e['sram'].ports)}); "
+                f"Catapult binds every access of such a Memory Generator library to "
+                f"its ReadWrite port and ties the others off (asic_memories_2026-10-04"
+                f".rst s.6), which would drop a declared port. Use an all-rw macro or "
+                f"one without rw ports (1R1W)")
 
 
 @dataclass(frozen=True)
@@ -811,21 +883,53 @@ class Architecture:
         assert sram is not None, (
             f"memory {m.name}: the sram lowering needs the macro: declare "
             f"Memory(impl=Sram(...)) (or Sram.from_openram(<.v>, <.lib>))")
-        free = list(range(len(sram.ports)))
-        out = {}
+        out = self._pinned_sram_ports(m)
+        free = [i for i in range(len(sram.ports)) if i not in out.values()]
         for p in m.ports:
             assert p.count == 1, (
                 f"memory {m.name}: port {p.name} declares count={p.count}; a "
                 f"macro port serves one access per cycle (declare {p.count} ports)")
+            if p.name in out:
+                continue
             pick = next((i for i in free if sram.ports[i] == p.kind), None)
             if pick is None:
                 pick = next((i for i in free if sram.ports[i] == "rw"), None)
             assert pick is not None, (
                 f"memory {m.name}: port {p.name} ({p.kind}) has no port of the "
                 f"macro {sram.module} left to honour it: it offers "
-                f"{list(sram.ports)} for {[q.name for q in m.ports]}")
+                f"{list(sram.ports)} for {[q.name for q in m.ports]}"
+                + (" (a declared rw port needs an rw macro port: it reads in some "
+                   "cycles and writes in others)" if p.kind == "rw" else ""))
             free.remove(pick)
             out[p.name] = pick
+        return out
+
+    @staticmethod
+    def _pinned_sram_ports(m) -> dict:
+        """The placements ``Sram.mapped`` pins, each checked against D-12's
+        port kinds; refuses naming the port."""
+        sram = m.sram
+        pinned = dict(sram.port_map)
+        names = {p.name for p in m.ports}
+        for name in pinned:
+            assert name in names, (
+                f"memory {m.name}: the macro {sram.module}'s port_map names "
+                f"{name!r}, which is not one of its ports {sorted(names)}")
+        out = {}
+        for p in m.ports:
+            if p.name not in pinned:
+                continue
+            i = pinned[p.name]
+            k = sram.ports[i]
+            assert k in (p.kind, "rw"), (
+                f"memory {m.name}: port {p.name} ({p.kind}) cannot sit on port {i} "
+                f"of the macro {sram.module}, a {k!r} port: "
+                + ("a declared rw port reads in some cycles and writes in others at "
+                   "one address, so only an rw macro port honours it"
+                   if p.kind == "rw" else
+                   f"a {k!r} macro port cannot {'write' if p.writes else 'read'}")
+                + " (README D-12 port kinds; asic_memories_2026-10-04.rst s.6)")
+            out[p.name] = i
         return out
 
     def _check_sram(self, m):
@@ -835,10 +939,24 @@ class Architecture:
         assert not m.reset, (
             f"memory {m.name}: an SRAM macro ({sram.module}) is not reset; "
             f"declare reset=False (README D-14) or lower it to registers")
+        readers = [p.name for p in m.ports if p.reads]
+        writers = [p.name for p in m.ports if p.writes]
+        cross = any(r != w for r in readers for w in writers)
+        assert not (cross and m.collision == "refuse" and sram.rdwr != "RBW"), (
+            f"memory {m.name}: collision='refuse' lets a port read a word another "
+            f"port writes in the same cycle, and visible=1 says it sees the old "
+            f"word; the macro {sram.module} leaves that cycle {sram.rdwr} "
+            f"(rdwr). Declare collision='obligation' (why it cannot happen) or "
+            f"'undefined', or lower to registers")
         rows = self._rows(m)
-        assert rows <= sram.rows, (
+        need = -(-rows // sram.rows)
+        assert rows <= sram.rows * sram.banks, (
             f"memory {m.name}: {rows} rows do not fit the macro {sram.module} "
-            f"({sram.rows} rows); banking is not lowered here")
+            f"({sram.rows} rows x {sram.banks} bank{'s' if sram.banks > 1 else ''}); "
+            f"declare the banks, Sram.banked({need}) -- banking is never inferred")
+        assert sram.banks == 1 or rows > sram.rows * (sram.banks - 1), (
+            f"memory {m.name}: {rows} rows need {need} bank(s) of {sram.module} "
+            f"({sram.rows} rows); it declares {sram.banks}")
         width = self._width(m)
         assert width is None or width <= sram.width, (
             f"memory {m.name}: {width}-bit words are wider than the macro "
@@ -860,6 +978,54 @@ class Architecture:
                     f"memory {m.name}: port {p.name} declares visible="
                     f"{p.visible}; the macro {sram.module} shows a write after "
                     f"{sram.visible}")
+
+    def _server_ops(self, m) -> dict:
+        """``{port: {"read": pattern, "write": pattern}}``: Catapult's names for
+        each port's memory operations in the generated server (``_server``,
+        ``sram=True``), as glob patterns. Every ``rw`` port is one ``if``
+        (write) / ``else`` (read), in declaration order; an ``r`` port is a
+        plain read; each ``w`` port is one ``if`` after them all. Catapult
+        numbers a loop's ``if``s ``if``, ``if#1``, ``if#2``, ..."""
+        def sfx(k):
+            return "" if k == 0 else f"#{k}"
+
+        mem = "(mem:rsc*"
+        ops, k = {}, 0
+        for p in m.ports:
+            if p.kind == "rw":
+                ops[p.name] = {"write": f"*:if{sfx(k)}:write_mem{mem}",
+                               "read": f"*:else{sfx(k)}:*read_mem{mem}"}
+                k += 1
+            elif p.kind == "r":
+                ops[p.name] = {"read": f"*while:v*read_mem{mem}"}
+        for p in m.ports:
+            if p.kind == "w":
+                ops[p.name] = {"write": f"*:if{sfx(k)}:write_mem{mem}"}
+                k += 1
+        return ops
+
+    def cross_port_independence(self, m) -> list:
+        """The ``(from, to)`` operation pairs of different ports that Catapult
+        may treat as independent, as ``ignore_memory_precedences`` patterns:
+        every cross-port pair with a write in it, when the memory's
+        ``collision`` is an ``obligation`` or ``undefined`` -- a same-word
+        access by two ports in one cycle is then excluded (or masked), so no
+        order between them is observable. Without this Catapult chains each
+        port's access behind the other's and a two-port macro stops at II=2
+        (asic_memories_2026-10-04.rst s.6). Same-port order is kept."""
+        if m.collision not in ("obligation", "undefined"):
+            return []
+        ops = self._server_ops(m)
+        out = []
+        for p in m.ports:
+            for q in m.ports:
+                if p.name == q.name:
+                    continue
+                for a, pa in ops[p.name].items():
+                    for b, qb in ops[q.name].items():
+                        if "write" in (a, b):
+                            out.append((pa, qb))
+        return out
 
     def _width(self, m):
         """Bits of one word, or None when the type is not one of ours."""
@@ -1122,7 +1288,8 @@ class Architecture:
                        if not m.reset and links != "stream" and target != "vhls"
                        else "the backend's array (reset storage)")
             if choice == "sram":
-                storage = (f"SRAM macro {m.sram.module} ({m.sram.rows} x {m.sram.width}, "
+                storage = (f"SRAM macro {m.sram.module} x{m.sram.banks} "
+                           f"({m.sram.rows} x {m.sram.width}, "
                            f"ports {list(m.sram.ports)}), unreset by nature; the server's "
                            f"array is mapped onto it (Catapult: MAP_TO_MODULE)")
             impl = {
@@ -1170,6 +1337,14 @@ class Architecture:
             }
             if choice == "sram":
                 out[m.name]["macro"] = m.sram.manifest()
+                out[m.name]["cross_port_independent"] = (
+                    "Catapult may overlap the ports' accesses: the collision "
+                    f"{m.collision} excludes a same-word access by two ports in one "
+                    "cycle (ignore_memory_precedences between ports; same-port order kept)"
+                    if m.collision in ("obligation", "undefined") else
+                    "no: every cross-port order is kept")
+                out[m.name]["port_map"] = {k: f"{v} ({m.sram.ports[v]})"
+                                           for k, v in macro_ports.items()}
             if m.name in self.obligations:
                 out[m.name]["obligation"] = self.obligations[m.name]
         return out
@@ -1195,7 +1370,9 @@ class Architecture:
             rsc = f"/{root}/{kernel}/run/mem:rsc" if root else f"/{kernel}/run/mem:rsc"
             out.append({"memory": m.name, "library": m.sram.module,
                         "file": m.sram.catapult_lib, "module": m.sram.module,
-                        "rsc": rsc, "sram": m.sram})
+                        "rsc": rsc, "sram": m.sram,
+                        "block_size": m.sram.rows if m.sram.banks > 1 else None,
+                        "independent": self.cross_port_independence(m)})
         return out
 
     def build(self, target="simulator", lowering=None, schedule=None, technology=None,
@@ -1212,6 +1389,8 @@ class Architecture:
                 print(f"[memory] {name}: {d['lowering']}, untimed (the simulator "
                       f"keeps the order of accesses, not latency or visibility)")
         srams = self.sram_configs(target, lowering, technology, kwargs.get("configs"))
+        if target == "systemc":
+            _refuse_mixed_macros(srams)
         if srams and target == "systemc":
             configs = dict(kwargs.get("configs") or {})
             for e in srams:
@@ -1220,6 +1399,7 @@ class Architecture:
                     outdir = os.path.join(kwargs.get("project") or ".", "memgen")
                     e["file"] = build_memory_library(
                         e["sram"], outdir, clock=float(configs.get("clock_period", 3.33)))
+                    e["library_built"] = True
             configs["memories"] = [{k: v for k, v in e.items() if k != "sram"} for e in srams]
             kwargs["configs"] = configs
             for e in srams:

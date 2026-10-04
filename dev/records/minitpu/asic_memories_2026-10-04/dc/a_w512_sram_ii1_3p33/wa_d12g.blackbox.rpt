@@ -1,0 +1,29 @@
+ 
+****************************************
+Report : cell
+Design : wa_d12g
+Version: W-2024.09
+Date   : Sun Oct  4 13:24:12 2026
+****************************************
+
+Attributes:
+    b - black box (unknown)
+   cg - clock gating logic
+    d - dont_touch
+    h - hierarchical
+   mo - map_only
+    n - noncombinational
+    p - parameterized
+    r - removable
+   so - sizing only
+    u - contains unmapped logic
+
+Cell                      Reference       Library             Area  Attributes
+--------------------------------------------------------------------------------
+u4/clk_gate_vmem_mem_0_run_inst/mgc_c_p_0_sva_dfm_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_run_inst/mgc_d_p_0_sva_dfm_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/clk_gate_vmem_mem_0_run_inst/v87_reg/latch CLKGATETST_X1 NangateOpenCellLibrary 3.990000 b, cg, so
+u4/mem_rsc_comp           sram_2rw_64x512_freepdk45 sram_2rw_64x512_freepdk45_TT_1p0V_25C_lib 103782.070312 b, d, mo, p
+--------------------------------------------------------------------------------
+Total 4 cells                                             103794.040313
+1

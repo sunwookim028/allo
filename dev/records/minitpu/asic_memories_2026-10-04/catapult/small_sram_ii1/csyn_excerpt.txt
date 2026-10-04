@@ -1,0 +1,9 @@
+259:# $PROJECT_HOME/../kernel.cpp(795): Memory Resource '/wa_d12g/vmem_mem_0/run/mem:rsc' (from var: mem) mapped to 'sram_2rw_64x32_freepdk45.sram_2rw_64x32_freepdk45' (size: 32 x 64). (MEM-4)
+273:# /wa_d12g/vmem_mem_0/run/run:rlp/while/while:if#1:write_mem(mem:rsc.@)/IGNORE_DEPENDENCY_FROM while:if:write_mem(mem:rsc.@)
+275:# /wa_d12g/vmem_mem_0/run/run:rlp/while/while:else#1:v119:read_mem(mem:rsc.@)/IGNORE_DEPENDENCY_FROM while:if:write_mem(mem:rsc.@)
+277:# /wa_d12g/vmem_mem_0/run/run:rlp/while/while:if#1:write_mem(mem:rsc.@)/IGNORE_DEPENDENCY_FROM {while:if:write_mem(mem:rsc.@) while:else:v105:read_mem(mem:rsc.@)}
+279:# /wa_d12g/vmem_mem_0/run/run:rlp/while/while:if:write_mem(mem:rsc.@)/IGNORE_DEPENDENCY_FROM while:if#1:write_mem(mem:rsc.@)
+281:# /wa_d12g/vmem_mem_0/run/run:rlp/while/while:else:v105:read_mem(mem:rsc.@)/IGNORE_DEPENDENCY_FROM while:if#1:write_mem(mem:rsc.@)
+283:# /wa_d12g/vmem_mem_0/run/run:rlp/while/while:if:write_mem(mem:rsc.@)/IGNORE_DEPENDENCY_FROM {while:if#1:write_mem(mem:rsc.@) while:else#1:v119:read_mem(mem:rsc.@)}
+286:# Warning: Process 'run' has IGNORE_DEPENDENCY_FROM directives (potentially created from ignore_memory_precedence commands).  The command was refined to be dependent on the order of the arguments.  Please verify the correctness of the argument order.  See 
+370:CATAPULT_EXIT 0 WALL 43s

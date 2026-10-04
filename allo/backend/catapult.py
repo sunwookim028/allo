@@ -398,8 +398,9 @@ def memory_directives(memories):
     ``asic_memories_2026-10-04.rst``): after ``go compile`` (a library is read
     at the ``libraries`` stage), each macro's compiled Catapult library is
     added by file and the server's array resource is mapped onto the macro
-    with ``MAP_TO_MODULE``. ``memories`` is ``compose.Architecture.
-    sram_configs``: ``[{library, file, module, rsc}, ...]``.
+    with ``MAP_TO_MODULE``; a banked macro (``Sram.banked``) adds
+    ``-BLOCK_SIZE <macro rows>``. ``memories`` is ``compose.Architecture.
+    sram_configs``: ``[{library, file, module, rsc, block_size}, ...]``.
     """
     out = ""
     for e in memories or ():
@@ -408,10 +409,28 @@ def memory_directives(memories):
             f"library (Sram.catapult_lib); build_memory_library makes one on a Catapult host")
         out += f"solution library add {e['library']} -file {os.path.abspath(e['file'])}\n"
         out += f"directive set {e['rsc']} -MAP_TO_MODULE {e['module']}.{e['module']}\n"
+        if e.get("block_size"):
+            # Sram.banked(n): n copies of the macro, contiguous blocks of rows
+            out += f"directive set {e['rsc']} -BLOCK_SIZE {e['block_size']}\n"
     return out
 
 
-def memgen_spec(sram, outdir, clock=3.33, readdelay=None):
+def memory_independence(memories):
+    """``run.tcl`` lines after ``go assembly``: ``go architect``, then one
+    ``ignore_memory_precedences`` per cross-port operation pair that a
+    memory's collision obligation makes independent (``compose.Architecture.
+    cross_port_independence``; ``asic_memories_2026-10-04.rst`` s.6). Empty
+    when there is none."""
+    pairs = [pair for e in memories or () for pair in e.get("independent") or ()]
+    if not pairs:
+        return ""
+    out = "go architect\n"
+    for a, b in pairs:
+        out += f"ignore_memory_precedences -from {a} -to {b}\n"
+    return out
+
+
+def memgen_spec(sram, outdir, clock=3.33, readdelay=None, rdwr=None):
     """The Memory Generator spec (``flow run /MemGen/MemoryGenerator_BuildLib``,
     ``catapult_lb_useref.pdf`` ch. 1.2) for an OpenRAM-style macro, and a
     Verilator copy of its model. Returns ``(spec path, sim model path)``.
@@ -485,7 +504,7 @@ INPUTDELAY       0.01
 TIMEUNIT         1ns
 WIDTH            DATA_WIDTH
 AREA             {int(round(area))}
-RDWRRESOLUTION   UNKNOWN
+RDWRRESOLUTION   {rdwr or sram.rdwr}
 WRITELATENCY     {sram.visible}
 READLATENCY      {sram.read_latency}
 DEPTH            {sram.rows}
@@ -511,12 +530,12 @@ PINMAPS {{
     return spec, sim_v
 
 
-def build_memory_library(sram, outdir, clock=3.33, readdelay=None):
+def build_memory_library(sram, outdir, clock=3.33, readdelay=None, rdwr=None):
     """Compile ``sram`` into a Catapult memory library with the Memory
     Generator (``catapult -shell -f <spec>``; the plain Catapult licence
     suffices) and return the ``.lib`` path, ``<outdir>/memgen/<module>.lib``.
     Refuses without Catapult on PATH, naming the spec it wrote."""
-    spec, _ = memgen_spec(sram, outdir, clock, readdelay)
+    spec, _ = memgen_spec(sram, outdir, clock, readdelay, rdwr)
     lib = os.path.join(os.path.abspath(outdir), "memgen", f"{sram.module}.lib")
     if os.path.exists(lib):
         return lib
@@ -756,6 +775,7 @@ solution app execution
 solution library add ccs_sample_mem
 go assembly
 """
+        out_str += memory_independence(configs.get("memories"))
         out_str += "go extract\n"
 
     # csyn stops at `go extract`. Power needs two more steps, and mode="ppa" used to

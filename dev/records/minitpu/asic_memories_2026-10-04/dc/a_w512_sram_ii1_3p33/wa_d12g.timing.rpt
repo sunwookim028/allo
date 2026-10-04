@@ -1,0 +1,65 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -max_paths 1
+        -transition_time
+Design : wa_d12g
+Version: W-2024.09
+Date   : Sun Oct  4 13:24:12 2026
+****************************************
+
+Operating Conditions: typical   Library: NangateOpenCellLibrary
+Wire Load Model Mode: top
+
+  Startpoint: u4/mem_rsc_comp/clk1
+              (internal path startpoint clocked by ideal_clock)
+  Endpoint: u4/vmem_mem_0_run_inst/v91_reg[6]
+            (rising edge-triggered flip-flop clocked by ideal_clock)
+  Path Group: ideal_clock
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  wa_d12g            5K_hvratio_1_1        NangateOpenCellLibrary
+
+  Point                                       Fanout     Trans      Incr       Path
+  ------------------------------------------------------------------------------------
+  clock ideal_clock (fall edge)                                     1.66       1.66
+  clock network delay (ideal)                                       0.00       1.66
+  input external delay                                              0.00       1.66 f
+  u4/mem_rsc_comp/clk1 (sram_2rw_64x512_freepdk45)        0.00      0.00       1.66 f
+  u4/mem_rsc_comp/dout1[6] (sram_2rw_64x512_freepdk45)
+                                                          0.00      0.41       2.08 f
+  u4/mem_rsci_dout0_d[70] (net)                 1                   0.00       2.08 f
+  U152/A (CLKBUF_X1)                                      0.00      0.01       2.08 f
+  U152/Z (CLKBUF_X1)                                      0.01      0.03       2.11 f
+  n18 (net)                                     1                   0.00       2.11 f
+  U150/A (INV_X1)                                         0.01      0.01       2.12 f
+  U150/ZN (INV_X1)                                        0.01      0.01       2.13 r
+  n16 (net)                                     1                   0.00       2.13 r
+  U151/A (INV_X1)                                         0.01      0.01       2.15 r
+  U151/ZN (INV_X1)                                        0.00      0.01       2.16 f
+  n17 (net)                                     2                   0.00       2.16 f
+  U384/A (MUX2_X1)                                        0.00      0.01       2.16 f
+  U384/Z (MUX2_X1)                                        0.01      0.05       2.22 f
+  u4/vmem_mem_0_run_inst/N13 (net)              1                   0.00       2.22 f
+  u4/vmem_mem_0_run_inst/v91_reg[6]/D (DFFR_X1)           0.01      0.01       2.23 f
+  data arrival time                                                            2.23
+
+  clock ideal_clock (rise edge)                                     3.33       3.33
+  clock network delay (ideal)                                       0.00       3.33
+  u4/vmem_mem_0_run_inst/v91_reg[6]/CK (DFFR_X1)                    0.00       3.33 r
+  library setup time                                               -0.04       3.29
+  data required time                                                           3.29
+  ------------------------------------------------------------------------------------
+  data required time                                                           3.29
+  data arrival time                                                           -2.23
+  ------------------------------------------------------------------------------------
+  slack (MET)                                                                  1.06
+
+
+1
