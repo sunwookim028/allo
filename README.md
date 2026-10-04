@@ -302,6 +302,28 @@ backend, and one `Stateful` has one kernel.**
   unit) cannot match MiniTPU per cycle on Catapult, or a two-port VMEM
   cannot reach II=1.
 
+**D-15 (2026-10-04). An engine is declared, and a swap that changes the
+accumulate order is a different function.**
+- A swappable engine is a record, not a function: operand, accumulator and
+  output types with their widths; `mul`/`add`/`pack` bodies; their latency as
+  a D-10 `latency=` on those bodies; the accumulate `order` it is exact for;
+  the same arithmetic in numpy; and the directives it needs of a schedule. A
+  unit binds the record's names as parameters (`MAC_IN`, `MAC_ADD`, ...),
+  never a bare function.
+- A matrix engine declares its `order` (`sequential` | `tree`). What a
+  composition books is the declared latency; what a backend built is
+  `latency.json`. Neither is a constant in a body.
+- The contract reference of a composite takes the order as an argument. An
+  engine swap that keeps the order is verified against the same reference;
+  one that changes it is verified against the reference evaluated with the
+  new order, and recorded as a different function, as `ip_gaps.rst` does for
+  a narrower node type. Measured at U3: systolic and tree differ on 74 of
+  8,192 bf16 outputs at DIM 16 on random data, 0 on exact-sum data, 0 at int8.
+- MiniTPU's instance admits one order, `sequential` acc24 with one
+  `pack_bf16` (P-5); an instance with an adder-tree engine declares `tree`.
+- Evidence: `dev/records/minitpu/u3_composition_design_2026-10-04.rst` §1,
+  prototype `examples/minitpu/template/`.
+
 ## Milestones
 
 Each milestone passes on **one acceptance check** and names the tools it uses

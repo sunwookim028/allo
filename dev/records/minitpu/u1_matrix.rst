@@ -267,6 +267,11 @@ and its params as undeclared free names; unit bodies need lazy annotations
 (doc gap); ``Architecture._check`` refuses a dangling channel (H15 on this
 path). Tracks C and D now take B's units.
 
+**Checkpoint 12, 2026-10-04:** D-15 **approved** (README), with the two
+wording edits (engine latency is a D-10 ``latency=``; "an adder-tree instance
+declares ``tree``"). Implementation on review branch ``compose-engines``.
+D-16..D-19 next, one at a time.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
