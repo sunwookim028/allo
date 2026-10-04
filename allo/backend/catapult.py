@@ -3,6 +3,8 @@
 
 import os
 import re
+import shutil
+import subprocess
 
 import numpy as np
 from .utils import format_str
@@ -263,8 +265,6 @@ def resolve_ncsim_root(configs=None):
     only exists on one host OR an empty root that silently runs no simulation. On
     zhang-21 none of 1-3 are set, so the explicit config is the one that works.
     """
-    import shutil
-
     configs = configs or {}
     # A blank or whitespace-only value is NOT a root. Treated as given it would emit
     # `/NCSim/NC_ROOT ` with nothing after it, which points Catapult at nothing and
@@ -391,6 +391,147 @@ def unreset_directives(kernels, top, design_top, group=None):
             continue
         out += f"directive set {path} -RESET_CLEARS_ALL_REGS no\n"
     return out
+
+
+def memory_directives(memories):
+    """``run.tcl`` lines for ``sram``-lowered memories (README D-12;
+    ``asic_memories_2026-10-04.rst``): after ``go compile`` (a library is read
+    at the ``libraries`` stage), each macro's compiled Catapult library is
+    added by file and the server's array resource is mapped onto the macro
+    with ``MAP_TO_MODULE``. ``memories`` is ``compose.Architecture.
+    sram_configs``: ``[{library, file, module, rsc}, ...]``.
+    """
+    out = ""
+    for e in memories or ():
+        assert e.get("file"), (
+            f"memory {e.get('memory')}: the macro {e['module']} has no compiled Catapult "
+            f"library (Sram.catapult_lib); build_memory_library makes one on a Catapult host")
+        out += f"solution library add {e['library']} -file {os.path.abspath(e['file'])}\n"
+        out += f"directive set {e['rsc']} -MAP_TO_MODULE {e['module']}.{e['module']}\n"
+    return out
+
+
+def memgen_spec(sram, outdir, clock=3.33, readdelay=None):
+    """The Memory Generator spec (``flow run /MemGen/MemoryGenerator_BuildLib``,
+    ``catapult_lb_useref.pdf`` ch. 1.2) for an OpenRAM-style macro, and a
+    Verilator copy of its model. Returns ``(spec path, sim model path)``.
+
+    Ports as OpenRAM names them (``clk<i>, csb<i>, web<i>, addr<i>, din<i>,
+    dout<i>``): one ReadWrite/Read/Write port per physical port, ``csb`` an
+    active-low PORT_ENABLE, ``web`` an active-low WRITE_ENABLE. READLATENCY and
+    WRITELATENCY from the ``Sram``; RDWRRESOLUTION UNKNOWN (a port either reads
+    or writes; a cross-port same-word access is the D-12 collision obligation);
+    AREA the Liberty area rounded (the nangate-45nm_beh unit is um^2-like);
+    READDELAY = clock/2 + the Liberty's largest dout delay (OpenRAM's output
+    moves after the FALLING edge), unless given. The sim copy drops the
+    ``#(T_HOLD) dout = 'bx`` line (Verilator ignores the delay and the X would
+    race the consumer's sample) and the ``#(DELAY)`` on the read (Verilator 5
+    refuses a timing control without ``--timing``), VERBOSE 0.
+    """
+    with open(sram.verilog, encoding="utf-8") as f:
+        v = f.read()
+    with open(sram.liberty, encoding="utf-8") as f:
+        lib = f.read()
+    dq = 0.0
+    for blk in re.finditer(r"pin\(dout\d+\[.*?\]\)\{(.*?)\n\s*\}\n\s*\}", lib, re.S):
+        for tbl in re.finditer(r"cell_(?:rise|fall)\(CELL_TABLE\) \{(.*?)\}", blk.group(1), re.S):
+            for num in re.findall(r"[\d.]+", tbl.group(1)):
+                dq = max(dq, float(num))
+    if readdelay is None:
+        readdelay = round(clock / 2 + dq, 3)
+    area = sram.area_um2 or 0.0
+    os.makedirs(outdir, exist_ok=True)
+    sim_v = os.path.join(outdir, f"{sram.module}_sim.v")
+    sim = re.sub(r"\n\s*#\(T_HOLD\) dout\d+ = \d+'bx;", "", v)
+    sim = sim.replace("<= #(DELAY) ", "<= ").replace("parameter VERBOSE = 1 ;", "parameter VERBOSE = 0 ;")
+    with open(sim_v, "w", encoding="utf-8") as f:
+        f.write(sim)
+    aw = max(1, (sram.rows - 1).bit_length())
+    port_decls, pinmaps = [], []
+    for i, kind in enumerate(sram.ports):
+        p = f"p{i}"
+        mode = {"rw": "ReadWrite", "r": "Read", "w": "Write"}[kind]
+        port_decls.append(f"  {{ NAME {p} MODE {mode} }}")
+        pinmaps.append(f"  {{ PHYPIN clk{i}  LOGPIN CLOCK        DIRECTION in  WIDTH 1.0        PHASE 1  DEFAULT {{}} PORTS {p} }}")
+        pinmaps.append(f"  {{ PHYPIN csb{i}  LOGPIN PORT_ENABLE  DIRECTION in  WIDTH 1.0        PHASE 0  DEFAULT {{}} PORTS {p} }}")
+        pinmaps.append(f"  {{ PHYPIN addr{i} LOGPIN ADDRESS      DIRECTION in  WIDTH ADDR_WIDTH PHASE {{}} DEFAULT {{}} PORTS {p} }}")
+        if kind == "rw":
+            pinmaps.append(f"  {{ PHYPIN web{i}  LOGPIN WRITE_ENABLE DIRECTION in  WIDTH 1.0        PHASE 0  DEFAULT {{}} PORTS {p} }}")
+        if kind in ("rw", "w"):
+            pinmaps.append(f"  {{ PHYPIN din{i}  LOGPIN DATA_IN      DIRECTION in  WIDTH DATA_WIDTH PHASE {{}} DEFAULT {{}} PORTS {p} }}")
+        if kind in ("rw", "r"):
+            pinmaps.append(f"  {{ PHYPIN dout{i} LOGPIN DATA_OUT     DIRECTION out WIDTH DATA_WIDTH PHASE {{}} DEFAULT {{}} PORTS {p} }}")
+    memgen_dir = os.path.join(os.path.abspath(outdir), "memgen")
+    nl = "\n"
+    tcl = f"""# Generated by allo.backend.catapult.memgen_spec from {os.path.basename(sram.verilog)} and {os.path.basename(sram.liberty)}
+# (macro {sram.module}: {sram.rows} x {sram.width} b, ports {', '.join(sram.ports)}; Liberty area {area:.1f} um^2)
+flow package require MemGen
+flow run /MemGen/MemoryGenerator_BuildLib {{
+VENDOR           *
+RTLTOOL          DesignCompiler
+TECHNOLOGY       *
+LIBRARY          {sram.module}
+MODULE           {sram.module}
+OUTPUT_DIR       {memgen_dir}
+FILES {{
+  {{ FILENAME {os.path.abspath(sram.verilog)} FILETYPE Verilog MODELTYPE generic PARSE 1 PATHTYPE copy STATICFILE 1 }}
+}}
+VHDLARRAYPATH    {{}}
+WRITEDELAY       0.1
+INITDELAY        1
+READDELAY        {readdelay}
+VERILOGARRAYPATH mem
+INPUTDELAY       0.01
+TIMEUNIT         1ns
+WIDTH            DATA_WIDTH
+AREA             {int(round(area))}
+RDWRRESOLUTION   UNKNOWN
+WRITELATENCY     {sram.visible}
+READLATENCY      {sram.read_latency}
+DEPTH            {sram.rows}
+PARAMETERS {{
+  {{ PARAMETER DATA_WIDTH TYPE hdl IGNORE 0 MIN {sram.width} MAX {sram.width} DEFAULT {sram.width} }}
+  {{ PARAMETER ADDR_WIDTH TYPE hdl IGNORE 0 MIN {aw} MAX {aw} DEFAULT {aw} }}
+  {{ PARAMETER RAM_DEPTH  TYPE hdl IGNORE 1 MIN {{}} MAX {{}} DEFAULT {sram.rows} }}
+  {{ PARAMETER DELAY      TYPE hdl IGNORE 1 MIN {{}} MAX {{}} DEFAULT 3 }}
+  {{ PARAMETER VERBOSE    TYPE hdl IGNORE 1 MIN {{}} MAX {{}} DEFAULT 1 }}
+  {{ PARAMETER T_HOLD     TYPE hdl IGNORE 1 MIN {{}} MAX {{}} DEFAULT 1 }}
+}}
+PORTS {{
+{nl.join(port_decls)}
+}}
+PINMAPS {{
+{nl.join(pinmaps)}
+}}
+}}
+"""
+    spec = os.path.join(outdir, f"{sram.module}_memgen.tcl")
+    with open(spec, "w", encoding="utf-8") as f:
+        f.write(tcl)
+    return spec, sim_v
+
+
+def build_memory_library(sram, outdir, clock=3.33, readdelay=None):
+    """Compile ``sram`` into a Catapult memory library with the Memory
+    Generator (``catapult -shell -f <spec>``; the plain Catapult licence
+    suffices) and return the ``.lib`` path, ``<outdir>/memgen/<module>.lib``.
+    Refuses without Catapult on PATH, naming the spec it wrote."""
+    spec, _ = memgen_spec(sram, outdir, clock, readdelay)
+    lib = os.path.join(os.path.abspath(outdir), "memgen", f"{sram.module}.lib")
+    if os.path.exists(lib):
+        return lib
+    if shutil.which("catapult") is None:
+        raise RuntimeError(
+            f"macro {sram.module}: no `catapult` on PATH to build its memory library; "
+            f"the Memory Generator spec is {spec} (run `catapult -shell -f` there), or "
+            f"pass Sram(catapult_lib=<built .lib>)")
+    log = os.path.join(outdir, "memgen.log")
+    with open(log, "w", encoding="utf-8") as f:
+        r = subprocess.run(["catapult", "-shell", "-f", os.path.basename(spec)],
+                           cwd=outdir, stdout=f, stderr=subprocess.STDOUT, check=False)
+    if r.returncode != 0 or not os.path.exists(lib):
+        raise RuntimeError(f"macro {sram.module}: Memory Generator failed (exit {r.returncode}); see {log}")
+    return lib
 
 
 def codegen_tcl(top, configs):
@@ -591,6 +732,7 @@ go analyze
     out_str += unreset_directives(
         configs.get("unreset_storage"), top, design_top, configs.get("synth_group")
     )
+    out_str += memory_directives(configs.get("memories"))
 
 
     if mode == "csim":
@@ -1470,7 +1612,6 @@ def check_emitted_cpp(path, extra_includes=(), std="c++11", strict=None):
     handoff. Set ALLO_REQUIRE_AC_TYPES=1 to turn that skip into a failure --
     what CI and a handoff script should do.
     """
-    import subprocess
     import sys
 
     if strict is None:

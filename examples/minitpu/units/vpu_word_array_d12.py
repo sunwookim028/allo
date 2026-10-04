@@ -16,8 +16,30 @@ form). ``dev/records/minitpu/u2_d12_prototype_2026-10-04.rst``.
 
 from __future__ import annotations
 
-from allo.compose import Architecture, Channel, Memory, Port, unit
+import os
+
+from allo.compose import Architecture, Channel, Memory, Port, Sram, unit
 from allo.ir.types import UInt, int32, uint1  # noqa: F401  (names the bodies use)
+
+# The SRAM macros the `sram` lowering has (asic_memories_2026-10-04.rst): OpenRAM
+# 2RW, FreePDK45, kept with the record. `small` (32 x 64 b) is the dry run, `w512`
+# (512 x 64 b) the largest built; the `mid` (4,096 x 64 b) macro is pending there. Any other instance stays on
+# registers unless the caller passes its own Sram.
+_REC = os.path.join(
+    os.path.dirname(__file__), "..", "..", "..", "dev", "records", "minitpu",
+    "asic_memories_2026-10-04", "openram")
+SRAMS = {
+    "small": lambda: Sram.from_openram(
+        os.path.join(_REC, "sram_2rw_64x32_freepdk45.v"),
+        os.path.join(_REC, "sram_2rw_64x32_freepdk45_TT_1p0V_25C.lib"),
+        catapult_lib=os.environ.get("MINITPU_SRAM_SMALL_CATAPULT_LIB"),
+    ),
+    "w512": lambda: Sram.from_openram(
+        os.path.join(_REC, "sram_2rw_64x512_freepdk45.v"),
+        os.path.join(_REC, "sram_2rw_64x512_freepdk45_TT_1p0V_25C.lib"),
+        catapult_lib=os.environ.get("MINITPU_SRAM_W512_CATAPULT_LIB"),
+    ),
+}
 
 
 def _geom(inst):
@@ -97,8 +119,14 @@ def sink(yc: UInt(W)[N], yd: UInt(W)[N]):
         yd[t] = qd.get()
 
 
-def architecture(n, inst="narrow", reset=False):
+def architecture(n, inst="narrow", reset=False, impl=None):
+    """``impl``: the memory's declared lowering -- an ``Sram`` (the macro
+    path), ``"registers"``, or None for the instance's macro from ``SRAMS``
+    when it has one and registers otherwise. ``region(lowering=...)`` still
+    overrides it (the ``d12_server`` variants do)."""
     ww, words, aw, rl, drl = _geom(inst)
+    if impl is None and inst in SRAMS:
+        impl = SRAMS[inst]()
     vmem = Memory(
         "vmem",
         "UInt(W)",
@@ -109,6 +137,7 @@ def architecture(n, inst="narrow", reset=False):
         ),
         collision="obligation",
         reset=reset,
+        impl=impl,
     )
     a, d = "UInt(AW)", "UInt(W)"
     return Architecture(
@@ -150,10 +179,18 @@ def architecture(n, inst="narrow", reset=False):
     )
 
 
-def make(target, reset=False):
+def make(target, reset=False, lowering="server"):
+    """A ``VARIANTS`` maker. ``lowering="server"`` (alias of ``registers``):
+    the flop form; ``"sram"``: the instance's macro (refused for an instance
+    without one, naming it)."""
+
     def f(n, w=64, inst="narrow"):
         assert _geom(inst)[0] == w
-        return architecture(n, inst, reset).region(target, {"vmem": "server"})
+        if lowering == "sram":
+            assert inst in SRAMS, (
+                f"vpu_word_array {inst}: no SRAM macro for this instance (SRAMS has "
+                f"{sorted(SRAMS)}); asic_memories_2026-10-04.rst")
+        return architecture(n, inst, reset).region(target, {"vmem": lowering})
 
-    f.__name__ = f"d12_server_{target}"
+    f.__name__ = f"d12_{lowering}_{target}"
     return f

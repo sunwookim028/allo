@@ -101,6 +101,7 @@ VREG = Memory(
     ),
     collision="refuse",
     reset=False,
+    impl="registers",  # the ASIC form: one flop array, three combinational read muxes
 )
 
 
@@ -140,7 +141,10 @@ def make(lowering, target):
     """A ``VARIANTS`` maker: ``make(n, w)`` -> the lowered region."""
 
     def f(n, w=16):
-        return architecture(n, w).region(target, {"vreg": lowering})
+        # `replica` is FPGA-only (LUTRAM-style copies; asic_memories_2026-10-04.rst):
+        # the harness asks for it by name, so it says so.
+        tech = "fpga" if lowering == "replica" else None
+        return architecture(n, w).region(target, {"vreg": lowering}, technology=tech)
 
     f.__name__ = f"d12_{lowering}_{target}"
     return f
