@@ -173,6 +173,8 @@ def fake_mod(*arrays):
         if kd in ("in", "out"):
             n = len(arr) if n is None else n
             assert len(arr) == n, (p, len(arr), n)
+    if n is None:  # every port is a memory (no stream): the rows are the arrays' length
+        n = len(arrays[0])
     sizes = [len(arr) for arr in arrays]
     code = driver(n, sizes)
     exe = build(code)
@@ -204,7 +206,14 @@ def fake_mod(*arrays):
             stamps[i] = blk_[:, k_].astype(np.int64)
 
 
-make, runner = u.VARIANTS[a.variant]
+if a.variant.startswith("form:"):  # a track-C form with its own make()/run()
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "forms"))
+    _f = importlib.import_module(a.variant[5:])
+    make, runner = _f.make, _f.run
+    trace_variant = None
+else:
+    make, runner = u.VARIANTS[a.variant]
+    trace_variant = a.variant
 t0 = time.time()
 if u.RTL.shape == "valid":
     stim = u.stimulus()
@@ -222,7 +231,7 @@ if u.RTL.shape == "valid":
 else:
     w = u.WIDTH[inst]
     unit = u.INSTANCES[inst]
-    cmd, spans = check._trace_all(u, inst, a.n, a.variant)
+    cmd, spans = check._trace_all(u, inst, a.n, trace_variant)
     n = len(next(iter(cmd.values())))
     packed = {p: rtl.pack(cmd[p], wd) for p, wd in unit.inputs}
     rtl_out = rtl.run_trace(unit, packed, seed=1)
@@ -268,3 +277,31 @@ else:
         print("    differing defined slots by trace: " + ", ".join(f"{lb}={c}" for lb, c in per_label.items()))
         for f in first:
             print(f"    e.g. {f}")
+    if a.unit == "mxu":  # the contract as the consumer sees it: pop data in pop order, first valid, drops
+        wv, wd = rtl_int["output_valid_o"], rtl_int["output_data_o"]
+        gv, gd = [int(x) for x in got["output_valid_o"]], [int(x) for x in got["output_data_o"]]
+        pop = [int(x) for x in cmd["output_pop_i"]]
+        push = [int(x) for x in cmd["input_push_i"]]
+        # the VLD stream's push-edge stamps: the 1-bit output whose values are output_valid_o
+        vst = None
+        for i, (kd, p_, w_, _) in enumerate(args):
+            if kd == "out" and w_ == 1 and i in stamps and [int(x) for x in got["output_valid_o"]] == gv and vst is None:
+                pass
+        vo_arrays = [i for i, (kd, p_, w_, _) in enumerate(args) if kd == "out" and w_ == 1 and i in stamps]
+        if len(vo_arrays) >= 1:
+            vst = stamps[vo_arrays[-1]]  # VLD is the last 1-bit output in both the lockstep and the Stream-FIFO forms
+        for lab, s0, s1 in spans:
+            pw = [wd[t] for t in range(s0, s1) if pop[t] and wv[t]]
+            pg = [gd[t] for t in range(s0, s1) if pop[t] and gv[t]]
+            ok = sum(int(x == y) for x, y in zip(pw, pg))
+            rw = next((t - s0 for t in range(s0, s1) if wv[t]), None)
+            rg = next((t - s0 for t in range(s0, s1) if gv[t]), None)
+            vt = [t for t in range(s0, s1) if reason["output_valid_o"][t] == ""]
+            vok = sum(int(gv[t] == wv[t]) for t in vt)
+            pv = ""
+            if vst is not None and rg is not None:
+                lp = [t for t in range(s0, s0 + rg) if push[t]]
+                if lp:
+                    pv = f" | push->valid: rows {rg - (lp[-1] - s0)}, cycles {int(vst[s0 + rg] - acc_cycles[lp[-1]])}"
+            print(f"    MXU-CONTRACT {lab:18s} pops rtl {len(pw)} catapult {len(pg)} in-order-equal {ok}/{len(pw)} | "
+                  f"output_valid per cycle {vok}/{len(vt)} | first valid rtl {rw} catapult {rg}{pv}")

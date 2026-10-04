@@ -98,9 +98,15 @@ if a.unroll_inner:
     # every loop but each kernel's iteration loop: a rolled constant-trip loop
     # would be merged into the pipelined loop
     mains = main_loops()
-    for fn, band, names in kernel_loops():
+    kl = kernel_loops()
+    for fn, band, names in kl:
         mb, mn = mains[fn]
         for nm in (names[1:] if band == mb else names):
+            # a loop name used by two bands of one kernel cannot be named to
+            # unroll() ("Find multiple bands containing loop k"): left rolled, noted
+            if sum(nm in ns for f2, b2, ns in kl if f2 == fn) > 1:
+                print(f"UNROLL-SKIP {fn}:{nm} (ambiguous name across bands)")
+                continue
             unrolls.append(f"{fn}:{nm}")
 if a.pipeline_all or a.pipeline_match:
     import re as _re

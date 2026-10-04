@@ -65,7 +65,103 @@ the row's own edge, section 2) at II = 1, so the Allo RTL shows MiniTPU's
 value on MiniTPU's edge. ``L`` is the manifest's number and is checked
 against it (D-10). Small geometry decides (P-4).
 
-TABLE_PLACEHOLDER
+.. list-table::
+   :header-rows: 1
+   :widths: 24 14 30 32
+
+   * - unit / form (clock, pin)
+     - values vs RTL oracle
+     - Catapult: manifest latency / II; measured L per output
+     - verdict
+   * - ``sfu`` S1 ``bits`` (3.33, ``latency=5``)
+     - **462,144/462,144**
+     - 5 / 1; L 5 on all vectors, 1.000 cyc/vector
+     - **match, cycle-equal** (P-3's pin, Catapult placed the 5 registers)
+   * - same (2.0, ``latency=5``)
+     - **462,144/462,144**
+     - 5 / 1; L 5
+     - **match, cycle-equal**
+   * - same, free (3.33 / 2.0)
+     - **462,144/462,144** both
+     - 1 / 1 and 2 / 1; L 1 / 2
+     - match; **not** the contract: Catapult's own depth is 1 or 2 (the ROM
+       read, multiply and subtract in one or two c-steps by its model; H3)
+   * - ``sfu`` S2 ``staged`` landed (3.33, free)
+     - **462,144/462,144** (memory-pin comparator)
+     - 1 / 1 (RAM pins: no accept edge to measure L against); 1.000 cyc/vector
+     - match; **``latency=`` refused** (C2: conditional accesses -> RAM
+       pins); the staged registers are in the rows
+   * - ``sfu`` S2 as rows (``sfu_staged_rows``; 3.33 and 2.0, ``latency=1``)
+     - **462,140/462,140** (rows 4.. of 462,144)
+     - 1 / 1 pinned; L 1 = I/O; **unit latency 5 = 4 rows + 1**, 1.000 cyc/vector
+     - **match, cycle-equal** at both clocks (free at 3.33: also 1)
+   * - ``xlu_reduction_tree`` T1 as ``tree_wide`` n16 (3.33, ``latency=1``)
+     - **204,120/204,120** defined (38,520 masked: fill 3,661, no valid 34,859; equal on 35,936)
+     - 1 / 1 pinned; L 1 on ``valid_o``, ``result_o``, ``lane_valid_o``, ``lane_result_o``; 1.000 cyc/row
+     - **match, cycle-equal** (root 9 = 8 rows + 1, tap 5 = 4 + 1 at n16)
+   * - same, free (3.33)
+     - **204,120/204,120**
+     - 1 / 1; L 1, 1, 1, **0** (the tap pushed in the Pop's c-step)
+     - match; **not cycle-equal** by one port a cycle early (C4)
+   * - same, free (2.0)
+     - **204,120/204,120**
+     - 3 / 1; L 2, 3, 3, 2
+     - match; not cycle-equal (Catapult takes 2-3 c-steps Pop->Push at 2.0 ns; a pin at 1 was not run at 2.0)
+   * - T1 as ``tree_wide_staged`` n16 (3.33 / 2.0, ``latency=1``)
+     - --
+     - **refused**, SCHD-30: ``chained data dependency ... from operation OR
+       "add_bits:add_bits:or"`` (the one-adder-per-c-step recurrence does not
+       fit Pop->Push = 1 in Catapult's model); free at 2.0: refused the same
+       way at II = 1
+     - blocked (C6): the RTL's two registers per level would have to be the
+       adder's own stage split, which no Allo form of ``bf16_add`` has
+   * - same, free (3.33)
+     - STAGED_V2_PLACEHOLDER
+     - STAGED_V2_LAT
+     - STAGED_V2_VERDICT
+   * - T1 landed ``bits`` n16 as emitted (3.33, no pipeline)
+     - LANDED_TREE_PLACEHOLDER
+     - RAM pins for ``data_i``/``lane_result_o`` (C1)
+     - LANDED_TREE_VERDICT
+   * - T2 ``units`` n16 (compose, 3.33)
+     - T2_ROW_PLACEHOLDER
+     - T2_ROW_LAT
+     - T2_ROW_VERDICT
+   * - ``xlu_transpose`` X1 as ``transpose_wide`` (3.33 and 2.0, ``latency=1``; tile partitioned, ``REGISTER_THRESHOLD 4096``)
+     - **95,783/95,783** defined (24,401 masked "no valid", equal on 24,392)
+     - 1 / 1 pinned; L 1 on ``read_valid_o`` and ``read_data_o``; 1.000 cyc/row
+     - **match, cycle-equal** at both clocks (free: also 1 at both)
+   * - X1 landed ``trace`` as emitted (3.33)
+     - --
+     - RAM pins for the 1,024-bit words (C1); ``could not schedule partition
+       '/top/tx_0/run' - could not schedule even with unlimited resources``
+     - blocked as written
+   * - X1 ``trace_unreset`` (P-9)
+     - --
+     - **refused at emit** (A6, verbatim in H14)
+     - refused (D-14 honest)
+   * - ``mxu_pe`` P1 ``bits`` (3.33 and 2.0, ``latency=1``)
+     - **360,202/360,202** defined (338 masked reset-fill, equal on 337)
+     - 1 / 1 pinned; L 1 on all six outputs; 1.000 cyc/row (free: also 1 at both clocks)
+     - **match, cycle-equal** (the PE's 4 is in the rows; ``mxu_pe_trace`` per cycle holds on RTL, H6)
+   * - ``mxu_pe`` P2 ``unit`` (compose: driver -> PE -> sink over depth-2 FIFOs; 3.33, free)
+     - **360,196/360,196** defined (338 masked, equal on 337)
+     - drive 3 / 1, PE 1 / 1, sink 1 / 1; **2.000 cyc/row**; every output 5 or 7 cycles after its row's accept
+     - **match per row; semantic mismatch per cycle** (H7: 2x the rows, +5-7 edges)
+   * - ``mxu_systolic_array`` A1 ``streams`` DIM 2 (3.33, PE grid pipelined)
+     - **79,983/79,983** defined (287 masked, equal on 284)
+     - drive 8 / **9**, sink 2 / 3, PEs 1 / 1 (one 0 / 1); **9.000 cyc/row**; outputs 12-13 cycles after the row
+     - **match per row; semantic mismatch per cycle** (H7); with the driver
+       and sink pipelined too: refused (C1, ``array_sink_0`` II 1 impossible)
+   * - same, DIM 4 (3.33)
+     - ARRAY4_PLACEHOLDER
+     - drive 16 / **17**, sink 4 / 5, PEs 1 / 1 (one 0 / 1)
+     - ARRAY4_VERDICT
+   * - ``mxu`` M1 ``lockstep`` DIM 4 (3.33)
+     - MXU4_ROW_PLACEHOLDER
+     - with every kernel pipelined: refused, ``could not schedule partition
+       '/mxu_dim4/mxu_back_0/run'`` (C1); MXU4_ROW_LAT
+     - MXU4_ROW_VERDICT
 
 2. The forms, and why the landed ones needed a track-C shape
 ============================================================
@@ -134,29 +230,461 @@ so one ``unroll`` covers it (H4 below).
 3. Hypotheses
 =============
 
-HYP_PLACEHOLDER
+* **H2 (2,048-entry constant ROMs; does Catapult infer a ROM?)** -- **yes.**
+  ``sfu.bits``'s four kernel-local constant arrays (``rom_gelu``, ``rom_exp``
+  2,048 x int32; ``recip_pwl``, ``rsqrt_pwl`` 32 x int32, emitted as
+  ``static const int32_t`` inside the thread, finding A1's form) become four
+  Catapult ROM components in ``rtl.rpt``: ``ROM_1i11_1o12`` (score 1908.8),
+  ``ROM_1i11_1o16`` (1493.9), two ``ROM_1i5_1o21`` (120.8, 118.4) -- an
+  11-bit address and a 12- or 16-bit word: Catapult trimmed the constant top
+  bits of the exp table to 12 output bits, and of every table from int32 to
+  the bits that vary. They are combinational ROM blocks of the
+  ``nangate-45nm_beh`` library (``rtl.rpt`` ``ROM: 0.0`` in the memory row:
+  no memory macro), as MiniTPU's ``(* rom_style = "block" *)`` arrays become
+  in DC. No abstraction was needed beyond the constant array; the H2 question
+  for RTLGen and AMC stays with track D.
+* **H3 (T1 matches; Catapult's free depth != 13 unless pinned)** -- **the
+  free depth is the *I/O* depth, and the register depth is in the data.**
+  ``tree_wide`` (T1's body) free at 3.33 ns: II 1, manifest latency 1,
+  values 204,120/204,120 per row, but the tap output was pushed in the Pop's
+  own c-step (``lane_result_o`` L = 0, the other three 1): its Push depends
+  on no Pop of the iteration, so the scheduler is free to put it anywhere,
+  and the manifest's one number (the max over pairs) hides it. Pinned
+  ``latency=1`` makes every (Push, Pop) pair 1 -> **cycle-equal** (section
+  1). So the pin is still needed at U3, for a reason D-10 did not list: not
+  to reach the depth (the rows carry it) but to hold *every* output to one
+  edge. ``rtl.rpt`` slack is -1.46 ns on both; DC decides (section 5).
+* **H4 (the 63 composed adders each need ``leading_zeros17`` unrolled: C10
+  for ``@df.unit``, not for ``compose.unit``)** -- in every form here
+  ``add_bits``/``leading_zeros17`` (and the PE's nested ``leading_zeros19``)
+  are emitted as **one helper function** per module, called from every node
+  or unit body, so ``s.unroll("leading_zeros17:offset")`` is one directive
+  for 15 or 63 nodes: C10 does not recur on the SystemC path for ``@df.kernel``
+  (T1 body) nor for ``compose.unit`` (T2, P2, A1: the PE's ``offset`` loop is
+  one per unit *instance* because B inlined it into the body, and
+  ``--unroll-inner`` lists them). T2_PLACEHOLDER
+* **H7 (a Stream-linked array computes the contract but not the cycle
+  model; push->valid > 82)** -- **measured on Catapult RTL for the first
+  time, and it is a rate as much as a latency.** ``mxu_pe.unit`` (P2: one PE
+  between a driver and a sink over depth-2 Connections FIFOs): every defined
+  slot matches per row (360,196/360,196) but the composite runs **2.0 cycles
+  per row** and every output lags its input row by 5 or 7 cycles
+  (alternating), where ``mxu_pe.bits`` runs 1 cycle per row at L = 1.
+  ``mxu_systolic_array.streams`` at DIM 2 (A1): 79,983/79,983 per row, **9.0
+  cycles per row** (the driver reads D words of each ``[N * D]`` RAM-pin
+  array per row: II 9), outputs 12-13 cycles after the row. The cycle model
+  holds *in token time* (B's P-11) and fails *in cycles* exactly as the plan
+  expected, with the numbers: 2x the rows for one PE hop, 9x for a lane
+  memory read per row; the Catapult FIFO hop costs what ``u3_fifo_composed``
+  measured. MXU4_PLACEHOLDER
+* **H8 / A2 (Wire-locked grid)** -- not attempted (plan: expected blocked).
+* **H14 (D-14 unreset payload: DC area within 5 % of MiniTPU; reset form
+  +10-20 %)** -- **not reached as stated**: the one unreset form in the
+  track-A units (``xlu_transpose.trace_unreset``) is refused by the emitter
+  on a kernel with non-Wire ports (A6, reproduced verbatim here:
+  ``error: unreset storage `tile` (tx_0): the kernel has a non-Wire argument
+  (argument 0); the write runs at every clock edge, which matches the
+  kernel's iterations only when every port is a Wire``), and the forms'
+  payload registers (the SFU stages, the tree pipes, the PE's registers) are
+  kernel-local scalars, which Catapult resets as part of the thread state.
+  What was measured instead: the **reset-flop share** of the Catapult RTLs'
+  sequential area against MiniTPU's (section 5).
 
 4. Findings
 ===========
 
-FINDINGS_PLACEHOLDER
+Classified per D-9. Verbatim messages are in ``logs/``.
+
+**C1 -- missing abstraction (emitter): a lane array is not a port.** A
+rank-2 boundary array (P-8's ``uint16[n, N]``) is never a Connections
+stream (``isSeqStreamable`` is rank-1 only) and becomes RAM pins, one word
+per cycle: the landed tree, transpose, array and MXU forms have no
+one-word-per-cycle RTL boundary, so none can be held to MiniTPU per cycle as
+written, and a pipelined kernel that reads D words of one such array per
+iteration **cannot be II = 1 at all** (``array_sink_0``/``mxu_back_0``:
+``could not schedule partition ... even with unlimited resources``,
+SCHD-30). The track-C forms pack the lanes into one ``UInt(16 N)`` word
+(the RTL's own port) -- a *workaround* for the units, and a gap for the
+model: a lane array that is one word per iteration should be one port.
+Proposal: a rank-2 array whose first index is the iteration variable and
+whose inner dimension is fully read/written per iteration streams as one
+``ac_int<W * N>`` (or N ports), by declaration (``Stream[UInt(16)[N]]``
+style) rather than by inference.
+
+**C2 -- workaround (emitter rule, correct): a conditional port access is not
+a stream.** The landed ``sfu.staged`` warm-up/drain (``if t < n``, ``if t >=
+4`` over ``n + 4`` iterations) and the transpose's ``if r == 0: rvo[t] = 0
+else rvo[t] = v`` make the array RAM pins; ``latency=`` is then refused with
+a message about *Wire* ports (``it has no Connections In/Out pair (Wire
+ports?)``), which is the wrong cause. The refusal is right (a skipped Pop
+would desynchronise the stream, the emitter's comment). The row forms
+(``sfu_staged_rows``: one Pop and one Push per row over ``n`` rows, output
+row ``t`` = input row ``t - 4``; ``rvo[t] = 0 if r == 0 else v``) are the
+honest shape; a pipe-as-data kernel has no warm-up on a stream. Proposal: the
+refusal names the arrays that fell to RAM pins and why (conditional access /
+rank / multiple sites).
+
+**C3 -- semantic gap (D-10 manifest): a row form's latency is rows + I/O.**
+``latency.json`` reports the Pop->Push distance (1 for every row form); the
+unit's latency is that plus the rows written as data (4 for the SFU, 8/4
+for the n16 tree, the PE's). ``harness/latency.verdict`` therefore prints
+``LATENCY-MISMATCH ... reported 1, measured 5`` on a bit-exact,
+cycle-equal build unless the comparator separates the two (``u3c_cmp.py
+--shift``: ``5 rows as data + I/O {1}``). The manifest cannot know the
+rows; the form can. Proposal: a kernel written as rows declares them
+(``rows=4``, or the ``latency=`` of a row form means rows + 1), and the
+manifest carries both, so an assembler's table (D-10) reads the unit's
+number.
+
+**C4 -- finding (scheduler): the pin holds every output to one edge; the
+free schedule does not.** ``tree_wide`` free: ``lane_result_o`` pushed at
+L = 0 (same c-step as the Pops: its Push depends on no Pop), the other
+outputs at 1 -- one output a cycle early relative to MiniTPU, values intact
+per row, the manifest showing 1. Pinned 1: all four at 1. On ``pe_unit_1_1``
+in the array, the manifest itself says ``latency=0``. A unit whose outputs
+are registered state (every row form) has no data dependence from Pop to
+Push, so without the pin Catapult places each Push where it likes.
+Relevant to D-10's "``latency=`` only where a contract demands": a
+multi-output row form demands it for alignment, not depth.
+
+**C5 -- workaround (two Catapult directives the source does not say): a
+``Stateful`` array is a RAM.** ``tile @ Stateful`` (16 x 16) was mapped to
+``ccs_sample_mem.ccs_ram_sync_1R1W`` (one read port, next-cycle data), so a
+64-way crossing read per row is impossible and ``latency=1`` was refused
+(SCHD-6 ``MEMORYREAD ... mapped to ccs_ram_sync_1R1W_rwport(14,16,8,256,
+256,16,5)``). ``s.partition("tx_0:tile")`` emits ``hls_resource ...
+[Register]`` (the U2 ``vpu_regfile`` precedent) -- and then Catapult refused
+to split it: ``Error: Splitting of Resource '/top/tx_0/__stateful_tx_0_tile_1
+_rsc' into 256 variables could cause excessive runtime or memory
+requirements (MEM-8) / Please select a library with memories or increase
+REGISTER_THRESHOLD``. ``directive set -REGISTER_THRESHOLD 4096`` (hand-set
+in ``run.tcl`` via ``--tcl``, recorded) builds it: 256 registers, L = 1 at
+both clocks, cycle-equal. Neither the partition nor the threshold is in the
+Allo source; D-12's ``Memory(ports=...)`` is where a 16-way read would be
+declared (track A, X2: not in this tree). Proposal: the SystemC backend sets
+``REGISTER_THRESHOLD`` to the size of the largest fully partitioned
+``Stateful`` it emits, and refuses a crossing read on an unpartitioned one.
+
+**C6 -- semantic mismatch (tool timing): Catapult's rtl.rpt slack vs DC
+(N4 again, larger).** The n16 ``tree_wide`` (a 4-level bf16 tree in one
+c-step, II 1) and ``mxu_pe.bits`` schedule at 3.33 ns with ``rtl.rpt``
+slack -1.46 / -0.31 ns; DC's numbers for the same RTL are in section 5.
+Catapult's library model of a bf16 adder chain and DC's FreePDK45 disagree
+by more than a cycle at 2.0 ns on the PE (-1.89). The staged tree with one
+adder per c-step was *refused* at ``latency=1`` at 3.33 ns (SCHD-30, the
+``add_bits ... or`` chain) while the full-tree form was *accepted* at the
+same pin: the chain the pin constrains is Pop->Push, and in the full-tree
+form nothing on that path is an adder -- the adders sit on the
+register-to-register path, which the scheduler checks against the clock
+with its own (optimistic) model. The measured truth is DC's.
+
+**C7 -- bug (my form, caught by the oracle): the staged tree's register
+order.** The first ``tree_wide_staged`` updated ``stB <= stA`` before
+computing ``stA <= f(stB)``, so each level cost one row, not two, and read
+the valid pipe before the cycle's clear: 125,907/204,120 on RTL, every
+difference a valid or a one-row-early payload. Fixed (compute from the old
+registers, then shift, then output, as T1 and ``sfu.staged`` do); the
+rebuilt form is in section 1. Recorded because it is the second time
+(track B's finding 7) that a hand-written pipe-as-data form was wrong in its
+*ordering* and only the per-cycle RTL oracle said so.
+
+**C8 -- finding (Catapult, scale):** the unrolled n16 tree takes Catapult
+19-22 min per run (``dpfsm`` 500-1,100 s on 15 unrolled adders), the SFU
+and PE ~2 min, the DIM-2 array 4 min; the n64 tree and the DIM-4 array/MXU
+were not finished in this session's budget (section 8).
 
 5. Same-flow DC area
 ====================
 
-DC_PLACEHOLDER
+Same flow, same clock, MiniTPU's unit (its own valid-style clocked ports)
+against the Catapult RTL of the cycle-equal form (Connections handshake
+ports: U1 measured the handshake at +100 to +500 um2 per unit). Areas are
+um2, pre-layout, ``report_area``; flops are ``Sequential Cell Count``;
+slack is DC's. Every design closes its clock in DC, including the ones
+Catapult's ``rtl.rpt`` reports at -0.3 to -1.9 ns (C6, N4).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 7 22 9 7 7 26 9 7 7 8
+
+   * - unit
+     - clock
+     - MiniTPU design
+     - um2
+     - flops
+     - slack
+     - Catapult RTL (form, pin)
+     - um2
+     - flops
+     - slack
+     - Cat / MiniTPU
+   * - sfu
+     - 3.33
+     - ``sfu`` (ROMs as ``localparam``, P-C5)
+     - 5355.6
+     - 269
+     - 1.51
+     - S1 ``bits``, ``latency=5``
+     - 3950.4
+     - 153
+     - 0.80
+     - **0.74**
+   * - sfu
+     - 2.0
+     - same
+     - 5357.2
+     - 269
+     - 0.26
+     - same
+     - 4906.9
+     - 198
+     - 0.00
+     - 0.92
+   * - sfu
+     - 3.33
+     - same
+     - 5355.6
+     - 269
+     - 1.51
+     - S2 rows, ``latency=1``
+     - 6051.8
+     - 301
+     - 0.87
+     - 1.13
+   * - sfu
+     - 2.0
+     - same
+     - 5357.2
+     - 269
+     - 0.26
+     - same
+     - 5820.9
+     - 312
+     - 0.04
+     - 1.09
+   * - xlu_reduction_tree n16
+     - 3.33
+     - ``xlu_reduction_tree`` (``MINITPU_NUM_LANES=4``, ``N=16``)
+     - 20663.4
+     - 1729
+     - 0.02
+     - T1 ``tree_wide``, ``latency=1``
+     - 33648.5
+     - 3067
+     - 0.00
+     - **1.63**
+   * - xlu_reduction_tree n16
+     - 3.33
+     - same
+     - 20663.4
+     - 1729
+     - 0.02
+     - T1 ``tree_wide`` free (tap a cycle early)
+     - 32865.1
+     - 2922
+     - 0.00
+     - 1.59
+   * - xlu_reduction_tree n16
+     - 2.0
+     - same
+     - 22971.5
+     - 1729
+     - 0.00
+     - T1 ``tree_wide`` free (L 2-3)
+     - TREE2P0_DC
+     - TREE2P0_FLOPS
+     - TREE2P0_SLACK
+     - TREE2P0_RATIO
+   * - xlu_reduction_tree n64
+     - 3.33 / 2.0
+     - ``xlu_reduction_tree`` shipped
+     - 86226.6 / 97762.4
+     - 7161
+     - 0.00 / 0.00
+     - (no n64 Catapult run: 20 min per n16 run, C8)
+     - --
+     - --
+     - --
+     - --
+   * - xlu_transpose
+     - 3.33
+     - ``xlu_transpose``
+     - 31562.2
+     - 5125
+     - 2.17
+     - X1 ``transpose_wide``, ``latency=1``
+     - 46642.8
+     - 6230
+     - 1.84
+     - **1.48**
+   * - xlu_transpose
+     - 2.0
+     - same
+     - 31568.9
+     - 5125
+     - 0.89
+     - same
+     - 46643.1
+     - 6230
+     - 0.54
+     - 1.48
+   * - mxu_pe
+     - 3.33
+     - ``mxu_pe``
+     - 2457.8
+     - 208
+     - 0.01
+     - P1 ``bits``, ``latency=1``
+     - 4069.5
+     - 371
+     - 0.08
+     - **1.66**
+   * - mxu_pe
+     - 2.0
+     - same
+     - 2607.3
+     - 208
+     - 0.00
+     - same
+     - 4617.8
+     - 403
+     - 0.01
+     - 1.77
+   * - mxu_pe
+     - 3.33
+     - same
+     - 2457.8
+     - 208
+     - 0.01
+     - P2 ``unit`` composite (driver, PE, sink, 6 FIFOs)
+     - 8787.8
+     - 1122
+     - 0.03
+     - 3.58
+   * - mxu_systolic_array DIM 2
+     - 3.33
+     - ``mxu_systolic_array`` (``DIM=2``)
+     - 8018.3
+     - 725
+     - 0.00
+     - A1 ``streams`` composite (driver, 4 PEs, sink, FIFOs)
+     - 18060.3
+     - 2201
+     - 0.00
+     - **2.25**
+   * - mxu_systolic_array DIM 4
+     - 3.33
+     - ``mxu_systolic_array`` (``DIM=4``)
+     - MARRAY4_DC
+     - MARRAY4_FLOPS
+     - MARRAY4_SLACK
+     - A1 ``streams`` composite
+     - CARRAY4_DC
+     - CARRAY4_FLOPS
+     - CARRAY4_SLACK
+     - ARRAY4_RATIO
+
+Reading it:
+
+* **The SFU is the one unit where Catapult's RTL is smaller** (0.74x at
+  3.33 ns): Catapult trimmed the ROMs to the bits that vary (12-bit exp
+  words, H2) and S1 at ``latency=5`` keeps 153 flops against MiniTPU's 269
+  (the five stages' payload is not all needed once the scheduler chooses
+  where the registers go). The row form (every register as written) is
+  1.09-1.13x: the handshake and the full register set.
+* **The PE is 1.66-1.77x**, the tree 1.59-1.63x, the transpose 1.48x (6,230
+  flops vs 5,125: the 1,024-bit Connections data register plus the
+  handshake on both words). U1's acc24 was 1.72x on the same arithmetic
+  transcription (N7), so the PE's ratio is the acc24 adder's, not new.
+* **A composed form costs 2.2-3.6x**: the depth-2 FIFO per link, a driver
+  and a sink kernel each with their own FSM, and the PE's three 32/64-bit
+  token registers. On the DIM-2 array the 4 PEs' logic is a minority of the
+  18,060 um2.
+* **Reset-flop share (H14's measurable part):** every Catapult register is
+  reset (``RESET_CLEARS_ALL_REGS`` default; no ``Stateful(reset=False)`` in
+  these forms), while MiniTPU resets only valids, ops and commits: the
+  transpose's 4,096 tile flops, the tree's leaf and level payload, the PE's
+  payload are unreset there. The flop *count* gap above (sfu rows +32 to +43,
+  tree +1,193 to +1,338, transpose +1,105, PE +163 to +195) is the handshake
+  registers and Catapult's FSM state, not reset; the reset *cell* penalty
+  itself (a reset flop vs a plain flop in FreePDK45) is the 5 % U2 measured
+  on the register file, and was not isolated here.
 
 6. Proposals for the core (no patches here)
 ===========================================
 
-PROPOSALS_PLACEHOLDER
+1. ``EmitSystemC.cpp`` ``isSeqStreamable`` / the port rule (C1): a rank-2
+   boundary array indexed ``[iteration, lane]`` with every lane accessed once
+   per iteration streams as one word (or N ports) -- preferably by a
+   declaration on the region argument, so the simulator and csim keep the
+   lane array and the RTL gets the word. Until then the track-C ``*_wide``
+   forms are the Catapult shape of every lane-array unit.
+2. The ``latency=`` refusal message (C2): name the arrays that fell to RAM
+   pins and the reason (conditional access, rank, several sites), not
+   "Wire ports?".
+3. ``latency.json`` for a row form (C3): carry the rows written as data
+   beside the I/O latency (``rows``), or define ``latency=L`` on a row form
+   as rows + I/O so the manifest's number is the unit's; ``harness/latency.
+   verdict`` then needs no ``--shift``. D-10 follow-up, for the owner.
+4. D-10 text (C4): "``latency=`` only where a contract demands" should
+   include *a multi-output row form*, whose outputs the free schedule places
+   on different edges (one a cycle early) while the manifest reports one
+   number; or the manifest reports per-port I/O latency.
+5. ``allo/backend/hls.py`` SystemC tcl (C5): set ``REGISTER_THRESHOLD`` to the
+   largest fully partitioned ``Stateful`` the emission contains; refuse a
+   per-row crossing read of an unpartitioned ``Stateful`` (it is a one-port
+   RAM in Catapult) naming the storage. D-12's ``Memory(ports=)`` is the
+   declaration this stands in for.
+6. ``u3c_build.py``'s "ambiguous loop name" (two bands of one kernel with the
+   same induction variable, ``tree_sink``'s two ``k`` loops): ``s.unroll``
+   raises ``Find multiple bands containing loop k``; a loop handle by band
+   (``kernel:band.loop``) would make every emitted loop addressable.
 
 7. Provisional calls made (D-9)
 ===============================
 
-CALLS_PLACEHOLDER
+* **P-C1. Cycle-equal is judged with ``latency=1`` on a row form.** The
+  landed forms carry the RTL's registers as rows; the Pop->Push edge is the
+  row's edge, so the pin that makes the Allo RTL show MiniTPU's value on
+  MiniTPU's edge is 1, not the declared count. P-3's numbers (SFU 5, tree
+  13/9, PE 4) were pinned on S1 as 5 (the combinational SFU, Catapult placing
+  the registers) and *reached* on every row form as rows + 1. *Reason:*
+  section 2; both SFU pins are cycle-equal and bit-exact.
+* **P-C2. The wide-word forms are the Catapult shape of the lane-array
+  units**, kept in the record's ``forms/`` (as U1 kept its ``wire/`` forms),
+  not in ``units/*.py``'s ``VARIANTS`` (the simulator cannot run a 1,024-bit
+  numpy port, B6). *Reason:* C1; the body is the landed body.
+* **P-C3. Composites are judged per row on the RTL and their cycles
+  reported, not pinned** (P-2/P-3): P2 and A1 ``UNIT-MATCH`` per row with
+  the rate and skew beside them. *Reason:* a self-timed form has no edge to
+  pin; the numbers are the H7 evidence the owner asked for.
+* **P-C4. Two Catapult directives set by hand are recorded as such** (the
+  ``Stateful`` partition and ``REGISTER_THRESHOLD``, C5); every other build
+  is Allo's ``run.tcl`` as emitted, with ``latency=`` as a build config.
+* **P-C5. MiniTPU's ``sfu.sv`` is synthesized in DC from a stand-in** whose
+  two ``$readmemh`` ROMs are ``localparam`` arrays (``gen_sfu_dc.py``; every
+  other line byte-identical, diffed). *Reason:* DC ignores ``initial`` and
+  would synthesize empty ROMs; the ``.mem`` contents are the ROMs.
 
 8. Not done
 ===========
 
-NOTDONE_PLACEHOLDER
+* **A2 / H8** (Wire-locked grid): not attempted, as planned.
+* **The n64 tree and DIM 16** on Catapult: an n16 run is 19-30 min (C8);
+  n64 was not started. MiniTPU's n64 DC rows are in the table for the next
+  session.
+* **``latency=1`` on the tree at 2.0 ns** (the free run gives 2-3), and the
+  2.0 ns rows for the composites.
+* **The staged tree's honest 2.0 ns form** needs ``bf16_add`` written as its
+  two RTL stages (``vpu_bf16_add_pipe``'s split) -- no such Allo text exists;
+  the per-level staged form is refused at ``latency=1`` at both clocks (C6).
+* **B's finding 3 on RTL** (the MXU output FIFOs as polled Streams,
+  ``try_put``/``empty()``, vs the explicit ring): the probe units
+  (``u3_track_b_2026-10-04/repros/mxu_streams_units.py``) were not built
+  through Catapult in this session's budget; the comparator
+  (``u3c_cmp_landed.py``) and the directive hook are ready for it.
+* **The reset-flop penalty in isolation** (H14): needs an unreset form that
+  the emitter accepts on a stream-port kernel (A6), or U2's Wire-only shape.
+* **``mode="ppa"`` / SCVerify cosim**: Verilator against the Phase 0 oracle
+  was used throughout, as in U1.
+* Not filed anywhere (P-10): nothing here is a MiniTPU finding.
