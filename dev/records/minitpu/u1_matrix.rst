@@ -201,6 +201,22 @@ the FIFOs, ``u2_word_array_2026-10-02.rst``, ``u2_fifo_2026-10-02.rst``):
 - ``d14-followups`` merged into ``u1-pilot``; ``d12-ports`` conflicts with it
   in ``hls.py`` and ``EmitSystemC.cpp`` -- resolved on ``u1-pilot-sync2``.
 
+**U3 track E landed** (``u3_composition_design_2026-10-04.rst``, branch
+``u3-compose``): drafts **D-15..D-19** for the owner (engine interface;
+parameters at instantiation; schedules that travel; optional modules;
+derived-parameter legality), each with a prototype in
+``examples/minitpu/template/`` (gate ``run_u3e``: 27 OK / 1 finding / 0 fail).
+Measured: one PE source with two MAC engines matches in one region on the
+simulator and csim (H10 holds); systolic and adder-tree engines behind one
+declaration, each bit-exact against the contract reference *with its own
+order* -- and 74/8,192 differ between orders at bf16 DIM 16 on random data, 0
+on exact-sum data, 0 at int8 (H11: the order is part of the function);
+twelve derived geometry numbers equal Phase 0's; five wrong declarations
+refused. New tool findings E1-E6, the first a **silent bug**: a plain
+``@df.kernel`` region builds and runs a ``Stream`` with one or no endpoint
+and SystemC emits it (the ``@df.unit`` path refuses). Provisional: O3
+answered as "MiniTPU instance ``sequential`` only; DotTree declares ``tree``".
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
