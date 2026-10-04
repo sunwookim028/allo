@@ -19,6 +19,9 @@ Instances (``vpu_pkg`` defines and ``-G`` parameters):
 ``narrow16``    ``MINITPU_NUM_SUBLANES=1`` too: 32 words of 16 b (added for the SystemC
                 csim column, whose testbench moves data through ``long long``)
 ``mid``         ``MINITPU_NUM_LANES=1`` alone: 4096 words of 64 b (the Catapult RAM-mapping probe)
+``small``       ``MINITPU_NUM_LANES=1``, ``MINITPU_VMEM_ENTRIES_PER_LANE=64``: 32 words of
+                64 b -- the smallest OpenRAM 2RW macro, the SRAM path's dry run
+                (``asic_memories_2026-10-04.rst``)
 ``full``        the default geometry: 4096 words of 1024 b, latencies 3/2
 ``full_rl2``    ``READ_LATENCY=2``: what ``tb_vpu_word_array`` instantiates
 
@@ -93,11 +96,13 @@ from examples.minitpu.harness.traces import Trace, hot_addr, rng_for, word
 SOURCES = ["src/core/vpu/vpu_pkg.sv", "src/core/vpu/vpu_word_array.sv"]
 NARROW = ["MINITPU_NUM_LANES=1", "MINITPU_VMEM_ENTRIES_PER_LANE=16"]
 NARROW16 = NARROW + ["MINITPU_NUM_SUBLANES=1"]
+SMALL = ["MINITPU_NUM_LANES=1", "MINITPU_VMEM_ENTRIES_PER_LANE=64"]
 GEOM = {  # instance: (word bits, words, address bits, compute latency, dma latency)
     "narrow": (64, 8, 3, 3, 2),
     "narrow16": (16, 32, 5, 3, 2),  # NUM_SUBLANES = 1: words below 64 b (csim's long long path, S8)
     "narrow_rl2": (64, 8, 3, 2, 2),
     "mid": (64, 4096, 12, 3, 2),  # NUM_LANES = 1 at the default depth: a RAM-sized array of 64 b words
+    "small": (64, 32, 5, 3, 2),  # NUM_LANES = 1, 64 entries: the smallest OpenRAM 2RW macro (SRAM dry run)
     "full": (1024, 4096, 12, 3, 2),
     "full_rl2": (1024, 4096, 12, 2, 2),
 }
@@ -116,7 +121,7 @@ def _unit(inst):
         outputs=[(f"{p}_rdata_o", ww, "post") for p in PORTS],
         shape="trace",
         defines=NARROW16 if inst == "narrow16" else NARROW if inst.startswith("narrow")
-        else NARROW[:1] if inst == "mid" else [],
+        else NARROW[:1] if inst == "mid" else SMALL if inst == "small" else [],
         params={} if rl == 3 else {"READ_LATENCY": rl},
         assertions=True,
     )
