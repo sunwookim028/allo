@@ -1,0 +1,163 @@
+# 2026-10-04T01:49:18-04:00 zhang-21, MiniTPU b3ba0a4d4fb69d39091c55f5f00d1f237082a4f1, Verilator 5.052 2026-09-05 rev conda-forge build 
+== mxu_pe:pe: mxu_pe (trace) params={} defines=[]
+   ok  banks-commit                 legal       20 cyc  defined 118/118 masked 2  seed-diff 0  asserts 0
+   ok  commit+load-same-cycle       legal       18 cyc  defined 106/106 masked 2  seed-diff 0  asserts 0
+   ok  specials                     legal       22 cyc  defined 130/130 masked 2  seed-diff 0  asserts 0
+   ok  reset-mid-stream             legal       24 cyc  defined 140/140 masked 4  seed-diff 0  asserts 0
+   ok  random-0                     legal    20002 cyc  defined 119902/119902 masked 110  seed-diff 0  asserts 0
+   ok  random-1                     legal    20002 cyc  defined 119894/119894 masked 118  seed-diff 0  asserts 0
+   ok  random-2                     legal    20002 cyc  defined 119912/119912 masked 100  seed-diff 0  asserts 0
+   undefined-slot census (slots, guess matched, moved with seed):
+      psum_o             reset fill            338  guess      317  seed-moved        7
+   LATENCY-OK   lhs_i -> lhs_o: declared 1, step probe 1
+   LATENCY-OK   psum_i -> psum_o (MXU_PE_LATENCY): declared 4, step probe 4
+   LATENCY-OK   lhs_i -> psum_o: declared 4, step probe 4
+   LATENCY-OK   weight_commit_i -> psum_o (1 + MXU_PE_LATENCY): declared 5, step probe 5
+   LATENCY-OK   weight_i -> weight_o: declared 1, step probe 1
+   LATENCY-OK   valid -> psum_valid_o: declared 4, step probe 4
+   LATENCY-OK   weight_commit_i -> weight_commit_o: declared 1, step probe 1
+   REF-MATCH mxu_pe:pe (34.1s)
+== mxu_systolic_array:dim2: mxu_systolic_array (trace) params={'DIM': 2} defines=[]
+   ok  tiles-0                      legal       66 cyc  defined 128/128 masked 4  seed-diff 0  asserts 0
+   ok  tiles-1                      legal       66 cyc  defined 128/128 masked 4  seed-diff 0  asserts 0
+   ok  random-0                     legal    20002 cyc  defined 39864/39864 masked 140  seed-diff 0  asserts 0
+   ok  random-1                     legal    20002 cyc  defined 39876/39876 masked 128  seed-diff 0  asserts 0
+   undefined-slot census (slots, guess matched, moved with seed):
+      result_o           reset fill            276  guess      232  seed-moved       12
+   LATENCY-OK   lhs_i[0] -> result_o: declared 8, step probe 8
+   LATENCY-OK   lhs_i[1] -> result_o: declared 4, step probe 4
+   REF-MATCH mxu_systolic_array:dim2 (22.4s)
+== mxu_systolic_array:dim4: mxu_systolic_array (trace) params={'DIM': 4} defines=[]
+   ok  tiles-0                      legal      108 cyc  defined 200/200 masked 16  seed-diff 0  asserts 0
+   ok  tiles-1                      legal      108 cyc  defined 200/200 masked 16  seed-diff 0  asserts 0
+   ok  random-0                     legal    20002 cyc  defined 39612/39612 masked 392  seed-diff 0  asserts 0
+   ok  random-1                     legal    20002 cyc  defined 39702/39702 masked 302  seed-diff 0  asserts 0
+   undefined-slot census (slots, guess matched, moved with seed):
+      result_o           reset fill            694  guess      450  seed-moved       28
+      result_o           uninit                 32  guess       32  seed-moved        0
+   LATENCY-OK   lhs_i[0] -> result_o: declared 16, step probe 16
+   LATENCY-OK   lhs_i[3] -> result_o: declared 4, step probe 4
+   REF-MATCH mxu_systolic_array:dim4 (23.8s)
+== mxu_systolic_array:dim16: mxu_systolic_array (trace) params={'DIM': 16} defines=[]
+   ok  tiles-0                      legal      367 cyc  defined 658/658 masked 76  seed-diff 0  asserts 0
+   ok  tiles-1                      legal      367 cyc  defined 658/658 masked 76  seed-diff 0  asserts 0
+   ok  random-0                     legal     3002 cyc  defined 5832/5832 masked 172  seed-diff 0  asserts 0
+   ok  random-1                     legal     3002 cyc  defined 5673/5673 masked 331  seed-diff 0  asserts 0
+   undefined-slot census (slots, guess matched, moved with seed):
+      result_o           reset fill            479  guess       56  seed-moved      124
+      result_o           uninit                176  guess      176  seed-moved        0
+   LATENCY-OK   lhs_i[0] -> result_o: declared 64, step probe 64
+   LATENCY-OK   lhs_i[15] -> result_o: declared 4, step probe 4
+   REF-MATCH mxu_systolic_array:dim16 (5.8s)
+== mxu:dim2: mxu (trace) params={'DIM': 2} defines=[]
+   ok  identity                     legal       27 cyc  defined 79/79 masked 29  seed-diff 0  asserts 0
+   ok  banks-at-span                legal       41 cyc  defined 123/123 masked 41  seed-diff 0  asserts 0
+   ok  fifo-full-exact              legal      106 cyc  defined 395/395 masked 29  seed-diff 0  asserts 0
+   ok  waiting-pops                 legal       48 cyc  defined 145/145 masked 47  seed-diff 0  asserts 0  pop idle=24
+   ok  group-straddles-load         legal       37 cyc  defined 111/111 masked 37  seed-diff 0  asserts 0
+   ok  push-before-load             legal       31 cyc  defined 92/92 masked 32  seed-diff 0  asserts 0
+   ok  reset-mid-stream             legal       90 cyc  defined 276/276 masked 84  seed-diff 0  asserts 0
+   ok  overflow                     illegal    111 cyc  defined 414/414 masked 30  seed-diff 0  asserts 2  drop=2, pop idle=1
+   ok  bank-overwrite               illegal     32 cyc  defined 93/93 masked 35  seed-diff 0  asserts 1  bank overwrite=1
+   ok  commit-early                 illegal     27 cyc  defined 79/79 masked 29  seed-diff 0  asserts 0
+   ok  random-0                     legal    13884 cyc  defined 49931/49931 masked 5605  seed-diff 0  asserts 0  pop idle=3145
+   ok  random-1                     legal    13790 cyc  defined 49524/49524 masked 5636  seed-diff 0  asserts 0  pop idle=3195
+   ok  random-2                     legal    13862 cyc  defined 49930/49930 masked 5518  seed-diff 0  asserts 0  pop idle=3169
+   ok  tb_mxu_single_port           legal       29 cyc  defined 85/85 masked 31  seed-diff 0  asserts 0 TB-REPLAY 85/85
+   undefined-slot census (slots, guess matched, moved with seed):
+      input_accept_o     before reset           14  guess        0  seed-moved        0
+      input_ready_o      before reset           14  guess        0  seed-moved        0
+      output_data_o      bank overwrite          1  guess        0  seed-moved        0
+      output_data_o      before reset           14  guess        0  seed-moved       14
+      output_data_o      no valid            17126  guess        0  seed-moved      443
+      output_valid_o     before reset           14  guess        0  seed-moved        0
+   events: bank overwrite=1, drop=2, pop idle=9534
+   assertion x1: %Error: mxu.sv:259: Assertion failed in TOP.mxu.unnamedblk11: mxu: vmatload overwrote pending bank 0 4 cycles into the tile it holds, before its last PE switched at 5
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[0].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[1].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   LATENCY-OK   push -> input_accept_o: declared 1, step probe 1
+   LATENCY-OK   last push of a group -> output_valid_o: declared 12, step probe 12
+   LATENCY-OK   pop -> output_valid_o: declared 1, step probe 1
+   LATENCY-OK   weight switch span (by function): declared 5, step probe 5
+   REF-MATCH mxu:dim2 (25.1s)
+== mxu:dim4: mxu (trace) params={'DIM': 4} defines=[]
+   ok  identity                     legal       39 cyc  defined 115/115 masked 41  seed-diff 0  asserts 0
+   ok  banks-at-span                legal       65 cyc  defined 195/195 masked 65  seed-diff 0  asserts 0
+   ok  fifo-full-exact              legal      118 cyc  defined 431/431 masked 41  seed-diff 0  asserts 0
+   ok  waiting-pops                 legal       60 cyc  defined 181/181 masked 59  seed-diff 0  asserts 0  pop idle=24
+   ok  group-straddles-load         legal       51 cyc  defined 153/153 masked 51  seed-diff 0  asserts 0
+   ok  push-before-load             legal       43 cyc  defined 128/128 masked 44  seed-diff 0  asserts 0
+   ok  reset-mid-stream             legal      114 cyc  defined 348/348 masked 108  seed-diff 0  asserts 0
+   ok  overflow                     illegal    123 cyc  defined 450/450 masked 42  seed-diff 0  asserts 4  drop=4, pop idle=1
+   ok  bank-overwrite               illegal     56 cyc  defined 165/165 masked 59  seed-diff 0  asserts 1  bank overwrite=1
+   ok  commit-early                 illegal     39 cyc  defined 115/115 masked 41  seed-diff 0  asserts 0
+   ok  random-0                     legal    10144 cyc  defined 36428/36428 masked 4148  seed-diff 0  asserts 0  pop idle=2200
+   ok  random-1                     legal    10163 cyc  defined 36371/36371 masked 4281  seed-diff 0  asserts 0  pop idle=2265
+   ok  random-2                     legal    10056 cyc  defined 36048/36048 masked 4176  seed-diff 0  asserts 0  pop idle=2135
+   undefined-slot census (slots, guess matched, moved with seed):
+      input_accept_o     before reset           13  guess        0  seed-moved        0
+      input_ready_o      before reset           13  guess        0  seed-moved        0
+      output_data_o      bank overwrite          1  guess        0  seed-moved        0
+      output_data_o      before reset           13  guess        0  seed-moved       13
+      output_data_o      no valid            13103  guess        0  seed-moved      591
+      output_valid_o     before reset           13  guess        0  seed-moved        0
+   events: bank overwrite=1, drop=4, pop idle=6625
+   assertion x1: %Error: mxu.sv:259: Assertion failed in TOP.mxu.unnamedblk11: mxu: vmatload overwrote pending bank 0 14 cycles into the tile it holds, before its last PE switched at 15
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[0].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[1].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[2].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[3].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   LATENCY-OK   push -> input_accept_o: declared 1, step probe 1
+   LATENCY-OK   last push of a group -> output_valid_o: declared 22, step probe 22
+   LATENCY-OK   pop -> output_valid_o: declared 1, step probe 1
+   LATENCY-OK   weight switch span (by function): declared 15, step probe 15
+   REF-MATCH mxu:dim4 (32.6s)
+== mxu:dim16: mxu (trace) params={'DIM': 16} defines=[]
+   ok  identity                     legal      111 cyc  defined 331/331 masked 113  seed-diff 0  asserts 0
+   ok  banks-at-span                legal      209 cyc  defined 627/627 masked 209  seed-diff 0  asserts 0
+   ok  fifo-full-exact              legal      190 cyc  defined 647/647 masked 113  seed-diff 0  asserts 0
+   ok  waiting-pops                 legal      132 cyc  defined 397/397 masked 131  seed-diff 0  asserts 0  pop idle=24
+   ok  group-straddles-load         legal      135 cyc  defined 405/405 masked 135  seed-diff 0  asserts 0
+   ok  push-before-load             legal      115 cyc  defined 344/344 masked 116  seed-diff 0  asserts 0
+   ok  reset-mid-stream             legal      258 cyc  defined 780/780 masked 252  seed-diff 0  asserts 0
+   ok  overflow                     illegal    195 cyc  defined 666/666 masked 114  seed-diff 0  asserts 16  drop=16, pop idle=1
+   ok  bank-overwrite               illegal    200 cyc  defined 597/597 masked 203  seed-diff 0  asserts 1  bank overwrite=1
+   ok  commit-early                 illegal    111 cyc  defined 331/331 masked 113  seed-diff 0  asserts 0
+   ok  random-0                     legal     2956 cyc  defined 9914/9914 masked 1910  seed-diff 0  asserts 0  pop idle=335
+   ok  random-1                     legal     2590 cyc  defined 8886/8886 masked 1474  seed-diff 0  asserts 0  pop idle=252
+   ok  random-2                     legal     2722 cyc  defined 9222/9222 masked 1666  seed-diff 0  asserts 0  pop idle=343
+   undefined-slot census (slots, guess matched, moved with seed):
+      input_accept_o     before reset           13  guess        0  seed-moved        0
+      input_ready_o      before reset           13  guess        0  seed-moved        0
+      output_data_o      bank overwrite          1  guess        0  seed-moved        0
+      output_data_o      before reset           13  guess        0  seed-moved       13
+      output_data_o      no valid             6496  guess        0  seed-moved     1788
+      output_valid_o     before reset           13  guess       13  seed-moved        0
+   events: bank overwrite=1, drop=16, pop idle=955
+   assertion x1: %Error: mxu.sv:259: Assertion failed in TOP.mxu.unnamedblk11: mxu: vmatload overwrote pending bank 0 74 cycles into the tile it holds, before its last PE switched at 75
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[0].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[10].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[11].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[12].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[13].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[14].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[15].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[1].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[2].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[3].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[4].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[5].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[6].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[7].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[8].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   assertion x1: %Error: vpu_fifo.sv:39: Assertion failed in TOP.mxu.gen_lane_output[9].i_output_fifo: vpu_fifo overflow: illegal/undefined schedule
+   LATENCY-OK   push -> input_accept_o: declared 1, step probe 1
+   LATENCY-OK   last push of a group -> output_valid_o: declared 82, step probe 82
+   LATENCY-OK   pop -> output_valid_o: declared 1, step probe 1
+   LATENCY-OK   weight switch span (by function): declared 75, step probe 75
+   REF-MATCH mxu:dim16 (23.1s)
+
+real	2m50.670s
+user	2m47.356s
+sys	0m2.466s
+exit 0

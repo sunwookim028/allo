@@ -1,0 +1,41 @@
+== tb_sfu_equiv (Verilator 5.052 2026-09-05 rev conda-forge build ); sources: src/core/vpu/vpu_pkg.sv src/core/sfu/sfu.sv tb/ref_sfu_fp32.sv
+exit 0
+PASS tb_sfu_equiv: bit-identical on all 229377 cases
+real	0m0.318s
+== tb_sfu_math_sweep (Verilator 5.052 2026-09-05 rev conda-forge build ); sources: src/core/vpu/vpu_pkg.sv src/core/sfu/sfu.sv
+exit 0
+PASS tb_sfu_math_sweep: vexp and vgelu, all 65536 BF16 operands each
+real	0m0.104s
+== tb_sfu_direct_lut (Verilator 5.052 2026-09-05 rev conda-forge build ); sources: src/core/vpu/vpu_pkg.sv src/core/sfu/sfu.sv
+exit 0
+PASS tb_sfu_direct_lut
+real	0m0.015s
+== tb_xlu_lane_tap (Verilator 5.052 2026-09-05 rev conda-forge build ); sources: src/pkg/minitpu_config_pkg.sv src/core/vpu/vpu_pkg.sv src/core/sequencer/sequencer_pkg.sv src/core/vpu/vpu_bf16_add.sv src/core/vpu/vpu_bf16_add_pipe.sv src/core/xlu/xlu_reduction_tree.sv src/core/xlu/xlu.sv
+exit 0
+PASS tb_xlu_lane_tap
+real	0m0.014s
+== tb_reduce_pipe (Verilator 5.052 2026-09-05 rev conda-forge build ); sources: src/core/vpu/vpu_pkg.sv src/core/vpu/vpu_bf16_add.sv src/core/vpu/vpu_bf16_add_pipe.sv src/core/xlu/xlu_reduction_tree.sv
+exit 0
+  PASS back-to-back: 8 results, II = 1
+  PASS alternating sum/max control alignment
+PASS tb_reduce_pipe
+real	0m0.024s
+== tb_reduce_pipe +define+MINITPU_NUM_LANES=4 (N=16, not a shipped geometry)
+exit 1
+  PASS sum of 64 x 1.0: 4180, measured pipeline latency = 9
+  PASS back-to-back: 8 results, II = 1
+  FAIL alternating op result 0: got 4180
+tb_reduce_pipe: 70 checks, 1 errors, pipeline latency 9
+FAIL tb_reduce_pipe
+== tb_xlu_lane_tap +define+MINITPU_NUM_LANES=4 (N=16, not a shipped geometry)
+exit 1
+FAIL lane sum, sublane 0: got 4080, want 4180
+FAIL lane sum, sublane 1: got 4100, want 4200
+FAIL lane sum, sublane 2: got 4180, want 4280
+FAIL lane sum, sublane 3: got 4200, want 4300
+FAIL full sum: got 4270, want 4370
+[900000] %Fatal: tb_xlu_lane_tap.sv:134: Assertion failed in tb_xlu_lane_tap: FAIL tb_xlu_lane_tap: 5 checks
+# Note: both 4x4 failures are the tbs' hard-coded 16x4 expectations, not the RTL:
+# tb_reduce_pipe.sv:157 expects 16'h4280 (64.0) for N x 1.0, the RTL gives 16'h4180 (16.0 = N);
+# tb_xlu_lane_tap expects 16 lanes per sublane (2**s * 16), the RTL gives 2**s * 4.
+# The harness holds the same RTL at N=16 bit-exact (characterize xlu_reduction_tree:n16).

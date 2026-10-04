@@ -1,0 +1,344 @@
+U3 plan: datapath composites (the template's first composition level)
+======================================================================
+
+2026-10-04, zhang-21. The owner is away and has authorised U3 to proceed in
+full (D-9: the agent decides from the D-entries, records each call as
+*provisional*, and keeps going; changes to the programming model or passes stay
+proposals until reviewed). Inputs: README (Design target; D-1, D-7, D-9..D-14;
+the U3 row), ``u1_matrix.rst`` checkpoints 2-9, ``u2_matrix.rst``,
+``u1_alu_2026-10-02.rst`` (C1-C11), ``u3_fifo_composed_2026-10-02.rst``,
+``d12_memory_ports_2026-10-02.rst``, ``latency_report_2026-10-02.rst``,
+``docs/source/designs/ip_gaps.rst`` (the adder tree), TinyTPU's
+``examples/tinytpu/ip/``, MiniTPU ``b3ba0a4d`` (``docs/UNITS.md``,
+``ARITHMETIC.md``, ``isa_latency.json``).
+
+**Phase 0 is done** (``u3_phase0_2026-10-04.rst``): every U3 unit has an
+``RtlUnit`` spec, stimulus, and a numpy reference that is bit-exact against the
+RTL on every defined slot and at every declared latency, and MiniTPU's own tbs
+pass unchanged. Those references are the oracles the tracks below are held to.
+**[V]** means verified by a Phase 0 run; **[I]** inferred, to test.
+
+1. The units, and what Phase 0 fixed
+------------------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 17 33 20 30
+
+   * - unit
+     - shape, geometry run
+     - declared = measured [V]
+     - oracle (``harness/``)
+   * - ``sfu``
+     - ``valid``; 4 ops x 65,536 operands + op-interleaved stream
+     - 5 (``VPU_SFU_LATENCY``)
+     - ``ref.sfu``: bit model; ROMs and PWL tables read from the clone as data
+   * - ``xlu_reduction_tree``
+     - ``trace``; N = 16 (``MINITPU_NUM_LANES=4``) and 64
+     - 13 / tap 9 at N=64; 9 / 5 at N=16 (``1 + 2*LEVELS``)
+     - ``ref.xlu_reduction_tree_trace``
+   * - ``xlu_transpose``
+     - ``trace``; 16 x 4 only (row select hard-codes 2+2 bits)
+     - read 1 (``VPU_TXOUT_LATENCY``); write->read 2
+     - ``ref.xlu_transpose_trace``
+   * - ``mxu_pe``
+     - ``trace``; no geometry
+     - psum 4 (``MXU_PE_LATENCY``); commit->psum 5; forwards 1
+     - ``ref_mxu.mxu_pe_trace``: cycle model, taints unreset payload
+   * - ``mxu_systolic_array``
+     - ``trace``; DIM 2, 4, 16 (a real parameter)
+     - row r -> result ``4*(DIM-r)``
+     - ``ref_mxu.mxu_systolic_array_trace``: grid of PE models
+   * - ``mxu``
+     - ``trace``; DIM 2, 4, 16; legal and illegal *programs*
+     - push->valid ``2 + 5*DIM`` (82 at 16; ISA 85); switch span ``5*(DIM-1)`` by function
+     - ``ref_mxu.mxu_trace``: the push / commit / pop **contract**, no ``mxu.sv`` register
+
+Facts the plan rests on [V]:
+
+* **Payload is unreset everywhere in U3; only valids, ops and commits reset**
+  (tree leaves and levels, SFU stages, transpose tile, PE ``lhs``/``product``/
+  ``psum`` and the adder payload). Outputs on non-valid cycles still follow the
+  data (census "no valid": the guess matched every tree slot), so verdicts hold
+  outputs on valid cycles only.
+* **The MXU is a contract plus one timing constant.** A client may rely on: a
+  push accepted next cycle; ``DIM`` RHS rows shift into ``load_bank``
+  bottom-first; a commit makes the bank just loaded the next tile's; each LHS
+  row gives ``pack_bf16`` of the acc24 chain in ascending row order; groups of
+  ``NUM_SUBLANES`` rows per lane; ``output_valid`` = AND of lane non-empty,
+  ``2 + DIM*(PE+1)`` after a group's last push; a full lane FIFO **drops**;
+  a refill earlier than the span corrupts the switching tile. Everything else
+  in ``mxu.sv`` (skew lines, commit-bank skew, gather registers) is
+  implementation, free to change.
+* **The array alone has no matrix contract**: the skew lives in ``mxu.sv``. It
+  is a cycle-locked grid; only a cycle-locked Allo form can be held to its
+  cycle model.
+* **MiniTPU elaborates at N = 16** and is bit-exact there, though ``UNITS.md``
+  says no geometry but 16x4 was ever built; its tree tbs are not geometry-generic.
+
+2. Allo expression options per unit
+-----------------------------------
+
+Decisions that apply to every unit: **D-10** (a backend reports latency;
+``latency=L`` only where a contract demands it), **D-13** (comb outputs
+declared), **D-14** (``Stateful(..., reset=False)`` for unreset storage),
+**D-12** (ported memories), **D-11** (single-call traces until verdicts need
+more), checkpoint 2 item 3 (NaN sign/payload and the zero sign are
+don't-care), checkpoint 6 (pipe-as-data is the reference form of a registered
+pipeline). U1 gives the arithmetic: ``bf16_add.bits``,
+``mul_acc24.bits``, ``acc24_add_pipe.bits``/``staged``, ``alu.bits`` (and
+``bf16_gt``), all bit-exact on simulator, csim and Catapult RTL.
+
+**sfu.** Which contract: 5 cycles is consumed by the sequencer (``WB_W_SFU`` 7).
+
+* **S1 ``bits``** (default): ``sfu.sv`` transcribed into one kernel per element:
+  ``fp32_abs_q7`` with saturation, the address fold, two 2,048-entry ROMs,
+  the 32-entry PWL tables, truncating decode. ROMs as module-level constant
+  arrays loaded from the ``.mem`` files at build. Probes: how each backend
+  lowers a 2,048 x 16 b constant (Catapult ROM vs logic; Vitis BRAM; RTLGen;
+  AMC ``rom_1r``), and the C4 path (a module-level numpy array -- fixed on
+  ``main``, worth a regression here).
+* **S2 ``staged``**: S1 with the five registers written as data (pipe-as-data),
+  for the cycle-equal Catapult cell.
+* ``sfu_group`` is ``LANES`` instances sharing ``valid``/``op``: an instance
+  count, i.e. C9 (sized at instantiation).
+
+**xlu_reduction_tree.** Contract: 13 / tap 9 (``WB_W_REDUCE`` 15, ``WB_W_LANE_REDUCE`` 11).
+
+* **T1 ``bits``** (reference): one kernel, ``log2 N`` levels of
+  ``bf16_add.bits`` / ``bf16_gt`` select on a per-wavefront op tag, the tap at
+  level ``log2 NUM_LANES``. Untimed on the simulator; Catapult picks the depth.
+* **T2 ``units``** (the composition probe): ``N - 1`` adder *units*
+  (``bf16_add_pipe``) wired by level, plus the 2-deep max path. MiniTPU assumes
+  the adder's 2 cycles in two places and checks it nowhere; here the max delay
+  is **derived from the adder unit's declared latency** and the tap level from
+  ``NUM_LANES`` -- legality conditions, as ``ip/units/reduction_tree.py``
+  already does (``ip_gaps.rst``). This is also the **adder-tree matrix engine**
+  of the swap (section 3).
+* **T3 ``library``**: TinyTPU's ``reduction_tree.py`` with a bf16 node engine.
+  Its legality refuses a node type narrower than ``IN + DEPTH``; a bf16 tree
+  *rounds at every level by design*, so the library must say "rounding tree,
+  order declared" instead of refusing -- the first test of whether the library
+  generalises from integers.
+
+**xlu_transpose.** Contract: read 1 (``WB_W_TXOUT`` 3).
+
+* **X1 ``trace``** (default): one kernel; ``tile @ Stateful(reset=False)``
+  16 x 16 x ``UInt(16)``; a write lands four rows; the crossing read is
+  registered (pipe-as-data, latency 1).
+* **X2 ``ported``**: D-12 does **not** describe it: the read is a permutation
+  across every row, not a port on a word. Probe whether ``Memory(ports=...)``
+  can say it at all, or whether a register array plus a registered mux is the
+  only honest form (hypothesis H13).
+
+**mxu_pe.** Contract: ``MXU_PE_LATENCY`` = 4, which ``mxu.sv``'s skew depends on (asserted).
+
+* **P1 ``bits``**: one kernel per PE: ``mul_acc24.bits`` on (lhs, active),
+  ``acc24_add_pipe.staged``, two pending banks and the active weight as
+  registers, forwards as registers. Checked per cycle against
+  ``mxu_pe_trace``.
+* **P2 ``unit``**: P1 as a ``compose.unit`` with stream ports (lhs/commit
+  east, weights/psum south), the TinyTPU ``pe`` shape. The **MAC plug-in**
+  is its pair ``(mul, add)`` plus their types: bf16 -> acc24 here, int8 ->
+  int32 in TinyTPU.
+
+**mxu_systolic_array.**
+
+* **A1 ``streams``**: ``mapping=[DIM, DIM]`` of P2 over ``Stream`` links
+  (TinyTPU's form). Self-timed: tokens align by order, so the skew is
+  unnecessary and the cycle model cannot hold (each link is a FIFO, 3 cycles
+  push->pop in Catapult, ``u3_fifo_composed``). Judged at ``mxu`` on the
+  contract.
+* **A2 ``locked``**: P1 instances over ``Wire`` links, cycle-locked like the
+  RTL, so ``mxu_systolic_array_trace`` applies on Catapult RTL. Needs ``Wire``
+  *unit* ports (still refused: checkpoint 7) and a pinned per-PE latency on a
+  Wire kernel (N2: cannot be pinned today). Expected **blocked**; the probe
+  says how far.
+
+**mxu.** Contract: ``mxu_trace``; the timing constant consumed by asm is 85.
+
+* **M1 ``composed``** (default, per ``u3_fifo_composed``): input
+  ``Stream[UInt(1+16*DIM), 4]`` consumed by ``try_get`` every cycle; load/skew
+  kernel (the skew as pipe-as-data, or dropped under A1); the array; per-lane
+  gather + ``pack_bf16`` with ``try_put`` into ``Stream[UInt(16*SUB), 16]``
+  (overflow = drop, M5); pop by blocking ``get`` gated on every lane's
+  ``empty()``. Reset is the region's.
+* **M2 ``microarch``** (``microarch.py``): retired as an oracle. Its acc24 is
+  float32 ``round24``, which double-rounds (``ARITHMETIC.md`` §7: 0.06 % of
+  adds, one ulp); keep it only as the whole-core model until U5.
+
+3. Composition questions
+------------------------
+
+**Q1. The MAC plug-in.** C1/C2 are fixed on ``main`` (``core-scoping``):
+an engine passed as a value links and two engines with one def name coexist.
+Open: C9 (a ``@df.unit``'s sizes freeze at decoration) and C10 (a function's
+schedule does not travel; the tree's 63 adders each need
+``leading_zeros17`` unrolled). ``compose.unit`` binds free names when the
+``Architecture`` emits, so it does not have C9, and its ``Directives`` carry a
+unit's schedule, so composed units do not have C10 (``tinytpu_library.rst``).
+Test: one PE source, two MACs (bf16->acc24, int8->int32), each in its
+own region and both in one region.
+
+**Q2. The matrix engine: systolic or adder tree.** The two are **different
+functions** at bf16: systolic accumulates sequentially in acc24 and rounds once
+to bf16 (``ARITHMETIC.md`` §8); a tree rounds at every level in its node type.
+So a swap is legal only if the engine interface declares its accumulate order
+and node type, and the contract reference takes them as parameters. The timing
+constant changes too (linear in DIM against ``log2``): it must come from the
+manifest (D-10), never a constant in asm. Test: ``mxu_trace`` with
+``order=sequential|tree``; the tree engine is T2 in a ``DotTree``-shaped MXU.
+
+**Q3. Optional modules** (SFU, transpose, reduction tap, TinyTPU's accumulator
+file). Mechanism today: a Python conditional over ``Architecture.units()`` and
+its channels. Test: a VPU-lane composite with and without the SFU; check that
+an unused channel or a dangling ISA slot is refused by the netlist rules, not
+left silently unconnected.
+
+**Q4. Parameters and what is derived.** ``DIM``, ``NUM_LANES``,
+``NUM_SUBLANES``, ``N``, banks, FIFO depths. Derived, never declared: tree
+``LEVELS`` and tap level; the max-path delay (= adder latency); the span
+``(DIM-1)*PE + (DIM-1)``; ``push->valid``. Each derived relation becomes a
+``legality`` condition on the unit (the ``ip_gaps`` pattern), not an assertion
+in a testbench (MiniTPU's tap/booking relation lived only in a tb).
+
+**Q5. Cycle-locked vs self-timed composition.** U3 is where D-10's
+"cycle-locked composition" bites: the PE's 4 and the array's skew are a
+contract between units. Either the composition is locked (A2: ``latency=`` on
+every unit, Wire links) or it is self-timed (A1: Streams) and the contract is
+moved up to ``mxu``'s interface, where Phase 0 shows it can be stated without
+any internal timing.
+
+4. Hypotheses (tool columns)
+----------------------------
+
+Sim = Allo simulator, SC = SystemC csim stand-in, Cat = Catapult RTL (+DC),
+RTLG = RTLGen, AMC. **Y** applies, **opt** optional, **probe** exploratory.
+
+====  ===  ===  =====  =====  =====  ===============================================================
+#     Sim  SC   Cat    RTLG   AMC    hypothesis
+====  ===  ===  =====  =====  =====  ===============================================================
+H1    Y    Y    Y      Y      probe  S1 ``bits`` matches all 262,144 op x operand vectors first time (U1 arithmetic, no new op)
+H2    --   Y    Y      probe  probe  2,048-entry constant ROMs: Catapult infers a ROM; some backend inlines or refuses (**missing abstraction**: ROM from file)
+H3    Y    Y    Y      opt    --     T1 matches; Catapult's free depth != 13 unless ``latency=13`` (D-10 contract)
+H4    --   --   Y      --     --     T2: each of N-1 adder units needs ``leading_zeros17`` unrolled: C10 recurs for ``@df.unit``, not for ``compose.unit``
+H5    Y    Y    Y      --     --     T2/T3 derived max delay and tap level as legality; a wrong adder latency refused at composition
+H6    Y    Y    Y      opt    opt    P1 matches ``mxu_pe_trace`` per cycle on Cat RTL at ``latency=4``; Sim/SC function-only
+H7    Y    Y    Y      --     --     A1 Stream array computes the contract at ``mxu`` but not the cycle model (**semantic mismatch**, by design); push->valid > 82
+H8    --   Y    Y      --     --     A2 Wire-locked array **blocked**: Wire unit ports refused (checkpoint 7), Wire latency unpinnable (N2)
+H9    Y    Y    Y      --     --     M1 ``try_put`` output reproduces the RTL's drop on the overflow program (M5) and the contract elsewhere
+H10   Y    Y    probe  --     --     Q1: one PE source, two MACs, one region: works on Sim/SC (C1/C2 fixed); C9 forces a factory for ``@df.unit``
+H11   Y    Y    --     --     --     Q2: tree engine differs from systolic in the last bits on random data; equal on exact-sum data
+H12   Y    Y    Y      --     --     wide ports (1,024 b tree/transpose, 257 b input): B6/S7/S8 recur unless ports are ``UInt(16)[N]`` lanes
+H13   --   --   --     --     probe  X2: D-12 ports cannot state a transposing read (**missing abstraction**)
+H14   --   --   Y      --     --     D-14 payload ``reset=False``: DC area within 5 % of MiniTPU on PE/tree; reset form +10-20 %
+H15   Y    Y    --     --     --     Q3: removing the SFU leaves a dangling channel the netlist rules refuse (or **bug**: silently accepted)
+====  ===  ===  =====  =====  =====  ===============================================================
+
+5. Order of work and agent split
+--------------------------------
+
+Every track works on its own ``u3-*`` branch from ``u3-phase0`` in its own
+worktree, writes only its own ``units/*.py`` variants and its own record, and
+holds each variant to the Phase 0 oracle with ``check.py`` (one
+``UNIT-MATCH`` line per unit/variant/backend). Verilator builds share a cache:
+one track per unit. The integrator (one session) is the only writer of
+``u3_matrix.rst`` and of ``u1-pilot``.
+
+**Wave 1 (parallel, now):**
+
+* **A -- leaves and XLU** (``u3-xlu-sfu``): S1, S2, T1, X1 on Sim and SC,
+  then T2 (units, derived legality). Hypotheses H1, H3, H5, H12. Output:
+  the reference expressions and their ``check`` lines.
+* **B -- matrix** (``u3-mxu``): P1, P2 on Sim and SC against ``mxu_pe_trace``;
+  A1 array; M1 composite against ``mxu_trace`` (directed + random programs,
+  every instance). H6, H7, H9, H12.
+* **E -- composition design** (``u3-compose``, mostly writing): the engine
+  interface (types, latency, accumulate order), unit parameters at
+  instantiation (C9), schedules that travel (C10), optional modules (Q3), and
+  the derived-parameter legality conditions (Q4), each as a D-n **draft**
+  with a minimal prototype outside ``allo/`` (in ``examples/minitpu/``) where
+  one is possible. Q1/Q2/Q3 experiments once A's T2 and B's P2 exist (H10,
+  H11, H15).
+
+**Wave 2 (as variants land):**
+
+* **C -- Catapult + DC** (``u3-catapult``): every landed ``bits``/``staged``
+  variant through SystemC -> Catapult at 3.33 ns and 2.0 ns, RTL in Verilator
+  against the oracle per cycle where the form is cycle-locked, ``latency.json``
+  against the declared value, same-flow DC area beside MiniTPU's unit (U1
+  ``dc_u1.tcl``). Then A2 (H8), ROMs (H2), H4, H14.
+* **D -- open HLS** (``u3-openhls``): RTLGen and AMC on S1, T1, P1 (H1, H2,
+  H6 columns); AMC's ``rom_1r`` against the SFU tables.
+
+**Wave 3:** the integrator fills ``u3_matrix.rst``, triages, and drafts the
+D-n entries E produced for the owner's return.
+
+Dependencies: B's M1 needs P1/A1; C waits on a variant, not a track; E's Q2
+needs T2 (A) and P2 (B). Expected cost: A and B about a day each of agent
+time; C about a day; D half a day; E a day of writing.
+
+6. Provisional decisions (the owner is away; work proceeds on these)
+--------------------------------------------------------------------
+
+Each is the agent's call under D-9, with its reason; each stays open for the
+owner's review.
+
+* **P-1. Expressions.** Defaults: S1 (+S2 for Catapult), T1 (+T2 as the
+  composition probe), X1, P1 -> P2, A1 (A2 as a probe only), M1. *Reason:*
+  each default is the form that already matched in U1/U2 or that
+  ``u3_fifo_composed`` measured; the others are probes.
+* **P-2. Verdicts for composites.** ``mxu`` is judged on the contract trace;
+  ``mxu_pe``/``mxu_systolic_array`` on the cycle model only for cycle-locked
+  RTL (Catapult). A Stream-linked array gets a contract verdict at ``mxu`` and
+  a recorded semantic mismatch per cycle. *Reason:* the array has no matrix
+  contract of its own (section 1), and checkpoint 6 already moved FIFOs to
+  Streams for the composed MXU.
+* **P-3. Latency.** Report first (D-10). Pin with ``latency=`` only where a
+  MiniTPU contract consumes the number: PE 4 (the skew), SFU 5, tree 13/9.
+  ``mxu``'s push->valid is reported and compared with 82, and its difference
+  (Streams: 3 cycles per link) is recorded, not forced. *Reason:* D-10's
+  text; the 85 is consumed by asm, so a deviation goes into the manifest the
+  assembler would read, not into the source.
+* **P-4. Geometry.** Verdicts at the small geometry (tree N=16, array and
+  ``mxu`` DIM=4) with the shipped one (N=64, DIM=16) run once per variant.
+  The transpose only at 16 x 4. *Reason:* U2 Q2 precedent; Phase 0 shows
+  MiniTPU is bit-exact at N=16.
+* **P-5. Numerics.** NaN sign/payload and zero sign stay don't-care
+  (checkpoint 2); the **MXU accumulate order is not**: sequential acc24 with
+  one ``pack_bf16`` must be bit-exact. acc24 only through U1's integer units,
+  never float32. *Reason:* ``ARITHMETIC.md`` §7-§9.
+* **P-6. Unit mechanism.** Parameterised units are ``compose.unit``s (no
+  C9/C10); ``@df.unit`` only for fixed-size leaves; factories (C11) only
+  where neither works, and each one recorded. *Reason:* C9/C10 are open,
+  and ``compose`` already avoids both.
+* **P-7. Engine swap.** An engine declares types, latency and accumulate
+  order; a swap that changes the order is a different function and is
+  checked against the contract reference with that order. A D-n draft, no
+  core code. *Reason:* ``ip_gaps.rst`` ("narrower is a different function")
+  applies to order as much as to width.
+* **P-8. Wide ports.** Allo-side ports are lane arrays (``UInt(16)[N]``,
+  ``UInt(16)[DIM]``); the harness packs them. *Reason:* B6/S7/S8 (no numpy
+  dtype above 64 b; csim read-back of 64-bit words).
+* **P-9. Unreset payload.** ``Stateful(reset=False)`` (D-14) on payload
+  registers that MiniTPU leaves unreset, valids reset. *Reason:* D-14 and
+  the census: MiniTPU's own semantics.
+* **P-10. MiniTPU findings** (Phase 0 findings 1-4) are recorded for the
+  owner and not filed upstream while the owner is away. *Reason:* filing
+  was always an owner's go-ahead (checkpoint 2 items 7 and 13).
+
+7. Open questions for the owner (none blocks Wave 1)
+----------------------------------------------------
+
+* **O1.** Accept P-2's contract-level verdict for a Stream-linked array, or
+  require a cycle-locked array (A2) at U3, which needs Wire unit ports and a
+  pinnable Wire latency first?
+* **O2.** Is ``mxu``'s 82/85 a contract the Allo MXU must meet (then Streams
+  cost 2 cycles per link and the composition must absorb them), or a
+  manifest number the assembler reads (P-3)?
+* **O3.** Engine swap (P-7): should the template expose MiniTPU's sequential
+  order as the only bf16 order, or admit a tree engine as a declared
+  different function?
+* **O4.** File the Phase 0 MiniTPU findings (``vrecip`` top binade gives a
+  non-canonical NaN; no subnormal flush in the SFU; tree tbs not
+  geometry-generic)?

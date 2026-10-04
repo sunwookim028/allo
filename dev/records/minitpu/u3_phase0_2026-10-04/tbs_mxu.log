@@ -1,0 +1,49 @@
+Verilator 5.052 2026-09-05 rev conda-forge build 
+== tb_mxu_single_port
+PASS tb_mxu_single_port
+- tb/tb_mxu_single_port.sv:71: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 280ns; walltime 0.000 s; speed 1.631 ms/s
+- Verilator: cpu 0.000 s on 1 threads; allocated 2 MB
+== tb_acc24_special_pipe
+PASS tb_acc24_special_pipe
+- tb/tb_acc24_special_pipe.sv:64: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 179ns; walltime 0.000 s; speed 1.068 ms/s
+- Verilator: cpu 0.000 s on 1 threads; allocated 2 MB
+== tb_matrix_full_vreg
+PASS tb_matrix_full_vreg
+- tb/tb_matrix_full_vreg.sv:116: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 1us; walltime 0.053 s; speed 20.323 us/s
+- Verilator: cpu 0.051 s on 1 threads; allocated 8 MB
+== tb_matrix_command_ii
+  pop 82 cycles after the push: stalled
+  pop 83 cycles after the push: stalled
+  pop 84 cycles after the push: stalled
+  pop 85 cycles after the push: on time
+  pop 86 cycles after the push: on time
+  vmatpush result latency (earliest on-time pop)       85 (docs/isa_latency.json: 85)
+  load, push, push, pop, pop at their intervals        every port-C read and write on its documented cycle
+  pops beside pushes, one cycle apart                  every port-C read and write on its documented cycle
+  output FIFO rows after 16 pushes                     64 (docs/isa_latency.json: 64)
+  output FIFO full at that count                       1 (docs/isa_latency.json: 1)
+PASS tb_matrix_command_ii
+- tb/tb_matrix_command_ii.sv:357: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 17us; walltime 0.190 s; speed 89.064 us/s
+- Verilator: cpu 0.188 s on 1 threads; allocated 7 MB
+== tb_matrix_weight_pipelining
+PASS tb_matrix_weight_pipelining (a load refills a bank 75 cycles after the first push of the tile it held; the load between streams 32 cycles after it)
+- tb/tb_matrix_weight_pipelining.sv:331: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 4us; walltime 0.095 s; speed 43.884 us/s
+- Verilator: cpu 0.093 s on 1 threads; allocated 8 MB
+== tb_matrix_weight_banks
+  two-push tiles, loads on the bank rule       8 tiles, every result exact
+  GEMM steps, loads on the stream engine       5 tiles, every result exact
+PASS tb_matrix_weight_banks
+- tb/tb_matrix_weight_banks.sv:224: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 7us; walltime 0.119 s; speed 62.169 us/s
+- Verilator: cpu 0.117 s on 1 threads; allocated 8 MB
