@@ -272,6 +272,44 @@ wording edits (engine latency is a D-10 ``latency=``; "an adder-tree instance
 declares ``tree``"). Implementation on review branch ``compose-engines``.
 D-16..D-19 next, one at a time.
 
+**Coordination with ``minitpu-comp``, 2026-10-04** (the owner's compiler/ISA
+session; facts as of minitpu-tmp master ``a9757be``, its decisions in
+``docs/DECISIONS.md`` / ``docs/COMPILER_PLAN.md``):
+
+- **ISA versions**: ``v1-course`` = the frozen course ISA (our pin
+  ``b3ba0a4d``; MXU push->valid **82**), ``v1`` = master (**85**), ``v2`` =
+  ``docs/ISA_V2.md`` (frozen on defaults, §8.1): standard branches with 2 delay
+  slots + one zero-overhead loop level replacing the 8-deep ``loop.begin``
+  stack, post-increment addressing, counting semaphores with queued DMA
+  descriptors, a sticky fault register. v2 RTL not started.
+- **Interlocks**: v2 **adds them** (matrix-slot stalls, SREG scoreboard
+  default 5, E03 freeze-on-stall); v1 stays assembler-enforced. The one RTL
+  change in flight is **E03** (branch ``e03``, unmerged): units freeze on
+  every issue stall; new ``en_i`` ports on ``sfu``, ``xlu_reduction_tree``,
+  ``vpu_alu``, ``xlu_transpose`` and a 4-entry VMEM load landing ring
+  (``docs/E03_PROTOTYPE.md``). Our U1-U3 models are of ``b3ba0a4d`` and would
+  need those ports to follow E03.
+- **Arithmetic contracts unchanged** in v1/E03/v2 (NaN canon, (+0)+(-0),
+  multiplier flush, SFU no-flush, sequential acc24 + one ``pack_bf16``). Open
+  there: vrecip wrap (ISA-N03 = our #33) and ``vrsqrt(+0)=NaN``; vmax/vmin
+  NaN (ISA-X02, deferred); f32 accumulation across K tiles (deferred). v2
+  default 12: writeback collisions become a **fault** via a priority mux.
+- **Shared truth stays ``docs/isa_latency.json`` + ``isa_slots.json``**,
+  everything generated and ``--check``ed from them (datasheet, asm.py
+  constants, tb packages, an LLVM target's TableGen on branch
+  ``llvm-spike``). A ``versions`` section is in progress. **Agreed seam**: a
+  generator writes a version's deltas from our ``latency.json``/``memory.json``
+  per (unit, backend, clock) into ``isa_*.json``, ``--check`` failing on
+  disagreement; D-12's ports map onto their LLVM target's FuncUnits (write
+  port, port C, matrix engines, weight banks). Schema to be agreed when their
+  versioning branch lands (they will message).
+- Our #19 and #20 are **fixed on master** as ``asm.py`` refusals ("M6-F3",
+  "M6-F5/F6"); #18, #21, #22, #33-#36 open; #21/#22 bear on E03's landing
+  ring.
+- **Decision needed from the owner**: which version the ladder models
+  (stay on ``b3ba0a4d`` v1-course through U5, then re-pin; follow master v1;
+  or model v2 for U4's control), and the D-7 interlock note given v2.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
