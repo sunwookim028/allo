@@ -212,3 +212,137 @@ def seeds():
         dut="dut", clk="clk_i", unit=INSTANCES["n64"])
     out.append(("tb_xlu_lane_tap", "n64", cmd, seen, True))
     return out
+
+
+# ---------------------------------------------------------------------------
+# Allo expressions (U3 track A; ``dev/records/minitpu/u3_track_a_2026-10-04.rst``)
+#
+# ``bits`` (plan T1)   one kernel: ``N`` leaves, ``log2 N`` levels of
+#                      ``bf16_add.add_bits`` or the ``bf16_gt`` select on the
+#                      wavefront's op, the tap at level ``log2 NUM_LANES``;
+#                      the ``1 + 2*LEVELS`` register edges of ``.sv`` are the
+#                      output's delay line, written as data (checkpoint 6):
+#                      the valid pipes are cleared by ``rst_ni``, the payload
+#                      pipes never are (P-9). Untimed on the simulator; the
+#                      depth that Catapult picks is track C's (H3).
+# ``units`` (T2)       ``xlu_reduction_tree_units.py``: the same tree as
+#                      ``N - 1`` composed adder units with derived legality.
+#
+# Ports are lane arrays (P-8): ``data_i`` arrives as ``uint16[n, N]``,
+# ``lane_result_o`` leaves as ``uint16[n, NUM_SUBLANES]``; ``_run`` packs.
+# ---------------------------------------------------------------------------
+
+import numpy as np  # noqa: E402
+
+import allo.dataflow as df  # noqa: E402
+from allo.ir.types import int32, uint8, uint16  # noqa: E402
+from examples.minitpu.units.alu import bf16_gt  # noqa: E402
+from examples.minitpu.units.bf16_add import add_bits  # noqa: E402
+
+WIDTH = {k: 16 for k in GEOM}
+RESP = ("valid_o", "result_o", "lane_valid_o", "lane_result_o")
+# ``check.py`` hands a runner ``(mod, cmd, n, w)`` and not the instance, so a
+# geometry-bearing unit remembers the one it last built (harness note, record).
+_BUILT = {}
+
+
+def _args(cmd, n, inst):
+    nl = _n(inst)
+    _, sub = GEOM[inst]
+    ins = [np.asarray(cmd[p][:n], dtype=np.uint8) for p in ("rst_ni", "valid_i", "op_i")]
+    ins.append(ref._split16(rtl.pack(cmd["data_i"][:n], 16 * nl), nl).astype(np.uint16))
+    outs = [np.zeros(n, dtype=np.uint8), np.zeros(n, dtype=np.uint16),
+            np.zeros(n, dtype=np.uint8), np.zeros((n, sub), dtype=np.uint16)]
+    return ins, outs
+
+
+def _run(mod, cmd, n, w):
+    inst = _BUILT["inst"]
+    ins, outs = _args(cmd, n, inst)
+    mod(*ins, *outs)
+    vo, ro, lvo, lro = outs
+    _, sub = GEOM[inst]
+    lane = rtl.unpack(ref._join16(lro.astype(np.int64), (16 * sub + 63) // 64))
+    return {"valid_o": vo, "result_o": ro, "lane_valid_o": lvo, "lane_result_o": lane}
+
+
+def bits(n, w=16, inst="n64"):
+    nl = _n(inst)
+    lanes, sub = GEOM[inst]
+    root_d, tap_d = declared(inst)  # 1 + 2*LEVELS, 1 + 2*LANE_LEVELS: the pipes' depth
+    tap_base = 2 * nl - 2 * sub  # the first node of the level that covers one sublane
+    _BUILT["inst"] = inst
+
+    @df.region()
+    def top(RST: uint8[n], VLD: uint8[n], OP: uint8[n], D: uint16[n, nl],
+            VO: uint8[n], RO: uint16[n], LVO: uint8[n], LRO: uint16[n, sub]):
+        @df.kernel(mapping=[1], args=[RST, VLD, OP, D, VO, RO, LVO, LRO])
+        def tree(rst: uint8[n], vld: uint8[n], op: uint8[n], d: uint16[n, nl],
+                 vo: uint8[n], ro: uint16[n], lvo: uint8[n], lro: uint16[n, sub]):
+            # node[0:N] are the leaves; node[N + m] has children 2m, 2m + 1,
+            # so one ascending loop is the balanced tree (ip/units/reduction_tree.py)
+            node: uint16[2 * nl - 1]
+            vq: uint8[root_d]  # the valid pipe to the root: reset
+            rq: uint16[root_d]  # its payload: never reset
+            lvq: uint8[tap_d]
+            lrq: uint16[tap_d, sub]
+            for k in range(root_d):
+                vq[k] = 0
+            for k in range(tap_d):
+                lvq[k] = 0
+            for t in range(n):
+                r: uint8 = rst[t]
+                v: uint8 = vld[t]
+                o: uint8 = op[t]
+                for l in range(nl):
+                    node[l] = d[t, l]
+                for m in range(nl - 1):
+                    a: uint16 = node[2 * m]
+                    b: uint16 = node[2 * m + 1]
+                    if o == 0:
+                        node[nl + m] = add_bits(a, b)
+                    else:
+                        if bf16_gt(a, b):
+                            node[nl + m] = a
+                        else:
+                            node[nl + m] = b
+                # the register edges: stage k takes stage k - 1, stage 0 the tree
+                for k in range(1, root_d):
+                    vq[root_d - k] = vq[root_d - k - 1]
+                    rq[root_d - k] = rq[root_d - k - 1]
+                vq[0] = v
+                rq[0] = node[2 * nl - 2]
+                for j in range(1, tap_d):
+                    lvq[tap_d - j] = lvq[tap_d - j - 1]
+                    for s in range(sub):
+                        lrq[tap_d - j, s] = lrq[tap_d - j - 1, s]
+                lvq[0] = v
+                for s in range(sub):
+                    lrq[0, s] = node[tap_base + s]
+                # synchronous reset of every valid stage; the payload keeps flowing
+                if r == 0:
+                    for k in range(root_d):
+                        vq[k] = 0
+                    for k in range(tap_d):
+                        lvq[k] = 0
+                # the lane array first: SystemC csim keeps only the first of the
+                # last iteration's stores to a 2-D output when they come last (A5)
+                for s in range(sub):
+                    lro[t, s] = lrq[tap_d - 1, s]
+                vo[t] = vq[root_d - 1]
+                ro[t] = rq[root_d - 1]
+                lvo[t] = lvq[tap_d - 1]
+
+    return top
+
+
+def units(n, w=16, inst="n64"):
+    """T2: the tree as ``N - 1`` composed adder units (``xlu_tree_compose.py``)."""
+    from examples.minitpu.units import xlu_tree_compose
+
+    lanes, sub = GEOM[inst]
+    _BUILT["inst"] = inst
+    return xlu_tree_compose.architecture(lanes, sub, n).region()
+
+
+VARIANTS = {"bits": (bits, _run), "units": (units, _run)}

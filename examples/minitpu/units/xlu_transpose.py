@@ -154,3 +154,116 @@ def probes(inst):
     res.append(("write -> read_data_o (visibility + read)", 2,
                 rtl.probe_trace(RTL, t.cmd(), "read_data_o", ev)))
     return res
+
+
+# ---------------------------------------------------------------------------
+# Allo expressions (U3 track A; ``dev/records/minitpu/u3_track_a_2026-10-04.rst``)
+#
+# ``trace`` (plan X1)  one kernel; ``tile`` is ``uint16[16, 16] @
+#                      Stateful(reset=False)`` (D-14, P-9: the RTL never
+#                      resets it); a write lands four whole rows; the read is
+#                      the crossing permutation ``out[s][l] = tile[l][4q + s]``
+#                      of the tile before this cycle's write, delivered in the
+#                      same row (the RTL's one register edge, ``"post"``).
+# Ports are lane arrays (P-8): ``write_data_i``/``read_data_o`` are
+# ``uint16[n, 64]`` (field ``s * 16 + l``); ``_run`` packs.
+# ---------------------------------------------------------------------------
+
+import numpy as np  # noqa: E402
+
+import allo.dataflow as df  # noqa: E402
+from allo.ir.types import Stateful, int32, uint8, uint16  # noqa: E402
+
+WIDTH = {"t16x4": 16}
+NF = LANES * SUB  # 64 fields of 16 bits
+CMD = ("rst_ni", "write_valid_i", "write_index_i", "write_data_i", "read_valid_i", "read_index_i")
+
+
+def _args(cmd, n):
+    ins = []
+    for p in CMD:
+        if p == "write_data_i":
+            ins.append(ref._split16(rtl.pack(cmd[p][:n], W), NF).astype(np.uint16))
+        else:
+            ins.append(np.asarray(cmd[p][:n], dtype=np.uint8))
+    outs = [np.zeros(n, dtype=np.uint8), np.zeros((n, NF), dtype=np.uint16)]
+    return ins, outs
+
+
+def _run(mod, cmd, n, w):
+    ins, outs = _args(cmd, n)
+    mod(*ins, *outs)
+    rvo, rdo = outs
+    return {"read_valid_o": rvo,
+            "read_data_o": rtl.unpack(ref._join16(rdo.astype(np.int64), W // 64))}
+
+
+def trace(n, w=16, inst="t16x4"):
+    """X1 with the tile RESET (``@ Stateful``): the form the SystemC emitter
+    accepts on a kernel with array ports (D-14's unreset lowering is
+    Wire-only, finding A6); a recorded deviation from the RTL's unreset tile.
+    """
+    @df.region()
+    def top(RST: uint8[n], WV: uint8[n], WI: uint8[n], WD: uint16[n, NF],
+            RV: uint8[n], RI: uint8[n], RVO: uint8[n], RDO: uint16[n, NF]):
+        @df.kernel(mapping=[1], args=[RST, WV, WI, WD, RV, RI, RVO, RDO])
+        def tx(rst: uint8[n], wv: uint8[n], wi: uint8[n], wd: uint16[n, NF],
+               rv: uint8[n], ri: uint8[n], rvo: uint8[n], rdo: uint16[n, NF]):
+            tile: uint16[LANES, LANES] @ Stateful
+            for t in range(n):
+                r: uint8 = rst[t]
+                v: uint8 = rv[t]
+                q: int32 = ri[t]  # B4: widen before indexing
+                e: uint8 = wv[t]  # S6: every port read unconditionally
+                wq: int32 = wi[t]
+                # the registered crossing read, of the tile before this cycle's write
+                for s in range(SUB):
+                    for l in range(LANES):
+                        rdo[t, s * LANES + l] = tile[l, 4 * q + s]
+                if r == 0:
+                    rvo[t] = 0  # read_valid_q is the one reset register
+                else:
+                    rvo[t] = v
+                # a write lands four whole rows
+                if e == 1:
+                    for s in range(SUB):
+                        for l in range(LANES):
+                            tile[4 * wq + s, l] = wd[t, s * LANES + l]
+
+    return top
+
+
+def trace_unreset(n, w=16, inst="t16x4"):
+    """X1 as planned (P-9): ``trace`` with ``tile @ Stateful(reset=False)``.
+    The simulator treats it as ordinary storage; the SystemC emitter refuses
+    it on this kernel shape, naming the storage and the cause (D-14, honest).
+    The body is ``trace``'s (a closure flag would become an ``scf.if``)."""
+    @df.region()
+    def top(RST: uint8[n], WV: uint8[n], WI: uint8[n], WD: uint16[n, NF],
+            RV: uint8[n], RI: uint8[n], RVO: uint8[n], RDO: uint16[n, NF]):
+        @df.kernel(mapping=[1], args=[RST, WV, WI, WD, RV, RI, RVO, RDO])
+        def tx(rst: uint8[n], wv: uint8[n], wi: uint8[n], wd: uint16[n, NF],
+               rv: uint8[n], ri: uint8[n], rvo: uint8[n], rdo: uint16[n, NF]):
+            tile: uint16[LANES, LANES] @ Stateful(reset=False)  # D-14, P-9
+            for t in range(n):
+                r: uint8 = rst[t]
+                v: uint8 = rv[t]
+                q: int32 = ri[t]  # B4: widen before indexing
+                e: uint8 = wv[t]  # S6: every port read unconditionally
+                wq: int32 = wi[t]
+                for s in range(SUB):
+                    for l in range(LANES):
+                        rdo[t, s * LANES + l] = tile[l, 4 * q + s]
+                if r == 0:
+                    rvo[t] = 0
+                else:
+                    rvo[t] = v
+                if e == 1:
+                    for s in range(SUB):
+                        for l in range(LANES):
+                            tile[4 * wq + s, l] = wd[t, s * LANES + l]
+
+    return top
+
+
+VARIANTS = {"trace": (trace, _run), "trace_unreset": (trace_unreset, _run)}
