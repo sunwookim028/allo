@@ -174,6 +174,33 @@ the FIFOs, ``u2_word_array_2026-10-02.rst``, ``u2_fifo_2026-10-02.rst``):
 - **If D-12's prototype fails its reverses-if, iterate** on alternative
   lowerings, recording each.
 
+**Checkpoint 10, 2026-10-04** (the owner away; provisional):
+
+- **D-12 prototyped, neither reverses-if fired** (``u2_d12_prototype_2026-10-04.rst``,
+  branch ``d12-ports``): the register file as three reader units and one
+  writeback unit is bit- and cycle-exact to ``vpu_regfile.sv`` on Catapult
+  RTL (180,780/180,780, read 0, write-visible 1) under both lowerings
+  (``server``: one storage kernel; ``replica``: a copy per read port), every
+  port kernel at II=1; DC 4,061.6 um^2 vs MiniTPU 4,021.7 (+0.99 %). The
+  two-port VMEM (narrow) as two units on one declared memory schedules at
+  II=1, cycle-exact 67,717/67,717 on both ports. The 4,096-word RAM stays at
+  II=2 on Catapult's sync dual-port model, as the one-kernel form did.
+  Composition refuses every rule violation naming the port; Vitis refuses
+  more than one owner; ``allo.memory.Memory(latency=, depth=)`` refused.
+- **D-14 follow-ups** (``u2_d14_followups_2026-10-04.rst``, branch
+  ``d14-followups``): ``RESET_CLEARS_ALL_REGS`` is scoped to the write
+  process (Catapult allows Solution/Design/Process). The design-wide form
+  **had dropped the kernel thread's own reset** -- a real hazard, now
+  closed; mixing reset and unreset storage needs no refusal (Verilator
+  mid-run reset: unreset kept 32/32, reset cleared). ``UInt`` ``Stateful``
+  now emits unsigned on every backend (TinyTPU emission unchanged).
+- **B3, a regression on ``main``**: D-11's csim state save in ``sc_main``
+  sat outside ``#ifndef __SYNTHESIS__``, so Catapult ``go analyze`` aborted
+  (CRD-135) on every ``@ Stateful`` design since ``core-stateful`` merged.
+  Fixed on ``d14-followups``; goes to ``main`` with the next ladder sync.
+- ``d14-followups`` merged into ``u1-pilot``; ``d12-ports`` conflicts with it
+  in ``hls.py`` and ``EmitSystemC.cpp`` -- resolved on ``u1-pilot-sync2``.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
