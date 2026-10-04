@@ -738,6 +738,19 @@ I/O cycle constraint pins it, and a chain of stage kernels is not a chain of
 registers. Measurements and a proposal:
 ``dev/records/minitpu/u1_pipe_2026-10-02.rst``.
 
+**Bookings** (README D-20). A geometry record's derived latency
+(``MxuGeometry.push_to_valid``, ``TreeGeometry.latency``) is a booking: the
+number the assembler schedules against. ``latency.check_booking(manifest,
+{unit: booked}, clock)`` holds it to the manifest's measured ``latency`` and
+prints ``BOOKING-MATCH``, ``BOOKING-MISMATCH`` or ``BOOKING-UNCHECKED`` per
+unit, with the backend and clock of the manifest on the line. Only a
+``scheduled`` entry at the booking's clock counts; an ``unreliable`` or absent
+entry, or a manifest at another period, is UNCHECKED, never a pass. The same
+check runs from the shell with ``python -m examples.minitpu.harness.latency
+--bookings <json|module:attr> <manifest>``. No tree or MXU manifest exists
+yet, so the test (``harness/tests/test_latency_booking.py``) exercises the
+comparison on committed manifests with borrowed unit names.
+
 ``vpu_bf16_add`` as measured, 2026-10-02
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
