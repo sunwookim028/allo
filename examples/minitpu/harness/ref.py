@@ -535,3 +535,272 @@ def vpu_fifo_trace(cmd, width, depth):
             rd = (rd + 1) % depth
         count += int(do_push) - int(do_pop)
     return resp, reason, events
+
+
+# ---------------------------------------------------------------------------
+# U3: cross-lane and special-function units.
+#
+# ``sfu``: a bit-level model of ``sfu.sv``'s logic. Its DATA -- the two
+# 2048-entry ROMs (``gelu_bf16.mem``, ``exp_bf16.mem``) and the two 32-entry
+# piecewise-linear case tables of ``recip_entry``/``rsqrt_entry`` -- is read
+# from the pinned clone, not transcribed: the model is independent in its
+# logic (magnitude, address fold, interpolation, packing, special cases) and
+# shares the tables with the RTL. A wrong table therefore passes here, as it
+# passes ``tb_sfu_equiv``; ``tb_sfu_math_sweep`` (the functions themselves)
+# is the check that covers the tables.
+
+SFU_OPS = ("GELU", "EXP", "RECIP", "RSQRT")  # vpu_pkg::vpu_sfu_op_e, from 0
+SFU_OP = {name: i for i, name in enumerate(SFU_OPS)}
+_SFU_TABLES = {}
+
+
+def _sfu_tables():
+    if _SFU_TABLES:
+        return _SFU_TABLES
+    import os
+    import re
+
+    from examples.minitpu.harness import rtl
+
+    home = rtl.minitpu_home()
+    for name in ("gelu", "exp"):
+        with open(os.path.join(home, f"src/core/sfu/{name}_bf16.mem"), encoding="utf-8") as f:
+            words = [int(w, 16) for w in f.read().split() if not w.startswith("//")]
+        assert len(words) == 2048, (name, len(words))
+        _SFU_TABLES[name] = np.array(words, dtype=np.int64)
+    with open(os.path.join(home, "src/core/sfu/sfu.sv"), encoding="utf-8") as f:
+        src = f.read()
+    for name in ("recip", "rsqrt"):
+        body = src[src.index(f"function automatic logic [PWL_WORD_W-1:0] {name}_entry"):]
+        body = body[: body.index("endfunction")]
+        ent = dict((int(i), int(v, 16)) for i, v in
+                   re.findall(rf"5'd(\d+):\s*{name}_entry\s*=\s*21'h([0-9A-Fa-f]+);", body))
+        assert sorted(ent) == list(range(32)), name
+        _SFU_TABLES[name] = np.array([ent[i] for i in range(32)], dtype=np.int64)
+    return _SFU_TABLES
+
+
+def _fp32_abs_q7(x):
+    """``sfu.sv`` ``fp32_abs_q7`` on a bf16 operand (its fp32 view's low 16
+    bits are zero): |x| in Q7, truncated toward zero, saturated at 0x1fff."""
+    e = (x >> 7) & 0xFF
+    mant = (0x80 | (x & 0x7F)) << 16  # {1, value[22:0]}
+    rs = 16 - (e - 127)
+    sh = np.clip(rs, 0, 63)
+    v = mant >> sh
+    out = np.where(v > 0x1FFF, 0x1FFF, v)
+    out = np.where(rs <= 0, 0x1FFF, out)
+    return np.where((e == 0) | (rs >= 24), 0, out)
+
+
+def sfu(op, x):
+    """``sfu.sv`` at b3ba0a4d (module comment and ARITHMETIC.md §6/§9):
+
+    * vgelu/vexp: a 2048-entry ROM indexed by the Q7 magnitude (truncated),
+      folded around the table's centre; vgelu outside [-8, 8) is 0 or x;
+      vexp of x > 0 (and of +-0) is 1.0, below -16 it is 0;
+    * vrecip/vrsqrt: 32-bin piecewise-linear tables (13 value + 8 slope
+      bits), the interpolation's 13-bit result truncated to 7 mantissa bits;
+    * every NaN in is ``0x7fc0``; vrecip(+-Inf) = +-0, vrecip(+-0) = +-Inf;
+      vrsqrt(x <= 0) = NaN, vrsqrt(+Inf) = 0.
+    """
+    T = _sfu_tables()
+    op = np.asarray(op, dtype=np.int64)
+    x = np.asarray(x, dtype=np.int64) & 0xFFFF
+    sign, e, frac = x >> 15, (x >> 7) & 0xFF, x & 0x7F
+    mag = _fp32_abs_q7(x)
+    nan = (e == 0xFF) & (frac != 0)
+    inf = (e == 0xFF) & (frac == 0)
+    zero = (x & 0x7FFF) == 0
+    nonpos = (sign == 1) | zero
+    gelu_addr = np.where(sign == 1, 1024 - 1 - mag, 1024 + mag) & 0x7FF
+    exp_addr = (2048 - 1 - mag) & 0x7FF
+    # fp32 view {x, 16'b0}: fp32[22:18] = x[6:2], fp32[17:6] = {x[1:0], 10'b0}
+    recip_addr, recip_pos = (x >> 2) & 0x1F, (x & 3) << 10
+    rsqrt_addr = (((~x >> 7) & 1) << 4) | ((x >> 3) & 0xF)  # {~fp32[23], fp32[22:19]}
+    rsqrt_pos = (x & 7) << 9  # fp32[18:7]
+    rw, sw = T["recip"][recip_addr], T["rsqrt"][rsqrt_addr]
+    r_bias = (((rw >> 8) & 0x1FFF) + 8321) & 0x3FFF
+    s_bias = (((sw >> 8) & 0x1FFF) + 8322) & 0x3FFF
+    r_prod, s_prod = (rw & 0xFF) * recip_pos, (sw & 0xFF) * rsqrt_pos
+    r_int = ((r_bias - ((r_prod >> 11) & 0x1FF)) & 0x3FFF) & 0x1FFF
+    s_int = ((s_bias - ((s_prod >> 11) & 0x1FF)) & 0x3FFF) & 0x1FFF
+    s_exp = np.where(e & 1, ((379 - e) & 0x1FF) >> 1, ((380 - e) & 0x1FF) >> 1) & 0xFF
+    gelu = np.where(nan, 0x7FC0, np.where(zero, 0, np.where(
+        mag >= 1024, np.where(sign == 1, 0, x), T["gelu"][gelu_addr])))
+    expv = np.where(nan, 0x7FC0, np.where(zero | (sign == 0), 0x3F80, np.where(
+        mag >= 2048, 0, T["exp"][exp_addr])))
+    recip = np.where(nan, 0x7FC0, np.where(inf, sign << 15, np.where(
+        zero, (sign << 15) | 0x7F80,
+        (sign << 15) | (((253 - e) & 0xFF) << 7) | ((r_int >> 6) & 0x7F))))
+    rsqrt = np.where(nan | nonpos, 0x7FC0, np.where(
+        inf, 0, (s_exp << 7) | ((s_int >> 6) & 0x7F)))
+    out = np.choose(op & 3, [gelu, expv, recip, rsqrt])
+    return out.astype(np.uint16)
+
+
+def ieee_sfu(op, x):
+    """The functions themselves in float64, rounded once to bf16 (RNE, NaN
+    kept with its sign): GELU with erf, exp, 1/x, 1/sqrt(x)."""
+    from math import erf
+
+    op = np.asarray(op, dtype=np.int64)
+    xv = _bf16_to_f32(np.asarray(x, dtype=np.uint16)).astype(np.float64)
+    verf = np.vectorize(erf, otypes=[np.float64])
+    with np.errstate(all="ignore"):
+        fin = np.isfinite(xv)
+        g = np.where(fin, 0.5 * xv * (1.0 + verf(np.where(fin, xv, 0.0) / np.sqrt(2.0))),
+                     np.where(xv > 0, xv, np.where(np.isnan(xv), xv, 0.0)))
+        r = np.choose(op & 3, [g, np.exp(xv), 1.0 / xv, 1.0 / np.sqrt(xv)])
+    return f32_to_bf16_rne(r.astype(np.float32))
+
+
+# ``xlu_reduction_tree``: a pairwise tree, element e of level l combining
+# elements 2e (as ``a``) and 2e+1 (as ``b``) of level l-1.
+
+def bf16_max(a, b):
+    """``xlu_reduction_tree``'s max select: ``bf16_gt(a, b) ? a : b``."""
+    a = np.asarray(a, dtype=np.int64)
+    b = np.asarray(b, dtype=np.int64)
+    return np.where(bf16_gt(a, b), a, b).astype(np.uint16)
+
+
+def reduce_tree_levels(op, leaves):
+    """``[value[0], ..., value[LEVELS]]`` for leaves ``uint16[m, N]`` under a
+    per-row op (0 = SUM, 1 = MAX): every level of the tree, so the root is
+    ``[-1][:, 0]`` and the per-sublane tap is level ``log2(NUM_LANES)``."""
+    v = np.asarray(leaves, dtype=np.uint16)
+    op = np.asarray(op, dtype=np.int64).reshape(-1, 1)
+    levels = [v]
+    while v.shape[1] > 1:
+        a, b = v[:, 0::2], v[:, 1::2]
+        v = np.where(op == 0, vpu_bf16_add(a, b), bf16_max(a, b)).astype(np.uint16)
+        levels.append(v)
+    return levels
+
+
+def _split16(col, n):
+    """``uint64[m, nw]`` packed port -> ``int64[m, n]`` of 16-bit fields."""
+    col = np.asarray(col, dtype=np.uint64)
+    out = np.zeros((len(col), n), dtype=np.int64)
+    for i in range(n):
+        out[:, i] = ((col[:, (16 * i) // 64] >> np.uint64((16 * i) % 64)) & np.uint64(0xFFFF)).astype(np.int64)
+    return out
+
+
+def _join16(fields, nw):
+    """``int64[m, n]`` of 16-bit fields -> packed ``uint64[m, nw]``."""
+    fields = np.asarray(fields, dtype=np.uint64)
+    out = np.zeros((len(fields), nw), dtype=np.uint64)
+    for i in range(fields.shape[1]):
+        out[:, (16 * i) // 64] |= (fields[:, i] & np.uint64(0xFFFF)) << np.uint64((16 * i) % 64)
+    return out
+
+
+def xlu_reduction_tree_trace(cmd, n_leaves, lanes):
+    """``xlu_reduction_tree.sv``: ``1 + 2*LEVELS`` edges to the root, ``1 +
+    2*LANE_LEVELS`` to the per-sublane tap, II=1, the op tag travelling with
+    its wavefront. Rows are ``"post"`` (after edge ``t + 1``).
+
+    The payload is never gated (leaves, both adder stages and the max
+    registers load every cycle), so ``result_o`` row ``t`` is the tree of the
+    data and op driven ``L - 1`` rows earlier on *every* cycle. Defined: the
+    valids on every cycle after the first reset, the results on valid cycles.
+    Other cycles are masked ``no valid`` (the guess is that window function);
+    rows whose window reaches back to or before a reset cycle are ``fill``
+    (the reset clears the adders' ``result_o``, the leaves keep stale data).
+    """
+    n = len(cmd["valid_i"])
+    levels_n = int(np.log2(n_leaves))
+    tap = int(np.log2(lanes))
+    rst = ~_bit(cmd, "rst_ni")
+    valid = _bit(cmd, "valid_i")
+    op = _col(cmd, "op_i")[:, 0].astype(np.int64)
+    data = _split16(_col(cmd, "data_i"), n_leaves)
+    lv = reduce_tree_levels(op, data)
+    sub = n_leaves // lanes
+    nw_lane = (sub * 16 + 63) // 64
+    resp = {
+        "valid_o": np.zeros((n, 1), dtype=np.uint64),
+        "result_o": np.zeros((n, 1), dtype=np.uint64),
+        "lane_valid_o": np.zeros((n, 1), dtype=np.uint64),
+        "lane_result_o": np.zeros((n, nw_lane), dtype=np.uint64),
+    }
+    reason = {p: np.full(n, "", dtype=object) for p in resp}
+    first_rst = np.flatnonzero(rst)
+    first_rst = first_rst[0] if len(first_rst) else n
+    last_rst = np.full(n, -1, dtype=np.int64)  # last reset cycle at or before t
+    r = -1
+    for t in range(n):
+        if rst[t]:
+            r = t
+        last_rst[t] = r
+    for vp, rp, depth, src in (("valid_o", "result_o", 1 + 2 * levels_n, None),
+                               ("lane_valid_o", "lane_result_o", 1 + 2 * tap, tap)):
+        for t in range(n):
+            s = t - (depth - 1)  # the row whose command shows in row t
+            if t < first_rst:
+                reason[vp][t] = reason[rp][t] = "pre-reset"
+                continue
+            # valid_q is reset: rows whose source is at or before the last reset read 0
+            if s < 0 or s <= last_rst[t]:
+                resp[vp][t, 0] = 0
+                reason[rp][t] = "fill"
+                continue
+            resp[vp][t, 0] = int(valid[s])
+            if src is None:
+                resp[rp][t, 0] = int(lv[-1][s, 0])
+            else:
+                resp[rp][t] = _join16(lv[src][s : s + 1], nw_lane)[0]
+            if not valid[s]:
+                reason[rp][t] = "no valid"
+    return resp, reason, {}
+
+
+def xlu_transpose_trace(cmd, lanes=16, sublanes=4):
+    """``xlu_transpose.sv``: a ``lanes x lanes`` tile written whole rows at a
+    time (beat ``q`` writes rows ``4q..4q+3`` from sublanes 0..3) and read
+    through a registered crossing mux: ``read_data_o[s][l] = tile[l][4*idx+s]``
+    one edge after the read (``"post"`` row ``t``), from the tile as it was
+    before cycle ``t``'s write (both happen at edge ``t + 1``). The tile is
+    never reset: a read touching an unwritten element is ``uninit``.
+    ``read_data_q`` loads every cycle, so ``read_data_o`` is defined on
+    ``read_valid_o`` cycles only (``no valid`` otherwise, guess kept).
+    """
+    n = len(cmd["read_valid_i"])
+    nw = (lanes * sublanes * 16 + 63) // 64
+    rst = ~_bit(cmd, "rst_ni")
+    wv, wi = _bit(cmd, "write_valid_i"), _addr(cmd, "write_index_i")
+    rv, ri = _bit(cmd, "read_valid_i"), _addr(cmd, "read_index_i")
+    wd = _split16(_col(cmd, "write_data_i"), lanes * sublanes)  # field s*lanes + l
+    tile = np.zeros((lanes, lanes), dtype=np.int64)
+    known = np.zeros((lanes, lanes), dtype=bool)
+    resp = {"read_valid_o": np.zeros((n, 1), dtype=np.uint64),
+            "read_data_o": np.zeros((n, nw), dtype=np.uint64)}
+    reason = {p: np.full(n, "", dtype=object) for p in resp}
+    seen_rst = False
+    for t in range(n):
+        idx = ri[t]
+        cols = [4 * idx + s for s in range(sublanes)]
+        out = np.zeros(lanes * sublanes, dtype=np.int64)
+        ok = True
+        for s, c in enumerate(cols):
+            out[s * lanes : (s + 1) * lanes] = tile[:, c]
+            ok &= bool(known[:, c].all())
+        resp["read_data_o"][t] = _join16(out.reshape(1, -1), nw)[0]
+        if rst[t]:
+            seen_rst = True
+            resp["read_valid_o"][t, 0] = 0
+        else:
+            resp["read_valid_o"][t, 0] = int(rv[t])
+        if not seen_rst:
+            reason["read_valid_o"][t] = "pre-reset"
+        if not rv[t] or rst[t]:
+            reason["read_data_o"][t] = "no valid"
+        elif not ok:
+            reason["read_data_o"][t] = UNINIT
+        if wv[t]:
+            for s in range(sublanes):
+                tile[4 * wi[t] + s, :] = wd[t, s * lanes : (s + 1) * lanes]
+                known[4 * wi[t] + s, :] = True
+    return resp, reason, {}

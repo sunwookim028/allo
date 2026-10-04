@@ -1,0 +1,78 @@
+# 2026-10-04T01:41:00-04:00 zhang-21, MiniTPU b3ba0a4d4fb69d39091c55f5f00d1f237082a4f1, Verilator 5.052 2026-09-05 rev conda-forge build 
+== sfu: sfu (valid), 462144 vectors, rtl 0.2s
+   LATENCY-OK   declared 5 [vpu_pkg.sv:64 VPU_SFU_LATENCY = 5 (isa_latency.json WB_W_SFU 7 = 5 + VPU_WB_STAGES 2)]; measured: valid_o [5], step probe 5
+   REF-MATCH 462144/462144
+   IEEE-DIFF 278601/462144, by cause:
+         73794  vrecip/vrsqrt PWL truncation, <= 2 ulp  e.g. (0002,0080) ieee 7e80 rtl 7e7f; (0002,0086) ieee 7e75 rtl 7e74
+         57569  vrsqrt(x < 0) = +0x7fc0 (IEEE: NaN, sign differs)  e.g. (0003,8001) ieee ffc0 rtl 7fc0; (0003,8002) ieee ffc0 rtl 7fc0
+         57023  vgelu table step: abs <= 4e-3 (half a 1/128 bin) + 1 ulp of the bf16 entry, or rel <= 1%  e.g. (0000,0080) ieee 0040 rtl 3b00; (0000,0081) ieee 0040 rtl 3b00
+         30687  vexp(x > 0) = 1.0 (unit covers x <= 0 only; clamps silently)  e.g. (0001,3b80) ieee 3f81 rtl 3f80; (0001,3b81) ieee 3f81 rtl 3f80
+         27969  vgelu(x < -8) = 0 (table domain; IEEE a tiny negative)  e.g. (0000,c100) ieee a7b0 rtl 0000; (0000,c101) ieee a762 rtl 0000
+         27856  vexp table step (input quantized to 1/128, bin centre): rel <= 1%  e.g. (0001,8080) ieee 3f80 rtl 3f7f; (0001,8081) ieee 3f80 rtl 3f7f
+           866  NaN in -> +0x7fc0 (IEEE keeps the operand's NaN sign/payload)  e.g. (0000,ff81) ieee ffc0 rtl 7fc0; (0000,ff82) ieee ffc0 rtl 7fc0
+           707  subnormal operand: exponent field 0 read as a normal exponent (recip/rsqrt)  e.g. (0002,0001) ieee 7f80 rtl 7efe; (0002,0002) ieee 7f80 rtl 7efc
+           702  vgelu/vexp subnormal operand -> table centre bin  e.g. (0000,0001) ieee 0000 rtl 3b00; (0000,0002) ieee 0001 rtl 3b00
+           548  vexp(x <= -16) = 0 (table domain [-16, 0); IEEE a tiny normal/subnormal)  e.g. (0001,c180) ieee 33f2 rtl 0000; (0001,c181) ieee 33d5 rtl 0000
+           450  vrecip, |x| in [2^127, 2^128): exponent 253 - 254 wraps to 0xff -> Inf or a NON-canonical NaN pattern (e.g. 0x7fff)  e.g. (0002,7f00) ieee 0040 rtl 7fff; (0002,7f01) ieee 0040 rtl 7ffe
+           423  vrecip, |x| in [2^126, 2^127): exponent field 0 with the fraction bits -> a subnormal pattern worth half (hidden bit lost); IEEE the subnormal 1/x  e.g. (0002,7e80) ieee 0080 rtl 007f; (0002,7e81) ieee 007f rtl 007e
+             7  vrsqrt(+-0) = NaN (IEEE: +-Inf)  e.g. (0003,0000) ieee 7f80 rtl 7fc0; (0003,8000) ieee ff80 rtl 7fc0
+== xlu_reduction_tree:n64: xlu_reduction_tree (trace) params={} defines=[]
+   ok  lane-leak                    legal       28 cyc  defined 60/60 masked 52  seed-diff 0  asserts 0
+   ok  corners                      legal      102 cyc  defined 356/356 masked 52  seed-diff 0  asserts 0
+   ok  mixed-sum-max                legal      426 cyc  defined 1652/1652 masked 52  seed-diff 0  asserts 0
+   ok  reset-mid-stream             legal       86 cyc  defined 268/268 masked 76  seed-diff 0  asserts 0
+   ok  random-0                     legal     6006 cyc  defined 20100/20100 masked 3924  seed-diff 0  asserts 0
+   ok  random-1                     legal     6006 cyc  defined 20101/20101 masked 3923  seed-diff 0  asserts 0
+   ok  random-2                     legal     6006 cyc  defined 20241/20241 masked 3783  seed-diff 0  asserts 0
+   ok  tb_reduce_pipe               legal     1110 cyc  defined 2372/2372 masked 2068  seed-diff 0  asserts 0 TB-REPLAY 2370/2370
+   ok  tb_xlu_lane_tap              legal       91 cyc  defined 186/186 masked 178  seed-diff 0  asserts 0 TB-REPLAY 184/184
+   undefined-slot census (slots, guess matched, moved with seed):
+      lane_result_o      fill                  635  guess      352  seed-moved        0
+      lane_result_o      no valid             6332  guess     6332  seed-moved        0
+      result_o           fill                  900  guess      509  seed-moved        0
+      result_o           no valid             6241  guess     6241  seed-moved        0
+   LATENCY-OK   result_o (data step): declared 13, step probe 13
+   LATENCY-OK   lane_result_o (data step): declared 9, step probe 9
+   LATENCY-OK   valid_o (valid step): declared 13, step probe 13
+   LATENCY-OK   lane_valid_o (valid step): declared 9, step probe 9
+   LATENCY-OK   result_o (op step): declared 13, step probe 13
+   REF-MATCH xlu_reduction_tree:n64 (2.4s)
+== xlu_reduction_tree:n16: xlu_reduction_tree (trace) params={'N': 16} defines=['MINITPU_NUM_LANES=4']
+   ok  lane-leak                    legal       28 cyc  defined 60/60 masked 52  seed-diff 0  asserts 0
+   ok  corners                      legal      102 cyc  defined 356/356 masked 52  seed-diff 0  asserts 0
+   ok  mixed-sum-max                legal      426 cyc  defined 1652/1652 masked 52  seed-diff 0  asserts 0
+   ok  reset-mid-stream             legal       86 cyc  defined 276/276 masked 68  seed-diff 0  asserts 0
+   ok  random-0                     legal    20006 cyc  defined 67252/67252 masked 12772  seed-diff 0  asserts 0
+   ok  random-1                     legal    20006 cyc  defined 67282/67282 masked 12742  seed-diff 0  asserts 0
+   ok  random-2                     legal    20006 cyc  defined 67242/67242 masked 12782  seed-diff 0  asserts 0
+   undefined-slot census (slots, guess matched, moved with seed):
+      lane_result_o      fill                 1318  guess      565  seed-moved        0
+      lane_result_o      no valid            17591  guess    17591  seed-moved        0
+      result_o           fill                 2343  guess     1104  seed-moved        0
+      result_o           no valid            17268  guess    17268  seed-moved        0
+   LATENCY-OK   result_o (data step): declared 9, step probe 9
+   LATENCY-OK   lane_result_o (data step): declared 5, step probe 5
+   LATENCY-OK   valid_o (valid step): declared 9, step probe 9
+   LATENCY-OK   lane_valid_o (valid step): declared 5, step probe 5
+   LATENCY-OK   result_o (op step): declared 9, step probe 9
+   REF-MATCH xlu_reduction_tree:n16 (3.1s)
+== xlu_transpose:t16x4: xlu_transpose (trace) params={} defines=[]
+   ok  tile                         legal       16 cyc  defined 20/20 masked 12  seed-diff 0  asserts 0
+   ok  partial-tile (illegal)       illegal     12 cyc  defined 12/12 masked 12  seed-diff 0  asserts 0
+   ok  write+read same cycle        legal       19 cyc  defined 27/27 masked 11  seed-diff 0  asserts 0
+   ok  reset-keeps-tile             legal       18 cyc  defined 22/22 masked 14  seed-diff 0  asserts 0
+   ok  random-0                     legal    20009 cyc  defined 32005/32005 masked 8013  seed-diff 0  asserts 0
+   ok  random-1                     legal    20009 cyc  defined 31875/31875 masked 8143  seed-diff 0  asserts 0
+   ok  random-2                     legal    20009 cyc  defined 31818/31818 masked 8200  seed-diff 0  asserts 0
+   undefined-slot census (slots, guess matched, moved with seed):
+      read_data_o        no valid            24401  guess    24339  seed-moved       62
+      read_data_o        uninit                  4  guess        0  seed-moved        4
+   LATENCY-OK   read index -> read_data_o: declared 1, step probe 1
+   LATENCY-OK   read_valid_i -> read_valid_o: declared 1, step probe 1
+   LATENCY-OK   write -> read_data_o (visibility + read): declared 2, step probe 2
+   REF-MATCH xlu_transpose:t16x4 (19.5s)
+
+real	0m32.974s
+user	0m31.074s
+sys	0m1.579s
+exit 0

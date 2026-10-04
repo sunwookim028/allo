@@ -1,0 +1,291 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+#########################################################################
+U3 Phase 0: the datapath composites' RTL, references and the MXU contract
+#########################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-04.** zhang-21, branch ``u3-phase0``
+   (from ``u1-pilot`` at ``d1e729b4``). MiniTPU at
+   ``b3ba0a4d4fb69d39091c55f5f00d1f237082a4f1``, read only. Verilator 5.052
+   (conda-forge), g++ 13.3.1 (gcc-toolset-13), numpy 2.4.0. RTL side only: no
+   Allo expression of a U3 unit exists yet; the plan is
+   ``u3_plan_2026-10-04.rst``. The owner is away and authorised U3 in full.
+   Nothing under ``allo/`` or ``mlir/`` changed.
+
+Phase 0 gives each U3 unit an oracle: an ``RtlUnit`` spec, stimulus, and a
+numpy reference held bit-exact against the Verilator-wrapped ``.sv`` on every
+defined slot, with every declared latency measured by a step probe, and
+MiniTPU's own tbs run unchanged as the second check (D-7). For the MXU the
+reference is the **push / commit / pop contract**, not a model of ``mxu.sv``.
+
+Reproduce (``source examples/minitpu/harness/env-zhang21.sh`` first)::
+
+   $ALLO_PYTHON -m examples.minitpu.harness.characterize sfu xlu_reduction_tree xlu_transpose   # ~35 s warm
+   $ALLO_PYTHON -m examples.minitpu.harness.characterize mxu_pe mxu_systolic_array mxu        # ~3 min warm
+
+Outputs: ``u3_phase0_2026-10-04/characterize_xlu_sfu.log``,
+``characterize_mxu.log``; the tbs: ``tbs_xlu_sfu.log``, ``tbs_mxu.log``.
+
+Files:
+
+* ``units/sfu.py``, ``units/xlu_reduction_tree.py``, ``units/xlu_transpose.py``,
+  ``units/mxu_pe.py``, ``units/mxu_systolic_array.py``, ``units/mxu.py``, each
+  with ``VARIANTS = {}``.
+* ``harness/ref.py``, new section "U3: cross-lane and special-function units":
+  ``sfu``, ``ieee_sfu``, ``xlu_reduction_tree_trace``, ``xlu_transpose_trace``.
+* ``harness/ref_mxu.py`` (new): ``PeGrid`` (the PE cycle model, with taints),
+  ``mxu_pe_trace``, ``mxu_systolic_array_trace``, ``mxu_row``, ``mxu_trace``
+  (the contract), ``push_to_valid``, ``switch_span``.
+* ``harness/rtl.py`` and ``characterize.py``: **unchanged**. A ROM unit
+  passes its ``.mem`` paths as absolute ``-G`` string parameters, because the
+  driver does not run inside the clone (``sfu.py``).
+
+Setup note: the bindings copied from ``wt-u1`` hold four symlinks into the
+deleted ``scratch/wt-sync``; in this worktree's build directory they were
+repointed to ``mlir/include/allo/Bindings`` and ``_allo_ops_gen.py`` copied
+from ``wt-d14f`` (same commit, identical ``mlir/include``). ``wt-u1``'s own
+copy is still broken.
+
+Results
+=======
+
+Every instance: **REF-MATCH** on every defined slot, **seed-stable**, every
+probe **LATENCY-OK**, every legal trace fires no assertion. Totals over the
+directed, random and seeded traces:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 26 8 10 14 10 32
+
+   * - unit:instance (geometry)
+     - traces
+     - cycles
+     - defined slots (all match)
+     - masked
+     - notes
+   * - ``sfu`` (``valid`` shape)
+     - --
+     - 462,144 vectors
+     - 462,144
+     - --
+     - every op x every operand, plus 200k with the op changing every cycle
+   * - ``xlu_reduction_tree:n64`` (16 x 4)
+     - 9
+     - 19,861
+     - 65,336
+     - 14,108
+     - ``tb_reduce_pipe`` 2,370/2,370, ``tb_xlu_lane_tap`` 184/184 replayed
+   * - ``xlu_reduction_tree:n16`` (``MINITPU_NUM_LANES=4``)
+     - 7
+     - 60,660
+     - 204,120
+     - 38,520
+     - elaborates and matches (finding 4)
+   * - ``xlu_transpose:t16x4``
+     - 7
+     - 60,092
+     - 95,779
+     - 24,405
+     - no unit-level MiniTPU tb exists
+   * - ``mxu_pe``
+     - 7
+     - 60,090
+     - 360,202
+     - 338
+     - every output, per cycle
+   * - ``mxu_systolic_array:dim2`` / ``dim4`` / ``dim16``
+     - 4 each
+     - 40,136 / 40,220 / 6,738
+     - 79,996 / 79,714 / 12,821
+     - 276 / 726 / 655
+     - random per-cycle stimulus and skewed tiles
+   * - ``mxu:dim2`` / ``dim4`` / ``dim16``
+     - 14 / 13 / 13
+     - 42,115 / 31,071 / 9,924
+     - 151,277 / 111,128 / 33,147
+     - 17,183 / 13,156 / 6,549
+     - 7 legal directed, 3 random legal, 3 illegal programs; ``tb_mxu_single_port`` 85/85 (dim2)
+
+Latency, declared vs measured (step probes)
+-------------------------------------------
+
+.. list-table::
+   :header-rows: 1
+
+   * - unit
+     - port / path
+     - declared (source)
+     - measured
+   * - ``sfu``
+     - ``valid_i`` -> ``valid_o``/``result_o``
+     - 5 (``vpu_pkg.sv:64`` ``VPU_SFU_LATENCY``; ``WB_W_SFU`` 7 = 5 + ``VPU_WB_STAGES`` 2)
+     - 5 (valid) and 5 (probe)
+   * - ``xlu_reduction_tree`` n64 / n16
+     - data, valid, op -> root; data, valid -> tap
+     - 13 / 9 root (``vpu_pkg.sv:65``, = ``1 + 2*LEVELS``); 9 / 5 tap (``:66``, ``1 + 2*LANE_LEVELS``)
+     - 13, 13, 13 / 9, 9, 9; tap 9, 9 / 5, 5
+   * - ``xlu_transpose``
+     - read index -> ``read_data_o``; write -> read
+     - 1 (``vpu_pkg.sv:67`` ``VPU_TXOUT_LATENCY``; ``WB_W_TXOUT`` 3); 2
+     - 1; 2
+   * - ``mxu_pe``
+     - ``psum_i``/``lhs_i`` -> ``psum_o``; commit -> ``psum_o``; forwards
+     - 4 (``vpu_pkg.sv:106`` ``MXU_PE_LATENCY``); 5 = 1 + 4; 1
+     - 4, 4; 5; 1, 1, 1, valid 4
+   * - ``mxu_systolic_array`` DIM d
+     - ``lhs_i[r]`` -> ``result_o``
+     - ``4*(d-r)``, derived
+     - 8, 4 / 16, 4 / 64, 4 (r = 0, d-1)
+   * - ``mxu`` DIM d
+     - push -> ``input_accept_o``; last push of a group -> ``output_valid_o``; pop -> valid
+     - 1; ``2 + d*(PE+1)``, derived (``isa_latency.json`` 85 at 16 = 4 + 82 - 1); 1
+     - 1; 12 / 22 / **82**; 1
+   * - ``mxu`` DIM d
+     - weight-switch span, **by function**
+     - ``(d-1)*PE + (d-1)`` (``mxu.sv`` ``WEIGHT_SWITCH_SPAN``; ``isa_latency.json`` 75)
+     - 5 / 15 / **75**
+
+The span is measured without the assertion: refill the bank of a tile that is
+still switching at offsets around the span, and take the smallest offset from
+which every larger offset leaves the tile exact (the monotone-suffix rule of
+``tb_vpu_latency_probe``). At DIM 16 offsets 71-74 corrupt the tile and 75-77
+do not; ``mxu.sv:259`` fires at exactly 74.
+
+The references
+==============
+
+**``sfu``** (``ref.sfu``). A bit model of ``sfu.sv``: ``fp32_abs_q7`` with
+saturation, the GELU/EXP address fold, ROM lookup, the PWL decode
+(``bias - product[19:11]``, truncated to 7 mantissa bits), the ``rsqrt``
+exponent, and every special case. The two ``.mem`` ROMs and the two 32-entry
+case tables are **data read from the clone** (the tables parsed out of
+``sfu.sv``): a wrong table passes here, and ``tb_sfu_math_sweep`` (which
+computes ``exp``/erf-GELU itself) is the check that covers them. Against the
+exact functions rounded RNE the RTL differs on 278,601 vectors, all
+classified (``characterize_xlu_sfu.log``): PWL truncation <= 2 ulp
+(73,794); ``vrsqrt(x<0)`` is ``+0x7fc0`` (57,569); GELU and EXP table steps
+(57,023, 27,856); ``vexp(x>0) = 1.0`` (30,687); domain clamps (27,969, 548);
+canonical NaN (866); subnormal operands (707, 702); the ``vrecip`` top
+binades (450, 423; finding 1); ``vrsqrt(+-0)`` NaN (7).
+
+**``xlu_reduction_tree``** (``ref.xlu_reduction_tree_trace``). Pairs
+``(2e, 2e+1)`` per level, ``vpu_bf16_add`` (a = left) or the ``bf16_gt`` max
+(ties to ``b``), op per wavefront. The adders' payload is ungated, so the
+result is a function of the inputs ``2*LEVELS + 1`` edges earlier on **every**
+cycle: valids are held every cycle, results on valid cycles, and the "no valid"
+census shows the guess matched every one of its 47,432 slots.
+
+**``xlu_transpose``** (``ref.xlu_transpose_trace``). Whole-row writes;
+registered crossing read ``out[s][l] = tile[l][4*idx + s]``; the tile is
+never reset (a read of an unwritten row is ``uninit``, and all 4 such slots
+moved with the seed).
+
+**``mxu_pe`` and ``mxu_systolic_array``** (``ref_mxu``, cycle models). Every
+register of ``mxu_pe.sv``; the array is a grid of them wired as the ``.sv``
+wires it (row 0's ``psum_in = '0`` with ``psum_valid = lhs_valid``; the
+weight-valid broadcast down each column). Unreset payload carries a taint:
+``uninit`` until known, ``reset fill`` for an adder output whose special-class
+stage was forced by reset while its payload kept flowing -- 21 of the PE's 338
+such slots differ from the data function, so the mask is needed.
+
+**``mxu``: the contract** (``ref_mxu.mxu_trace``). No ``mxu.sv`` register is
+modelled. What a client may rely on:
+
+1. A word pushed in cycle ``p`` is accepted in ``p + 1`` (the input FIFO
+   drains every cycle, so it can never overflow: a full FIFO is also popping).
+2. An RHS word shifts into pending bank ``load_bank``: row 0 takes it, row
+   ``r`` takes row ``r-1``'s, so the first of DIM beats lands in the bottom row.
+3. ``weight_commit_i`` toggles ``load_bank`` and makes the bank just loaded
+   the next tile's; the next LHS word starts that tile, and every activation of
+   the tile is multiplied by that bank as it stood at the tile's start.
+4. Activation ``a`` (lane ``r`` -> row ``r``) gives per lane ``c``
+   ``pack_bf16`` of ``psum_r = acc24_add(a_r * W[r][c], psum_{r-1})``,
+   ``psum_{-1} = +0``, ascending ``r``.
+5. Results gather per lane in groups of ``NUM_SUBLANES`` LHS words, counted
+   globally (a group may straddle a reload); lane ``c``'s group enters its
+   FIFO ``1 + DIM*PE + c`` cycles after its last word is accepted; a full
+   lane FIFO **drops** it (``mxu.sv:44``); ``output_valid_o`` is the AND of
+   lane non-empty; a pop while valid removes one group from every lane, a pop
+   while not valid is ignored.
+6. A refill of a started tile's bank less than the span after the start
+   breaks that tile (masked ``bank overwrite``).
+
+Programs are laid out as the stream and pop engines lay them out (a load is
+DIM rows back to back with the commit in the cycle the last is accepted; a
+push is 4 rows back to back; a pop either fires once where valid, or is held
+from before valid as a waiting ``vmatpop``), and legal ones keep the switch
+span and the 16-group capacity. Directed: ``identity`` (the tb's scenario),
+``banks-at-span`` (a refill at exactly the span), ``fifo-full-exact``,
+``waiting-pops``, ``group-straddles-load``, ``push-before-load`` (zero
+weights after reset), ``reset-mid-stream``; illegal: ``overflow`` (the 17th
+group dropped on every lane, DIM ``vpu_fifo`` overflow assertions, the
+reference's drop model exact), ``bank-overwrite`` (one assertion; the tile's
+slot masked, and the reference's clean guess **does not** match: the
+corruption is real), ``commit-early`` (the last RHS row goes to the other
+bank: defined, and silent at the ``mxu`` boundary -- only the stream engine
+asserts it).
+
+Second check: MiniTPU's tbs, unchanged
+======================================
+
+Built out of the clone into ``scratch/u3p0_tbs/``, run with the clone as
+working directory: ``tb_sfu_equiv`` (229,377 cases), ``tb_sfu_math_sweep``,
+``tb_sfu_direct_lut``, ``tb_xlu_lane_tap``, ``tb_reduce_pipe``,
+``tb_mxu_single_port``, ``tb_acc24_special_pipe``, and the vpu-level
+``tb_matrix_full_vreg``, ``tb_matrix_command_ii`` (result latency 85),
+``tb_matrix_weight_pipelining`` (span 75), ``tb_matrix_weight_banks``: all
+**PASS**. Seeds: ``tb_reduce_pipe`` and ``tb_xlu_lane_tap`` into
+``xlu_reduction_tree:n64``, ``tb_mxu_single_port`` into ``mxu:dim2``, all
+TB-REPLAY equal.
+
+Findings
+========
+
+1. **MiniTPU, ``vrecip`` on the top binades** (FYI, P-10). For
+   ``|x|`` in ``[2^127, 2^128)`` the exponent ``253 - 254`` wraps to ``0xff``:
+   Inf or a **non-canonical NaN** pattern (``0x7f00`` -> ``0x7fff``), against
+   ``ARITHMETIC.md`` §6 ("every unit emits the same canonical NaN"). For
+   ``[2^126, 2^127)`` the result has exponent 0 and loses its hidden bit (worth
+   half).
+2. **MiniTPU, no subnormal flush in the SFU**, unlike both multipliers:
+   ``vrecip(0x0001) = 0x7efe`` (IEEE: Inf); GELU/EXP send a subnormal to the
+   centre bin.
+3. ``vrsqrt(+-0)`` is NaN (documented, ``x <= 0``; IEEE ``+-Inf``).
+4. **MiniTPU elaborates and is bit-exact at N = 16** (``xlu_reduction_tree``,
+   ``MINITPU_NUM_LANES=4``), though ``UNITS.md`` §1 says no geometry but 16x4
+   was ever built; its tree tbs are **not** geometry-generic
+   (``tb_reduce_pipe.sv:157`` hard-codes ``16'h4280``; ``tb_xlu_lane_tap``
+   assumes 16 lanes per sublane), so they fail there while the RTL is right.
+5. **Payload is unreset throughout U3** (tree, SFU stages, transpose tile,
+   PE payload and the adder's): outputs on non-valid cycles follow the data.
+   This is D-14's ``reset=False`` on every payload register (plan P-9).
+6. **The MXU contract needs no internal register and one derived constant**,
+   ``push -> valid = 2 + DIM*(MXU_PE_LATENCY + 1)``, reconciled with
+   ``isa_latency.json``'s 85 (4 stream rows + 82 - 1). The array alone has no
+   matrix contract (the skew is ``mxu.sv``'s), which is what makes a
+   Stream-linked Allo array acceptable at ``mxu`` level (plan P-2).
+7. **The weight-switch span is exact**, by function and by assertion
+   (5 / 15 / 75): a refill one cycle early corrupts exactly the last PE.
+8. **Method: random data hides a one-PE corruption.** The first span probe
+   read 74 at DIM 16 with random weights: one wrong weight of 256 rounded away
+   in the bf16 pack. A probe of a contract that can fail in one PE needs data
+   built so that PE decides the output.
+9. The output FIFO's **drop** (u3_fifo_composed M5) is reproduced at the
+   ``mxu`` boundary: the 17th unpopped group is lost on every lane, with one
+   ``vpu_fifo`` assertion per lane, and the contract reference predicts it.
+10. ``commit-early`` is silent at the ``mxu`` boundary (only
+    ``mxu_stream_engine.sv:99`` asserts the commit/last-row relation): a
+    contract an Allo ``mxu`` unit must state, since nothing below checks it.
+
+Not done in Phase 0
+===================
+
+* No Allo expression (plan Wave 1).
+* ``sfu_group`` (``LANES`` copies sharing valid/op) not characterised alone.
+* ``mxu`` with a non-default ``NUM_SUBLANES`` or output depth.
+* MiniTPU's ``run_verilator_unit_suite.sh`` and bundle suite not run as
+  scripts (they build inside the read-only clone); their U3 tbs were built
+  unchanged out of it.
