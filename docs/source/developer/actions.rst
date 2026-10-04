@@ -268,10 +268,15 @@ What composition checks (``tests/test_compose_engines.py``):
   the reference evaluated with it (``Engine.dot(A, W, order)``). At bf16 the
   two orders differ on 74 of 8,192 outputs at DIM 16 on random data, so a
   swap that changes the order is a different function, never "the same MXU".
-* **Directives.** ``Architecture.directives`` applies, after each unit's own,
-  the directives of every engine the unit binds (``ctx.unit``,
-  ``ctx.engine`` name the binding). C10's ``leading_zeros19`` unroll now
-  travels with the bf16 engine and no region schedule names it.
+* **Directives** (README D-18). ``Architecture.directives`` applies, after
+  each unit's own, the directives of every engine the unit binds -- once
+  per distinct engine, since the loop they name sits in one ``func.func``
+  shared by every caller (``ctx.unit``, ``ctx.engine`` name the first
+  binding). C10's ``leading_zeros19`` unroll now travels with the bf16
+  engine and no region schedule names it. An engine's directive must name
+  ``<function>:<loop>`` of a function the module holds as its own
+  ``func.func``; one naming an absent function, or one marked to be inlined
+  (``s.inline``), is refused naming the function, never dropped.
 
 The latencies are bookings: what a composite's timing is derived from
 (``legality.py``), never a constant a body consumes; what a backend built is

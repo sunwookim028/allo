@@ -1547,16 +1547,67 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
         return structure(self, name)
 
     def directives(self, s):
-        """Apply every unit's Vitis directives to a built schedule, then, for
-        every unit binding an engine, the engine's (README D-15), with
-        ``ctx.unit`` and ``ctx.engine`` naming the binding."""
+        """Apply every unit's Vitis directives to a built schedule; after each
+        unit's own, the directives of every engine the unit binds (README
+        D-15, D-18), ONCE per distinct engine: an engine's directive names a
+        loop of one of its functions, which the front end builds as one
+        ``func.func`` shared by every caller (``leading_zeros19:offset``), so
+        one application covers every unit binding it. ``ctx.unit`` and
+        ``ctx.engine`` name the first binding. A directive naming a function
+        the module does not hold as its own ``func.func`` (absent, or marked
+        to be inlined) is refused naming the function, never dropped (D-1)."""
         ctx = Directives(top=s.top_func_name, parameters=self.parameters)
+        applied = set()
         for u in self.units:
             if u.directives is not None:
                 u.directives(s, ctx)
             for slot in sorted(u.engine_slots):
                 eng = self.engines[slot]
-                if eng.directives is not None:
-                    eng.directives(s, Directives(top=ctx.top, parameters=ctx.parameters,
-                                                 unit=u.name, engine=slot))
+                if eng.directives is None or id(eng) in applied:
+                    continue
+                applied.add(id(eng))
+                eng.directives(_CarriedSchedule(s, eng.name),
+                               Directives(top=ctx.top, parameters=ctx.parameters,
+                                          unit=u.name, engine=slot))
         return s
+
+
+class _CarriedSchedule:
+    """The schedule an engine's directives see (README D-18): every
+    primitive is the schedule's own, but a loop or array it names must sit
+    in a function the module holds as its own ``func.func`` -- a carried
+    directive names the function that needs it, never the region's top or
+    an inlined helper, whose loops would vanish with the inlining."""
+
+    def __init__(self, s, engine):
+        self._s = s
+        self._engine = engine
+
+    def _function(self, target):
+        where = f"engine {self._engine}: directive on {target!r}"
+        assert ":" in target, (
+            f"{where} names no function; a carried directive names the "
+            f"function whose loop it schedules, '<function>:<loop>' (README D-18)")
+        fname = target.split(":", 1)[0]
+        func = self._s._find_function(fname, error=False)
+        assert func is not None, (
+            f"{where}: function {fname!r} is not a func.func of this module "
+            f"(the front end inlined it, or nothing calls it); a directive on "
+            f"an inlined function is refused, not dropped (README D-18, D-1)")
+        assert "inline" not in func.attributes, (
+            f"{where}: function {fname!r} is marked to be inlined, so its "
+            f"loops vanish into every caller; a directive on an inlined "
+            f"function is refused, not dropped (README D-18, D-1)")
+
+    def __getattr__(self, attr):
+        prim = getattr(self._s, attr)
+        if not callable(prim):
+            return prim
+
+        def carried(*args, **kwargs):
+            for a in list(args) + list(kwargs.values()):
+                if isinstance(a, str):
+                    self._function(a)
+            return prim(*args, **kwargs)
+
+        return carried

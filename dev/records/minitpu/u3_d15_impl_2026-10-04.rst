@@ -68,9 +68,10 @@ P2. **Who declares the order.** An engine record and an engine unit declare
 P3. **Type-to-channel check** reads ``x: T = ch.get()`` and ``ch.put(x)``
     with ``x`` annotated, and fires only when ``T`` names an engine slot;
     every other channel is left as before (TinyTPU's emission unchanged).
-P4. **Directives run once per binding unit.** Two units binding the bf16
-    engine unroll ``leading_zeros19:offset`` twice; the second is accepted
-    (measured). Superseded by D-18 if it lands (once per distinct engine).
+P4. **Directives ran once per binding unit** at the D-15 commit. Two units
+    binding the bf16 engine unrolled ``leading_zeros19:offset`` twice; the
+    second was accepted (measured). Superseded by D-18 below (once per
+    distinct engine).
 P5. **Track B's ``mxu_pe_unit.py`` / ``mxu_unit.py`` are not migrated:**
     they have no engine slot (the bf16 MAC is written inline, line for line
     against ``mxu_pe.sv``). Binding them to an engine is a source change of
@@ -181,3 +182,26 @@ Migration
 ``template/instantiate.py`` is deleted; ``mac_pe.pe_rig_two``,
 ``matrix_engine.mxu_rig`` and ``optional.assemble`` use ``compose.Instance``
 (``pe_rig_two`` binds per unit only the names that unit takes).
+
+D-18: what landed
+=================
+
+``Architecture.directives`` runs, after each unit's own directives, the
+directives of every engine the unit binds, **once per distinct engine**
+(record §3 option B): the loop an engine's directive names sits in one
+``func.func`` shared by every caller, so one application covers every unit
+binding it. ``ctx.unit``/``ctx.engine`` name the first binding. The engine's
+directive sees the schedule through ``_CarriedSchedule``, which checks every
+target it names: ``<function>:<loop>`` of a function the module holds as its
+own ``func.func`` and not marked ``inline``. A target with no function, an
+absent function (inlined by the front end, or never called), and a function
+marked to be inlined are refused naming the function (D-1: refused, not
+dropped).
+
+Measured (``tests/test_compose_directives.py``): ``pe_rig`` at bf16, no
+region schedule: before ``directives`` the MLIR holds one ``loop_name =
+"offset"`` with no ``unroll``, after it the same one loop with ``unroll =
+0``. ``pe_rig_two`` with the bf16 engine bound to both PEs (six units bind
+it): the directive runs once, from ``pe_feed_a``. The front-end form (a
+schedule attribute on the function) and the SystemC emitter's handling of
+carried directives (D-18 third bullet) are not part of this change.
