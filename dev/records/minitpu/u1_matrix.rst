@@ -249,6 +249,24 @@ has no latency, so a composed tree's adder latency is a trusted parameter
   ``ccs_fpga`` never used; the large VMEM's area is not an ASIC number until
   a macro path exists.
 
+**U3 track B landed** (``u3_track_b_2026-10-04.rst``, branch ``u3-mxu``): PE as
+one kernel (P1) and as a ``compose.unit`` with stream ports (P2) both match
+the cycle model 360k/360k on simulator and csim; the systolic array as a
+``mapping=[D,D]`` grid of the PE unit over Streams matches per cycle at DIM
+2/4 (both) and 16 (simulator, 256 kernels); the composed MXU (front with skew
+lines, grid, back with gather/``pack_bf16``/lane rings/pop) is contract-exact
+at DIM 2/4 (both) and 16 (simulator) on legal, illegal (overflow drop, bank
+overwrite, early commit) and random programs. Provisional P-11: a
+Stream-linked composition is judged in *token time* on the untimed backends,
+so cycle questions (H7) belong to track C. **Measured semantic mismatch**:
+Stream FIFOs polled with ``try_put``/``empty()`` cannot be held to a cycle
+(simulator: the pop engine never sees a group; csim: valid rises at 92 vs
+19), so M1 uses explicit rings for the per-cycle verdict (P-12).
+Findings: **compose bug** -- ``Unit.check`` reports a nested helper ``def``
+and its params as undeclared free names; unit bodies need lazy annotations
+(doc gap); ``Architecture._check`` refuses a dangling channel (H15 on this
+path). Tracks C and D now take B's units.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
