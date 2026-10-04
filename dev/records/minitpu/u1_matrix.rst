@@ -428,6 +428,31 @@ of depth READ_LATENCY+1; latencies now count issue cycles; arithmetic and
 ``isa_latency.json`` unchanged. Our pin (D-16) unaffected; E03 becomes a
 declared variant after U5 (``en_i`` as a declared port on those units).
 
+**Session handoff, 2026-10-04 (session ``allo-minitpu`` ending at its limit).**
+State: ``main`` = ``9b33ee03`` (ladder through U3 wave 1, D-12..D-20 decided,
+D-12/D-14/B3 code). ``u1-pilot`` = ``8ceb3011`` = main + ``compose-engines``
+(D-15..D-20 in ``allo/compose.py``) + ``asic-memories`` (``impl=`` lowerings,
+``Sram``) + tracks C/D records; Python-only beyond main (no ``mlir/``
+change), so **not yet regressed for main as a whole**. In flight on their
+branches: ``core-fixes-3`` (A3/A5/E1/E2-E5, worktree ``wt-fix3`` +
+``fix3_base``), a Sonnet regression of the compose tip (``wt-reg4``, base
+``wt-reg4-base``; it does not cover ``asic-memories``), ``asic-memories-2``
+(banked 4,096-word VMEM; a 1R1W macro for II=1; ``wt-asicmem2``).
+Next session, in order: (1) read this file's checkpoints 11-18 and the
+records they cite; (2) when ``core-fixes-3`` and ``reg4`` report, merge the
+fix batch into ``u1-pilot``, run ONE regression of ``u1-pilot`` vs ``main``
+(the usual: emission hashes, gates, test-set diff) and fast-forward ``main``
+(the owner's mandate covers it); (3) merge ``asic-memories-2`` when it
+lands; (4) U4 (control: sequencer, DMA) Phase 0 against ``b3ba0a4d`` (D-16),
+using D-12 ports for VMEM's DMA side and the SRAM path; (5) the queued
+front-end work: ``@df.unit`` type parameters (D-17), the schedule attribute
+(D-18), the SystemC half of D-18, E03 as a declared variant after U5.
+Open with the owner: push RTLGen's ``bits`` SV through DC for comparable ASIC
+numbers (asked, unanswered). Coordination: ``minitpu-comp`` will send the
+``versions`` commit; the manifest -> ``isa_*.json`` schema is agreed in
+principle. Worktrees not in flight are removed; ``wt-u1`` is the integrator
+and has its own build at ``8ceb3011``.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
