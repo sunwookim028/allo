@@ -116,10 +116,10 @@ many masked slots matched anyway.
      - 111,067 (13 traces, 31,071 cycles)
      - 13,217 masked = 13,115 no valid + 98 bank overwrite + 4 before reset (13,162); build 16 s / 9 s, run 5 s / 30 s
    * - ``mxu:dim16`` / ``lockstep``
-     - MXU16_SIM
+     - **match**
      - not run (P-4)
-     - MXU16_SLOTS
-     - MXU16_NOTE
+     - 33,063 (13 traces, 9,924 cycles)
+     - 6,633 masked = 6,508 no valid + 121 bank overwrite + 4 before reset (6,507); **build 367 s, run 205 s**
 
 Hypotheses (plan section 4): **H6** holds on both columns (P1 bit-exact per
 cycle; the simulator and csim are function-only columns, latency unchecked
@@ -265,6 +265,57 @@ Findings
    Making the Stream form deterministic on the simulator would need a
    per-cycle handshake token between the gather and the pop kernel (a
    "cycle" the simulator does not have) and a head register per lane.
+
+   **Measured** (``repros/probe_streams_fifo.py`` with
+   ``repros/mxu_streams_units.py``: the same front and grid, a gather that
+   ``try_put``\ s each finished group into ``laneq[c]: Stream[UInt(64), 16]``,
+   a pop engine that polls ``empty()`` and ``get``\ s on a pop; DIM 2, five
+   programs; ``probe_streams_fifo.log``):
+
+   .. list-table::
+      :header-rows: 1
+      :widths: 14 18 22 22 24
+
+      * - program
+        - pops (RTL)
+        - simulator: pops delivered / first valid
+        - csim: pops delivered / first valid (RTL 19)
+        - drops (reference)
+      * - identity
+        - 1
+        - 0 / never
+        - 0 / never
+        - 0 / 0 (0)
+      * - fifo-full-exact
+        - 16
+        - 0 / never
+        - 1 / 92
+        - 0 / 0 (0)
+      * - waiting-pops
+        - 4
+        - 0 / never
+        - 0 / never
+        - 0 / 0 (0)
+      * - overflow
+        - 16
+        - 0 / never
+        - 2 / 92
+        - sim 2 / csim 0 (2)
+      * - random-0
+        - 2,423
+        - 0 / never
+        - 943 / 96
+        - sim 4,814 / csim 2,924 (0)
+
+   On the simulator the pop engine ran all its iterations before the gather
+   pushed anything (``empty()`` was 1 at every poll), so no pop ever fired
+   and the lanes then overflowed; the two ``overflow`` drops agree with the
+   reference only because nothing was popped either way. In csim the pop
+   engine's iteration ``t`` runs some 70 clocks ahead of the gather's: the
+   first group is seen at 92, a pop fires only where the program happens to
+   hold ``output_pop_i`` long enough, and every group popped is the right
+   one in order (943/943) -- the *contract* data is intact, the *cycle* is
+   gone, as the FIFO record found for one FIFO.
 4. **Scale (simulator)**: build and run times are in the table and logs;
    the simulator builds the 256-kernel array in 346 s and runs 6,738 cycles in 92 s (DIM 4: 16.5 s / 4.3 s), csim at DIM 4 in 8 s / 35 s. Linear in PE count for the build, so the shipped geometry is a once-per-variant run (P-4), not a gate.
 5. **``Architecture._check`` refuses a dangling channel** -- composing the
