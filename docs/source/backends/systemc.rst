@@ -276,11 +276,18 @@ stores to unreset storage:
   (address, data, and the conditions of the ``if``\ s they sit under). The thread
   drops them and whatever only they needed. ``dont_initialize()`` (csim only) keeps
   the method from running once at time 0, which the flop never does.
-- **``run.tcl`` gets ``directive set -RESET_CLEARS_ALL_REGS no``** whenever the
-  emitted code holds unreset storage (the ``// allo unreset storage:`` marker).
-  Without it Catapult adds a reset to every register, the storage included (F3
-  form c). With it, a register is reset only when a reset action sets it: the
-  kernel's FSM and ``done`` flag still are.
+- **``run.tcl`` gets ``directive set /<top>/<kernel>/wr -RESET_CLEARS_ALL_REGS
+  no``** after ``go compile``, one line per kernel that holds unreset storage (the
+  ``// allo unreset storage:`` marker; ``/<kernel>/wr`` when the kernel is the
+  ``synth_top``). Without it Catapult adds a reset to every register, the storage
+  included (F3 form c). The directive admits a process as its object (``Allowed
+  Object: Solution,Design,Process``), and it is set on the write method alone: the
+  design-wide form ``directive set -RESET_CLEARS_ALL_REGS no`` also dropped the
+  reset of a register inside the same kernel's *thread* (an ``if (we)`` data
+  register, which the C semantics do not require to be reset), where the scoped
+  form leaves the thread's RTL byte-identical to a build with no directive.
+  Reset ``@ Stateful`` storage, the kernel's FSM and ``done`` are reset either way
+  (``dev/records/minitpu/u2_d14_followups_2026-10-04.rst``).
 - **The rule** (refused at build, naming the storage: ``unreset storage `mem`
   (rf_0): ...``). ``wr`` runs at *every* clock edge -- under reset, before the
   kernel's first iteration and after its last -- so it may compute only what is a

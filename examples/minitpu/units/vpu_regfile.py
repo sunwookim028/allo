@@ -66,8 +66,8 @@ Catapult RTL a cycle is whatever the schedule makes of an iteration, which
 ``comb_unreset`` (README D-14)
     ``comb`` with ``mem @ Stateful(reset=False)``: the storage is not reset,
     as MiniTPU's is not. The emitter writes it from a clock-edge ``SC_METHOD``
-    with no reset action, and ``run.tcl`` sets ``-RESET_CLEARS_ALL_REGS no``.
-    SystemC only. ``dev/records/minitpu/u2_unreset_impl_2026-10-02.rst``.
+    with no reset action, and ``run.tcl`` sets ``-RESET_CLEARS_ALL_REGS no`` on
+    that process. SystemC only. ``dev/records/minitpu/u2_unreset_impl_2026-10-02.rst``.
 ``trace_raw``
     ``trace`` as first written (no workarounds); evidence only.
 
@@ -712,7 +712,9 @@ def comb_unreset(n, w=16):
     """D-14: ``comb`` with ``mem`` declared ``@ Stateful(reset=False)``: the
     storage survives reset, as MiniTPU's does (``rst_ni`` unused). The SystemC
     emitter moves the write to a clock-edge ``SC_METHOD`` with no reset action
-    and ``run.tcl`` gets ``-RESET_CLEARS_ALL_REGS no``. The body is ``comb``'s."""
+    and ``run.tcl`` gets ``-RESET_CLEARS_ALL_REGS no`` on that process (the
+    design-wide form also dropped a thread register's reset). The body is
+    ``comb``'s."""
     W = UInt(w)
 
     @df.region()

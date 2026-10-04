@@ -2706,8 +2706,10 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
     statefulGlobals.push_back(g);
   });
   for (auto &g : statefulGlobals) {
-    auto at = llvm::cast<ShapedType>(g.getType());
+    // The sign first: fixUnsignedType retypes the global (i16 -> ui16), so a
+    // type read before it declared a `UInt` member signed (int16_t).
     fixUnsignedType(g, g->hasAttr("unsigned"));
+    auto at = llvm::cast<ShapedType>(g.getType());
     // `s.partition(.., Complete)` on the Stateful: registers, spelled for
     // Catapult as hls_resource [Register] before the member (the pragma
     // emitArrayDirectivesPreheader writes for a partitioned local array).
@@ -2961,8 +2963,8 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
       state.encounteredError = true;
       return;
     }
-    auto at = llvm::cast<ShapedType>(g.getType());
     fixUnsignedType(g, g->hasAttr("unsigned"));
+    auto at = llvm::cast<ShapedType>(g.getType());
     // The frontend only allows a single scalar initialiser (`x: T[N] @ Stateful = 0`),
     // so the attribute is a splat and one loop nest resets the whole array. Emitting an
     // assignment per element instead would put thousands of statements in the reset
@@ -5464,13 +5466,21 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
     // reloads them in __allo_state_resume when ALLO_STATE_RESUME is set). Done
     // here, after the run is quiescent, not at the end of each thread's pass: a
     // stream sink's sc_stop() can land before a producer's thread reaches the
-    // end of its body.
+    // end of its body. Guarded: the members exist only outside __SYNTHESIS__,
+    // and Catapult parses sc_main too (CRD-135 "class has no member
+    // __allo_state_save" aborted `go analyze` of every @ Stateful design).
+    bool anySaved = false;
     for (auto &ki : kernelInsts)
       if (statefulKernels.count(ki.second)) {
+        if (!anySaved)
+          os << "#ifndef __SYNTHESIS__\n";
+        anySaved = true;
         indent();
         os << "{ std::ofstream _f(\"allo_state_" << ki.first << ".data\"); t.dut."
            << ki.first << ".__allo_state_save(_f); }\n";
       }
+    if (anySaved)
+      os << "#endif\n";
     indent(); os << "return 0;\n";
     reduceIndent();
     os << "}\n";

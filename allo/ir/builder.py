@@ -198,6 +198,8 @@ class ASTTransformer(ASTBuilder):
             FlatSymbolRefAttr.get(global_name),
             ip=ip,
         )
+        if global_name in getattr(ctx, "stateful_unsigned", ()):
+            get_global_op.attributes["unsigned"] = UnitAttr.get()
         ctx.global_op_cache[global_name] = get_global_op
         return get_global_op
 
@@ -2004,6 +2006,17 @@ class ASTTransformer(ASTBuilder):
                     ip=InsertionPoint(ctx.top_func),
                 )
                 global_op.attributes["static"] = UnitAttr.get()
+                # The global's element type is signless (i16): the sign of a
+                # ``UInt`` is carried as an ``unsigned`` attribute on the
+                # global and on each ``get_global`` (``stateful_unsigned``
+                # holds the symbols), as on a local alloc. Without it every
+                # emitter declared ``UInt`` ``Stateful`` storage signed
+                # (ac_int<16, true>, int16_t).
+                if isinstance(dtype, UInt):
+                    global_op.attributes["unsigned"] = UnitAttr.get()
+                    if not hasattr(ctx, "stateful_unsigned"):
+                        ctx.stateful_unsigned = set()
+                    ctx.stateful_unsigned.add(global_name)
                 # README D-14: storage declared ``Stateful(reset=False)``. The
                 # SystemC emitter reads this attribute; every other backend
                 # refuses it (allo/backend/hls.py); the simulator ignores it.
@@ -2025,6 +2038,8 @@ class ASTTransformer(ASTBuilder):
                 FlatSymbolRefAttr.get(global_name),
                 ip=ctx.get_ip(),
             )
+            if global_name in getattr(ctx, "stateful_unsigned", ()):
+                get_global_op.attributes["unsigned"] = UnitAttr.get()
             # the variable's name, so `s.partition("k:mem")` finds it (`name`
             # is the symbol attribute of memref.get_global itself)
             get_global_op.attributes["stateful_name"] = StringAttr.get(

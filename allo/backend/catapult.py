@@ -358,6 +358,35 @@ def resolve_ppa_testbench(configs):
     return tb
 
 
+def unreset_directives(kernels, top, design_top):
+    """``run.tcl`` lines for unreset storage (README D-14), one per kernel.
+
+    ``kernels`` are the SC_MODULEs holding ``@ Stateful(reset=False)`` storage
+    (``unreset_storage_in``); each writes it from a clock-edge ``SC_METHOD``
+    ``wr`` with no reset action. Without a directive Catapult resets every
+    register it builds, that storage included (u2_comb_wire_impl_2026-10-02.rst
+    F3 form c: ``if ( rst ) mem_k <= 0``). ``RESET_CLEARS_ALL_REGS`` admits a
+    process as its object, so it is set ``no`` on ``wr`` alone, after ``go
+    compile`` (the process exists from then; the directive's last state is
+    ``schedule``). The design-wide form also dropped the reset of a register in
+    the same kernel's thread (u2_d14_followups_2026-10-04.rst, A1); scoped,
+    the thread's RTL is byte-identical to a build with no directive. Catapult
+    resolves a block by its module name below the region top (``/top/rf_0/wr``),
+    or as the top itself (``/rf_0/wr``) when it is ``synth_top``; a kernel
+    outside the synthesized design gets no line.
+    """
+    out = ""
+    for k in kernels or ():
+        if design_top == k:
+            path = f"/{k}/wr"
+        elif design_top == top:
+            path = f"/{top}/{k}/wr"
+        else:
+            continue
+        out += f"directive set {path} -RESET_CLEARS_ALL_REGS no\n"
+    return out
+
+
 def codegen_tcl(top, configs):
     """Generate TCL script for Catapult HLS synthesis.
 
@@ -509,13 +538,6 @@ solution file add "$sfd/kernel.cpp" -type C++
 # Set top-level design function
 directive set -DESIGN_HIERARCHY {design_top}
 """
-    # README D-14: the design holds unreset storage (`@ Stateful(reset=False)`),
-    # written by a clock-edge SC_METHOD with no reset action. Without this
-    # Catapult resets every register it builds -- including that storage
-    # (u2_comb_wire_impl_2026-10-02.rst F3 form c: `if ( rst ) mem_k <= 0`).
-    # With it, a register is reset only when the reset action sets it.
-    if configs.get("unreset_storage"):
-        out_str += "directive set -RESET_CLEARS_ALL_REGS no\n"
     out_str += f"""
 # Set clock constraints
 directive set -CLOCKS {{clk {{-CLOCK_PERIOD {clock_period_str}}}}}
@@ -560,6 +582,7 @@ go analyze
         out_str += "\n"
 
     out_str += "go compile\n"
+    out_str += unreset_directives(configs.get("unreset_storage"), top, design_top)
 
 
     if mode == "csim":
