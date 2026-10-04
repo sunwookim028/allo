@@ -93,5 +93,81 @@ def test_helper_constant_csim(which):
     np.testing.assert_array_equal(r, want)
 
 
+def look(i: int32, rom: int32[64]) -> int32:
+    return rom[i]
+
+
+def look_twice(i: int32, rom: int32[64]) -> int32:
+    return look(i, rom) + look(i + 1, rom)
+
+
+def bump(i: int32, buf: int32[64]) -> int32:
+    buf[i] = buf[i] + 1
+    return buf[i]
+
+
+def _passed_region():
+    """A4: the kernel's constant table passed down to helpers (two deep)."""
+
+    @df.region()
+    def top(X: int32[N], R: int32[N]):
+        @df.kernel(mapping=[1], args=[X, R])
+        def k(x: int32[N], r: int32[N]):
+            rom: int32[64] = ROM
+            for i in range(N):
+                r[i] = look_twice(x[i], rom)
+
+    return top
+
+
+def _written_region():
+    @df.region()
+    def top(X: int32[N], R: int32[N]):
+        @df.kernel(mapping=[1], args=[X, R])
+        def k(x: int32[N], r: int32[N]):
+            buf: int32[64] = 0
+            for i in range(N):
+                r[i] = bump(x[i], buf)
+
+    return top
+
+
+def _signature(code, name):
+    m = re.search(r"void " + name + r"\(([^)]*)\)", code)
+    assert m, f"{name} not emitted"
+    return " ".join(m.group(1).split())
+
+
+def test_read_only_array_param_is_const():
+    code = df.customize(_passed_region()).build(target="systemc").hls_code
+    assert "const int32_t v1[64]" in _signature(code, "look")
+    assert "const int32_t" in _signature(code, "look_twice")
+
+
+def test_written_array_param_stays_mutable():
+    code = df.customize(_written_region()).build(target="systemc").hls_code
+    assert "const" not in _signature(code, "bump")
+
+
+def test_vitis_signature_unchanged():
+    code = str(df.customize(_passed_region()).build(target="vhls"))
+    assert "const" not in _signature(code, "look")
+
+
+@needs_csim
+@pytest.mark.parametrize("which", ["passed", "written"])
+def test_array_param_csim(which):
+    x = _inputs()
+    r = np.zeros(N, dtype=np.int32)
+    region = _passed_region() if which == "passed" else _written_region()
+    with tempfile.TemporaryDirectory() as tmp:
+        df.build(region, target="systemc", mode="csim", project=tmp)(x, r)
+    if which == "passed":
+        want = ROM[x] + ROM[x + 1]
+    else:
+        want = np.ones(N, dtype=np.int32)  # distinct indices, each bumped once
+    np.testing.assert_array_equal(r, want)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-q"])

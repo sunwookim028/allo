@@ -30,6 +30,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Tools/mlir-translate/Translation.h"
 #include "llvm/Support/raw_ostream.h"
+#include <set>
 #include <cstdlib> // std::atoi (wideIntWidth)
 
 using namespace mlir;
@@ -474,6 +475,12 @@ private:
   static bool isBakedConstGlobal(memref::GlobalOp g);
   void emitStaticConstGlobal(memref::GlobalOp g);
   llvm::StringSet<> fileScopeConsts;
+  // A4: a helper's array parameter that the helper only reads (loads, or
+  // passes on to a helper parameter that is itself read-only) is emitted
+  // `const`, so a kernel's `static const` table can be passed to it.
+  bool isConstArrayParam(func::FuncOp func, unsigned argIdx) override;
+  bool readOnlyArrayArg(func::FuncOp func, unsigned argIdx,
+                        std::set<std::pair<Operation *, unsigned>> &visiting);
   // One element of a dense initializer, as a C++ literal. Mirrors the base emitGlobal's
   // per-element formatting, which is only reachable there inside a full `= {...}` brace
   // list -- a reset action needs the values one at a time.
@@ -4430,6 +4437,56 @@ void SystemCModuleEmitter::emitTopModule(func::FuncOp func) {  // new (SystemC-o
 //===----------------------------------------------------------------------===//
 // emitModule — header + dispatch each func to kernel/top emission.
 //===----------------------------------------------------------------------===//
+
+bool SystemCModuleEmitter::isConstArrayParam(func::FuncOp func,
+                                             unsigned argIdx) {
+  if (func->hasAttr("top") || func->hasAttr("df.kernel") ||
+      func->hasAttr("dataflow"))
+    return false;
+  std::set<std::pair<Operation *, unsigned>> visiting;
+  return readOnlyArrayArg(func, argIdx, visiting);
+}
+
+bool SystemCModuleEmitter::readOnlyArrayArg(
+    func::FuncOp func, unsigned argIdx,
+    std::set<std::pair<Operation *, unsigned>> &visiting) {
+  if (func.isExternal() || argIdx >= func.getNumArguments())
+    return false;
+  Value arg = func.getArgument(argIdx);
+  auto memref = llvm::dyn_cast<MemRefType>(arg.getType());
+  if (!memref || !memref.hasStaticShape())
+    return false;
+  if (auto space = memref.getMemorySpace())
+    if (auto str = llvm::dyn_cast<StringAttr>(space))
+      if (str.getValue().starts_with("stream"))
+        return false;
+  Type elt = memref.getElementType();
+  if (!elt.isIntOrIndexOrFloat())
+    return false;
+  // A recursive call chain back to this function: assume read-only on the
+  // way round; any store on it is still seen at its own use.
+  auto key = std::make_pair(func.getOperation(), argIdx);
+  if (!visiting.insert(key).second)
+    return true;
+  bool readOnly = true;
+  for (OpOperand &use : arg.getUses()) {
+    Operation *user = use.getOwner();
+    if (isa<affine::AffineLoadOp, memref::LoadOp>(user))
+      continue;
+    if (auto call = dyn_cast<func::CallOp>(user)) {
+      auto callee = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+          call, call.getCalleeAttr());
+      if (callee && !callee->hasAttr("top") && !callee->hasAttr("df.kernel") &&
+          !callee->hasAttr("dataflow") &&
+          readOnlyArrayArg(callee, use.getOperandNumber(), visiting))
+        continue;
+    }
+    readOnly = false;
+    break;
+  }
+  visiting.erase(key);
+  return readOnly;
+}
 
 bool SystemCModuleEmitter::isBakedConstGlobal(memref::GlobalOp g) {
   if (!g.getInitialValue().has_value())
