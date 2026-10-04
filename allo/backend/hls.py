@@ -586,6 +586,15 @@ class HLSModule:
         # run.tcl then tells Catapult not to add a reset to every register.
         if platform == "systemc" and "// allo unreset storage:" in self.hls_code:
             configs["unreset_storage"] = True
+        # README D-12: a ported memory's kernels synthesized as one unit.
+        if platform == "systemc" and configs.get("synth_group"):
+            from .systemc_group import add_synth_group  # noqa: PLC0415
+
+            group = configs["synth_group"]
+            self.hls_code = add_synth_group(
+                self.hls_code, group["name"], group["kernels"], top=top_func_name
+            )
+            configs["synth_top"] = group["name"]
         if platform == "systemc" and mode is not None and mode != "csim":
             refuse_self_fifo_for_synthesis(self.hls_code)
         if project is not None:

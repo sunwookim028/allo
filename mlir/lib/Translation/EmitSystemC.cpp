@@ -5465,12 +5465,23 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
     // here, after the run is quiescent, not at the end of each thread's pass: a
     // stream sink's sc_stop() can land before a producer's thread reaches the
     // end of its body.
+    // Under `#ifndef __SYNTHESIS__`, as __allo_state_save itself is: Catapult
+    // analyzes this testbench too (it is in kernel.cpp), and without the guard
+    // every design with a `@ Stateful` failed `go analyze` (CRD-135, "class
+    // ... has no member __allo_state_save"; u2_d12_prototype_2026-10-04.rst).
+    bool anyStateful = false;
+    for (auto &ki : kernelInsts)
+      anyStateful |= statefulKernels.count(ki.second) > 0;
+    if (anyStateful)
+      os << "#ifndef __SYNTHESIS__\n";
     for (auto &ki : kernelInsts)
       if (statefulKernels.count(ki.second)) {
         indent();
         os << "{ std::ofstream _f(\"allo_state_" << ki.first << ".data\"); t.dut."
            << ki.first << ".__allo_state_save(_f); }\n";
       }
+    if (anyStateful)
+      os << "#endif\n";
     indent(); os << "return 0;\n";
     reduceIndent();
     os << "}\n";
