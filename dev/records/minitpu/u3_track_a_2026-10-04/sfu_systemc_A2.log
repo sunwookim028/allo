@@ -1,0 +1,22 @@
+RTL sfu: 462144 vectors, latency [5] (declared 5), 0.2s
+kernel.cpp: In function ‘void sfu_bits(int32_t, int32_t, int32_t*)’:
+kernel.cpp:639:17: error: ‘rom_gelu’ was not declared in this scope
+  639 |   int32_t v86 = rom_gelu[v85]; // L193
+      |                 ^~~~~~~~
+kernel.cpp:644:17: error: ‘rom_exp’ was not declared in this scope
+  644 |   int32_t v89 = rom_exp[v88]; // L198
+      |                 ^~~~~~~
+kernel.cpp:649:17: error: ‘recip_pwl’ was not declared in this scope; did you mean ‘recip_pos’?
+  649 |   int32_t v92 = recip_pwl[v91]; // L203
+      |                 ^~~~~~~~~
+      |                 recip_pos
+kernel.cpp:654:17: error: ‘rsqrt_pwl’ was not declared in this scope; did you mean ‘rsqrt_pos’?
+  654 |   int32_t v95 = rsqrt_pwl[v94]; // L208
+      |                 ^~~~~~~~~
+      |                 rsqrt_pos
+[06:10:19] Compiling with g++ ...
+UNIT-FAIL  sfu bits systemc: RuntimeError: Failed to compile with g++. Check if g++ is installed and ac_types headers are correct.
+[06:10:23] Compiling with g++ ...
+[06:10:28] Running simulation ...
+UNIT-MATCH sfu staged systemc 462144/462144 latency=unchecked (rtl 5) (build 0.3s, run 7.5s)
+== exit=1
