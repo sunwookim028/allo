@@ -309,3 +309,9 @@ INFO: [SCHED] Initiation interval search seeded at II=4 (resource-min II=4, pipe
 INFO: [SCHED] II cannot go below 4 here: one iteration takes 16 slots of a resource serving 4 per cycle. Banking or replicating what this access reaches is what lowers that bound (at 'n0' tree_n16_inline_kernel.py:98:18)
 INFO: [SCHED] Lifetime repair re-placed the schedule's slack: modeled chain and pulse cost 114448 -> 87656 (at loop 't' tree_n16_inline_kernel.py:50:4)
 INFO: [SCHED] Scheduled: II=4 (>1: a loop-carried recurrence and/or shared-resource limit), latency = 1621 (at loop 't' tree_n16_inline_kernel.py:50:4)
+WARN: [EMIT] Exact sharing gave up after 10 deterministic time units (solver status UNKNOWN); keeping the greedy plan (at 'lrq4_3' tree_n16_inline_kernel.py:50:4)
+SCHED latency: 1621 | II: [4]
+QOR: lat 1621 fmax 302.2 area Utilization(lut=36200, logic_lut=35892, srl=308, ff=13322, dsp=0, carry8=1248, muxf=0, bram36=0, uram288=0)
+CRIT: TimingPath(total=3.309000000357628, slack=0.024333253502845764, endpoint='the input of a pipeline register', where="'x' tree_n16_inline_kernel.py:170:12", steps=(TimingStep(what='launch: a delay register', delay=0.4189999997615814), TimingStep(what='addi at 32 bits', delay=0.5299999713897705), TimingStep(what='select at 32 bits', delay=0.12099999934434891), TimingStep(what='minsi at 32 bits'
+COSIM n16 inline N=400 cycles=1621 (40.9s)
+MATCH n16 inline N=400: 1472/1472 defined

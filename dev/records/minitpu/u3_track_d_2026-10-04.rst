@@ -97,15 +97,18 @@ of context at 3.333 ns. The two are not like for like.
        **finding** -- no pipelined region (II none), 40,401 cycles (~101 per
        wavefront), est. 38,543 LUT / 8,699 FF, and **832/1,472 defined**:
        every payload 0 (D1, silent; D2). ``inline`` form (the node body
-       repeated 15 times as text): II=4 -- "16 slots of a resource serving 4
-       per cycle", the lane-array port (D3) -- latency 1,621 for 400; cosim
-       **pending at the time of writing** (section 6)
+       repeated 15 times as text): **match** 1,472/1,472 defined on the
+       400-wavefront prefix, at **II=4** -- "16 slots of a resource serving 4
+       per cycle", the lane-array port (D3) -- 1,621 cycles for 400 (N*4 +
+       21); est. 36,200 LUT, 13,322 FF, fmax 302 MHz
      - **blocked** (bug, crash): the frontend is right (``llvm`` 1,472/1,472),
        ``amc`` aborts in ``LoopSchedule/Utils.cpp:442`` (unscheduled) or
        ``SCFToLoopSchedule.cpp:2274`` (pipelined). Minimal repro: a shift
        chain of **three** carried registers (A-D2); the tree has 9 + 5 + 4x5
    * - same, n64 (once)
-     - ``inline``: 63 nodes; run launched, **pending** (section 6)
+     - ``inline``: 63 nodes, 6,081 generated lines; scheduled at **II=16**
+       (64 lane reads on a 4-port memory, D3), latency 6,428 for 400; HW
+       emission still running at the time of writing (section 6)
      - **blocked** (A-D2, same construct)
    * - ``mxu_pe`` P1 ``bits`` (60,090 cycles)
      - **match** 360,202/360,202 defined, per cycle. II=1, N+4 cycles
@@ -337,11 +340,10 @@ here while RTLGen refuses it. AMC prints ``cycle time: <n>`` per call;
 6. Pending at the time of writing / not done
 ============================================
 
-* RTLGen ``inline`` tree, n16, 400 wavefronts: scheduled (II=4, latency
-  1,621); the HW emission had run for over 15 minutes when this record was
-  written. n64 (63 nodes) launched behind it. Their cosim lines are appended
-  to ``logs/tree_n16_inline_400_f300.log`` / ``logs/tree_n64_inline_400_f300.log``
-  when they finish, and section 1 is updated in the same commit or the next.
+* RTLGen ``inline`` tree: n16 matched after 18 minutes of HW emission for
+  a 1,553-line kernel (``logs/tree_n16_inline_400_f300.log``); the n64 run
+  (II=16) and a 100 MHz n16 run were still emitting when this was written,
+  and their lines are appended to ``logs/`` when they finish.
 * AMC tree: blocked by A-D2 at both geometries; no pipelined numbers.
 * No full-trace tree run on either tool (400 of 60,660 / 19,861 cycles): the
   RTLGen cosim cost at II=4 and the pending emission; the prefix covers the
