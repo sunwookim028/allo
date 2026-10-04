@@ -4,10 +4,13 @@
 """``@ Stateful(reset=False)``: declared unreset storage (README D-14).
 
 The SystemC emitter writes such storage from a clock-edge ``SC_METHOD`` with
-no reset action, and ``run.tcl`` sets ``-RESET_CLEARS_ALL_REGS no``, so
-Catapult builds plain flops (``examples/minitpu/units/vpu_regfile.py``
-variant ``comb_unreset``, measured against MiniTPU in
-``dev/records/minitpu/u2_unreset_impl_2026-10-02.rst``). Every other HLS
+no reset action, and ``run.tcl`` sets ``-RESET_CLEARS_ALL_REGS no`` on that
+process alone (``/<top>/<kernel>/wr``), so Catapult builds plain flops for it
+and keeps every other reset (``examples/minitpu/units/vpu_regfile.py`` variant
+``comb_unreset``, measured against MiniTPU in
+``dev/records/minitpu/u2_unreset_impl_2026-10-02.rst``; the scoped directive
+and a mixed design through Catapult and Verilator in
+``u2_d14_followups_2026-10-04.rst``). Every other HLS
 backend refuses it, naming the storage; the simulator runs it as ordinary
 storage. The emit and refusal tests run anywhere; the csim test compiles and
 runs the emitted testbench and skips without Catapult (``MGC_HOME``) and
@@ -272,13 +275,160 @@ def test_unreset_emit_shape():
     assert re.search(re.escape(mem) + r"\[.*\]\.read\(\);", rf[rf.index("void comb()") : rf.index("void wr()")])
 
 
+def _run_tcl(make, tmp, **configs):
+    df.build(make(8), target="systemc", mode="csyn", project=tmp, configs=configs or None)
+    return open(tmp + "/run.tcl").read()
+
+
 def test_unreset_run_tcl():
-    """``-RESET_CLEARS_ALL_REGS no`` only when unreset storage exists."""
+    """``-RESET_CLEARS_ALL_REGS no`` only when unreset storage exists, and then
+    on the kernel's write process alone, after ``go compile`` (the process
+    exists from then; the directive admits ``Solution,Design,Process``). The
+    design-wide form also dropped the reset of a register in the same
+    kernel's thread (u2_d14_followups_2026-10-04.rst, A1)."""
     with tempfile.TemporaryDirectory() as tmp:
-        df.build(_regfile(8), target="systemc", mode="csyn", project=tmp + "/u")
-        assert "directive set -RESET_CLEARS_ALL_REGS no\n" in open(tmp + "/u/run.tcl").read()
-        df.build(_plain_regfile(8, reset=True), target="systemc", mode="csyn", project=tmp + "/r")
-        assert "RESET_CLEARS_ALL_REGS" not in open(tmp + "/r/run.tcl").read()
+        tcl = _run_tcl(_regfile, tmp + "/u")
+        assert "go compile\ndirective set /top/rf_0/wr -RESET_CLEARS_ALL_REGS no\n" in tcl, tcl
+        assert "directive set -RESET_CLEARS_ALL_REGS" not in tcl
+        tcl = _run_tcl(_regfile, tmp + "/k", synth_top="rf_0")
+        assert "go compile\ndirective set /rf_0/wr -RESET_CLEARS_ALL_REGS no\n" in tcl, tcl
+        # a synth_top that does not contain the unreset storage gets no line
+        tcl = _run_tcl(_regfile, tmp + "/s", synth_top="src_0")
+        assert "RESET_CLEARS_ALL_REGS" not in tcl, tcl
+        tcl = _run_tcl(lambda n: _plain_regfile(n, reset=True), tmp + "/r")
+        assert "RESET_CLEARS_ALL_REGS" not in tcl
+
+
+def _mixed(n):
+    """Mixed reset in one kernel: unreset storage ``mem`` (comb read), reset
+    storage ``tag`` (thread-written) and a reset counter ``cnt``. Through
+    Catapult with the scoped directive, ``mem`` keeps its contents across a
+    mid-run reset pulse and ``tag``/``cnt`` reset (u2_d14_followups, A2)."""
+
+    @df.region()
+    def top(RA: A5[n], WA: A5[n], WD: D16[n], WE: uint1[n], QA: D16[n], QT: D16[n], QC: D16[n]):
+        w_ra: Wire[A5]
+        w_wa: Wire[A5]
+        w_wd: Wire[D16]
+        w_we: Wire[uint1]
+        w_qa: Wire[D16, comb]
+        w_qt: Wire[D16]
+        w_qc: Wire[D16]
+
+        @df.kernel(mapping=[1], args=[RA, WA, WD, WE])
+        def src(ra: A5[n], wa: A5[n], wd: D16[n], we: uint1[n]):
+            for t in range(n):
+                w_ra.put(ra[t])
+                w_wa.put(wa[t])
+                w_wd.put(wd[t])
+                w_we.put(we[t])
+
+        @df.kernel(mapping=[1], args=[])
+        def rf():
+            mem: D16[32] @ Stateful(reset=False)
+            tag: D16[4] @ Stateful = 0
+            cnt: D16[1] @ Stateful = 0
+            for _ in range(n):
+                a5: A5 = w_ra.get()
+                a: int32 = a5
+                x5: A5 = w_wa.get()
+                x: int32 = x5
+                d: D16 = w_wd.get()
+                e: uint1 = w_we.get()
+                w_qa.put(mem[a])
+                w_qt.put(tag[a & 3])
+                c: D16 = cnt[0]
+                w_qc.put(c)
+                cnt[0] = c + 1
+                if e:
+                    mem[x] = d
+                    tag[x & 3] = d
+
+        @df.kernel(mapping=[1], args=[QA, QT, QC])
+        def sink(qa: D16[n], qt: D16[n], qc: D16[n]):
+            for t in range(n):
+                qa[t] = w_qa.get()
+                qt[t] = w_qt.get()
+                qc[t] = w_qc.get()
+
+    return top
+
+
+def test_mixed_reset_emit():
+    """One kernel, reset and unreset storage side by side: only ``mem`` is
+    signal storage written by ``wr``; ``tag`` and ``cnt`` stay in the reset
+    action; the directive names ``wr`` once. The state save in ``sc_main``
+    is outside ``__SYNTHESIS__`` (Catapult parses ``sc_main`` too: CRD-135
+    "class has no member __allo_state_save" aborted ``go analyze``)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        mod = df.build(_mixed(8), target="systemc", mode="csyn", project=tmp)
+        tcl = open(tmp + "/run.tcl").read()
+    assert tcl.count("RESET_CLEARS_ALL_REGS") == 1
+    assert "directive set /top/rf_0/wr -RESET_CLEARS_ALL_REGS no\n" in tcl
+    rf = _kernel_module(mod.hls_code, "rf_0")
+    assert re.search(r"// allo unreset storage: __stateful_rf_0_mem\w*\n", rf)
+    assert "__stateful_rf_0_tag" not in rf[rf.index("void wr()") :]
+    for g in ("__stateful_rf_0_tag", "__stateful_rf_0_cnt"):
+        assert re.search(g + r"\w*\[_sr\w*\] = ", rf), g  # reset-action write
+    main = mod.hls_code[mod.hls_code.index("int sc_main(") :]
+    save = main.index("__allo_state_save(_f)")
+    assert main.rfind("#ifndef __SYNTHESIS__", 0, save) > main.rfind("#endif", 0, save), main
+
+
+def _model_mixed(ra, wa, wd, we):
+    """``_model`` plus ``tag`` (reset to 0) and the counter."""
+    mem, tag = [-1] * 32, [0] * 4
+    qa, qt, qc = [], [], []
+    for t, (a, x, d, e) in enumerate(zip(ra, wa, wd, we)):
+        qa.append(mem[int(a)])
+        qt.append(tag[int(a) & 3])
+        qc.append(t)
+        if e:
+            mem[int(x)] = int(d)
+            tag[int(x) & 3] = int(d)
+    return np.array(qa), np.array(qt), np.array(qc)
+
+
+def _offset(got, want, n):
+    """The constant offset at which every defined ``want`` agrees, or None."""
+    for k in range(0, 6):
+        if all(want[t] < 0 or int(got[t + k]) == want[t] for t in range(n - k)):
+            return k
+    return None
+
+
+@needs_csim
+def test_mixed_reset_csim():
+    n = 64
+    ra, wa, wd, we = _trace(n)
+    qa, qt, qc = (np.zeros(n, dtype=np.uint16) for _ in range(3))
+    with tempfile.TemporaryDirectory() as tmp:
+        mod = df.build(_mixed(n), target="systemc", mode="csim", project=tmp)
+        mod(ra, wa, wd, we, qa, qt, qc)
+    want = _model_mixed(ra, wa, wd, we)
+    ks = [_offset(g, w, n) for g, w in zip((qa, qt, qc), want)]
+    assert None not in ks, f"no constant offset matches: {ks}, got {qa[:8]} {qt[:8]} {qc[:8]}"
+    print(f"mixed csim: mem/tag/cnt match at offsets {ks}")
+
+
+def test_uint_stateful_unsigned():
+    """A ``UInt`` ``Stateful`` is declared unsigned on every backend (the
+    global carries the ``unsigned`` attribute, as a local alloc does). Before,
+    every emitter declared it signed: ``ac_int<16, true>``, ``int16_t``
+    (u2_unreset_impl_2026-10-02.rst, H4)."""
+    ir = str(df.customize(_regfile(4)).module)
+    assert re.search(r"memref\.global .*__stateful_rf_0_mem\w* .*\{[^}]*unsigned", ir), ir
+    code = df.build(_regfile(8), target="systemc").hls_code
+    assert re.search(r"sc_signal< ac_int<16, false> > __stateful_rf_0_mem\w*\[32\];", code), code
+    assert "ac_int<16, true> > __stateful" not in code
+    code = df.build(_regfile_stateful(8, D16, True), target="systemc").hls_code
+    assert re.search(r"sc_signal< ac_int<16, false> > __stateful_rf_0_mem\w*\[32\];", code), code
+    code = df.build(_plain_regfile(8, reset=True), target="systemc").hls_code
+    assert re.search(r"uint16_t __stateful_rf_0_mem\w*\[32\];", code), code
+    for tgt in ("vhls", "catapult"):
+        code = df.build(_plain_regfile(8, reset=True), target=tgt).hls_code
+        assert re.search(r"uint16_t __stateful_rf_0_mem\w*\[32\]", code), (tgt, code)
+        assert "int16_t __stateful" not in code.replace("uint16_t __stateful", ""), tgt
 
 
 @pytest.mark.parametrize(

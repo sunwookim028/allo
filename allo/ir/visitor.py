@@ -189,6 +189,9 @@ class ASTContext:
         # reset when a new function body opens.
         if hasattr(self, "stateful_var_map"):
             ctx.stateful_var_map = self.stateful_var_map
+        # the symbols of the ``UInt`` ones (one set: a symbol is unique)
+        if hasattr(self, "stateful_unsigned"):
+            ctx.stateful_unsigned = self.stateful_unsigned
         if hasattr(self, "stateful_counter"):
             ctx.stateful_counter = self.stateful_counter
         return ctx

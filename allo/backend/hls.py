@@ -46,6 +46,7 @@ from .catapult import (
     codegen_host as codegen_host_catapult,
     parse_catapult_report,
     write_latency_manifest,
+    unreset_storage_in,
     catapult_failure_cause,
     io_latency_tcl,
     parse_catapult_hierarchical_report,
@@ -583,9 +584,10 @@ class HLSModule:
         buf.seek(0)
         self.hls_code = buf.read()
         # README D-14: the emitter marks every kernel that holds unreset storage;
-        # run.tcl then tells Catapult not to add a reset to every register.
+        # run.tcl then tells Catapult not to reset the registers of that
+        # kernel's clock-edge write process (`wr`), and only of it.
         if platform == "systemc" and "// allo unreset storage:" in self.hls_code:
-            configs["unreset_storage"] = True
+            configs["unreset_storage"] = sorted(unreset_storage_in(self.hls_code))
         if platform == "systemc" and mode is not None and mode != "csim":
             refuse_self_fifo_for_synthesis(self.hls_code)
         if project is not None:
