@@ -615,6 +615,15 @@ on) while leaving the rest of the Vitis toolchain in place. Pass it to
 link). Any new Vitis flow on such a host needs the equivalent. Host toolchain
 details are on ``dev/toolchains.rst``.
 
+The opposite host exists too: where ``/usr/bin/ld`` is *older* than Vitis's
+2.37 (zhang-21: RHEL 8, binutils 2.30), ``-B/usr/bin`` fails the same link
+with ``unable to initialize decompress status for section .debug_info``,
+because that ``ld`` cannot read the compressed debug sections Vitis's gcc
+emits. ``examples/tinytpu/cosim.py`` picks the linker per host
+(``linker_dir()``): the system one when it is at least 2.37, else the ``allo``
+conda env's binutils 2.44 linked as ``ld`` into a scratch directory;
+``TPU_LD_DIR`` overrides.
+
 
 Conclusion
 ----------

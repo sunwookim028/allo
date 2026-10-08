@@ -57,6 +57,7 @@ import re
 import signal
 import subprocess
 import sys
+import tempfile
 
 import numpy as np
 
@@ -69,7 +70,54 @@ from examples.tinytpu.microarch_isa import (  # noqa: E402
 from examples.tinytpu.isa_dsl import gemm_program  # noqa: E402
 
 VITIS = "/opt/xilinx/Vitis_HLS/2023.2/settings64.sh"
-LDFLAGS = "-B/usr/bin"
+
+
+def _ld_version(ld):
+    """`(major, minor)` of a GNU ld, or None."""
+    try:
+        head = subprocess.run([ld, "--version"], capture_output=True,
+                              text=True, check=False).stdout.split("\n")[0]
+        m = re.search(r"(\d+)\.(\d+)", head)
+        return (int(m.group(1)), int(m.group(2))) if m else None
+    except OSError:
+        return None
+
+
+def linker_dir():
+    """The directory `cosim_design -ldflags "-B..."` takes its linker from.
+
+    Vitis 2023.2's own binutils 2.37 cannot read a newer glibc (the
+    `.relr.dyn` failure above), so the link is pointed at the host's
+    `/usr/bin` -- a 2.42 ld on ace-01. On zhang-21 `/usr/bin/ld` is 2.30 and
+    cannot read the compressed `.debug_info` Vitis's gcc emits (`unable to
+    initialize decompress status for section .debug_info`), so there the
+    `allo` conda env's binutils (2.44, `x86_64-conda-linux-gnu-ld`) is linked
+    as `ld` into a scratch directory and `-B` points at that. The rule: the
+    system linker when it is at least 2.37 (what Vitis itself bundles),
+    else the env's; `TPU_LD_DIR` names a directory with an `ld` and
+    overrides both. `dev/toolchains.rst`.
+    """
+    chosen = os.environ.get("TPU_LD_DIR")
+    if chosen:
+        return chosen
+    system = _ld_version("/usr/bin/ld")
+    if system is not None and system >= (2, 37):
+        return "/usr/bin"
+    conda_ld = os.path.join(os.environ.get("CONDA_PREFIX", ""), "bin",
+                            "x86_64-conda-linux-gnu-ld")
+    if not os.path.exists(conda_ld):
+        return "/usr/bin"
+    d = os.path.join(tempfile.gettempdir(), f"tinytpu_ld_{os.getuid()}")
+    os.makedirs(d, exist_ok=True)
+    link = os.path.join(d, "ld")
+    if os.path.islink(link) and os.readlink(link) != conda_ld:
+        os.remove(link)
+    if not os.path.exists(link):
+        os.symlink(conda_ld, link)
+    return d
+
+
+LDFLAGS = "-B" + linker_dir()
 from examples.tinytpu.shapes import SHAPES as _ALL  # noqa: E402
 # Only shapes the built array can express: every dimension must be a multiple
 # of T, since one vmatpush-equivalent is a whole packed word of T lanes.

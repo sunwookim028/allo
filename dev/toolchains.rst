@@ -398,6 +398,32 @@ Vitis 2023.2 ships binutils 2.37, which cannot read this system's glibc:
 ``unknown type [0x13] section '.relr.dyn'``, then ``cannot find libm.so.6``. Both
 the csim and the cosim link fail without it.
 
+**zhang-21 is the opposite case (2026-10-08).** Its ``/usr/bin/ld`` is 2.30
+(``2.30-128.el8_10``, glibc 2.28), and with ``-B/usr/bin`` the cosim
+testbench link fails on every object Vitis's gcc 8.3.0 compiles::
+
+   /usr/bin/ld: obj/kernel.cpp_pre.cpp.tb.o: unable to initialize decompress status for section .debug_info
+   collect2: error: ld returned 1 exit status
+
+``cosim.py`` (``linker_dir()``) therefore chooses per host: ``/usr/bin`` when
+the system ``ld`` is at least 2.37 (what Vitis bundles), otherwise the
+``allo`` env's binutils **2.44** (``$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-ld``,
+conda-forge ``binutils_impl_linux-64``), linked as ``ld`` into
+``$TMPDIR/tinytpu_ld_<uid>`` and passed as ``-B``; ``TPU_LD_DIR=<dir with an
+ld>`` overrides both. Every TinyTPU cosim entry point (``cosim.py``,
+``workloads/run.py --cosim``, ``mutate.py``'s cosim level, ``reproduce.sh``)
+goes through that one string. Before this, ``reproduce.sh``'s cosim stage had
+never passed on zhang-21, and ``mutate.py`` reported its RTL-only mutant as
+"caught" by a link failure. Measured with it on 2026-10-08, zhang-21 reproduces
+175 / 265 / 421 / 482 / 674 (``examples/tinytpu/README.md``, section 4). Wall
+times on this host, load average about 30: ``make mlp-cosim MODEL=mlp_small``
+4 min 40 s (csynth 2 min, two layer cosims; 2 781 cycles, the published
+figure); full ``reproduce.sh`` 10 min 36 s (the cosim stage 8 min);
+``TPU_TB=stress python cosim.py`` 6 min 52 s (``COSIM OK``, 6 stress calls at
+each of 5 shapes, ``ar_distance`` included). The same mechanism was first
+written for the TinyTPU instance
+(``examples/minitpu/template/instances/tinytpu/run_gates.py``).
+
 .. warning::
 
    **Do not source ``settings64.sh`` in a shell you then build the bindings in.**
