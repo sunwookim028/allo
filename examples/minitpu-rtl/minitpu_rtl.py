@@ -33,7 +33,6 @@ except ImportError:  # pragma: no cover
     import gen_shim  # type: ignore
 
 HERE = pathlib.Path(__file__).resolve().parent
-SHIM = HERE / "rtl" / "minitpu_core_shim.sv"
 
 BANKS = gen_shim.BANKS
 BANK_WORDS = 1 << gen_shim.BANK_ADDR_W          # DM words per bank = 32 MiB / 32 B
@@ -58,13 +57,23 @@ def core_files(tree: pathlib.Path) -> list[pathlib.Path]:
     return [tree / line for line in lines if not line.startswith("+")]
 
 
-def make_ip(tree: pathlib.Path, fifo_depth: int, *, build_jobs: int = 16, max_stall: int = 20_000_000):
+# MiniTPU's own DDR path below the credit pipe (src/minitpu.f), for the "bridge" shim.
+BRIDGE_FILES = ("src/ddr/dma_landing_fifo.sv", "src/ddr/dm_axi_bridge.sv", "src/ddr/uncore_io_tile.sv")
+
+
+def make_ip(tree: pathlib.Path, fifo_depth: int, *, memory: str = "bridge", build_jobs: int = 16,
+            max_stall: int = 20_000_000):
+    """``memory="bridge"``: the core behind MiniTPU's own uncore_io_tile and the testbench's memory model
+    (cycle-comparable); ``"direct"``: M-R1's memory, the credit pipe answered from the banks."""
+    top = gen_shim.MODULES[memory]
     ports = [Port("cmd", "cmd_data", "cmd_valid", "cmd_ready", size=NCMD),
              Port("st", "st_data", "st_valid", "st_ready", dir="out")]
-    ports += [MemPort(f"m{k}", BANK_WORDS, "int32_t", f"m{k}_addr", f"m{k}_ce", q=f"m{k}_q", we=f"m{k}_we",
-                      d=f"m{k}_d") for k in range(BANKS)]
+    for k in range(BANKS):  # write port before read port: the transactor commits in port order (write-first)
+        ports += [MemPort(f"mw{k}", BANK_WORDS, "int32_t", f"mw{k}_addr", f"mw{k}_ce", we=f"mw{k}_we", d=f"mw{k}_d"),
+                  MemPort(f"mr{k}", BANK_WORDS, "int32_t", f"mr{k}_addr", f"mr{k}_ce", q=f"mr{k}_q")]
+    extra = [tree / f for f in BRIDGE_FILES] if memory == "bridge" else []
     return RTLModule(
-        "minitpu_core_shim", [*core_files(tree), SHIM], ports=ports, name="minitpu_core_shim_sim",
+        top, [*core_files(tree), *extra, gen_shim.OUTS[memory]], ports=ports, name=f"{top}_sim",
         clock="clk", reset="rst_n", reset_active_high=False, start=None, done="done", persistent=False,
         include_paths=[tree / "src" / "pkg"],
         defines={"MINITPU_MXU_OUTPUT_FIFO_DEPTH": fifo_depth},
@@ -90,7 +99,7 @@ def make_region(ip):
         def core(b0: int32[BANK_WORDS], b1: int32[BANK_WORDS], b2: int32[BANK_WORDS], b3: int32[BANK_WORDS],
                  b4: int32[BANK_WORDS], b5: int32[BANK_WORDS], b6: int32[BANK_WORDS], b7: int32[BANK_WORDS],
                  w: int32[2], r: int32[DRAIN_WORDS]):
-            ip(cmd, st, b0, b1, b2, b3, b4, b5, b6, b7)
+            ip(cmd, st, b0, b0, b1, b1, b2, b2, b3, b3, b4, b4, b5, b5, b6, b6, b7, b7)
             first: int32 = w[0]
             count: int32 = w[1]
             for j in range(DRAIN_BEATS):
@@ -128,7 +137,7 @@ def feed(p: int32[NCMD]):
 def core(b0: int32[BANK_WORDS], b1: int32[BANK_WORDS], b2: int32[BANK_WORDS], b3: int32[BANK_WORDS],
          b4: int32[BANK_WORDS], b5: int32[BANK_WORDS], b6: int32[BANK_WORDS], b7: int32[BANK_WORDS],
          w: int32[2], r: int32[DRAIN_WORDS]):
-    CORE(cmd, st, b0, b1, b2, b3, b4, b5, b6, b7)
+    CORE(cmd, st, b0, b0, b1, b1, b2, b2, b3, b3, b4, b4, b5, b5, b6, b6, b7, b7)
     first: int32 = w[0]
     count: int32 = w[1]
     for j in range(DRAIN_BEATS):

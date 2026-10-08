@@ -73,6 +73,8 @@ def main() -> int:
     parser.add_argument("--sfu-negative-control", action="store_true",
                         help="run the selected launches from a directory without the SFU tables")
     parser.add_argument("--build-jobs", type=int, default=16)
+    parser.add_argument("--memory", choices=("bridge", "direct"), default="bridge",
+                        help="bridge: MiniTPU's uncore_io_tile + the TB's memory model (default); direct: M-R1's")
     args = parser.parse_args()
 
     manifest = json.loads((HERE / "oracle.json").read_text())
@@ -94,7 +96,7 @@ def main() -> int:
     print(f"staged {len(cases)} launch(es) in {time.monotonic() - t0:.1f} s", flush=True)
 
     t0 = time.monotonic()
-    mod, ip = minitpu_rtl.build(tree, depth, build_jobs=args.build_jobs)
+    mod, ip = minitpu_rtl.build(tree, depth, memory=args.memory, build_jobs=args.build_jobs)
     build_s = time.monotonic() - t0
     print(f"region built (Verilator model + simulator) in {build_s:.0f} s", flush=True)
 
@@ -142,9 +144,11 @@ def main() -> int:
 
     same = sum(r["identical"] for r in results)
     print(f"{same}/{len(results)} drains bit-identical to tb_kernel_image; build {build_s:.0f} s; "
-          f"pins: MiniTPU {manifest['minitpu_commit'][:8]}, oracle round_trip_cycles={manifest['round_trip_cycles']}")
+          f"memory={args.memory}; cycles equal to the TB on {sum(r['cycles'] == r['tb_cycles'] for r in results)}/"
+          f"{len(results)}; pins: MiniTPU {manifest['minitpu_commit'][:8]}, oracle round_trip_cycles={manifest['round_trip_cycles']}")
     if args.json:
-        args.json.write_text(json.dumps({"build_s": round(build_s, 1), "negative_control": args.sfu_negative_control,
+        args.json.write_text(json.dumps({"build_s": round(build_s, 1), "memory": args.memory,
+                                         "negative_control": args.sfu_negative_control,
                                          "launches": results}, indent=1) + "\n")
     return 0 if same == len(results) else 1
 

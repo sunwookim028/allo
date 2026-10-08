@@ -4,11 +4,11 @@
 //
 // Allo's shim around MiniTPU's unmodified minitpu_core (seam K): a command stream in, a status stream out,
 // and 8 word-interleaved RAMs (8 x 2^20 x 32 bit = 32 MiB at byte 0x80000000), each with a write
-// and a read MemPort on the same array, serving the core's device-memory credit pipe -- through MiniTPU's own uncore_io_tile (dm_axi_bridge, OUTSTANDING 2) and an AXI4 slave modelled on the testbench's axi4_mem_model at ROUND_TRIP_CYCLES=0 (M-R2b).
+// and a read MemPort on the same array, serving the core's device-memory credit pipe -- answered straight from the banks, one request in flight (M-R1's memory).
 // Every pin is <= 32 bits, as PR #48's RTLModule requires.
 `timescale 1ns/1ps
 
-module minitpu_core_shim (
+module minitpu_core_shim_direct (
   input  logic        clk,
   input  logic        rst_n,
   input  logic [31:0] cmd_data,
@@ -236,160 +236,130 @@ module minitpu_core_shim (
     end
   end
 
-  // ---------------------------------------------------------------- memory side: MiniTPU's bridge, then the TB's memory
-  // The credit pipe (u4_track_c section 10) is the core's port and stays the seam: the bridge sits BELOW it,
-  // between the core's DMA and an AXI4 slave, exactly as src/minitpu.sv wires it once the IRAM loader is idle.
-  localparam int AW = minitpu_config_pkg::DRAM_BYTE_ADDR_W;
-  localparam logic [32:0] MEM_LO = 33'h80000000;
-  localparam logic [32:0] MEM_HI = 33'h82000000;   // BASE + SIZE
+  // ---------------------------------------------------------------- memory side: the credit pipe on 8 RAMs
+  wire bridge_to_seen = 1'b0;   // no bridge in this form
+  localparam logic [1:0] M_IDLE = 2'd0, M_READ = 2'd1, M_WRITE = 2'd2, M_WRESP = 2'd3;
+  logic [1:0]  ms_q;
+  logic [19:0] rd_idx_q, wr_idx_q, wr_idx;
+  logic [8:0]  rd_issue_left_q, rd_ret_left_q, wr_left_q;
+  logic        pend_q, err_q;
+  logic [31:0] rd_words_q, wr_words_q, mem_err_q, wstrb_err_q, rd_reqs_q, wr_reqs_q;
 
-  logic [AW-1:0]  axi_araddr, axi_awaddr;
-  logic [7:0]     axi_arlen, axi_awlen;
-  logic [2:0]     axi_arsize, axi_awsize;
-  logic [1:0]     axi_arburst, axi_awburst, axi_rresp, axi_bresp;
-  logic [0:0]     axi_arid, axi_awid;
-  logic           axi_arvalid, axi_arready, axi_rvalid, axi_rready, axi_rlast;
-  logic           axi_awvalid, axi_awready, axi_wvalid, axi_wready, axi_wlast, axi_bvalid, axi_bready;
-  logic [255:0]   axi_rdata, axi_wdata;
-  logic [31:0]    axi_wstrb;
-  logic           bridge_to_seen, axi_ar_seen, axi_r_seen, axi_aw_seen, axi_b_seen;
+  // Range check of a new request: [addr, addr + len] must lie in [BASE_WORD, BASE_WORD + DEPTH).
+  wire [29:0] req_off = {1'b0, dm_req_addr} - BASE_WORD;
+  wire        req_ok  = ({1'b0, dm_req_addr} >= BASE_WORD) && (req_off + {22'd0, dm_req_len} < DEPTH);
 
-  uncore_io_tile #(.M_AXI_ID_WIDTH(1), .M_AXI_DATA_WIDTH(256)) u_uncore_io_tile (
-    .clk, .rst_n,
-    .dm_req_valid, .dm_req_ready, .dm_req_we, .dm_req_addr, .dm_req_len, .dm_req_wdata, .dm_req_wstrb,
-    .dm_rsp_valid, .dm_rsp_ready, .dm_rsp_data, .dm_rsp_last, .dm_rsp_resp,
-    .bridge_to_seen, .axi_ar_seen, .axi_r_seen, .axi_aw_seen, .axi_b_seen,
-    .dm_axi_arid(axi_arid), .dm_axi_araddr(axi_araddr), .dm_axi_arlen(axi_arlen), .dm_axi_arsize(axi_arsize),
-    .dm_axi_arburst(axi_arburst), .dm_axi_arvalid(axi_arvalid), .dm_axi_arready(axi_arready),
-    .dm_axi_rid(1'b0), .dm_axi_rdata(axi_rdata), .dm_axi_rresp(axi_rresp), .dm_axi_rvalid(axi_rvalid),
-    .dm_axi_rlast(axi_rlast), .dm_axi_rready(axi_rready),
-    .dm_axi_awid(axi_awid), .dm_axi_awaddr(axi_awaddr), .dm_axi_awlen(axi_awlen), .dm_axi_awsize(axi_awsize),
-    .dm_axi_awburst(axi_awburst), .dm_axi_awvalid(axi_awvalid), .dm_axi_awready(axi_awready),
-    .dm_axi_wdata(axi_wdata), .dm_axi_wstrb(axi_wstrb), .dm_axi_wlast(axi_wlast), .dm_axi_wvalid(axi_wvalid),
-    .dm_axi_wready(axi_wready),
-    .dm_axi_bid(1'b0), .dm_axi_bresp(axi_bresp), .dm_axi_bvalid(axi_bvalid), .dm_axi_bready(axi_bready)
-  );
-  // The TB's AXI port is 32 bits wide (m_araddr): the model sees the address's low 32 bits, as here.
-  wire [31:0] ar_a = axi_araddr[31:0];
-  wire [31:0] aw_a = axi_awaddr[31:0];
-  // axi4_mem_model's in_range(addr, (len + 1) << size), plus what the banks can serve: whole 32 B beats.
-  wire [32:0] ar_bytes = ({25'd0, axi_arlen} + 33'd1) << axi_arsize;
-  wire [32:0] aw_bytes = ({25'd0, axi_awlen} + 33'd1) << axi_awsize;
-  wire ar_ok = ({1'b0, ar_a} >= MEM_LO) && ({1'b0, ar_a} + ar_bytes <= MEM_HI);
-  wire aw_ok = ({1'b0, aw_a} >= MEM_LO) && ({1'b0, aw_a} + aw_bytes <= MEM_HI);
-  wire ar_shape = (axi_arsize == 3'd5) && (ar_a[4:0] == 5'd0);
-  wire aw_shape = (axi_awsize == 3'd5) && (aw_a[4:0] == 5'd0);
-  wire [19:0] ar_idx = 20'((ar_a - 32'h80000000) >> 5);
-  wire [19:0] aw_idx = 20'((aw_a - 32'h80000000) >> 5);
+  assign dm_req_ready = (ms_q == M_IDLE) || (ms_q == M_WRITE);
+  wire req_fire  = dm_req_valid & dm_req_ready;
+  wire first_beat = req_fire && (ms_q == M_IDLE);
+  wire rsp_fire  = dm_rsp_valid & dm_rsp_ready;
 
-  // Read channel: reads.size() == 0 is arready at round trip 0; beat k shows the cycle after it is fetched.
-  logic       rd_busy_q, ar_err_q;
-  logic [7:0] ar_len_q, r_beat_q;
-  logic [19:0] r_idx_q;            // bank index of the beat on the R channel
-  assign axi_arready = !rd_busy_q;
-  wire ar_fire = axi_arvalid & axi_arready;
-  wire r_fire  = axi_rvalid & axi_rready;
-  wire r_last_beat = (r_beat_q == ar_len_q);
-  wire rd_first = ar_fire && ar_ok && ar_shape;
-  wire mem_rd   = rd_first || (r_fire && !r_last_beat && !ar_err_q);
-  assign axi_rvalid = rd_busy_q;
-  assign axi_rlast  = rd_busy_q && r_last_beat;
-  assign axi_rresp  = ar_err_q ? 2'b11 : 2'b00;
-  assign axi_rdata  = ar_err_q ? '0 : {mr7_q, mr6_q, mr5_q, mr4_q, mr3_q, mr2_q, mr1_q, mr0_q};
+  // Store beats write all 8 banks in the cycle they are taken.
+  assign wr_idx = (ms_q == M_IDLE) ? req_off[19:0] : wr_idx_q;
+  wire wr_ok  = (ms_q == M_IDLE) ? req_ok : !err_q;
+  wire mem_wr = req_fire && dm_req_we && wr_ok;
+  // Loads issue one word per cycle once the previous one is (being) taken; the RAM answers a cycle later.
+  wire rd_issue = (ms_q == M_READ) && (rd_issue_left_q != 9'd0) && (!pend_q || rsp_fire);
+  wire mem_rd   = rd_issue && !err_q;
 
-  // Write channel: W_IDLE -> W_DATA on AW, -> W_RESP on wlast, bvalid in W_RESP's first cycle.
-  localparam logic [1:0] W_IDLE = 2'd0, W_DATA = 2'd1, W_RESP = 2'd2;
-  logic [1:0] ws_q;
-  logic       aw_err_q;
-  logic [19:0] aw_idx_q;
-  assign axi_awready = (ws_q == W_IDLE);
-  assign axi_wready  = (ws_q == W_DATA);
-  wire aw_fire = axi_awvalid & axi_awready;
-  wire w_fire  = axi_wvalid & axi_wready;
-  wire mem_wr  = w_fire && !aw_err_q;
-  assign axi_bvalid = (ws_q == W_RESP);
-  assign axi_bresp  = aw_err_q ? 2'b11 : 2'b00;
-
-  assign mw0_addr = aw_idx_q;
+  assign mw0_addr = wr_idx;
   assign mw0_ce   = mem_wr;
   assign mw0_we   = mem_wr;
-  assign mw0_d    = axi_wdata[31:0];
-  assign mr0_addr = rd_first ? ar_idx : r_idx_q + 20'd1;
+  assign mw0_d    = dm_req_wdata[31:0];
+  assign mr0_addr = rd_idx_q;
   assign mr0_ce   = mem_rd;
-  assign mw1_addr = aw_idx_q;
+  assign mw1_addr = wr_idx;
   assign mw1_ce   = mem_wr;
   assign mw1_we   = mem_wr;
-  assign mw1_d    = axi_wdata[63:32];
-  assign mr1_addr = rd_first ? ar_idx : r_idx_q + 20'd1;
+  assign mw1_d    = dm_req_wdata[63:32];
+  assign mr1_addr = rd_idx_q;
   assign mr1_ce   = mem_rd;
-  assign mw2_addr = aw_idx_q;
+  assign mw2_addr = wr_idx;
   assign mw2_ce   = mem_wr;
   assign mw2_we   = mem_wr;
-  assign mw2_d    = axi_wdata[95:64];
-  assign mr2_addr = rd_first ? ar_idx : r_idx_q + 20'd1;
+  assign mw2_d    = dm_req_wdata[95:64];
+  assign mr2_addr = rd_idx_q;
   assign mr2_ce   = mem_rd;
-  assign mw3_addr = aw_idx_q;
+  assign mw3_addr = wr_idx;
   assign mw3_ce   = mem_wr;
   assign mw3_we   = mem_wr;
-  assign mw3_d    = axi_wdata[127:96];
-  assign mr3_addr = rd_first ? ar_idx : r_idx_q + 20'd1;
+  assign mw3_d    = dm_req_wdata[127:96];
+  assign mr3_addr = rd_idx_q;
   assign mr3_ce   = mem_rd;
-  assign mw4_addr = aw_idx_q;
+  assign mw4_addr = wr_idx;
   assign mw4_ce   = mem_wr;
   assign mw4_we   = mem_wr;
-  assign mw4_d    = axi_wdata[159:128];
-  assign mr4_addr = rd_first ? ar_idx : r_idx_q + 20'd1;
+  assign mw4_d    = dm_req_wdata[159:128];
+  assign mr4_addr = rd_idx_q;
   assign mr4_ce   = mem_rd;
-  assign mw5_addr = aw_idx_q;
+  assign mw5_addr = wr_idx;
   assign mw5_ce   = mem_wr;
   assign mw5_we   = mem_wr;
-  assign mw5_d    = axi_wdata[191:160];
-  assign mr5_addr = rd_first ? ar_idx : r_idx_q + 20'd1;
+  assign mw5_d    = dm_req_wdata[191:160];
+  assign mr5_addr = rd_idx_q;
   assign mr5_ce   = mem_rd;
-  assign mw6_addr = aw_idx_q;
+  assign mw6_addr = wr_idx;
   assign mw6_ce   = mem_wr;
   assign mw6_we   = mem_wr;
-  assign mw6_d    = axi_wdata[223:192];
-  assign mr6_addr = rd_first ? ar_idx : r_idx_q + 20'd1;
+  assign mw6_d    = dm_req_wdata[223:192];
+  assign mr6_addr = rd_idx_q;
   assign mr6_ce   = mem_rd;
-  assign mw7_addr = aw_idx_q;
+  assign mw7_addr = wr_idx;
   assign mw7_ce   = mem_wr;
   assign mw7_we   = mem_wr;
-  assign mw7_d    = axi_wdata[255:224];
-  assign mr7_addr = rd_first ? ar_idx : r_idx_q + 20'd1;
+  assign mw7_d    = dm_req_wdata[255:224];
+  assign mr7_addr = rd_idx_q;
   assign mr7_ce   = mem_rd;
 
-  logic [31:0] rd_words_q, wr_words_q, mem_err_q, wstrb_err_q, rd_reqs_q, wr_reqs_q;
+  assign dm_rsp_valid = ((ms_q == M_READ) && pend_q) || (ms_q == M_WRESP);
+  assign dm_rsp_data  = ((ms_q == M_READ) && !err_q) ? {mr7_q, mr6_q, mr5_q, mr4_q, mr3_q, mr2_q, mr1_q, mr0_q} : '0;
+  assign dm_rsp_last  = (ms_q == M_WRESP) || (rd_ret_left_q == 9'd1);
+  assign dm_rsp_resp  = err_q ? 2'b11 : 2'b00;   // DECERR, as tb's axi4_mem_model answers outside its window
+
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-      rd_busy_q <= 1'b0; ar_err_q <= 1'b0; ar_len_q <= '0; r_beat_q <= '0; r_idx_q <= '0;
-      ws_q <= W_IDLE; aw_err_q <= 1'b0; aw_idx_q <= '0;
+      ms_q <= M_IDLE; rd_idx_q <= '0; wr_idx_q <= '0; rd_issue_left_q <= '0; rd_ret_left_q <= '0;
+      wr_left_q <= '0; pend_q <= 1'b0; err_q <= 1'b0;
       rd_words_q <= '0; wr_words_q <= '0; mem_err_q <= '0; wstrb_err_q <= '0; rd_reqs_q <= '0; wr_reqs_q <= '0;
     end else begin
-      if (ar_fire) begin
-        rd_busy_q <= 1'b1; ar_len_q <= axi_arlen; r_beat_q <= '0; r_idx_q <= ar_idx;
-        ar_err_q <= !(ar_ok && ar_shape);
-        rd_reqs_q <= rd_reqs_q + 32'd1;
-        if (!(ar_ok && ar_shape)) mem_err_q <= mem_err_q + 32'd1;
-      end else if (r_fire) begin
-        rd_words_q <= rd_words_q + 32'd1;
-        if (r_last_beat) rd_busy_q <= 1'b0;
-        else begin r_beat_q <= r_beat_q + 8'd1; r_idx_q <= r_idx_q + 20'd1; end
-      end
-      unique case (ws_q)
-        W_IDLE: if (aw_fire) begin
-          aw_idx_q <= aw_idx; aw_err_q <= !(aw_ok && aw_shape); ws_q <= W_DATA;
-          wr_reqs_q <= wr_reqs_q + 32'd1;
-          if (!(aw_ok && aw_shape)) mem_err_q <= mem_err_q + 32'd1;
+      if (req_fire && dm_req_we && dm_req_wstrb != 32'hFFFF_FFFF) wstrb_err_q <= wstrb_err_q + 32'd1;
+      if (mem_wr) wr_words_q <= wr_words_q + 32'd1;
+      unique case (ms_q)
+        M_IDLE: if (first_beat) begin
+          err_q <= !req_ok;
+          if (!req_ok) mem_err_q <= mem_err_q + 32'd1;
+          if (dm_req_we) begin
+            wr_reqs_q <= wr_reqs_q + 32'd1;
+            wr_idx_q <= req_off[19:0] + 20'd1;
+            wr_left_q <= {1'b0, dm_req_len};
+            ms_q <= (dm_req_len == 8'd0) ? M_WRESP : M_WRITE;
+          end else begin
+            rd_reqs_q <= rd_reqs_q + 32'd1;
+            rd_idx_q <= req_off[19:0];
+            rd_issue_left_q <= {1'b0, dm_req_len} + 9'd1;
+            rd_ret_left_q <= {1'b0, dm_req_len} + 9'd1;
+            pend_q <= 1'b0;
+            ms_q <= M_READ;
+          end
         end
-        W_DATA: if (w_fire) begin
-          wr_words_q <= wr_words_q + 32'd1;
-          if (axi_wstrb != 32'hFFFF_FFFF) wstrb_err_q <= wstrb_err_q + 32'd1;
-          aw_idx_q <= aw_idx_q + 20'd1;
-          if (axi_wlast) ws_q <= W_RESP;
+        M_WRITE: if (req_fire) begin
+          wr_idx_q <= wr_idx_q + 20'd1;
+          wr_left_q <= wr_left_q - 9'd1;
+          if (wr_left_q == 9'd1) ms_q <= M_WRESP;
         end
-        W_RESP: if (axi_bvalid && axi_bready) ws_q <= W_IDLE;
-        default: ws_q <= W_IDLE;
+        M_WRESP: if (rsp_fire) begin err_q <= 1'b0; ms_q <= M_IDLE; end
+        default: begin  // M_READ
+          if (rd_issue) begin
+            rd_idx_q <= rd_idx_q + 20'd1;
+            rd_issue_left_q <= rd_issue_left_q - 9'd1;
+          end
+          pend_q <= rd_issue ? 1'b1 : (rsp_fire ? 1'b0 : pend_q);
+          if (rsp_fire) begin
+            rd_words_q <= rd_words_q + 32'd1;
+            rd_ret_left_q <= rd_ret_left_q - 9'd1;
+            if (rd_ret_left_q == 9'd1) begin err_q <= 1'b0; pend_q <= 1'b0; ms_q <= M_IDLE; end
+          end
+        end
       endcase
     end
   end
