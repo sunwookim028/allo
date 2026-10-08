@@ -21,6 +21,11 @@ part A (the unit alone, ``tb.dutA``) and part B (inside the sequencer,
 import os
 import sys
 
+import numpy as np
+
+import allo.dataflow as df
+from allo.ir.types import UInt, int32, uint1
+
 from examples.minitpu.harness import rtl
 from examples.minitpu.harness import ref_ctrl_decode as R
 from examples.minitpu.harness.traces import Trace, rng_for
@@ -196,7 +201,145 @@ def probes(inst):
     return res
 
 
-VARIANTS = {}
+# ---------------------------------------------------------------------------
+# Allo (U4 track A, plan S1). One kernel, one iteration per cycle (the trace
+# convention): the read ports from committed ``sreg`` first ("pre"), then the
+# edge. The ``S_LAT``-deep write pipeline is DATA (U3 checkpoint 6): ``S_LAT``
+# entries of ``{valid, rd, data, product, is_mac}``; each edge shifts them
+# and puts the issuing op in entry 0, then commits entry ``S_LAT - 1`` --
+# ``S_LAT = 1`` commits the op of this very edge (RTL ``g_lat1``), ``S_LAT = 2``
+# commits the one registered an edge earlier (``g_latN``). No bypass: the
+# read ports never look into the pipe. SMAC's add happens at commit, after
+# the pipe register, as the RTL's ``final_data``. ``S_LAT`` comes from the
+# instance (``LATS``); it is the number ``asm.py`` consumes (a D-20 booking,
+# ``template/control_geometry.py``).
+# ---------------------------------------------------------------------------
+
+WIDTH = {k: 32 for k in LATS}
+U32 = UInt(32)
+
+
+def scalar_result(op: UInt(3), base: UInt(32), imm: UInt(24), arg: UInt(32)) -> UInt(32):
+    """``result_prepipe_comb``: SMAC's pre-pipe value is the base alone."""
+    r: UInt(32) = 0
+    if op == 0:  # SMOVI: zero-extend
+        r = imm
+    elif op == 1:  # SMOV_ARG
+        r = arg
+    elif op == 2:  # SADDI: sign-extend IMM
+        e: UInt(32) = imm
+        if imm[23]:
+            e[24:32] = 0xFF
+        r = base + e
+    elif op == 3:  # SMAC: + product after the pipe register
+        r = base
+    elif op == 4:  # SSHL
+        sh: UInt(5) = imm[0:5]
+        r = base << sh
+    return r
+
+
+def s1(n, w, inst):
+    SL = LATS[inst]
+
+    @df.region()
+    def top(RST: uint1[n], SV: uint1[n], SOP: UInt(3)[n], SRD: UInt(2)[n], SRS: UInt(2)[n], SIV: uint1[n],
+            SLV: UInt(3)[n], SIMM: U32[n], KA: U32[n, 4], IV: U32[n, 8], SB: UInt(2)[n], SS: UInt(2)[n],
+            LA: uint1[n], SLB: UInt(2)[n],
+            SREG: U32[n, 4], OB: U32[n], OS: U32[n], OL: U32[n], OW: U32[n]):
+        @df.kernel(mapping=[1], args=[RST, SV, SOP, SRD, SRS, SIV, SLV, SIMM, KA, IV, SB, SS, LA, SLB,
+                                      SREG, OB, OS, OL, OW])
+        def agu(rst: uint1[n], sv: uint1[n], sop: UInt(3)[n], srd: UInt(2)[n], srs: UInt(2)[n],
+                siv: uint1[n], slv: UInt(3)[n], simm: U32[n], ka: U32[n, 4], iv: U32[n, 8],
+                sb: UInt(2)[n], ss: UInt(2)[n], la: uint1[n], slb: UInt(2)[n],
+                sreg_o: U32[n, 4], ob: U32[n], os: U32[n], ol: U32[n], ow: U32[n]):
+            sreg: U32[4] = 0
+            written: UInt(4) = 0
+            pv: uint1[SL] = 0
+            prd: UInt(2)[SL] = 0
+            pdata: U32[SL] = 0
+            pprod: U32[SL] = 0
+            pmac: uint1[SL] = 0
+            for t in range(n):
+                live: uint1 = rst[t]
+                if live == 0:  # async reset: the row shows the reset state
+                    written = 0
+                    for k in range(4):
+                        sreg[k] = 0
+                    for k in range(SL):
+                        pv[k] = 0
+                        prd[k] = 0
+                        pdata[k] = 0
+                        pprod[k] = 0
+                        pmac[k] = 0
+                # ---- "pre" outputs: committed sreg only (no bypass) ----
+                for k in range(4):
+                    sreg_o[t, k] = sreg[k]  # A5: the 2-D output stored first
+                ib: int32 = sb[t]
+                ob[t] = sreg[ib]
+                i_s: int32 = ss[t]
+                os[t] = sreg[i_s]
+                il: int32 = slb[t]
+                raw: U32 = sreg[il]
+                if la[t]:
+                    raw = ka[t, il]
+                bound: U32 = raw[0:16]
+                if raw[16:32] != 0:
+                    bound = 0xFFFF
+                ol[t] = bound
+                ow[t] = written
+                # ---- rising edge ----
+                if live:
+                    irs: int32 = srs[t]
+                    ilv: int32 = slv[t]
+                    imm: UInt(24) = simm[t]
+                    operand: U32 = sreg[irs]
+                    if siv[t]:
+                        operand = iv[t, ilv]
+                    prod: U32 = operand * imm
+                    pre: U32 = scalar_result(sop[t], sreg[irs], imm, ka[t, irs])
+                    for j in range(SL - 1):
+                        k: int32 = SL - 1 - j
+                        pv[k] = pv[k - 1]
+                        prd[k] = prd[k - 1]
+                        pdata[k] = pdata[k - 1]
+                        pprod[k] = pprod[k - 1]
+                        pmac[k] = pmac[k - 1]
+                    pv[0] = sv[t]
+                    prd[0] = srd[t]
+                    pdata[0] = pre
+                    pprod[0] = prod
+                    pmac[0] = sop[t] == 3
+                    written = 0
+                    if pv[SL - 1]:
+                        fin: U32 = pdata[SL - 1]
+                        if pmac[SL - 1]:
+                            fin = fin + pprod[SL - 1]
+                        iw: int32 = prd[SL - 1]
+                        sreg[iw] = fin
+                        written[iw] = 1
+
+    return top
+
+
+S_IN = [("rst_n", np.uint8), ("s_valid_i", np.uint8), ("s_op_i", np.uint8), ("s_rd_i", np.uint8),
+        ("s_rs_i", np.uint8), ("s_use_iv_i", np.uint8), ("s_level_i", np.uint8), ("s_imm_i", np.uint32)]
+S_RD = [("rd_sel_d_base_i", np.uint8), ("rd_sel_d_stride_i", np.uint8), ("rd_loop_bound_from_arg_i", np.uint8),
+        ("rd_sel_loop_bound_i", np.uint8)]
+
+
+def run_s1(mod, cmd, n, w):
+    from examples.minitpu.units.ctrl_lanes import col, join, split
+
+    sreg = np.zeros((n, 4), dtype=np.uint32)
+    outs = [np.zeros(n, dtype=np.uint32) for _ in range(4)]
+    mod(*[col(cmd, p, n, d) for p, d in S_IN], split(cmd["kernel_arg_csr_i"][:n], 4),
+        split(cmd["iv_flat_i"][:n], 8), *[col(cmd, p, n, d) for p, d in S_RD], sreg, *outs)
+    return {"sreg_o": join(sreg), "rd_data_d_base_o": outs[0], "rd_data_d_stride_o": outs[1],
+            "rd_data_loop_bound_o": outs[2], "sreg_written_o": outs[3]}
+
+
+VARIANTS = {"s1": (s1, run_s1)}
 
 if __name__ == "__main__":
     sys.exit(0)
