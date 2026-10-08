@@ -389,6 +389,11 @@ checked-in snapshot.
      - none yet (closed on ``core-fixes-4``; draft upstream text in
        ``dev/records/limitations/core_fixes_4_2026-10-08.rst``)
 
+   * - :ref:`L <limitation-l>`
+     - A D-12 read port of latency ``L`` delivered at ``t + L - 1`` on Stream
+       links, ``t + L`` on Wire links (U4 track A T-2; track C C8)
+     - none yet (closed on ``core-fixes-4``)
+
 :ref:`Item 13 <limitation-13>` is **not** in this table: it was largely
 retracted, but a real convenience gap (no ``allo.dma`` intrinsic) remains
 under the same item number, so its status is not unambiguous enough to close
@@ -705,4 +710,21 @@ member its thread writes with no reset action, and ``run.tcl`` scopes
 Still refused, naming the storage: a ``Wire[T, comb]`` output reading it in
 such a kernel (CIN-233). Tests: ``tests/dataflow/test_systemc_unreset.py``
 (``test_unreset_stream_kernel_*``); record
+``dev/records/limitations/core_fixes_4_2026-10-08.rst``.
+
+
+.. _limitation-l:
+
+L. A D-12 read port's latency depended on the link kind -- closed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Found by U4 track A (T-2: ``fetch_d12`` kept the IRAM's read register in its
+body) and track C (C8: ``dma_vmem``'s group held each read token one
+iteration). The ``registers`` server put its pipe's last stage after the
+shift, which a registered Wire link turns into ``L`` iterations and a Stream
+link into ``L - 1``. Closed by README D-12 amended: ``L`` is counted in the
+owner's iterations on every link kind (:doc:`/developer/dataflow_semantics`,
+"Memory ports"). The compensating registers are gone from
+``examples/minitpu/units/fetch_d12.py`` and ``dma_unit.py``. Test
+``tests/dataflow/test_compose_port_latency.py``; record
 ``dev/records/limitations/core_fixes_4_2026-10-08.rst``.

@@ -1,0 +1,3 @@
+UNIT-DIFF  fetch:iram f1_d12 simulator 23014/25026 defined (1602 masked: reset=56, uninit=1546; allo==rtl on 44) cycle=order-only (build 1.4s, run 0.3s)
+    e.g. program-0 cycle 16 bundle_data: allo 4cc5cf10bb01d775d9c39205c2b856ae rtl 21f0bf9489acafa5b96655f460d275bc
+    e.g. program-0 cycle 17 bundle_data: allo 4cc5cf10bb01d775d9c39205c2b856ae rtl 21f0bf9489acafa5b96655f460d275bc

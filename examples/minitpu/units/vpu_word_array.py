@@ -815,6 +815,13 @@ VARIANTS = {
 from examples.minitpu.units import vpu_word_array_d12 as _d12  # noqa: E402
 
 VARIANTS["d12_server"] = (_d12.make("simulator"), _run_flat)
+# README D-12 amended (2026-10-08): a port's read issued at t reaches its
+# owner at t + L, the word DURING cycle t + L -- the RTL's post-edge row
+# t + L - 1. On the Stream links of the simulator form, ``q[t]`` is therefore
+# held against row ``t - 1`` (before the rule it was row ``t``: T-2).
+_D12_SHIFT = {"compute_rdata_o": -1, "dma_rdata_o": -1}
+RESP_SHIFT["d12_server"] = _D12_SHIFT
+RESP_SHIFT["d12_sram"] = _D12_SHIFT
 VARIANTS["d12_server_wire"] = (_d12.make("systemc"), _run_flat)
 # the `sram` lowering (asic_memories_2026-10-04.rst): the instance's OpenRAM macro
 VARIANTS["d12_sram"] = (_d12.make("simulator", lowering="sram"), _run_flat)

@@ -62,7 +62,7 @@ latency 2. The scoped directive on ``run`` also leaves unreset any thread
 register whose reset value the C semantics do not need (U2 A1's hazard, now
 confined to the kernel that declares unreset storage).
 
-**Tests** (``tests/dataflow/test_systemc_unreset.py``, 18 pass, csim
+**Tests** (``tests/dataflow/test_systemc_unreset.py``, 16 pass, csim
 included): ``test_unreset_stream_kernel_emit`` (Stream-port and array-port
 kernels: plain member, no ``wr``, no reset write, the thread writes it,
 ``directive set /top/rf_0/run -RESET_CLEARS_ALL_REGS no`` once);
@@ -103,3 +103,101 @@ was already a match):
 Masked counts are track C's, unchanged (e.g. ``core`` 68,144: landing empty
 68,122, power-up 22). The ``bits``/``streams`` verdicts equal their
 ``_reset`` twins on every instance.
+
+2. D-12 amended: a port's latency in the owner's iterations (U4 T-2, C8)
+========================================================================
+
+**Before.** The ``registers`` server (``allo/compose.py`` ``_server``) wrote a
+latency-``L`` read as a pipe of ``L`` entries *as data* and put the last
+entry after the shift. On the SystemC target's declared links the data pin is
+a registered ``Wire``, so the owner saw the read of iteration ``t`` in
+iteration ``t + L``; on Stream links (the simulator; csim of the simulator's
+region) a token arrives in the iteration it is put, so the owner saw it in
+``t + L - 1`` -- the word *after* the edge that ends ``t + L - 1``. Track A's
+``fetch_d12`` therefore kept the IRAM's read register in its body
+(``rd_reg``), which the Wire form would count twice; track C's
+``dma_vmem`` group held every token one iteration (``hold``), a register that
+was not hardware. The pipe was also uninitialised on Stream links (the first
+deliveries were stack garbage: 32,571 / 32,601 in the pre-fix runs below).
+
+**Change** (``_server(..., links)``). On Stream links each latency-``L >= 1``
+port's last pipe stage is put at the **top** of the server's iteration --
+before its shift and before it takes any address -- and the pipe starts at 0;
+the declared (Wire) form is unchanged (its register is one of the ``L``
+stages). Putting first also removes a deadlock the old order had: the server
+took every port's address before any put, so one owner reaching its read
+port before its write port, with the write port declared first, blocked both
+(found writing the test; ``scripts/pre_fix_t2.py`` declares the read port
+first to get past it). ``memory.json`` now says "delivered L owner iterations
+after the access" for both link kinds. The rule is written in
+``docs/source/developer/dataflow_semantics.rst`` ("Memory ports").
+
+**Test** ``tests/dataflow/test_compose_port_latency.py`` (8 pass): one memory
+(8 words, unreset), a ``w`` port and an ``r`` port of latency 1 and 2, one
+owner with its own counter reading word ``5c & 7`` and writing word ``c & 7``
+every iteration and sending ``(c + 1, data)`` to a sink on ONE link kind, so
+the pair cannot be mispaired by the sink's skew. Simulator, csim on Stream
+links and csim on Wire links: every defined pair equals the read of iteration
+``c - L`` as of before its write, at L = 1 and 2; the manifest text is
+checked for both link kinds. The sink reads both links before its (blocking,
+in csim) output pushes: written the other way the Wire csim read the tag and
+the data a cycle apart and looked one iteration early -- a test artefact,
+noted because it is the easy way to write such a sink. Before the fix
+(``logs/t2_pre_fix.log``): **41/41 and 40/40 pairs differ, all agreeing at
+tag offset -1** (delivered at ``t + L - 1``).
+
+**Units changed with the rule** (the compensation goes, the verdicts hold):
+
+* ``examples/minitpu/units/fetch_d12.py``: ``rd_reg`` removed; ``fq`` reads
+  ``mem[next_addr]`` and gets port B's read register. Negative control
+  (``logs/t2_fetch_d12_old_body_new_rule.log``): the old body under the new
+  rule is ``UNIT-DIFF 23,014/25,026`` -- the register counted twice.
+* ``examples/minitpu/units/dma_unit.py`` ``vmem_group``: ``hold`` removed;
+  the word access moved before ``beat_rdata_o`` so this cycle's
+  ``vmem_rd_data`` is the port's token itself, and ``scatter`` latches it.
+* ``examples/minitpu/units/dma_selftimed.py`` ``st_vowner`` (self-timed
+  probe): its pending-store-beat register is a ``VL``-deep pipe and C10's
+  flush accesses after a store are ``VL`` (was 1): the last store beat now
+  arrives ``VL`` accesses later.
+* ``examples/minitpu/units/vpu_word_array.py``: ``RESP_SHIFT`` -1 on both
+  ports for ``d12_server``/``d12_sram`` -- the U2 harness compares with the
+  RTL's post-edge rows, and the port now delivers the word *during* cycle
+  ``t + L`` (row ``t + L - 1``).
+
+.. list-table:: Verdicts, before -> after (``logs/t2_*.log``)
+   :header-rows: 1
+
+   * - unit:instance / variant
+     - before (U4 records)
+     - after
+   * - ``fetch:iram`` ``f1`` sim / csim
+     - match 25,026 / match
+     - **UNIT-MATCH** 25,026/25,026 / **UNIT-MATCH** 25,026/25,026
+   * - ``fetch:iram`` ``f1_d12`` sim / csim
+     - match (with ``rd_reg``, T-2 noted)
+     - **UNIT-MATCH** 25,026/25,026 / **UNIT-MATCH** 25,026/25,026, no ``rd_reg``
+   * - ``dma_vmem:core`` ``d12`` sim; ``d12_reset_r256`` sim / csim
+     - match (with ``hold``); match / match
+     - **UNIT-MATCH** 138,855/138,855; **UNIT-MATCH** / **UNIT-MATCH** 138,855
+   * - ``dma_vmem:o1`` same
+     - match; match / match
+     - **UNIT-MATCH** 128,260; **UNIT-MATCH** / **UNIT-MATCH** 128,260
+   * - ``dma_vmem:o4`` same
+     - match; match / match
+     - **UNIT-MATCH** 88,216; **UNIT-MATCH** / **UNIT-MATCH** 88,216
+   * - ``dma_vmem:core`` ``d12`` csim
+     - refused (C2)
+     - C2 gone; csim does not complete (C7, the server's 512 KB local on the
+       thread stack; ran > 12 min at 100 % CPU, stopped)
+   * - ``dma_selftimed`` core/o1/o4 x 3 seeds, sim / csim
+     - CONTRACT-MATCH 9/9 / 9/9
+     - **CONTRACT-MATCH** 9/9 / 9/9 (``VL`` flushes per store)
+   * - ``vpu_word_array:narrow`` ``d12_server`` sim / csim
+     - match 67,717 (U2)
+     - **UNIT-MATCH** 67,717/67,717 / **UNIT-MATCH** (shift -1; 93,499 masked,
+       two fewer slots at the trace ends)
+
+Not run here: Catapult on a Wire-form owner (the declared form is unchanged,
+and U2's Catapult runs of ``vpu_word_array``/``vpu_regfile`` D-12 matched
+MiniTPU per cycle with it, +0 rows), and ``d12_server_wire`` in csim
+(limitation 22, unchanged).

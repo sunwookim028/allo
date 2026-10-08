@@ -1,0 +1,4 @@
+[memory] m: registers, untimed (the simulator keeps the order of accesses, not latency or visibility)
+L 1 PRE-FIX simulator (old server form) L=1: 41/41 differ, e.g. [(7, 32571, 4), (9, 1, 10), (10, 16, 1)]; agrees at tag offset [-1]
+[memory] m: registers, untimed (the simulator keeps the order of accesses, not latency or visibility)
+L 2 PRE-FIX simulator (old server form) L=2: 40/40 differ, e.g. [(8, 32571, 4), (10, 1, 10), (11, 16, 1)]; agrees at tag offset [-1]

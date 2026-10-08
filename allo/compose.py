@@ -1794,7 +1794,7 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
                     f"the {plan[m.name]} lowering needs one loop range")
             if plan[m.name] in SERVER_LOWERINGS:
                 servers.append(self._server(m, next(iter(iters[m.name])),
-                                            storage_attr, plan[m.name] == "sram"))
+                                            storage_attr, plan[m.name] == "sram", links))
         for u in self.units:
             if u.name not in trees:
                 continue
@@ -1919,20 +1919,40 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
                     new += [f"{pins['d']}.put(0)", f"{pins['e']}.put(0)"]
                 loop.body[0:0] = _stmts("\n".join(new))
 
-    def _server(self, m, loop_iter, storage_attr, sram=False):
+    def _server(self, m, loop_iter, storage_attr, sram=False, links="declared"):
         """The generated kernel that holds a `registers`- or `sram`-lowered
         memory: per iteration every port's address, then every read (latency
         0: a combinational put; L >= 1: a pipe of L registers, as data), then
         every write -- so a read sees writes of earlier iterations only
         (visible=1). ``sram``: the storage is a plain array (the backend maps
         it onto the declared macro; an unreset ``sc_signal`` array is not
-        RAM-mappable) and every ``rw`` port is written in the one-access form."""
+        RAM-mappable) and every ``rw`` port is written in the one-access form.
+
+        README D-12, amended (2026-10-08): a read port of latency ``L``
+        delivers the read its owner issues in iteration ``t`` in the owner's
+        iteration ``t + L`` on every link kind, and the value is the word as
+        of BEFORE the edge that ends ``t`` (the iteration's writes come after
+        its reads). On the declared links (SystemC: ``Wire``) the ``q`` pin is
+        registered, which is one of the ``L`` stages: the server puts the
+        pipe's last entry after the shift (``L - 1`` iterations of pipe + the
+        link). On Stream links (simulator, csim of the simulator form) a
+        token arrives in the iteration it is put, so the server puts the
+        last entry BEFORE the shift (``L`` iterations of pipe) -- at the top of
+        its iteration, before it takes any address, since the value no longer
+        depends on this iteration's access (so the order in which one owner
+        reaches two of its ports cannot deadlock the exchange) -- and the pipe
+        starts at 0 (the first ``L`` deliveries, before any read lands; the
+        RTL's read register before its first read is undefined anyway). Before
+        this, a Stream link delivered at ``t + L - 1`` (U4 T-2) and a
+        pre-sampling owner had to hold the token one iteration (U4 C8)."""
         dt, rows = m.dtype, m.rows
         at = _addr_type(self._rows(m))
         attr = storage_attr if not m.reset and not sram else ""
+        early = links == "stream"  # put before the shift: the link adds no stage
+        pinit = " = 0" if early else ""
         head = ["@df.kernel(mapping=[1])", f"def {m.name}_mem():",
                 f"    mem: {dt}[{rows}]{attr}"]
-        body, writes = [], []
+        body, writes, puts = [], [], []
         for p in m.ports:
             for k in range(p.count):
                 pk = p.name + (str(k) if p.count > 1 else "")
@@ -1945,28 +1965,34 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
                     # (u2_word_array_2026-10-02.rst). A read of a write cycle
                     # is undefined (MiniTPU masks it); a read of a word another
                     # port writes this cycle is the collision obligation.
-                    head.append(f"    _{pk}_p: {dt}[{p.latency}]")
+                    head.append(f"    _{pk}_p: {dt}[{p.latency}]{pinit}")
                     body += [f"_{pk}_d: {dt} = {ch}_d.get()",
                              f"_{pk}_e: uint1 = {ch}_e.get()"]
+                    if early:
+                        puts.append(f"{ch}_q.put(_{pk}_p[{p.latency - 1}])")
                     body += [f"_{pk}_p[{j}] = _{pk}_p[{j - 1}]"
                              for j in range(p.latency - 1, 0, -1)]
                     body += [f"if _{pk}_e:", f"    mem[_{pk}_i] = _{pk}_d",
-                             "else:", f"    _{pk}_p[0] = mem[_{pk}_i]",
-                             f"{ch}_q.put(_{pk}_p[{p.latency - 1}])"]
+                             "else:", f"    _{pk}_p[0] = mem[_{pk}_i]"]
+                    if not early:
+                        body.append(f"{ch}_q.put(_{pk}_p[{p.latency - 1}])")
                     continue
                 if p.reads and p.latency == 0:
                     body.append(f"{ch}_q.put(mem[_{pk}_i])")
                 elif p.reads:
-                    head.append(f"    _{pk}_p: {dt}[{p.latency}]")
+                    head.append(f"    _{pk}_p: {dt}[{p.latency}]{pinit}")
+                    if early:
+                        puts.append(f"{ch}_q.put(_{pk}_p[{p.latency - 1}])")
                     body += [f"_{pk}_p[{j}] = _{pk}_p[{j - 1}]"
                              for j in range(p.latency - 1, 0, -1)]
-                    body += [f"_{pk}_p[0] = mem[_{pk}_i]",
-                             f"{ch}_q.put(_{pk}_p[{p.latency - 1}])"]
+                    body.append(f"_{pk}_p[0] = mem[_{pk}_i]")
+                    if not early:
+                        body.append(f"{ch}_q.put(_{pk}_p[{p.latency - 1}])")
                 if p.writes:
                     writes += [f"_{pk}_d: {dt} = {ch}_d.get()",
                                f"_{pk}_e: uint1 = {ch}_e.get()",
                                f"if _{pk}_e:", f"    mem[_{pk}_i] = _{pk}_d"]
-        lines = head + [f"    for _ in {loop_iter}:"] + [f"        {x}" for x in body + writes]
+        lines = head + [f"    for _ in {loop_iter}:"] + [f"        {x}" for x in puts + body + writes]
         return textwrap.indent("\n".join(lines), "    ")
 
     def memory_manifest(self, target=None, lowering=None, technology=None) -> dict:
@@ -2007,10 +2033,17 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
             for p in m.ports:
                 d = p.manifest()
                 d["owner"] = owners[p.name][0].name
+                if choice in {"replica", "registers"} and links == "stream" and p.reads:
+                    d["read"] = ("same iteration" if p.latency == 0 else
+                                 f"delivered {p.latency} owner iterations after the "
+                                 f"access, the pre-edge word (a {p.latency}-deep pipe as "
+                                 f"data, put before its shift; D-12 amended)")
                 if choice in {"replica", "registers"} and links != "stream":
                     if p.reads:
                         d["read"] = ("combinational (D-13 comb links)" if p.latency == 0
-                                     else f"registered link + {p.latency}-deep pipe as data")
+                                     else f"registered link + {p.latency - 1}-deep pipe as "
+                                     f"data: delivered {p.latency} owner iterations after "
+                                     f"the access (D-12 amended)")
                     if p.writes:
                         d["write"] = "comb pins into a clock-edge write: seen next cycle"
                 if choice == "sram":

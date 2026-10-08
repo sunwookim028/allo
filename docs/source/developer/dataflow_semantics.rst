@@ -306,6 +306,37 @@ Nothing checks it, as nothing checks ``deadlock_free_because``: the simulator
 honours it, the HLS backends refuse the sharing regardless.
 ``examples/minitpu/microarch.py`` is the one in-tree user.
 
+Memory ports (README D-12): a read's latency in the owner's iterations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A ``compose.Memory`` port declared ``latency=L`` delivers the read its owner
+issues in iteration ``t`` in the owner's iteration ``t + L``, **on every link
+kind and backend**, and the value is the word as of *before* the edge that
+ends ``t`` (the iteration's writes come after its reads; ``visible=1``). A
+body that samples its inputs before the edge -- the RTL's view of a
+registered read during cycle ``t + L`` -- reads the port and gets that word,
+with no register of its own (README D-12, amended 2026-10-08).
+
+How each lowering honours it (``allo/compose.py`` ``_server``, the
+``registers`` lowering): on the SystemC target's declared links the data pin
+is a registered ``Wire``, one of the ``L`` stages, and the server's pipe
+holds the other ``L - 1``; on Stream links (the simulator, and csim of the
+simulator's region) a token arrives in the iteration it is put, so the
+server puts its pipe's last stage at the top of its iteration, before it
+shifts and before it takes any address, and the pipe starts at 0.
+``memory.json`` says so per port ("delivered L owner iterations after the
+access"). ``latency=0`` is a same-iteration read on both.
+
+Before the rule a Stream link delivered at ``t + L - 1`` (U4 track A, T-2),
+so a cycle-locked body could not be written once for both link kinds, and a
+pre-sampling owner held each token one iteration in a register that was not
+hardware (U4 track C, C8). The regression test,
+``tests/dataflow/test_compose_port_latency.py``, holds the simulator, csim
+on Stream links and csim on Wire links to the same owner-iteration pairing
+at ``L`` = 1 and 2. A harness that compares a port's output with an RTL
+trace sampled *after* the edge (the U2 word array's rows) shifts it by one
+row (``vpu_word_array.RESP_SHIFT``).
+
 ``df.get_pid()`` with ``mapping=[N]``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

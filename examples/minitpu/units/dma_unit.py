@@ -709,13 +709,13 @@ def streams_architecture(n, inst="core", payload="unreset"):
 # and owns ``vmem.d``; ``vmem_compute_idle`` owns ``vmem.c`` and never
 # writes (the compute side is out of D2's scope: U5).
 #
-# Token time: the generated server puts, at iteration t, its read pipe's
-# last stage -- the read issued at t - (VL - 1), i.e. the word array's
-# ``rdata`` AFTER edge t (the U2 record's post-edge row). The group samples
-# its inputs before the edge (``rtl.py``'s pre convention, as the DMA does),
-# so it holds the token one iteration (``hold``): during cycle t the word
-# array's output is the token of iteration t - 1. That register is the
-# token-time image of reading the pipe's last register, not hardware.
+# Token time (README D-12 amended, 2026-10-08): the port's latency-VL read
+# issued in iteration t reaches the group in iteration t + VL, as the word
+# before the edge that ends t -- the word array's ``rdata`` DURING cycle
+# t + VL, which is what the group, sampling before the edge (``rtl.py``'s pre
+# convention, as the DMA does), reads. Before the rule the server delivered
+# at t + VL - 1 (the post-edge row) and the group held the token one
+# iteration in a register that was not hardware (``hold``, U4 track C C8).
 # ---------------------------------------------------------------------------
 
 
@@ -741,7 +741,6 @@ def _group_legality(p):
 def vmem_group(mem):
     gather: UInt(WB) = 0   # gather_q (unreset in the RTL: never cleared here)
     scatter: UInt(WB) = 0  # scatter_q (unreset)
-    hold: UInt(WB) = 0     # the word array's rdata this cycle (token of t - 1)
     gword: int32 = 0
     filled: int32 = 0
     sidx: int32 = 0
@@ -761,16 +760,6 @@ def vmem_group(mem):
         rd_en: int32 = vq[2]
         wptr: int32 = vq[3:19]
         rptr: int32 = vq[19:35]
-        # ---- beat_rdata_o: this cycle's vmem_rd_data, from state ----
-        with allo.meta_for(SUB) as s:
-            if sidx == s:
-                with allo.meta_for(L) as k:
-                    if sfrom == 1:
-                        ob[k] = scatter[32 * (s * L + k):32 * (s * L + k + 1)]
-                    else:
-                        ob[k] = hold[32 * (s * L + k):32 * (s * L + k + 1)]
-        with allo.meta_for(L) as k:
-            x_vrd[k].put(ob[k])
         # ---- word side (minitpu_core.sv's select, then vpu_dma_group) ----
         en: int32 = wr_en | rd_en
         we: int32 = wr_en
@@ -793,7 +782,17 @@ def vmem_group(mem):
                     with allo.meta_for(L) as k:
                         wwd[32 * (s * L + k):32 * (s * L + k + 1)] = wd[k]
         waddr: int32 = word & ROWS_M  # identity at the full 4,096 rows (C7: csim's rows)
-        q: UInt(WB) = mem[waddr]
+        q: UInt(WB) = mem[waddr]  # the word array's rdata this cycle (the read of t - VL)
+        # ---- beat_rdata_o: this cycle's vmem_rd_data ----
+        with allo.meta_for(SUB) as s:
+            if sidx == s:
+                with allo.meta_for(L) as k:
+                    if sfrom == 1:
+                        ob[k] = scatter[32 * (s * L + k):32 * (s * L + k + 1)]
+                    else:
+                        ob[k] = q[32 * (s * L + k):32 * (s * L + k + 1)]
+        with allo.meta_for(L) as k:
+            x_vrd[k].put(ob[k])
         cm: uint1 = commit
         if cm:
             mem[waddr] = wwd
@@ -820,11 +819,10 @@ def vmem_group(mem):
                 if idx != 0:
                     sfrom = 1
             if rv_last == 1:
-                scatter = hold
+                scatter = q
             for j2 in range(VL - 1):
                 rvp[VL - 1 - j2] = rvp[VL - 2 - j2]
             rvp[0] = fetch
-        hold = q
 
 
 @unit(memories=("vmem.c",), parameters=("N", "WB"))

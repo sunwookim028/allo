@@ -11,15 +11,14 @@ cycle (the RTL's port B has no enable) and owns everything else of
 ``sequencer_fetch_queue.sv``, transcribed as in ``fetch.f1``. ``src`` and
 ``sink`` replay the per-cycle trace, one token per port per cycle.
 
-The read's latency, and the finding it exposes (``u4_track_a`` T-3):
-the server lowering writes a latency-L read as a pipe of L registers *as
-data* whose last entry it puts in the SAME iteration, so on Stream links
-(simulator, csim) an L = 1 read returns ``mem[a]`` of this very iteration;
-on the Wire links Catapult gets, the registered link supplies the edge. The
-RTL's read register is therefore written in ``fq``'s body (``rd_reg``), which
-is right for Stream links and one cycle too many for the Wire form: a D-12
-port's latency is honoured in time only by the Wire lowering, so a body that
-must be cycle-locked cannot be written once for both.
+The read's latency (``u4_track_a`` T-2, closed by README D-12 amended,
+2026-10-08): a latency-L read issued in iteration ``t`` is delivered in the
+owner's iteration ``t + L`` on Stream and Wire links alike, as the word
+before the edge that ends ``t``. ``fq`` reads ``mem[next_addr]`` and gets
+port B's read register -- the word addressed in the previous cycle -- with no
+register of its own. (Before the rule, a Stream link delivered at ``t + L -
+1`` and ``fq`` kept the RTL's read register itself, ``rd_reg``, which the
+Wire form would have counted twice.)
 """
 
 from __future__ import annotations
@@ -68,7 +67,6 @@ def loader(mem):
       writes=("q_data", "q_rda", "q_rdv", "q_valid", "q_baddr", "q_empty", "q_full"),
       parameters=("N", "AW"))
 def fq(mem):
-    rd_reg: UInt(128) = 0  # sequencer_iram's read register (see the module note)
     fq_addr: UInt(AW)[4] = 0
     fq_data: UInt(128)[4] = 0
     next_addr: UInt(AW) = 0
@@ -98,10 +96,10 @@ def fq(mem):
         q_empty.put(empty)
         full: uint1 = count == 4
         q_full.put(full)
-        # the edge: port B reads the fetch address every cycle
-        bram: UInt(128) = rd_reg
+        # port B reads the fetch address every cycle; its latency-1 read
+        # returns the word addressed last cycle (sequencer_iram's read register)
         ir: int32 = next_addr
-        rd_reg = mem[ir]
+        bram: UInt(128) = mem[ir]
         if rst:
             if flush:
                 next_addr = raddr

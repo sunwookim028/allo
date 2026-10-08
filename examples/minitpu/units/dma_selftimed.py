@@ -193,23 +193,24 @@ def st_land(stat: UInt(32)[4]):
 
 
 @unit(memories=("vmem.d", "VSTAT"), reads=("s_v", "s_lnd", "s_lndd"), writes=("s_vrd",),
-      parameters=("NP", "L", "SUB", "WB"))
+      parameters=("NP", "L", "SUB", "WB", "VL"))
 def st_vowner(mem, vstat: UInt(32)[4]):
-    # one port cycle per iteration; NP = every beat of the program + one
-    # FLUSH iteration after each store descriptor: the server returns the read
-    # of iteration t only in exchange for the access of t + 1 (latency 2 in
-    # token time), so the last store beat is retrieved by a dummy access
-    # before the next descriptor's blocking get (finding C10: without it a
-    # store followed by a load deadlocks -- issue waits for that beat, the
-    # owner waits for the load's landing beat, which issue has not requested)
+    # one port cycle per iteration; NP = every beat of the program + VL
+    # FLUSH iterations after each store descriptor: the port's read of
+    # iteration t reaches the owner in iteration t + VL (README D-12 amended),
+    # and only by way of the owner's accesses, so the last store beat is
+    # retrieved by VL dummy accesses before the next descriptor's blocking get
+    # (finding C10: without them a store followed by a load deadlocks -- issue
+    # waits for that beat, the owner waits for the load's landing beat, which
+    # issue has not requested)
     gather: UInt(WB) = 0
     have: int32 = 0       # a descriptor is being served
     store: int32 = 0
     vmem: int32 = 0
     left: int32 = 0       # beats still to serve in it
     r: int32 = 0          # beat index within it
-    pend: int32 = 0       # a store read issued last iteration
-    pidx: int32 = 0
+    pend: int32[VL] = 0   # pend[j]: a store read issued j + 1 iterations ago
+    pidx: int32[VL] = 0
     ld_done: int32 = 0
     flush: int32 = 0
     lanes: UInt(32)[L] = 0
@@ -238,25 +239,29 @@ def st_vowner(mem, vstat: UInt(32)[4]):
                 if idx == s:
                     with allo.meta_for(L) as k:
                         wwd[32 * (s * L + k):32 * (s * L + k + 1)] = lanes[k]
-        q: UInt(WB) = mem[word]  # the read of t - 1 (latency 2: token t = post edge t)
+        q: UInt(WB) = mem[word]  # the read of t - VL (D-12: latency in owner iterations)
         cm: uint1 = 0
         if we == 1 and idx == SUB - 1:
             cm = 1
         if cm:
             mem[word] = wwd
-        if pend == 1:  # the store beat read last iteration
+        if pend[VL - 1] == 1:  # the store beat read VL iterations ago
             with allo.meta_for(SUB) as s:
-                if pidx == s:
+                if pidx[VL - 1] == s:
                     with allo.meta_for(L) as k:
                         s_vrd[k].put(q[32 * (s * L + k):32 * (s * L + k + 1)])
-        pend = 0
-        flush = 0
+        for j in range(VL - 1):
+            pend[VL - 1 - j] = pend[VL - 2 - j]
+            pidx[VL - 1 - j] = pidx[VL - 2 - j]
+        pend[0] = 0
+        if flush > 0:
+            flush = flush - 1
         if have == 1:
             if we == 1:
                 gather = wwd
             else:
-                pend = 1
-                pidx = idx
+                pend[0] = 1
+                pidx[0] = idx
             r = r + 1
             left = left - 1
             if left == 0:
@@ -264,7 +269,7 @@ def st_vowner(mem, vstat: UInt(32)[4]):
                 if store == 0:
                     ld_done = ld_done + 1
                 else:
-                    flush = 1
+                    flush = VL
     vstat[0] = ld_done
 
 
@@ -279,11 +284,11 @@ def architecture(descs, inst="core", dmw=4096):
     from examples.minitpu.units.dma_params import GEOMETRIES  # noqa: PLC0415
 
     g = GEOMETRIES[inst].legality()
-    nb = sum(d[2] + 1 for d in descs) + sum(d[0] for d in descs)  # + a flush per store (C10)
+    nb = sum(d[2] + 1 for d in descs) + sum(d[0] for d in descs) * g.VMEM_DMA_READ_LATENCY  # + VL flushes per store (C10)
     nreq = sum(len(bursts(*d)) for d in descs) + 1
     p = {"ND": len(descs), "L": g.LANES, "ROW_M": (1 << g.ROW_BITS) - 1, "PW_M1": g.PAGE_WORDS - 1,
          "ADDR_M": (1 << g.DRAM_BEAT_ADDR_W) - 1, "DMW": dmw, "NRMAX": nreq, "NP": nb,
-         "SUB": g.NUM_SUBLANES, "WB": g.NUM_SUBLANES * g.BEAT_BITS}
+         "SUB": g.NUM_SUBLANES, "WB": g.NUM_SUBLANES * g.BEAT_BITS, "VL": g.VMEM_DMA_READ_LATENCY}
     vmem = Memory("vmem", "UInt(WB)", rows="256",
                   ports=(Port("c", "rw", latency=3, visible=1),
                          Port("d", "rw", latency=g.VMEM_DMA_READ_LATENCY, visible=1)),
