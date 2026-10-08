@@ -1,0 +1,4 @@
+SCHED written: latency 180506 | cyclic II [9] | QOR lat 180506 fmax 408.0 area Utilization(lut=1133, logic_lut=1131, srl=2, ff=1023, dsp=0, carry8=36, muxf=0, bram36=0, uram288=0)
+COSIM 1 chunks of 20056: cycles/chunk [180506] (35.6s)
+UNIT-MATCH dma_desc_adapter written rtlgen: 180495/180495 defined slots (rows 20056)
+WALL 37s rc=0

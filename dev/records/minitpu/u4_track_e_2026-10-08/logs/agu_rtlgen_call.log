@@ -1,0 +1,4 @@
+SCHED call: latency 245761 | cyclic II [1] | QOR lat 245761 fmax 489.2 area Utilization(lut=202, logic_lut=162, srl=40, ff=88, dsp=0, carry8=5, muxf=0, bram36=0, uram288=0)
+COSIM 3 chunks of 16384: cycles/chunk [245761] (163.6s)
+UNIT-MATCH agu_resolve call rtlgen: 38432/38432 defined slots (rows 38432)
+WALL 164s rc=0

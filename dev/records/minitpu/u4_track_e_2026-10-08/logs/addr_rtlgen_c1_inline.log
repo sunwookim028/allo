@@ -1,0 +1,4 @@
+SCHED c1_inline: latency 16388 | cyclic II [1] | QOR lat 16388 fmax 566.9 area Utilization(lut=106, logic_lut=90, srl=16, ff=163, dsp=3, carry8=7, muxf=0, bram36=0, uram288=0)
+COSIM 13 chunks of 16384: cycles/chunk [16388] (59.5s)
+UNIT-MATCH dma_addr_gen c1_inline rtlgen: 200700/200700 (chunk N=16384: [16388] cycles)
+WALL 61s rc=0
