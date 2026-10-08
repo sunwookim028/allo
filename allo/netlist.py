@@ -27,7 +27,7 @@ from ._mlir.exceptions import AlloError
 from .ir.types import Stream, TypeAnnotation
 from .ir.utils import get_global_vars
 
-READS = ("get", "try_get", "empty")
+READS = ("get", "try_get", "empty", "flush")  # flush: README D-25, consumer only
 WRITES = ("put", "try_put", "full")
 IN, OUT, CHAIN = "in", "out", "io"
 

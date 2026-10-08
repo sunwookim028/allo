@@ -2089,6 +2089,8 @@ class ASTTransformer(ASTBuilder):
                 stream_op = allo_d.StreamConstructOp(stream_type, ip=ctx.get_ip())
                 if isinstance(dtype.dtype, UInt):
                     stream_op.attributes["unsigned"] = UnitAttr.get()
+                if getattr(dtype, "flush_ok", False):
+                    stream_op.attributes["flush"] = UnitAttr.get()  # README D-25
                 stream_op.attributes["name"] = StringAttr.get(node.target.id)
                 ctx.buffers[node.target.id] = stream_op
                 ctx.put_symbol(name=node.target.id, val=stream_op)
@@ -2098,6 +2100,8 @@ class ASTTransformer(ASTBuilder):
                     stream_op = allo_d.StreamConstructOp(stream_type, ip=ctx.get_ip())
                     if isinstance(dtype.dtype, UInt):
                         stream_op.attributes["unsigned"] = UnitAttr.get()
+                    if getattr(dtype, "flush_ok", False):
+                        stream_op.attributes["flush"] = UnitAttr.get()  # README D-25
                     # pylint: disable=bad-builtin
                     new_name = node.target.id + "_" + "_".join(map(str, dim))
                     stream_op.attributes["name"] = StringAttr.get(new_name)
@@ -2894,6 +2898,37 @@ class ASTTransformer(ASTBuilder):
                     if isinstance(node.func.value.dtype.dtype, UInt):
                         get_op.attributes["unsigned"] = UnitAttr.get()
                     return get_op
+                if node.func.attr == "flush":
+                    # README D-25: s.flush() -> allo.stream_flush (the stream's
+                    # declaration was checked flushable by the type inferer)
+                    new_name, symbolic_slice, iterator_infos = (
+                        ASTTransformer.get_stream_name(ctx, node.func.value)
+                    )
+                    stream = ctx.get_symbol(new_name).clone(
+                        ip=ctx.get_stream_construct_ip()
+                    )
+                    if symbolic_slice is not None:
+                        stream.attributes["symbolic_slice"] = StringAttr.get(
+                            symbolic_slice
+                        )
+                        stream.attributes["iterators"] = DictAttr.get(iterator_infos)
+                    if isinstance(node.func.value, ast.Subscript):
+                        indices = (
+                            node.func.value.slice.value
+                            if isinstance(node.func.value.slice, ast.Index)
+                            else node.func.value.slice
+                        )
+                        indices = (
+                            indices.elts
+                            if isinstance(indices, ast.Tuple)
+                            else [indices]
+                        )
+                        indices = [
+                            ASTResolver.resolve_constant(x, ctx) for x in indices
+                        ]
+                    else:
+                        indices = []
+                    return allo_d.StreamFlushOp(stream.result, indices, ip=ctx.get_ip())
                 if node.func.attr == "empty":
                     new_name, symbolic_slice, iterator_infos = (
                         ASTTransformer.get_stream_name(ctx, node.func.value)

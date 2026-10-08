@@ -38,6 +38,12 @@ rid of what a flush strands in ``fifo``:
            ``k_push``: a DEADLOCK (D-23's condition). Counting them costs
            issue slots after every flush: measured below.
 
+``flush``   (README D-25, implemented 2026-10-08) ``fifo``/``ftag`` are
+           ``Stream[T, D, flush]`` and the queue calls ``.flush()`` at a branch
+           or a reset: the FIFO's synchronous clear, zero cycles, no count, no
+           epoch (``queue_flush``). ``drain`` and ``epoch`` stay as the
+           recorded workarounds it replaces.
+
 The proposal (``Stream.flush()``): a consumer-side flush that empties the
 channel at the edge and drops a put of the same edge; lowered to a FIFO with
 a synchronous clear (what the RTL is), it costs nothing and needs no epoch
@@ -256,6 +262,59 @@ def queue_epoch():
                 head_live = 1
 
 
+@unit(reads=("q_rst", "q_flush", "q_raddr", "q_pop", "fifo", "ftag", "k_push"),
+      writes=("k_count", "k_flush", "k_target", "o_data", "o_valid", "o_baddr", "o_empty", "o_full"),
+      parameters=("N",))
+def queue_flush():
+    """README D-25: ``fifo``/``ftag`` are ``Stream[T, D, flush]``; a branch (or a
+    reset) flushes them -- every stranded token is discarded at that edge, as
+    ``sequencer_fetch_queue.sv``'s ``count_q <= 0`` -- and the fetcher, which
+    hears of the flush in the same cycle (``k_flush``), does not put the
+    landing response. No stale count, no epoch, no drain loop."""
+    head: UInt(128) = 0
+    head_tag: UInt(13) = 0
+    head_live: uint1 = 0
+    live: UInt(3) = 0  # live tokens in fifo, behind the head
+    for _ in range(N):
+        rst: uint1 = q_rst.get()
+        flush_i: uint1 = q_flush.get()
+        raddr: UInt(12) = q_raddr.get()
+        pop_i: uint1 = q_pop.get()
+        if rst == 0:
+            live = 0
+            head_live = 0
+        count: UInt(3) = head_live + live
+        k_count.put(count)
+        k_flush.put(flush_i & rst)
+        k_target.put(raddr)
+        o_data.put(head)
+        o_baddr.put(head_tag[0:12])
+        o_valid.put(head_live)
+        empty: uint1 = 1 - head_live
+        o_empty.put(empty)
+        full: uint1 = (head_live + live) == 4
+        o_full.put(full)
+        pushed: uint1 = k_push.get()
+        clear: uint1 = 1 - rst  # a reset strands what is buffered, as a flush does
+        if rst:
+            if flush_i:
+                clear = 1
+                live = 0
+                head_live = 0
+            else:
+                if pop_i and head_live:
+                    head_live = 0
+                live = live + pushed
+        if clear:
+            fifo.flush()
+            ftag.flush()
+        if head_live == 0 and live > 0:
+            head = fifo.get()
+            head_tag = ftag.get()
+            live = live - 1
+            head_live = 1
+
+
 @unit(memories=("DATA", "RDA", "RDV", "VALID", "BADDR", "EMPTY", "FULL"),
       reads=("o_data", "o_rda", "o_rdv", "o_valid", "o_baddr", "o_empty", "o_full"), parameters=("N",))
 def sink(ydata: UInt(32)[N, 4], yrda: UInt(12)[N], yrdv: uint1[N], yvalid: uint1[N], ybaddr: UInt(12)[N],
@@ -280,14 +339,15 @@ def architecture(n, form):
            ("q_pop", "uint1"), ("k_count", "UInt(3)"), ("k_flush", "uint1"), ("k_target", "UInt(12)"),
            ("k_push", "uint1"), ("o_data", "UInt(128)"), ("o_rda", "UInt(12)"), ("o_rdv", "uint1"),
            ("o_valid", "uint1"), ("o_baddr", "UInt(12)"), ("o_empty", "uint1"), ("o_full", "uint1")]
-    ch = [Channel(c, d, "2") for c, d in one] + [Channel("fifo", "UInt(128)", str(DEPTH)),
-                                                  Channel("ftag", "UInt(13)", str(DEPTH))]
+    fl = form == "flush"  # README D-25: the flushable stream
+    ch = [Channel(c, d, "2") for c, d in one] + [Channel("fifo", "UInt(128)", str(DEPTH), flush=fl),
+                                                  Channel("ftag", "UInt(13)", str(DEPTH), flush=fl)]
     mems = [Memory(nm, dt) for nm, dt in (
         ("RST", "uint1[N]"), ("WE", "uint1[N]"), ("WA", "UInt(12)[N]"), ("WD", "UInt(32)[N, 4]"),
         ("PAUSE", "uint1[N]"), ("FLUSH", "uint1[N]"), ("RADDR", "UInt(12)[N]"), ("POP", "uint1[N]"),
         ("DATA", "UInt(32)[N, 4]"), ("RDA", "UInt(12)[N]"), ("RDV", "uint1[N]"), ("VALID", "uint1[N]"),
         ("BADDR", "UInt(12)[N]"), ("EMPTY", "uint1[N]"), ("FULL", "uint1[N]"))]
-    q = {"drain": queue_drain, "epoch": queue_epoch}[form]
+    q = {"drain": queue_drain, "epoch": queue_epoch, "flush": queue_flush}[form]
     return Architecture(name=f"fetch_f2_{form}", parameters={"N": n, "DEPTH": DEPTH}, memories=tuple(mems),
                         channels=tuple(ch), units=(src, fetcher, q, sink))
 
@@ -402,6 +462,7 @@ def main(argv=None):
     ap.add_argument("--backend", action="append", choices=("simulator", "systemc"))
     ap.add_argument("--project", default="/tmp/u4_flush_prj")
     ap.add_argument("--case", nargs=3, metavar=("TRACE", "FORM", "BACKEND"))
+    ap.add_argument("--form", action="append", choices=("flush", "drain", "epoch"))
     a = ap.parse_args(argv)
     if a.case:
         run_case(*a.case, a.project)
@@ -412,7 +473,7 @@ def main(argv=None):
         print(f"RTL fetch:iram {label}: {len(cmd['rst_n'])} cycles, {len(ri)} bundles issued, flush->target "
               f"{dict(sorted({x: rl.count(x) for x in rl}.items()))}", flush=True)
         for backend in a.backend or ["simulator"]:
-            for form in ("drain", "epoch"):
+            for form in a.form or ("flush", "drain", "epoch"):
                 # one process per build: the simulator's OpenMP teardown can corrupt
                 # the heap at exit (pitfalls.rst), which hangs a second build
                 r = subprocess.run([sys.executable, "-m", "examples.minitpu.template.flush_stream", "--case",

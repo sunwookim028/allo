@@ -31,6 +31,7 @@ from .backend.simulator import LLVMOMPModule
 from .passes import df_pipeline, analyze_arg_load_store
 from .backend import AIE_MLIRModule
 
+from ._mlir.exceptions import AlloError
 # pylint: disable=unused-import
 from .netlist import UnitSpec, netlist_of  # netlist_of is re-exported as df.netlist_of
 from .ir.units import expand_region_units
@@ -91,6 +92,29 @@ _LINK_PUT_OPS = (
     allo_d.ChannelPutOp,
     allo_d.ChannelTryPutOp,
 )
+
+
+def check_flush_consumer(op, stream_name, func_name):
+    """README D-25: ``s.flush()`` is legal only in the channel's one consumer --
+    a kernel that gets from the stream and never puts to it. Refused by name."""
+    # every use clones the construct: gather the uses of all same-named
+    # constructs in this kernel (the lifting merges them afterwards)
+    uses = []
+    for o in op.operation.block.operations:
+        if isinstance(o, _LINK_CONSTRUCT_OPS) and "name" in o.attributes \
+                and o.attributes["name"].value == stream_name:
+            uses += [u.owner for u in o.result.uses]
+    if not any(isinstance(u, allo_d.StreamFlushOp) for u in uses):
+        return
+    puts = any(isinstance(u, _LINK_PUT_OPS + (allo_d.StreamFullOp,)) for u in uses)
+    gets = any(isinstance(u, _LINK_GET_OPS + (allo_d.StreamEmptyOp,)) for u in uses)
+    if puts or not gets:
+        role = "puts to it" if puts else "never gets from it"
+        raise AlloError(
+            f"{stream_name}.flush() in kernel {func_name}, which {role}: a "
+            f"flushable stream is flushed only by its one consumer, the kernel "
+            f"that gets from it (README D-25)"
+        )
 
 
 # pylint: disable=eval-used, bad-builtin, too-many-branches, too-many-nested-blocks
@@ -158,6 +182,8 @@ def move_stream_to_interface(
                         direction = "in"
                     elif isinstance(use.owner, _LINK_PUT_OPS):
                         direction = "out"
+                    elif isinstance(use.owner, allo_d.StreamFlushOp):
+                        direction = "in"  # README D-25: the consumer flushes
                     elif isinstance(
                         use.owner, (allo_d.StreamEmptyOp, allo_d.StreamFullOp)
                     ):
@@ -185,6 +211,7 @@ def move_stream_to_interface(
                         direction = "in" if dirs[idx] == "i" else "out"
                     else:
                         raise ValueError(f"Stream is not used correctly: {use.owner}")
+                check_flush_consumer(op, stream_name, func_name)
                 if with_stream_type and stream_name not in stream_types_dict:
                     stream_types_dict[stream_name] = op.result.type
                 stream_info[func_name].append((stream_name, direction))
@@ -372,6 +399,8 @@ def move_stream_to_interface(
                         direction = "in"
                     elif isinstance(use.owner, _LINK_PUT_OPS):
                         direction = "out"
+                    elif isinstance(use.owner, allo_d.StreamFlushOp):
+                        direction = "in"  # README D-25: the consumer flushes
                     elif isinstance(
                         use.owner, (allo_d.StreamEmptyOp, allo_d.StreamFullOp)
                     ):
@@ -398,6 +427,7 @@ def move_stream_to_interface(
                     else:
                         raise ValueError(f"Stream is not used correctly: {use.owner}")
                 stream_name = op.attributes["name"].value
+                check_flush_consumer(op, stream_name, func_name)
                 if with_stream_type and stream_name not in stream_types_dict:
                     stream_types_dict[stream_name] = op.result.type
                 stream_info[func_name].append((stream_name, direction))

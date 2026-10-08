@@ -97,6 +97,7 @@ public:
   virtual void emitStreamTryPut(allo::StreamTryPutOp op) {}
   virtual void emitStreamEmpty(allo::StreamEmptyOp op) {}
   virtual void emitStreamFull(allo::StreamFullOp op) {}
+  virtual void emitStreamFlush(allo::StreamFlushOp op) {}
 
   // Wire operations (combinational link).
   virtual void emitWireConstruct(allo::WireConstructOp op) {}

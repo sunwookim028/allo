@@ -1084,6 +1084,19 @@ def StreamEmptyOp : Allo_Op<"stream_empty"> {
   }];
 }
 
+// README D-25: `s.flush()` on a `Stream[T, D, flush]`, by its one consumer.
+// Every buffered token is discarded at that edge; a put of the same edge is
+// dropped. Lowered to a FIFO with a synchronous clear (SystemC); refused by
+// every backend that cannot build the clear, naming the channel.
+def StreamFlushOp : Allo_Op<"stream_flush"> {
+  let summary = "Discard every token buffered in a flushable stream";
+  let arguments = (ins StreamLike:$stream, DenseI64ArrayAttr:$indices);
+  let results = (outs );
+  let assemblyFormat = [{
+      `(` $stream `,` $indices`)` attr-dict `:` qualified(type($stream))
+  }];
+}
+
 def StreamGlobalOp : Allo_Op<"stream_global", [Symbol]> {
   let summary = "Create a global stream object";
   let arguments = (ins SymbolNameAttr:$sym_name, TypeAttr:$element_type, DenseI64ArrayAttr:$shape);

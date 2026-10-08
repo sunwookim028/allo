@@ -327,9 +327,26 @@ class ConstExpr:
         return cls
 
 
+class _FlushMarker:
+    """``flush`` in ``Stream[T, D, flush]``: the stream may be flushed by its
+    one consumer, ``s.flush()`` (README D-25). Python has no keyword
+    subscripts, so the decision's ``Stream[T, D, flush=True]`` is spelled with
+    this marker, as ``comb`` marks a ``Wire``."""
+
+    def __repr__(self):
+        return "flush"
+
+
+flush = _FlushMarker()
+
+
 class Stream(AlloType):
     """
     A FIFO type. Schedules using the `dataflow` schedule may find using this improves parallelism.
+
+    ``Stream[T, D, flush]`` (README D-25) is a flushable stream: its one
+    consumer may call ``s.flush()``, which discards every buffered token at
+    that edge and drops a put of the same edge.
     """
 
     def __class_getitem__(cls, item):
@@ -340,18 +357,26 @@ class Stream(AlloType):
         to denote a type. ``Stream[int32[4], 2][8]`` composes: the inner
         subscript is the element, the outer one the array shape.
         """
-        dtype, depth = item if isinstance(item, tuple) else (item, 2)
+        items = item if isinstance(item, tuple) else (item,)
+        is_flush = False
+        if len(items) == 3:
+            assert items[2] is flush, (
+                f"Stream[T, D, {items[2]!r}]: the only Stream modifier is `flush` "
+                "(allo.ir.types.flush, README D-25)")
+            is_flush, items = True, items[:2]
+        dtype, depth = items if len(items) == 2 else (items[0], 2)
         shape = tuple()
         if isinstance(dtype, TypeAnnotation):
             dtype, shape = dtype.dtype, tuple(dtype.shape)
-        return cls(dtype=dtype, shape=shape, depth=depth)
+        return cls(dtype=dtype, shape=shape, depth=depth, flush=is_flush)
 
-    def __init__(self, dtype, shape, depth=2, size=1):
+    def __init__(self, dtype, shape, depth=2, size=1, flush=False):  # pylint: disable=redefined-outer-name
         assert isinstance(dtype, AlloType), f"dtype must be an AlloType, got {dtype}"
         self.dtype = dtype
         self.shape = shape
         self.depth = depth
         self.size = size
+        self.flush_ok = True if flush else False  # README D-25 (`bool` is a type here)
         super().__init__(0, 0, f"stream<{dtype}>")
 
     def build(self):
@@ -381,6 +406,9 @@ class Stream(AlloType):
         pass
 
     def full(self):
+        pass
+
+    def flush(self):
         pass
 
 

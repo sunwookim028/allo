@@ -201,3 +201,104 @@ Not run here: Catapult on a Wire-form owner (the declared form is unchanged,
 and U2's Catapult runs of ``vpu_word_array``/``vpu_regfile`` D-12 matched
 MiniTPU per cycle with it, +0 rows), and ``d12_server_wire`` in csim
 (limitation 22, unchanged).
+
+3. D-25: flushable streams (U4 T-4/H6, T-5)
+===========================================
+
+**Spelling.** Python has no keyword subscripts, so the decision's
+``Stream[T, D, flush=True]`` is ``Stream[T, D, flush]``, ``flush`` a marker in
+``allo.ir.types`` (as ``comb`` marks a ``Wire``); ``Stream[T, D, flush]`` also
+evaluates as a value (``.flush_ok``), and ``compose.Channel(..., flush=True)``
+emits it. ``s.flush()`` is the operation.
+
+**What changed.**
+
+* Front end: ``allo/ir/types.py`` (marker, ``Stream.flush_ok``, ``.flush()``),
+  ``infer.py`` (the 3-item annotation; ``s.flush()`` refused on a stream not
+  declared flushable, naming it), ``builder.py`` (``flush`` attribute on the
+  construct; ``s.flush()`` -> ``allo.stream_flush``), ``allo/netlist.py``
+  (``flush`` is a read), ``allo/dataflow.py`` (lifted as the consumer side;
+  ``check_flush_consumer`` refuses a flush in a kernel that puts to the stream
+  or never gets from it, naming stream and kernel).
+* IR: ``allo.stream_flush`` (``AlloOps.td``), visitor dispatch, a refusing
+  ``emitStreamFlush`` in the Vitis emitter (inherited by Catapult C++).
+* Simulator (``allo/backend/simulator.py``): the consumer's head pointer
+  jumps to the producer's tail, inside the same OpenMP critical/flush pattern
+  as get.
+* SystemC (``EmitSystemC.cpp``): ``AlloFifoClr<T, N>``, the fork's cleared
+  FIFO -- the vendor ``Connections::Fifo``'s structure (comb ``enq.rdy``,
+  ``deq.vld``, ``deq.dat``, next-state methods; one ``Seq`` thread;
+  ``FifoElem`` storage) plus a clear. The vendor FIFO has no clear and keeps its
+  state ``protected`` in a ``Seq`` thread we cannot extend, so flushable
+  streams (only) get the fork's own FIFO. The consumer gets ``sc_out<bool>
+  <s>_clr`` driven as a toggle (``<s>_tog`` register, reset to 0): while the
+  toggle differs from the FIFO's ``seen`` register the FIFO offers no token,
+  and the edge that ends that cycle discards every buffered token and that
+  cycle's enqueue -- zero cycles, nothing to deassert, back-to-back flushes are
+  back-to-back clears. In csim an ``In`` port under
+  ``CONNECTIONS_ACCURATE_SIM`` is itself a one-token buffer; the flush also
+  drops that token (``#ifndef __SYNTHESIS__``; found by the first csim run,
+  which issued one stale token per flush). Refused by name: depth 0,
+  ``empty()``/``full()`` on a flushable stream (no sideband yet). The
+  template is appended to the emitted header only when the design flushes a
+  stream, so every other design's text is unchanged (a first draft that always
+  emitted it moved the TinyTPU SystemC hash to ``c00d88ee…``, +3,408 bytes).
+* ``allo/backend/hls.py``: every non-SystemC HLS backend refuses a module with
+  ``s.flush()``, naming the channel(s).
+
+**Catapult** (``catapult_d25/``; one run): the test's region with
+``AlloFifoClr<ac_int<32,true>,4>`` synthesises (45 s, exit 0); its ``Seq`` is
+``Latency = 1`` as the vendor FIFO's; the clear (``clr``/``seen``) is in
+``concat_rtl.v``. Warnings: CIN-124 on ``Seq``'s signal writes ("should be
+scheduled with iomode=fixed"), which the vendor FIFO does not raise. Not done:
+a per-cycle check of the clear on the RTL (Verilator) -- the RTL column is
+track D's.
+
+**Tests** ``tests/dataflow/test_stream_flush.py`` (9 pass): a producer one
+token per step, a consumer one get every other step and flushes every sixth
+step (plus back-to-back flushes in a second trace), per-step ``ack``/``k``
+ordering; simulator and csim equal the model on every step, the token after
+each flush is the first put after it, the put of the flush step is dropped;
+the emitted shape; refusals (producer-side flush, undeclared stream, ``vhls``
+and ``catapult`` naming ``s``); the marker. Writing the second trace first
+deadlocked the simulator: the producer blocked on a full stream while the
+consumer waited for its ``ack`` -- the obligation now written in
+``stream_ports.rst`` and asserted by the test's model.
+
+**The F2 fetch queue** (``examples/minitpu/template/flush_stream.py``, track
+A's H6 prototype; ``units/fetch.py``'s ``f1`` holds the queue as body arrays
+and has no stream to flush): new form ``flush`` -- ``fifo``/``ftag`` are
+``Stream[..., 4, flush]`` and ``queue_flush`` calls ``.flush()`` on a branch
+or a reset, with no stale count, epoch or drain loop; ``drain`` and ``epoch``
+stay as the recorded workarounds (``logs/d25_flush_stream.log``):
+
+.. list-table::
+   :header-rows: 1
+
+   * - trace (RTL)
+     - ``flush`` sim / csim
+     - ``drain`` sim / csim
+     - ``epoch`` sim / csim
+   * - Phase 0 programs (3,804 cycles; 2,622 issued; flush->target {3: 153, 4: 7})
+     - **CONTRACT-MATCH** 24,362/24,362, 2,622 issued, {3: 153, 4: 7} / same
+     - match / match
+     - DIFF 24,348, 2,621 issued, {3: 152, 4: 8} / same
+   * - closed loop (3,134 cycles; 2,234; {3: 383})
+     - **CONTRACT-MATCH** 20,040/20,040 / same
+     - match / match
+     - match / match
+
+The Phase 0 program trace is the long trace that **hung** under the first
+(1-bit tag) epoch form (T-5); under ``flush`` it completes and matches on both
+backends in 1.6 s / 9.4 s. T-5's directed repro, two flushes with a full
+queue at gaps 0, 1, 2 (``scripts/f2_flushwrap.py``, ``logs/d25_flushwrap.log``):
+the target 4 issues first on both backends at every gap (the tag-only epoch
+issued 2, 3 first at gap 0).
+
+**Left (documented follow-up).** D-25's self-timed form -- an epoch of
+``ceil(log2(F + 1))`` bits for ``F`` flushes in flight on a declared one-deep
+flush link, carried by the channel -- is not built; a flushable stream between
+self-timed units carries the ordering obligation as the author's premise
+(``stream_ports.rst``). Also open: ``empty()``/``full()`` and arrays of
+flushable streams in SystemC (the front end accepts arrays; the emitter path
+is exercised only for scalar streams), and the RTL per-cycle check.

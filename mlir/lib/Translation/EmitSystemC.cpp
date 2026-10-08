@@ -448,6 +448,10 @@ private:
   void emitChannelTryGet(allo::ChannelTryGetOp op) override;
   void emitChannelTryPut(allo::ChannelTryPutOp op) override;
   void emitStreamEmpty(allo::StreamEmptyOp op) override;
+  void emitStreamFlush(allo::StreamFlushOp op) override;
+  // README D-25: per kernel, the flushable-stream ports it clears (`<port>_clr`
+  // toggle outputs, `<port>_tog` thread registers), reset in the reset action.
+  SmallVector<std::string, 2> flushPorts;
   void emitStreamFull(allo::StreamFullOp op) override;
   // Narrow a >64-bit ac_int to a native int/index with an explicit
   // .to_int64()/.to_uint64() (no implicit conversion under __SYNTHESIS__).
@@ -1734,6 +1738,7 @@ void SystemCModuleEmitter::emitAffineStore(affine::AffineStoreOp op) {  // overr
 
 // fwd decl (defined near emitStreamEmpty): does func query empty()/full() on arg?
 static bool streamArgQueried(func::FuncOp func, unsigned argIdx, bool wantEmpty);
+static bool streamArgFlushed(func::FuncOp func, unsigned argIdx);
 
 //===----------------------------------------------------------------------===//
 // Declared combinational outputs (README D-13, `Wire[T, comb]`)
@@ -2546,6 +2551,7 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
         return;
       }
   unresetThreadDead();
+  flushPorts.clear();
   os << "SC_MODULE(" << name << ") {\n";
   addIndent();
 
@@ -2621,6 +2627,15 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
         // empty()/full() (gate on usage, not direction -- a producer may query
         // full() on its Out-stream), and only for buffered streams (depth>=1) that
         // have an AlloFifo to source them. sc_in<bool> needs no Reset().
+        // README D-25: the consumer of a flushable stream drives the FIFO's
+        // clear as a toggle (one flip per flush, no deassert to schedule).
+        if (d != 'o' && streamArgFlushed(func, i)) {
+          indent();
+          os << "sc_out<bool> " << pn << "_clr;  // flush toggle (D-25)\n";
+          indent();
+          os << "bool " << pn << "_tog;\n";
+          flushPorts.push_back(pn);
+        }
         if (st.getDepth() != 0) {
           if (streamArgQueried(func, i, /*wantEmpty=*/true)) {
             indent();
@@ -3098,6 +3113,10 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
   // Raw sc_out wire ports must be driven in the reset action (Catapult CIN-233).
   for (auto &wp : wireOutPorts) {
     indent(); os << wp.first << ".write(" << wp.second << ");\n";
+  }
+  for (auto &fp : flushPorts) {  // README D-25: the flush toggle starts at 0
+    indent(); os << fp << "_tog = false;\n";
+    indent(); os << fp << "_clr.write(false);\n";
   }
   // Kernel-local comb storage (D-13) is zeroed here: Catapult requires every
   // signal a thread writes to be set in the reset action (CIN-233). The
@@ -3648,6 +3667,33 @@ static bool streamArgQueried(func::FuncOp func, unsigned argIdx, bool wantEmpty)
 // Does ANY kernel that receives this cross-kernel stream call empty()/full() on
 // it? If not, the buffered stream needs no occupancy sideband -- it can use a
 // plain Connections::Fifo instead of AlloFifoC (saves the status method + ports).
+// README D-25: does `func` call s.flush() on stream arg `argIdx`?
+static bool streamArgFlushed(func::FuncOp func, unsigned argIdx) {
+  bool found = false;
+  func.walk([&](allo::StreamFlushOp op) {
+    if (auto ba = llvm::dyn_cast<BlockArgument>(op->getOperand(0)))
+      if (ba.getArgNumber() == argIdx &&
+          ba.getOwner()->getParentOp() == func.getOperation())
+        found = true;
+  });
+  return found;
+}
+
+// README D-25: is this cross-kernel stream flushed by any kernel it reaches?
+static bool streamValueFlushed(Value sv) {
+  for (OpOperand &use : sv.getUses()) {
+    auto call = llvm::dyn_cast<func::CallOp>(use.getOwner());
+    if (!call)
+      continue;
+    auto mod = call->getParentOfType<ModuleOp>();
+    auto callee = mod ? mod.lookupSymbol<func::FuncOp>(call.getCallee()) : nullptr;
+    unsigned idx = use.getOperandNumber();
+    if (callee && idx < callee.getNumArguments() && streamArgFlushed(callee, idx))
+      return true;
+  }
+  return false;
+}
+
 static bool streamValueQueried(Value sv) {
   for (OpOperand &use : sv.getUses()) {
     auto call = llvm::dyn_cast<func::CallOp>(use.getOwner());
@@ -3671,6 +3717,35 @@ static bool streamValueQueried(Value sv) {
 // on a regular Connections In/Out port those return a sim-only latched-data flag
 // our channel never sets, so they never reflect FIFO state (data never moves). A
 // LOCAL self-FIFO instead reads its synchronous <stream>_cnt (see below).
+// README D-25: s.flush() flips the consumer's clear toggle; the stream's
+// AlloFifoClr sees the flip during this cycle and, at the edge that ends it,
+// discards every buffered token and the put of the same cycle. A get after the
+// flush in the same iteration waits (the FIFO gates its head while clearing).
+void SystemCModuleEmitter::emitStreamFlush(StreamFlushOp op) {  // override (base emitter)
+  Value stream = op->getOperand(0);
+  if (isLocalStream(stream) || !llvm::isa<BlockArgument>(stream)) {
+    op.emitError("flushable stream: s.flush() is legal only in the channel's one "
+                 "consumer, on a stream another kernel puts (README D-25)");
+    state.encounteredError = true;
+    return;
+  }
+  std::string pn = std::string(getName(stream).str());
+  auto st = llvm::cast<StreamType>(stream.getType());
+  indent();
+  os << pn << "_tog = !" << pn << "_tog; " << pn << "_clr.write(" << pn
+     << "_tog);  // flush (D-25)";
+  emitInfoAndNewLine(op);
+  // csim only: under CONNECTIONS_ACCURATE_SIM an In port is itself a one-token
+  // buffer (it latches a valid message before the thread pops it); that token
+  // left the FIFO before the flush, so it is discarded too. Zero-time in csim;
+  // the RTL port holds nothing (data moves only on the thread's Pop).
+  os << "#ifndef __SYNTHESIS__\n";
+  indent();
+  os << "{ " << getStreamPayloadTypeName(st.getBaseType(), linkPayloadUnsigned(stream))
+     << " _fl; " << pn << ".PopNB(_fl); }\n";
+  os << "#endif\n";
+}
+
 void SystemCModuleEmitter::emitStreamEmpty(StreamEmptyOp op) {  // override (base emitter)
   if (isLocalStream(op->getOperand(0))) {
     // self-FIFO empty(): read the synchronous occupancy counter, not the clocked
@@ -3951,7 +4026,29 @@ void SystemCModuleEmitter::emitTopModule(func::FuncOp func) {  // new (SystemC-o
       T = ipT->second;
     }
     std::string nm = std::string(addName(sc.getResult(), /*isPtr=*/false).str());
-    if (st.getDepth() == 0) {
+    if (sc->hasAttr("flush") && streamValueFlushed(sc.getResult())) {
+      // README D-25: a flushable stream is the fork's cleared FIFO.
+      std::string why;
+      if (st.getDepth() == 0)
+        why = "a depth-0 stream has no buffer to clear";
+      else if (streamValueQueried(sc.getResult()))
+        why = "empty()/full() on a flushable stream is not lowered yet";
+      if (!why.empty()) {
+        sc.emitError("flushable stream `") << getName(sc.getResult()) << "`: " << why
+                                            << " (README D-25)";
+        state.encounteredError = true;
+        continue;
+      }
+      indent();
+      os << "Connections::Combinational< " << T << " > " << nm << "_in;\n";
+      indent();
+      os << "Connections::Combinational< " << T << " > " << nm << "_out;\n";
+      indent();
+      os << "AlloFifoClr< " << T << ", " << st.getDepth() << " > " << nm
+         << "_fifo;  // flushable (D-25)\n";
+      indent();
+      os << "sc_signal<bool> " << nm << "_clr;\n";
+    } else if (st.getDepth() == 0) {
       indent();
       os << "Connections::Combinational< " << T << " > " << nm << ";\n";
     } else {
@@ -4339,6 +4436,12 @@ void SystemCModuleEmitter::emitTopModule(func::FuncOp func) {  // new (SystemC-o
            << ");\n";
         // Bind the occupancy sidebands the callee declared (usage-gated, mirrors
         // the port-decl condition), to this stream's top-level status signals.
+        if (streamDir(callee, opnd.index()) != 'o' &&
+            streamArgFlushed(callee, opnd.index())) {
+          indent();
+          os << instNames[it.index()] << "." << getName(carg) << "_clr("
+             << std::string(getName(ov).str()) << "_clr);\n";
+        }
         if (sty.getDepth() != 0) {
           std::string sbase = std::string(getName(ov).str());
           if (streamArgQueried(callee, opnd.index(), /*wantEmpty=*/true)) {
@@ -4436,8 +4539,11 @@ void SystemCModuleEmitter::emitTopModule(func::FuncOp func) {  // new (SystemC-o
     // consumer wire -> deq (Out). (AlloFifo's legacy ports were in/out.)
     indent(); os << nm << "_fifo.enq(" << nm << "_in);\n";
     indent(); os << nm << "_fifo.deq(" << nm << "_out);\n";
+    if (sc->hasAttr("flush") && streamValueFlushed(sc.getResult())) {
+      indent(); os << nm << "_fifo.clr(" << nm << "_clr);\n";
+    }
     // Only AlloFifoC (queried streams) has the occupancy ports to bind.
-    if (streamValueQueried(sc.getResult())) {
+    else if (streamValueQueried(sc.getResult())) {
       indent(); os << nm << "_fifo.empty_o(" << nm << "_empty_sig);\n";
       indent(); os << nm << "_fifo.full_o(" << nm << "_full_sig);\n";
     }
@@ -4743,6 +4849,89 @@ void SystemCModuleEmitter::emitModule(ModuleOp module) {  // override (base emit
       }
     });
   }
+
+// README D-25: appended after the device header only when a stream is flushed.
+static const char *allo_fifo_clr_header = R"XXX(
+// AlloFifoClr -- README D-25: a flushable stream's FIFO, the vendor
+// Connections::Fifo's structure (combinational enq.rdy / deq.vld / deq.dat /
+// next-state methods + one sequential thread) plus a synchronous clear. The
+// consumer drives `clr` as a TOGGLE: during the cycle in which clr differs from
+// `seen` the FIFO is clearing -- deq.vld is low (no token is handed out), and
+// at the edge that ends the cycle every buffered token AND this cycle's enq are
+// discarded (the enq handshake still completes: the put is dropped, as
+// sequencer_fetch_queue.sv drops the landing response of the flush cycle).
+// Zero cycles; nothing to deassert, so two flushes on consecutive cycles are
+// two clears. Unlike Connections::Fifo it has no line_trace and no marshalled
+// port variant (AUTO_PORT only, as the emitted kernels use).
+template <typename T, int N>
+SC_MODULE(AlloFifoClr) {
+  sc_in_clk clk;
+  sc_in<bool> rst;
+  Connections::In<T> enq;
+  Connections::Out<T> deq;
+  sc_in<bool> clr;
+  sc_signal<bool> seen, full, full_next;
+  sc_signal<int> head, tail, head_next, tail_next;  // head: enqueue slot; tail: dequeue slot
+  Connections::FifoElem<T> buf[N];  // the vendor's element: T in csim, its bits in synthesis
+  SC_HAS_PROCESS(AlloFifoClr);
+  AlloFifoClr(sc_module_name nm) : sc_module(nm), enq("enq"), deq("deq"), clr("clr") {
+#ifdef CONNECTIONS_SIM_ONLY
+    enq.disable_spawn();
+    deq.disable_spawn();
+#endif
+    SC_METHOD(EnqRdy); sensitive << full;
+    SC_METHOD(DeqVal); sensitive << full << head << tail << clr << seen;
+    SC_METHOD(DeqMsg); sensitive << tail << head << full;
+    for (int i = 0; i < N; ++i) sensitive << buf[i]._DATNAME_;
+    SC_METHOD(Next);
+    sensitive << enq._VLDNAME_ << deq._RDYNAME_ << full << head << tail << clr << seen;
+    SC_THREAD(Seq); sensitive << clk.pos(); async_reset_signal_is(rst, false);
+    tail.write(0);
+  }
+  static int inc(int i) { return i + 1 == N ? 0 : i + 1; }
+  bool empty() { return !full.read() && head.read() == tail.read(); }
+  bool clearing() { return clr.read() != seen.read(); }
+  void EnqRdy() { enq._RDYNAME_.write(!full.read()); }
+  void DeqVal() { deq._VLDNAME_.write(!empty() && !clearing()); }
+  void DeqMsg() { deq._DATNAME_.write(buf[tail.read()]._DATNAME_.read()); }
+  void Next() {
+    bool do_enq = enq._VLDNAME_.read() && !full.read();
+    bool do_deq = deq._RDYNAME_.read() && !empty() && !clearing();
+    if (clearing()) {          // discard all, and this cycle's enq
+      head_next.write(head.read());
+      tail_next.write(head.read());
+      full_next.write(false);
+      return;
+    }
+    int h = do_enq ? inc(head.read()) : head.read();
+    int t = do_deq ? inc(tail.read()) : tail.read();
+    head_next.write(h);
+    tail_next.write(t);
+    if (do_enq && !do_deq && h == tail.read()) full_next.write(true);
+    else if (do_deq && full.read()) full_next.write(false);
+    else full_next.write(full.read());
+  }
+  void Seq() {
+    full.write(false);
+    head.write(0);
+    tail.write(0);
+    seen.write(false);
+#pragma hls_unroll yes
+    for (int i = 0; i < N; ++i) buf[i].reset_state();
+    wait();
+    while (1) {
+      if (enq._VLDNAME_.read() && !full.read() && !clearing())
+        buf[head.read()]._DATNAME_.write(enq._DATNAME_.read());
+      head.write(head_next.read());
+      tail.write(tail_next.read());
+      full.write(full_next.read());
+      seen.write(clr.read());
+      wait();
+    }
+  }
+};
+
+)XXX";
 
   std::string device_header = R"XXX(
 //===------------------------------------------------------------*- C++ -*-===//
@@ -5238,14 +5427,22 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
 };
 
 )XXX";
+  // README D-25: the cleared FIFO is emitted only into a design that flushes a
+  // stream, so every other design's text (and hash) is unchanged.
+  bool anyFlush = false;
+  module.walk([&](allo::StreamFlushOp) { anyFlush = true; });
   if (std::getenv("ALLO_SYNC_RESET")) {
     // swap the async reset in the module templates (AlloMemPins/AlloFifo) to sync
     std::string dh(device_header);
+    if (anyFlush)
+      dh += allo_fifo_clr_header;
     for (size_t p; (p = dh.find("async_reset_signal_is")) != std::string::npos;)
       dh.replace(p, /*len("async_reset_signal_is")=*/21, "reset_signal_is");
     os << dh;
   } else {
     os << device_header;
+    if (anyFlush)
+      os << allo_fifo_clr_header;
   }
 
   // Every external SystemC IP the design instantiates needs its own header: the

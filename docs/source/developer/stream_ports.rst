@@ -222,6 +222,40 @@ Two honest limits on the cycle analysis, both conservative:
   refuse a depth-0 chain that is in fact acyclic. Depth-0 chains are not
   useful, and no design in this tree has one.
 
+Flushable streams (README D-25)
+-------------------------------
+
+``Stream[T, D, flush]`` adds one consumer-side operation, ``s.flush()``: every
+buffered token is discarded at that edge, and a put of the same edge is
+dropped. The rule, decided at construction and refused by name: the stream is
+declared flushable, and the flushing kernel is its one consumer (it gets from
+the stream, never puts to it). For the netlist rules a flush is a read.
+
+**The deadlock obligation**, which no rule decides. "The same edge" exists
+only through the composition: on the untimed simulator a flush discards what
+is buffered *when it runs*, and in csim what the FIFO accepted by the end of
+that cycle. So the units must order each step:
+
+* the producer's put of the flush step reaches the stream before the consumer
+  flushes -- e.g. the producer sends a per-step token after its data put, and
+  the consumer takes it before it flushes (``tests/dataflow/
+  test_stream_flush.py``'s ``ack``; the F2 fetch queue's ``k_push``) -- or the
+  producer hears of the flush in the same step and does not put (the F2
+  fetcher's ``k_flush``);
+* every put of a later step comes after the flush -- the producer takes a
+  per-step token the consumer sends after its flush (``k``; ``k_count``);
+* the producer must never block in ``put`` on a full stream while the consumer
+  waits for the producer's per-step token: with ``D`` the depth, the
+  producer's room test counts what is buffered, or the trace keeps it below
+  ``D`` (the test asserts this of its own trace).
+
+A cycle-locked producer/consumer pair meets the first two by construction. A
+self-timed producer may put before it hears of a flush; D-25 gives that pair an
+epoch of ``ceil(log2(F + 1))`` bits for ``F`` flushes in flight on a one-deep
+flush link, carried by the channel -- **not built** (a follow-up); until then a
+flushable stream between self-timed units carries the obligation above as
+the author's premise.
+
 The demonstration
 =================
 

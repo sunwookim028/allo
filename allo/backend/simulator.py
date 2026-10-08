@@ -558,6 +558,7 @@ def _process_function_streams(
                 allo_d.StreamTryPutOp,
                 allo_d.StreamEmptyOp,
                 allo_d.StreamFullOp,
+                allo_d.StreamFlushOp,
             ),
             func_stream_ops,
         )
@@ -571,6 +572,7 @@ def _process_function_streams(
                     allo_d.StreamTryPutOp,
                     allo_d.StreamEmptyOp,
                     allo_d.StreamFullOp,
+                    allo_d.StreamFlushOp,
                 ),
             )
             replace_ip = InsertionPoint(beforeOperation=stream_access_op)
@@ -618,6 +620,20 @@ def _process_function_streams(
             const_fifo_depth = arith_d.ConstantOp(
                 int_type, stream_type.get_dim_size(0), ip=replace_ip
             )
+            if isinstance(stream_access_op, allo_d.StreamFlushOp):
+                # README D-25: the consumer discards every buffered token --
+                # head (its own pointer) jumps to the producer's tail. A put
+                # that lands after this load survives: the composition orders
+                # the producer's same-step put before the flush (stream_ports.rst).
+                openmp_d.FlushOp([], ip=replace_ip)
+                tail_val = memref_d.LoadOp(memref=tail_ptr, indices=[], ip=replace_ip)
+                critical_op = openmp_d.CriticalOp(ip=replace_ip)
+                critical_ip = InsertionPoint(Block.create_at_start(critical_op.region))
+                memref_d.StoreOp(tail_val, head_ptr, [], ip=critical_ip)
+                openmp_d.TerminatorOp(ip=critical_ip)
+                openmp_d.FlushOp([], ip=replace_ip)
+                stream_access_op.operation.erase()
+                continue
             if isinstance(stream_access_op, allo_d.StreamEmptyOp):
                 # Flush before reading pointers to ensure we see the latest updates
                 openmp_d.FlushOp([], ip=replace_ip)

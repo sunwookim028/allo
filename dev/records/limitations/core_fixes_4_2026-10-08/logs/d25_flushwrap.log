@@ -1,0 +1,6 @@
+flush simulator gap 0 completed; addr [0, 0, 4, 5, 6, 7, 8, 9, 10, 11]
+flush systemc gap 0 completed; addr [0, 0, 4, 5, 6, 7, 8, 9, 10, 11]
+flush simulator gap 1 completed; addr [0, 0, 4, 5, 6, 7, 8, 9, 10, 11]
+flush systemc gap 1 completed; addr [0, 0, 4, 5, 6, 7, 8, 9, 10, 11]
+flush simulator gap 2 completed; addr [2, 2, 4, 5, 6, 7, 8, 9, 10, 11]
+flush systemc gap 2 completed; addr [2, 2, 4, 5, 6, 7, 8, 9, 10, 11]

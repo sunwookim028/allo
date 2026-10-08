@@ -1,0 +1,97 @@
+# Catapult 2024.2 csyn of tests/dataflow/test_stream_flush._region(8), whole region top, 3.33 ns (45 s wall, exit 0)
+# Info: $MGC_HOME/shared/include/connections/connections_fifo.h(267): Final schedule of SEQUENTIAL '/top/Connections::Fifo<ac_int<1,false>,2U,Connections::SYN_PORT>/Seq': Latency = 1, Area (Datapath, Register, Total) = 0.00, 0.00, 0.00 (CRAAS-12)
+# Info: $PROJECT_HOME/../kernel.cpp(523): Final schedule of SEQUENTIAL '/top/AlloFifoClr<ac_int<32,true>,4>/Seq': Latency = 1, Area (Datapath, Register, Total) = 0.00, 0.00, 0.00 (CRAAS-12)
+# Info: $PROJECT_HOME/../kernel.cpp(586): Final schedule of SEQUENTIAL '/top/prod_0/run': Latency = -1, Area (Datapath, Register, Total) = 14.96, 15.96, 30.92 (CRAAS-12)
+# Info: $PROJECT_HOME/../kernel.cpp(630): Final schedule of SEQUENTIAL '/top/cons_0/run': Latency = -1, Area (Datapath, Register, Total) = 67.75, 37.24, 104.99 (CRAAS-12)
+# Netlist written to file 'rtl.v' (NET-4)
+# Netlist written to file 'schedule.gnt' (NET-4)
+# Netlist written to file 'schematic.nlv' (NET-4)
+# Warning: $MGC_HOME/shared/include/connections/connections_fifo.h(267): SystemC thread 'Seq' should be scheduled with 'iomode=fixed' since it writes to sc_signal 'buffer(0).dat'. (CIN-124)
+# Warning: $MGC_HOME/shared/include/connections/connections_fifo.h(267): SystemC thread 'Seq' should be scheduled with 'iomode=fixed' since it writes to sc_signal 'buffer(1).dat'. (CIN-124)
+# Warning: $MGC_HOME/shared/include/connections/connections_fifo.h(267): SystemC thread 'Seq' should be scheduled with 'iomode=fixed' since it writes to sc_signal 'full'. (CIN-124)
+# Warning: $MGC_HOME/shared/include/connections/connections_fifo.h(267): SystemC thread 'Seq' should be scheduled with 'iomode=fixed' since it writes to sc_signal 'head'. (CIN-124)
+# Warning: $MGC_HOME/shared/include/connections/connections_fifo.h(267): SystemC thread 'Seq' should be scheduled with 'iomode=fixed' since it writes to sc_signal 'tail'. (CIN-124)
+# Warning: $PROJECT_HOME/../kernel.cpp(523): SystemC thread 'Seq' should be scheduled with 'iomode=fixed' since it writes to sc_signal 'buf(0).dat'. (CIN-124)
+# Warning: $PROJECT_HOME/../kernel.cpp(523): SystemC thread 'Seq' should be scheduled with 'iomode=fixed' since it writes to sc_signal 'buf(1).dat'. (CIN-124)
+# Warning: $PROJECT_HOME/../kernel.cpp(523): SystemC thread 'Seq' should be scheduled with 'iomode=fixed' since it writes to sc_signal 'buf(2).dat'. (CIN-124)
+# Warning: $PROJECT_HOME/../kernel.cpp(523): SystemC thread 'Seq' should be scheduled with 'iomode=fixed' since it writes to sc_signal 'buf(3).dat'. (CIN-124)
+# Warning: $PROJECT_HOME/../kernel.cpp(523): SystemC thread 'Seq' should be scheduled with 'iomode=fixed' since it writes to sc_signal 'full'. (CIN-124)
+# Warning: $PROJECT_HOME/../kernel.cpp(523): SystemC thread 'Seq' should be scheduled with 'iomode=fixed' since it writes to sc_signal 'head'. (CIN-124)
+# Warning: $PROJECT_HOME/../kernel.cpp(523): SystemC thread 'Seq' should be scheduled with 'iomode=fixed' since it writes to sc_signal 'seen'. (CIN-124)
+# Warning: $PROJECT_HOME/../kernel.cpp(523): SystemC thread 'Seq' should be scheduled with 'iomode=fixed' since it writes to sc_signal 'tail'. (CIN-124)
+# Warning: $PROJECT_HOME/../kernel.cpp(586): SystemC thread 'run' should be scheduled with 'iomode=fixed' since it writes to sc_signal 'done'. (CIN-124)
+# Warning: $PROJECT_HOME/../kernel.cpp(630): SystemC thread 'run' should be scheduled with 'iomode=fixed' since it writes to sc_signal 'done'. (CIN-124)
+# Warning: $PROJECT_HOME/../kernel.cpp(630): SystemC thread 'run' should be scheduled with 'iomode=fixed' since it writes to sc_signal 'v11_clr'. (CIN-124)
+# concat_rtl.v modules
+21:module ccs_in_wait_v1 (idat, rdy, ivld, dat, irdy, vld);
+67:module ccs_out_wait_v1 (dat, irdy, vld, idat, rdy, ivld);
+111:module top_comb (
+129:module AlloFifoClr_ac_int_32_true_4_comb (
+271:module AlloFifoClr_ac_int_32_true_4_Seq (
+360:module Connections_Fifo_ac_int_1_false_2U_Connections_SYN_PORT_comb (
+476:module Connections_Fifo_ac_int_1_false_2U_Connections_SYN_PORT_Seq (
+541:module prod_0_run_run_fsm (
+608:module prod_0_run_staller (
+627:module prod_0_run_v2_Pop_mioi_v2_Pop_mio_wait_dp (
+659:module prod_0_run_v2_Pop_mioi_v2_Pop_mio_wait_ctrl (
+688:module prod_0_run_v1_Push_mioi_v1_Push_mio_wait_dp (
+720:module prod_0_run_v1_Push_mioi_v1_Push_mio_wait_ctrl (
+749:module prod_0_run_v0_Push_mioi_v0_Push_mio_wait_dp (
+781:module prod_0_run_v0_Push_mioi_v0_Push_mio_wait_ctrl (
+811:module cons_0_run_run_fsm (
+883:module cons_0_run_staller (
+906:module cons_0_run_v12_Push_mioi_v12_Push_mio_wait_dp (
+938:module cons_0_run_v12_Push_mioi_v12_Push_mio_wait_ctrl (
+967:module cons_0_run_v9_Push_mioi_v9_Push_mio_wait_dp (
+999:module cons_0_run_v9_Push_mioi_v9_Push_mio_wait_ctrl (
+1028:module cons_0_run_v11_Pop_mioi_v11_Pop_mio_wait_ctrl (
+1046:module cons_0_run_v8_Pop_mioi_v8_Pop_mio_wait_dp (
+1112:module cons_0_run_v8_Pop_mioi_v8_Pop_mio_wait_ctrl (
+1141:module cons_0_run_v10_Pop_mioi_v10_Pop_mio_wait_dp (
+1173:module cons_0_run_v10_Pop_mioi_v10_Pop_mio_wait_ctrl (
+1202:module AlloFifoClr_ac_int_32_true_4 (
+1275:module Connections_Fifo_ac_int_1_false_2U_Connections_SYN_PORT (
+1338:module prod_0_run_v2_Pop_mioi (
+1397:module prod_0_run_v1_Push_mioi (
+1455:module prod_0_run_v0_Push_mioi (
+1517:module cons_0_run_v12_Push_mioi (
+1575:module cons_0_run_v9_Push_mioi (
+1635:module cons_0_run_v11_Pop_mioi (
+1677:module cons_0_run_v8_Pop_mioi (
+1740:module cons_0_run_v10_Pop_mioi (
+1799:module prod_0_run (
+1927:module cons_0_run (
+2166:module prod_0 (
+2207:module cons_0 (
+2262:module top (
+# clear logic: lines mentioning clr / seen in AlloFifoClr
+130:  enq_vld, enq_rdy, deq_vld, deq_rdy, deq_dat, clr, seen, full, full_next, head,
+138:  input clr;
+139:  input seen;
+177:  assign land_mx0w0 = ~(clr ^ seen);
+201:      = clr ^ seen;
+272:  clk, rst, enq_vld, enq_dat, clr, seen, full, full_next, head, head_next, tail_next,
+279:  input clr;
+280:  output seen;
+281:  reg seen;
+306:  assign or_dcpl_1 = (~((~ full) & enq_vld)) | (clr ^ seen);
+344:      seen <= 1'b0;
+350:      seen <= clr;
+1203:  clk, rst, enq_vld, enq_rdy, enq_dat, deq_vld, deq_rdy, deq_dat, clr
+1213:  input clr;
+1217:  wire seen;
+1237:      .clr(clr),
+1238:      .seen(seen),
+1255:      .clr(clr),
+1256:      .seen(seen),
+1929:      v10_dat, v11_vld, v11_rdy, v11_dat, v11_clr, v12_vld, v12_rdy, v12_dat
+1947:  output v11_clr;
+1948:  reg v11_clr;
+2075:      v11_clr <= 1'b0;
+2079:      v11_clr <= ~ v11_tog_sva;
+2209:      v10_dat, v11_vld, v11_rdy, v11_dat, v11_clr, v12_vld, v12_rdy, v12_dat
+2226:  output v11_clr;
+2250:      .v11_clr(v11_clr),
+2283:  wire v22_clr;
+2310:      .clr(v22_clr)
+2362:      .v11_clr(v22_clr),

@@ -85,7 +85,7 @@ public:
             allo::MinFixedOp, allo::MaxFixedOp, allo::PrintOp,
             allo::StreamConstructOp, allo::StreamGetOp, allo::StreamPutOp,
             allo::StreamTryGetOp, allo::StreamTryPutOp, allo::StreamEmptyOp,
-            allo::StreamFullOp,
+            allo::StreamFullOp, allo::StreamFlushOp,
             // Wire operations.
             allo::WireConstructOp, allo::WirePutOp, allo::WireGetOp,
             // Channel operations.
@@ -272,6 +272,7 @@ public:
   HANDLE(allo::StreamTryPutOp);
   HANDLE(allo::StreamEmptyOp);
   HANDLE(allo::StreamFullOp);
+  HANDLE(allo::StreamFlushOp);
 
   /// Wire operations.
   HANDLE(allo::WireConstructOp);

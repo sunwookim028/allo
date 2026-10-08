@@ -711,6 +711,9 @@ public:
   bool visitOp(allo::StreamFullOp op) {
     return emitter.emitStreamFull(op), true;
   }
+  bool visitOp(allo::StreamFlushOp op) {
+    return emitter.emitStreamFlush(op), true;
+  }
 
   /// Wire operations.
   bool visitOp(allo::WireConstructOp op) {
@@ -2321,6 +2324,20 @@ void allo::hls::VhlsModuleEmitter::emitStreamTryPut(StreamTryPutOp op) {
   emitValue(value);
   os << ");\n";
   emitInfoAndNewLine(op);
+}
+
+// README D-25: no `hls::stream` (nor the Catapult C++ ac_channel) can be
+// cleared, so a flushable stream is refused here, naming the channel. The
+// Python driver refuses first (hls.py); this is the emitter's own guard.
+void allo::hls::VhlsModuleEmitter::emitStreamFlush(StreamFlushOp op) {
+  std::string nm = "?";
+  if (auto *d = op->getOperand(0).getDefiningOp())
+    if (auto n = d->getAttrOfType<StringAttr>("name"))
+      nm = n.getValue().str();
+  op.emitError("flushable stream `")
+      << nm << "`: this backend cannot build a FIFO with a synchronous clear "
+               "(README D-25); build it with target=\"systemc\" or the simulator";
+  state.encounteredError = true;
 }
 
 void allo::hls::VhlsModuleEmitter::emitStreamEmpty(StreamEmptyOp op) {

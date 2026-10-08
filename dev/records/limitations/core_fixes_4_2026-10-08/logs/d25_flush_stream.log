@@ -1,0 +1,18 @@
+RTL fetch:iram program: 3804 cycles, 2622 bundles issued, flush->target {3: 153, 4: 7}
+CONTRACT-MATCH fetch f2_flush simulator program: 24362/24362 defined slots; 2622/2622 bundles issued (order = RTL); flush->target {3: 153, 4: 7} (1.6s)
+CONTRACT-MATCH fetch f2_drain simulator program: 24362/24362 defined slots; 2622/2622 bundles issued (order = RTL); flush->target {3: 153, 4: 7} (1.8s)
+CONTRACT-DIFF  fetch f2_epoch simulator program: 24348/24362 defined slots; 2621/2622 bundles issued (order DIFFERS); flush->target {3: 152, 4: 8} (1.6s); differing {'rd_addr': 2, 'rd_addr_valid': 2, 'bundle_valid': 1, 'bundle_data': 4, 'bundle_addr': 4, 'empty': 1} first at {'rd_addr': 1991, 'rd_addr_valid': 1990, 'bundle_valid': 1988, 'bundle_data': 1989, 'bundle_addr': 1989, 'empty': 1988}
+CONTRACT-MATCH fetch f2_flush systemc program: 24362/24362 defined slots; 2622/2622 bundles issued (order = RTL); flush->target {3: 153, 4: 7} (9.4s)
+CONTRACT-MATCH fetch f2_drain systemc program: 24362/24362 defined slots; 2622/2622 bundles issued (order = RTL); flush->target {3: 153, 4: 7} (9.9s)
+CONTRACT-DIFF  fetch f2_epoch systemc program: 24348/24362 defined slots; 2621/2622 bundles issued (order DIFFERS); flush->target {3: 152, 4: 8} (9.7s); differing {'rd_addr': 2, 'rd_addr_valid': 2, 'bundle_valid': 1, 'bundle_data': 4, 'bundle_addr': 4, 'empty': 1} first at {'rd_addr': 1991, 'rd_addr_valid': 1990, 'bundle_valid': 1988, 'bundle_data': 1989, 'bundle_addr': 1989, 'empty': 1988}
+RTL fetch:iram closed-loop: 3134 cycles, 2234 bundles issued, flush->target {3: 383}
+CONTRACT-MATCH fetch f2_flush simulator closed-loop: 20040/20040 defined slots; 2234/2234 bundles issued (order = RTL); flush->target {3: 383} (1.5s)
+CONTRACT-MATCH fetch f2_drain simulator closed-loop: 20040/20040 defined slots; 2234/2234 bundles issued (order = RTL); flush->target {3: 383} (1.7s)
+CONTRACT-MATCH fetch f2_epoch simulator closed-loop: 20040/20040 defined slots; 2234/2234 bundles issued (order = RTL); flush->target {3: 383} (1.5s)
+CONTRACT-MATCH fetch f2_flush systemc closed-loop: 20040/20040 defined slots; 2234/2234 bundles issued (order = RTL); flush->target {3: 383} (9.9s)
+CONTRACT-MATCH fetch f2_drain systemc closed-loop: 20040/20040 defined slots; 2234/2234 bundles issued (order = RTL); flush->target {3: 383} (8.9s)
+CONTRACT-MATCH fetch f2_epoch systemc closed-loop: 20040/20040 defined slots; 2234/2234 bundles issued (order = RTL); flush->target {3: 383} (9.4s)
+
+real	2m15.954s
+user	1m55.742s
+sys	0m13.527s

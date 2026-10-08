@@ -337,6 +337,33 @@ at ``L`` = 1 and 2. A harness that compares a port's output with an RTL
 trace sampled *after* the edge (the U2 word array's rows) shifts it by one
 row (``vpu_word_array.RESP_SHIFT``).
 
+Flushable streams (README D-25): ``s.flush()`` on each backend
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``Stream[T, D, flush]``; ``s.flush()`` by the stream's one consumer discards
+every buffered token and drops a put of the same edge.
+
+* **Simulator** (order only). The consumer's head pointer jumps to the
+  producer's tail: whatever is buffered when the flush runs is gone, a put
+  that lands after it survives. "The same edge" is the composition's per-step
+  exchange (:doc:`/developer/stream_ports`, the flush obligation).
+* **SystemC csim and Catapult.** The stream is ``AlloFifoClr<T, D>`` (the
+  vendor ``Connections::Fifo``'s structure plus a clear; the vendor FIFO has
+  none). The consumer flips a toggle port ``<s>_clr``; during the cycle in
+  which the toggle differs from the FIFO's ``seen`` register the FIFO hands out
+  no token, and at the edge that ends it discards every buffered token and that
+  cycle's enqueue (the handshake completes; the data is dropped) -- zero
+  cycles, ``sequencer_fetch_queue.sv``'s ``count_q <= 0`` with its landing
+  response dropped. In csim an ``In`` port under ``CONNECTIONS_ACCURATE_SIM``
+  is itself a one-token buffer, so the flush also drops that token
+  (``#ifndef __SYNTHESIS__``; the RTL port holds nothing). A get after a flush
+  in the same iteration waits for the next token, as on the simulator.
+  Catapult 2024.2 builds the FIFO (``dev/records/limitations/
+  core_fixes_4_2026-10-08.rst``).
+* **Vitis, the Catapult C++ flow, every other HLS backend**: refused, naming
+  the channel. A depth-0 flushable stream, and ``empty()``/``full()`` on one,
+  are refused by the SystemC emitter.
+
 ``df.get_pid()`` with ``mapping=[N]``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -30,6 +30,7 @@ from .types import (
     Stream,
     Wire,
     comb,
+    flush as flush_marker,
     Channel,
     Stateful,
     ConstExpr,
@@ -109,15 +110,26 @@ class TypeInferer(ASTVisitor):
             else:
                 dtype = ASTResolver.resolve(node.value, ctx.global_vars)
             if dtype is Stream:
-                # e.g., pipe: Stream[Ty, 4]
-                assert (
-                    isinstance(node.slice, ast.Tuple) and len(node.slice.elts) == 2
-                ), "Only support `ele_type` and `depth` for now"
+                # e.g., pipe: Stream[Ty, 4], or flushable (README D-25):
+                # pipe: Stream[Ty, 4, flush]
+                assert isinstance(node.slice, ast.Tuple) and len(
+                    node.slice.elts
+                ) in (2, 3), "Stream expects `ele_type`, `depth` and optionally `flush`"
+                is_flush = False
+                if len(node.slice.elts) == 3:
+                    flag = ASTResolver.resolve(node.slice.elts[2], ctx.global_vars)
+                    assert flag is flush_marker, (
+                        f"Stream[T, D, {ast.unparse(node.slice.elts[2])}]: the only "
+                        "Stream modifier is `flush` (allo.ir.types.flush, README D-25)"
+                    )
+                    is_flush = True
                 base_type, base_shape, _ = TypeInferer.visit_type_hint(
                     ctx, node.slice.elts[0]
                 )
                 depth = ASTResolver.resolve(node.slice.elts[1], ctx.global_vars)
-                stream_dtype = Stream(dtype=base_type, shape=base_shape, depth=depth)
+                stream_dtype = Stream(
+                    dtype=base_type, shape=base_shape, depth=depth, flush=is_flush
+                )
                 shape = tuple()
                 return stream_dtype, shape, None
             if dtype is Wire:
@@ -1213,6 +1225,24 @@ class TypeInferer(ASTVisitor):
                     node.dtype = (val.dtype.dtype, uint1)
                     node.func.value.shape = tuple()
                     node.func.value.dtype = val.dtype
+                elif node.func.attr == "flush":
+                    # README D-25: s.flush() on a stream declared flushable
+                    vid = (
+                        node.func.value.id
+                        if isinstance(node.func.value, ast.Name)
+                        else node.func.value.value.id
+                    )
+                    val = ctx.get_symbol(vid)
+                    sdt = val.dtype if hasattr(val, "dtype") else None
+                    if not getattr(sdt, "flush_ok", False):
+                        raise RuntimeError(
+                            f"{vid}.flush(): stream `{vid}` is not declared flushable; "
+                            f"declare it Stream[T, D, flush] (README D-25)"
+                        )
+                    node.shape = tuple()
+                    node.dtype = None
+                    node.func.value.shape = tuple()
+                    node.func.value.dtype = sdt
                 elif node.func.attr in {"empty", "full"}:
                     vid = (
                         node.func.value.id

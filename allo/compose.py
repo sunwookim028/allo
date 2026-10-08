@@ -29,14 +29,14 @@ from dataclasses import dataclass, field, replace as _dc_replace
 
 import allo
 import allo.dataflow as df
-from allo.ir.types import (Stateful, Stream, UInt, Wire, comb, int8, int16,
+from allo.ir.types import (Stateful, Stream, UInt, Wire, comb, flush, int8, int16,
                            int32, uint1)
 
 # Names every unit body may use without declaring them: the front end itself.
 FRONTEND_NAMES = {"allo": allo, "df": df, "Stream": Stream, "UInt": UInt,
                   "int8": int8, "int16": int16, "int32": int32,
                   "uint1": uint1, "Wire": Wire, "comb": comb,
-                  "Stateful": Stateful}
+                  "Stateful": Stateful, "flush": flush}
 _BUILTINS = {"range", "len", "min", "max", "abs", "int", "bool"}
 
 
@@ -60,6 +60,9 @@ class Channel:
     # SystemC-only; ``Architecture.region(target="simulator")`` emits every
     # link as a Stream, since the simulator is untimed and refuses Wire.
     kind: str = "stream"
+    # README D-25: a flushable stream, ``Stream[T, D, flush]``; its one
+    # consumer may call ``.flush()``. Stream links only.
+    flush: bool = False
 
     def __post_init__(self):
         """A packed word declares how many lanes it carries and how wide one
@@ -83,6 +86,8 @@ class Channel:
             f"lane width to derive one from")
         assert self.kind in {"stream", "wire", "comb"}, (
             f"channel {self.name}: kind {self.kind!r} is not stream, wire or comb")
+        assert not self.flush or self.kind == "stream", (
+            f"channel {self.name}: only a Stream can be flushable (README D-25)")
         assert self.kind == "stream" or not self.shape, (
             f"channel {self.name}: an array of {self.kind} links is not supported")
 
@@ -93,7 +98,8 @@ class Channel:
     def declaration_as(self, kind: str) -> str:
         dims = f"[{', '.join(self.shape)}]" if self.shape else ""
         if kind == "stream":
-            line = f"{self.name}: Stream[{self.dtype}, {self.depth}]{dims}"
+            fl = ", flush" if self.flush else ""
+            line = f"{self.name}: Stream[{self.dtype}, {self.depth}{fl}]{dims}"
         elif kind == "wire":
             line = f"{self.name}: Wire[{self.dtype}]"
         else:

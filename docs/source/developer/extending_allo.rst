@@ -724,6 +724,38 @@ primitive in this tree can currently falsify a standing claim. It belongs to
 whoever next touches ``LoopTransformations.cpp``.
 
 
+6. A flushable stream, ``Stream[T, D, flush]`` -- **done** (README D-25)
+-------------------------------------------------------------------------
+
+The fetch queue of every sequencer with branches is flushed; without a flush
+an Allo stream either drains in one iteration (several gets in a cycle: not
+buildable) or drops stale tokens by count or epoch (a bundle lost under a full
+queue, a 1-bit epoch wrong after two close flushes: U4 track A H6, T-5).
+
+**The rule.** ``s.flush()`` is legal **iff** ``s`` is declared ``Stream[T, D,
+flush]`` (Python has no keyword subscripts; ``flush`` is a marker in
+``allo.ir.types``, as ``comb`` is for ``Wire``) **and** the calling kernel is
+the stream's one consumer: it gets from ``s`` and never puts to it. Both are
+decided at construction and refused by name -- an undeclared stream by the
+type inferer, a producer-side or a non-reading flush in
+``allo.dataflow.check_flush_consumer`` -- and ``flush`` is a read for the
+``@df.unit`` netlist (``allo.netlist.READS``). Every backend that cannot build
+a FIFO with a synchronous clear refuses, naming the channel (Vitis and the
+Catapult C++ flow in ``hls.py`` and in the emitter; a depth-0 stream, and
+``empty()``/``full()`` on a flushable stream, in the SystemC emitter).
+
+**The analyses it carries.** The IR op ``allo.stream_flush`` and the
+construct's ``flush`` attribute; the simulator's lowering (the consumer's head
+pointer jumps to the producer's tail); the SystemC lowering (``AlloFifoClr``,
+a clear toggled by the consumer, zero cycles). Semantics per backend:
+:doc:`/developer/dataflow_semantics`, "Flushable streams".
+
+**The obligation** (declared, not checked): the put of the flush step must be
+ordered before the flush, and every later put after it, by the composition's
+per-step exchange -- a cycle-locked pair does this by construction; a
+self-timed producer also needs the epoch of D-25 (not built: a follow-up).
+:doc:`/developer/stream_ports`, "Flushable streams", states it.
+
 Before you claim an extension is legal
 ======================================
 

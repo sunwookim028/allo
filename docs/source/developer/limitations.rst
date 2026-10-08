@@ -394,6 +394,11 @@ checked-in snapshot.
        links, ``t + L`` on Wire links (U4 track A T-2; track C C8)
      - none yet (closed on ``core-fixes-4``)
 
+   * - :ref:`M <limitation-m>`
+     - No stream could be flushed (U4 track A T-4/H6; T-5 the epoch
+       workaround's failure)
+     - none yet (closed on ``core-fixes-4``: README D-25)
+
 :ref:`Item 13 <limitation-13>` is **not** in this table: it was largely
 retracted, but a real convenience gap (no ``allo.dma`` intrinsic) remains
 under the same item number, so its status is not unambiguous enough to close
@@ -728,3 +733,18 @@ owner's iterations on every link kind (:doc:`/developer/dataflow_semantics`,
 ``examples/minitpu/units/fetch_d12.py`` and ``dma_unit.py``. Test
 ``tests/dataflow/test_compose_port_latency.py``; record
 ``dev/records/limitations/core_fixes_4_2026-10-08.rst``.
+
+.. _limitation-m:
+
+M. No stream could be flushed -- closed (README D-25)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Found by U4 track A (T-4/H6): a sequencer's fetch queue is flushed on every
+taken branch; the Allo forms without a flush either drained several tokens in
+one iteration (not buildable) or dropped stale tokens by count or a 1-bit
+epoch, which lost a bundle under a full queue and, with the tag alone, issued
+stale bundles after two close flushes and hung the long trace (T-5). Closed by
+``Stream[T, D, flush]`` and ``s.flush()`` (:doc:`/developer/stream_ports`,
+:doc:`/developer/dataflow_semantics`). Not built: D-25's epoch for a
+self-timed producer (a follow-up). Tests ``tests/dataflow/test_stream_flush.py``;
+record ``dev/records/limitations/core_fixes_4_2026-10-08.rst``.

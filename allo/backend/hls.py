@@ -186,6 +186,30 @@ def unreset_storage_of(module):
     return names
 
 
+def flushed_streams_of(module):
+    """Names of the streams ``s.flush()`` is called on in ``module`` (README
+    D-25): the ``name`` of each ``allo.stream_flush``'s stream, else the
+    flushable constructs."""
+    names = set()
+
+    def walk(op):
+        for region in op.regions:
+            for block in region:
+                for o in block.operations:
+                    if o.operation.name == "allo.stream_flush":
+                        names.add(None)
+                    if (o.operation.name == "allo.stream_construct"
+                            and "flush" in o.attributes and "name" in o.attributes):
+                        constructs.add(f"`{o.attributes['name'].value}`")
+                    walk(o.operation)
+
+    constructs = set()
+    walk(module.operation)
+    if not names:
+        return []
+    return sorted(constructs) or ["<stream argument>"]
+
+
 def codegen_tcl(top, configs):
     out_str = """# Copyright Allo authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
@@ -504,6 +528,18 @@ class HLSModule:
                         f'the SystemC backend (target="systemc"), not "{platform}": '
                         "this backend has no measured form that leaves storage "
                         "unreset. Use target=\"systemc\", or declare it `@ Stateful`."
+                    )
+            # README D-25: a flushable stream lowers to a FIFO with a
+            # synchronous clear, which only the SystemC flow builds; every
+            # other HLS backend refuses it, naming the channel.
+            if platform != "systemc":
+                flushed = flushed_streams_of(self.module)
+                if flushed:
+                    raise NotImplementedError(
+                        f"flushable stream {', '.join(flushed)} (`Stream[T, D, "
+                        f"flush]` with s.flush(), README D-25) is only lowered by "
+                        f'the SystemC backend (target="systemc"), not "{platform}": '
+                        "this backend cannot build a FIFO with a synchronous clear."
                     )
             if platform == "systemc":
                 systemc.stamp_arg_dirs(self.module)

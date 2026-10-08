@@ -73,6 +73,7 @@ public:
   void emitStreamTryGet(allo::StreamTryGetOp op) override;
   void emitStreamTryPut(allo::StreamTryPutOp op) override;
   void emitStreamEmpty(allo::StreamEmptyOp op) override;
+  void emitStreamFlush(allo::StreamFlushOp op) override;
   void emitStreamFull(allo::StreamFullOp op) override;
 
   /// Top-level MLIR module emitter.
