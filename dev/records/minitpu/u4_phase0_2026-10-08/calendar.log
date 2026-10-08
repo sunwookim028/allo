@@ -1,0 +1,11 @@
+class        L(rtl) W(rtl) RAW(rtl) | W asm  W json  W pkg(L+2) | verdict
+load              4      6        7 | [6]         6         6  | CALENDAR-MATCH
+alu               3      5        6 | [5]         5         5  | CALENDAR-MATCH
+sfu               5      7        8 | [7]         7         7  | CALENDAR-MATCH
+reduce           13     15       16 | [15]       15        15  | CALENDAR-MATCH
+lane_reduce       9     11       12 | [11]       11        11  | CALENDAR-MATCH
+txout             1      3        4 | [3]         3         3  | CALENDAR-MATCH
+mpop              1      3        4 | [3]         3         3  | CALENDAR-MATCH
+CALENDAR-MATCH pair sweep: 586 (a, b, d) cases; two writes merged into one on the RTL in 15, rule W_a = d + W_b gives 15, asm _Timeline refuses 15
+   colliding cases: [('alu', 'txout', 2), ('lane_reduce', 'alu', 6), ('lane_reduce', 'load', 5), ('lane_reduce', 'sfu', 4), ('lane_reduce', 'txout', 8), ('load', 'alu', 1), ('load', 'txout', 3), ('reduce', 'alu', 10), ('reduce', 'lane_reduce', 4), ('reduce', 'load', 9), ('reduce', 'sfu', 8), ('reduce', 'txout', 12), ('sfu', 'alu', 2), ('sfu', 'load', 1), ('sfu', 'txout', 4)]
+   vpu.sv $onehot0 (vpu.sv:370) fired on 14; silent: [('reduce', 'lane_reduce', 4)]
