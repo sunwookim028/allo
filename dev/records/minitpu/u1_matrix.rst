@@ -485,6 +485,16 @@ the ISA JSON moves from ``docs/`` to a top-level ``isa/`` on branch
   gates run on it; our ``gen_isa_delta.py --check`` re-derives against the
   pinned commit. Nothing blocks before U5.
 
+**Checkpoint 19, 2026-10-08:** README D-21 -- the owner's short-term
+baseline: ``examples/minitpu-rtl/`` claiming "MiniTPU RTL obtained from Allo,
+mostly as RTL IP" (whole-core shim planned first, the hybrid real-``mxu.sv``
+in parallel), and the inverse angle, an Allo-synthesized MXU integrated into
+MiniTPU under its own ISA version. PR #48 (``RTLModule``) is being probed
+read-only (trial merge, its tests on this host, an ``mxu.sv`` descriptor);
+merging it is the owner's review. An audit of the 30 open fork issues
+against this month's fixes and decisions is in progress (no posting).
+Also started: U4 Phase 0 (prep only) and the TinyTPU-as-instance track.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
