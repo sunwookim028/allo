@@ -510,6 +510,31 @@ not a requirement). Issue audit recorded
 ``main``, prune the 13 merged branches, add the README naming paragraph
 (after the cleanup lands).
 
+**Checkpoint 26 (2026-10-08, the RTL-wrapped core passes; #48 on u1-pilot).**
+M-R1, M-R2 and M-R2b landed (``minitpu_rtl_m1_2026-10-08.rst``,
+``minitpu_rtl_m2b_2026-10-08.rst``): the whole ``minitpu_core.sv`` as one
+``RTLModule`` behind a generated core-seam shim inside a
+``compose.Architecture`` region on the simulator; all 52 oracle launches
+bit-identical to MiniTPU's testbench digests, and with MiniTPU's own DDR
+bridge inside the shim the cycle counts equal the testbench's on 52/52 (the
+direct-memory mode kept as ``--memory direct``). Folded into
+``examples/minitpu/rtl/`` (one design tree; the SV under
+``examples/minitpu/rtl/rtl/``). PR #48 merged into ``u1-pilot``
+(``48842407``) with its follow-up (Verilator 5 ``--json-only``,
+``verilator_args=``, ``max_stall=``, Sphinx page
+``backends/rtl_module.rst``, the stream-wiring check now counting IP calls);
+the 222-vs-175 cosim discrepancy was MAXDIM 64 vs 16, not the host.
+Tool findings from the wrap (for the matrix): an RTL IP enters a
+composition only as a parameter, no call-vs-port-direction check; no
+wide/multi-lane ``MemPort`` (eight banks + host interleave; a write and a
+read ``MemPort`` on one array, write listed first -- undocumented transactor
+order); fixed input-stream size pads the program (caps 1,280 bundles); no
+Verilator build cache (70 s per process); the IP call is untimed against the
+region. M-R3 (first swap, the Allo MXU as RTL in the same Verilated model)
+needs a file-list replacement option and a submodule port check; it waits
+for a DIM-16 Allo MXU RTL (the Vitis route). Next regression to ``main``
+after U4 track A lands.
+
 **Landing procedure for ISA deltas (minitpu-comp, 2026-10-08).** Target
 ``sunwookim028/minitpu-tmp`` branch ``master`` (``e5c2222`` at the time; the
 only maintained branch), from a pushed feature branch. The PR touches only
