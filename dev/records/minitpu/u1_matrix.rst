@@ -510,6 +510,24 @@ not a requirement). Issue audit recorded
 ``main``, prune the 13 merged branches, add the README naming paragraph
 (after the cleanup lands).
 
+**Checkpoint 21 (2026-10-08, two D-21 probes landed; owner review pending).**
+``pr48_probe_2026-10-08.md``: PR #48 merges onto ``main`` with two one-hunk
+conflicts and leaves every existing design's emission byte-identical; as
+submitted it simulates nothing on the pinned Verilator 5.052 (``--xml-only``
+is gone; a ~50-line ``--json-only`` port gives 60/60); raw ``mxu.sv`` is
+refused at the first pin (enum, packed arrays, >32-bit payloads), a 60-line
+shim at DIM=2 runs bit-exact through its Verilator transactor as a *tile op*;
+vmatload/vmatpush/vmatpop as separate instructions on one MXU are
+inexpressible (fixed transfer counts, one instance per object, ``ii=0``).
+``minitpu_rtl_plan_2026-10-08.rst``: the whole-core baseline should wrap
+``minitpu_core.sv`` (no AXI; a ready/valid credit memory pipe) rather than the
+AXI top; M-R0 (oracle digests from MiniTPU's own TB, no #48 needed) then M-R1
+(one GEMM bit-identical) / M-R2 (the ``sim_kernel.py`` set); 3.5-4.5
+agent-days; eleven owner decisions in its §6, the first being core seam vs
+AXI top and whether #48 may be extended. Provisional call while the owner is
+away: M-R0 may start (it touches neither tree); nothing else on the
+``minitpu-rtl`` track until the owner answers §6 and decides on #48.
+
 **Anchors (for anyone resuming this work), 2026-10-08.** MiniTPU is the
 practical design driver; TinyTPU is the toy instance for communicating the
 programming model (D-22). The ladder is a probe of the tools (D-9): findings
