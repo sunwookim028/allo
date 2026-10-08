@@ -510,6 +510,23 @@ not a requirement). Issue audit recorded
 ``main``, prune the 13 merged branches, add the README naming paragraph
 (after the cleanup lands).
 
+**Checkpoint 23 (2026-10-08, U4 wave 1 started; D-23/D-24).** The owner
+answered the U4 and merge questions: D-23 (the VPU command as three
+valid-qualified slot Streams plus four declared resources, payload gating a
+recorded deviation, with the condition that blocking streams cost neither a
+deadlock nor issue rate) and D-24 (cycle-locked first, self-timed compared);
+both TinyTPU branches merged as they were; all findings filed (MiniTPU to
+its issue repo, two Allo core bugs upstream, two fork defects). Merged into
+``u1-pilot`` without conflict: ``u4-phase0``, ``minitpu-rtl-m0``,
+``minitpu-rtl-mxu``, ``tinytpu-example``, ``tinytpu-instance`` (quick gates:
+compose/instance/tutorial tests 23 passed, ``gen_isa --check`` OK); their
+branches and worktrees deleted. Running: PR #48 merge + follow-up fixes
+(branch ``pr48-merge``), U4 tracks A ``u4-front``, B ``u4-issue``, C
+``u4-dma`` (one worktree each, own bindings), the issue filing, and the
+``u1-pilot`` -> ``main`` regression for this batch. Held per the owner: Allo's
+MXU into MiniTPU's tree (c2) until Catapult II=1 and the ``versions`` seam;
+its DIM-4 link-depth sweep is the first step when it resumes.
+
 **Checkpoint 22 (2026-10-08, owner decisions on D-21; U3 on main).**
 The owner settled the four D-21 choices (README D-21, last bullet): core seam
 first; merge PR #48 with a fork follow-up fixing its debts; the whole-core
