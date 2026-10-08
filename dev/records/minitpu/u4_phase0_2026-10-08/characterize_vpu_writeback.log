@@ -1,12 +1,13 @@
 == vpu_writeback:shipped: u4_vpu_wb (trace) params={} defines=[]
-   ok  singles                      legal      491 cyc  defined 2440/2440 masked 1488  seed-diff 0  asserts 0
-   ok  pairs                        illegal  14087 cyc  defined 70420/70420 masked 42276  seed-diff 0  asserts 20  write-port collisions (asserted)=20, write-port collisions (silent, one source bit)=1
-   ok  random-legal-0               legal     3023 cyc  defined 15100/15100 masked 9084  seed-diff 0  asserts 0
-   ok  random-legal-1               legal     3023 cyc  defined 15100/15100 masked 9084  seed-diff 0  asserts 0
-   ok  random-any-2                 illegal   3022 cyc  defined 15095/15095 masked 9081  seed-diff 0  asserts 279  write-port collisions (asserted)=279, write-port collisions (silent, one source bit)=8
-   ok  matrix-pops                  legal      572 cyc  defined 2845/2845 masked 1731  seed-diff 0  asserts 0
+   ok  singles                      legal      491 cyc  defined 2440/2440 masked 1979  seed-diff 0  asserts 0
+   ok  pairs                        illegal  14087 cyc  defined 70420/70420 masked 56363  seed-diff 0  asserts 20  write-port collisions (asserted)=20, write-port collisions (silent, one source bit)=1
+   ok  random-legal-0               legal     3023 cyc  defined 15100/15100 masked 12107  seed-diff 0  asserts 0
+   ok  random-legal-1               legal     3023 cyc  defined 15100/15100 masked 12107  seed-diff 0  asserts 0
+   ok  random-any-2                 illegal   3022 cyc  defined 15095/15095 masked 12103  seed-diff 0  asserts 279  write-port collisions (asserted)=279, write-port collisions (silent, one source bit)=8
+   ok  matrix-pops                  legal      572 cyc  defined 2845/2845 masked 2303  seed-diff 0  asserts 0
    undefined-slot census (slots, guess matched, moved with seed):
       ctrl_w_o           reset                  18  guess       18  seed-moved        0
+      dma_rdata_o        not modelled        24218  guess        0  seed-moved    24218
       matrix_busy_o      not modelled        24218  guess    24218  seed-moved        0
       rdata_a_o          not modelled        24218  guess      466  seed-moved    20035
       unsupported_o      not modelled        24218  guess    24218  seed-moved        0
@@ -44,4 +45,4 @@
    LATENCY-OK   mpop (result waiting): issue -> VREG write enable (W): declared 3, step probe 3
    LATENCY-OK   mpop: issue -> port A reads the new value (W+1), vd=9: declared 4, step probe 4
    LATENCY-OK   mpop: issue -> port A reads the new value (W+1), vd=30: declared 4, step probe 4
-   REF-MATCH vpu_writeback:shipped (12.8s)
+   REF-MATCH vpu_writeback:shipped (27.6s)

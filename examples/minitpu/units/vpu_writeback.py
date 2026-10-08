@@ -56,7 +56,7 @@ RTL = rtl.RtlUnit(
             ("dma_addr_i", 14), ("dma_wdata_i", LW)],
     outputs=[("ctrl_w_o", 8), ("wb_src_o", 6), ("wb_stage_valid_o", 1), ("wb_local_valid_o", 4),
              ("wb_local_addr_o", 5), ("rdata_a_o", 4 * LW), ("matrix_busy_o", 1),
-             ("unsupported_o", 1)],
+             ("unsupported_o", 1), ("dma_rdata_o", LW)],
     shape="trace",
     clk="clk_i",
     assertions=True,
@@ -117,7 +117,7 @@ class Prog:
                 f["raddr_a"] = raddr_a
             self.rows.append({"rst_ni": 1, "ctrl": f})
 
-    def preload(self):
+    def preload(self, data_rng=None):
         """Distinct VREG contents: DMA-write VMEM words 0..31 (four 32 B beats
         each, ``vpu_dma_group``), then ``vld v_k <- word k``. Needed because
         Verilator's ``--x-initial unique`` gives every entry of the unpacked
@@ -126,7 +126,7 @@ class Prog:
             for b in range(4):
                 self.idle()
                 self.rows[-1].update(dma_en_i=1, dma_we_i=1, dma_addr_i=4 * w + b,
-                                     dma_wdata_i=self.rng.getrandbits(LW))
+                                     dma_wdata_i=(data_rng or self.rng).getrandbits(LW))
         self.idle(4)
         for w in range(32):
             t = len(self.rows)
@@ -307,3 +307,74 @@ def probes(inst):
         res.append((f"mpop: issue -> port A reads the new value (W+1), vd={vd}", R.W["mpop"] + 1,
                     rtl.probe_trace(RTL, cmd, "rdata_a_o", ev)))
     return res
+
+
+def garbage_invariance(n_ops=600, seed=0, perturb=False):
+    """Same valid commands, two different random payloads on every field that
+    is not part of a valid op: the VREG file (read out through port A) and the
+    VMEM words the stream stores to (read out through the DMA port) must end
+    equal. Returns (vreg rows equal, vmem beats equal, rows compared).
+    ``perturb``: the control -- run B also changes one field of each valid
+    op (its destination), so the readouts must differ."""
+    def build(garbage):
+        rng = rng_for("u4-vpu-gi", seed)
+        g = rng_for("u4-vpu-gi-garbage", garbage)
+        p = Prog(g)
+        p.preload(rng_for("u4-vpu-gi-data", seed))
+        t0 = len(p.rows)
+        booked = set()
+        ops = []
+        for t in range(t0 + 2, t0 + 2 + n_ops):
+            r = rng.random()
+            if r < 0.35:
+                cls = rng.choice(CLASSES)
+                if t + R.W[cls] not in booked:
+                    booked.add(t + R.W[cls])
+                    ops.append((t, cls, rng.randrange(32), rng.randrange(32), rng.randrange(9),
+                                rng.randrange(32), rng.randrange(4), rng.randrange(64)))
+            elif r < 0.45:
+                ops.append((t, "store", rng.randrange(32), 0, 0, 0, 0, 64 + rng.randrange(64)))
+            elif r < 0.5:
+                ops.append((t, "txin", 0, rng.randrange(32), 0, 0, rng.randrange(4), 0))
+        for t, cls, vd, src, aop, srcb, idx, addr in ops:
+            f = _payload(g)  # garbage everywhere ...
+            if cls == "store":
+                f.update(vmem_valid=1, vmem_op=1, vmem_vreg_idx=vd, vmem_address=addr)
+            elif cls == "txin":
+                f.update(txin_valid=1, txin_index=idx, raddr_a=src)
+            else:  # ... except the fields of the valid op
+                f.update(_op(rng_for("op", t), cls, vd, src=src))
+                for n in R.VALIDS:
+                    f[n] = 0
+                for k in GROUP[cls]:
+                    f[k] = _op(rng_for("op", t), cls, vd, src=src)[k]
+                f["raddr_a"], f["raddr_b"], f["alu_op"] = src, srcb, [0, 1, 2, 3, 4, 5][aop % 6]
+                if cls == "txout":
+                    f["txout_index"] = idx
+                if cls == "load":
+                    f["vmem_address"] = addr
+            # the other ops' valid bits stay low, their fields garbage
+            if perturb and garbage:
+                for k in ("alu_vd", "sfu_vd", "reduce_vd", "txout_vd", "vmem_vreg_idx"):
+                    f[k] ^= 1
+            p.put(t, f)
+        p.idle(40)
+        reads = len(p.rows)
+        for v in range(32):
+            p.idle(1, raddr_a=v)
+        dma0 = len(p.rows)
+        for w in range(64, 128):
+            for bt in range(4):
+                p.idle()
+                p.rows[-1].update(dma_en_i=1, dma_we_i=0, dma_addr_i=4 * w + bt)
+        p.idle(4)
+        return p.cmd(tail=0), reads, dma0
+
+    (ca, reads, dma0), (cb, _, _) = build(0), build(1)
+    ra = rtl.run_trace(RTL, {q: rtl.pack(ca[q], w) for q, w in RTL.inputs})
+    rb = rtl.run_trace(RTL, {q: rtl.pack(cb[q], w) for q, w in RTL.inputs})
+    va = rtl.unpack(ra["rdata_a_o"][reads:reads + 32])
+    vb = rtl.unpack(rb["rdata_a_o"][reads:reads + 32])
+    da = rtl.unpack(ra["dma_rdata_o"][dma0:])
+    db = rtl.unpack(rb["dma_rdata_o"][dma0:])
+    return sum(x == y for x, y in zip(va, vb)), sum(x == y for x, y in zip(da, db)), (32, len(da))
