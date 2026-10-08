@@ -415,6 +415,11 @@ private:
     llvm::SmallVector<std::string, 2> globals; // unreset globals this kernel touches
     llvm::DenseSet<Operation *> wrSet;         // ops the `wr` method emits
     Block *body = nullptr;                     // the iteration block holding the stores
+    // README D-14, lowering extended (2026-10-08, U4 C2): in a kernel that is
+    // not Wire-only (a Stream, channel or array port), one iteration is not one
+    // clock edge, so the clock-edge `wr` method does not apply; the storage is
+    // a plain module member the thread writes, with no reset action.
+    bool member = false;
   };
   UnresetPlan unrst;
   enum class CombMode { Normal, Thread, Method, WriteMethod } combMode = CombMode::Normal;
@@ -425,6 +430,10 @@ private:
   bool isCombStorageGlobal(memref::GlobalOp g);
   bool isUnresetGlobal(memref::GlobalOp g) {
     return llvm::is_contained(unrst.globals, g.getSymName().str());
+  }
+  // Unreset storage lowered as signal storage written by `wr` (Wire-only kernels).
+  bool isUnresetSignalGlobal(memref::GlobalOp g) {
+    return !unrst.member && isUnresetGlobal(g);
   }
   bool skipOp(Operation *op) override;
   void emitCombStorageLoad(Value result, bool isUnsigned, Value memref,
@@ -1761,9 +1770,10 @@ bool SystemCModuleEmitter::isCombStorageGlobal(memref::GlobalOp g) {  // new (Sy
 }
 
 bool SystemCModuleEmitter::isCombStorage(Value memref) {  // new (SystemC-only)
-  // Unreset storage (D-14) is signal storage too, comb ports or not.
+  // Unreset storage (D-14) is signal storage too, comb ports or not -- unless
+  // the kernel is not Wire-only, where it is a plain member (unrst.member).
   if (auto gg = memref.getDefiningOp<memref::GetGlobalOp>())
-    if (llvm::is_contained(unrst.globals, gg.getName().str()))
+    if (!unrst.member && llvm::is_contained(unrst.globals, gg.getName().str()))
       return true;
   if (comb.outPorts.empty())
     return false;
@@ -2139,7 +2149,16 @@ bool SystemCModuleEmitter::planComb(func::FuncOp func) {  // new (SystemC-only)
 //         signal reads the old value until the next edge).
 //  The thread keeps everything else; reset storage and every other kernel are
 //  emitted as before. run.tcl gets `-RESET_CLEARS_ALL_REGS no` (hls.py, from
-//  the `// allo unreset storage:` marker this emitter writes).
+//  the `// allo unreset storage:` / `// allo unreset process:` markers this
+//  emitter writes), scoped to the writing process.
+//
+// A kernel that is NOT Wire-only (a Stream, channel or array port; README
+// D-14's lowering extended, U4 track C C2) iterates once per token, not per
+// edge, so the rule cannot hold and is not applied: the storage is a plain
+// module member that the thread reads and writes as any `@ Stateful` member,
+// minus the reset action, and the directive is scoped to the thread (`run`).
+// Only a comb cone reading it is refused there (signal storage written by a
+// thread must be reset, CIN-233).
 //===----------------------------------------------------------------------===//
 
 bool SystemCModuleEmitter::planUnreset(func::FuncOp func) {  // new (SystemC-only)
@@ -2156,6 +2175,24 @@ bool SystemCModuleEmitter::planUnreset(func::FuncOp func) {  // new (SystemC-onl
       if (combStoreTarget(u) == gg.getResult())
         stores.push_back(u);
   });
+  // Wire-only kernel: one iteration is one clock edge, and the stores move to
+  // the clock-edge `wr` method under THE RULE below. Any other kernel (a
+  // Stream, channel or array port: an iteration per token, not per edge) keeps
+  // the stores in its thread and the storage as a plain member with no reset
+  // action (README D-14, lowering extended; U4 track C, C2).
+  bool wireOnly = llvm::all_of(func.getArguments(), [](BlockArgument a) {
+    return llvm::isa<WireType>(a.getType());
+  });
+  if (wireOnly)
+    func.walk([&](Operation *o) {
+      if (llvm::isa<StreamGetOp, StreamTryGetOp, ChannelGetOp, ChannelTryGetOp,
+                    StreamPutOp, StreamTryPutOp, ChannelPutOp, ChannelTryPutOp>(o))
+        wireOnly = false;
+    });
+  if (!unrst.globals.empty() && !wireOnly) {
+    unrst.member = true;
+    return true;
+  }
   if (unrst.globals.empty() || stores.empty())
     return true;
   // The user's name for the storage: the `from`/`to` of any access to it.
@@ -2172,26 +2209,6 @@ bool SystemCModuleEmitter::planUnreset(func::FuncOp func) {  // new (SystemC-onl
         << " (README D-14: its write is a clock-edge process with no reset action)";
     return false;
   };
-  // Wire-only kernel.
-  for (auto arg : llvm::enumerate(func.getArguments()))
-    if (!llvm::isa<WireType>(arg.value().getType()))
-      return refuse(stores.front(), userName(stores.front()),
-                    "the kernel has a non-Wire argument (" +
-                        combPortName(func, arg.value()) +
-                        "); the write runs at every clock edge, which matches the "
-                        "kernel's iterations only when every port is a Wire");
-  {
-    Operation *bad = nullptr;
-    func.walk([&](Operation *o) {
-      if (!bad && llvm::isa<StreamGetOp, StreamTryGetOp, ChannelGetOp, ChannelTryGetOp,
-                            StreamPutOp, StreamTryPutOp, ChannelPutOp, ChannelTryPutOp>(o))
-        bad = o;
-    });
-    if (bad)
-      return refuse(bad, userName(stores.front()),
-                    "the kernel uses a stream or channel; the write runs at every clock "
-                    "edge, which matches the kernel's iterations only in a Wire-only kernel");
-  }
   Block &entry = func.front();
   auto isIterationBlock = [&](Block *b) {
     if (b == &entry)
@@ -2414,7 +2431,7 @@ void SystemCModuleEmitter::emitStatefulStateIO(
                                 body) {
     for (auto g : statefulGlobals) {
       auto at = llvm::cast<ShapedType>(g.getType());
-      bool unr = isUnresetGlobal(g);
+      bool unr = isUnresetSignalGlobal(g);
       bool sig = unr || isCombStorageGlobal(g);
       anyUnreset |= unr;
       std::string ctype =
@@ -2510,6 +2527,24 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
     state.encounteredError = true;
     return;
   }
+  // Member unreset storage (C2) is written by the thread; a comb cone (D-13)
+  // can read only signal storage, and Catapult resets every signal a thread
+  // writes (CIN-233). That combination genuinely cannot be unreset.
+  if (unrst.member)
+    for (auto &gname : unrst.globals)
+      if (llvm::is_contained(comb.storageGlobals, gname)) {
+        std::string user = gname;
+        if (auto g = func->getParentOfType<ModuleOp>().lookupSymbol<memref::GlobalOp>(gname))
+          if (auto n = g->getAttrOfType<StringAttr>("allo.unreset"))
+            user = n.getValue().str();
+        func.emitError("unreset storage `")
+            << user << "` (" << func.getName()
+            << "): a comb output reads it in a kernel that is not Wire-only; comb "
+               "storage is a signal the thread writes, and Catapult resets every "
+               "signal a thread writes (CIN-233) (README D-14)";
+        state.encounteredError = true;
+        return;
+      }
   unresetThreadDead();
   os << "SC_MODULE(" << name << ") {\n";
   addIndent();
@@ -2753,7 +2788,7 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
         }
       }
     indent();
-    if (isCombStorageGlobal(g) || isUnresetGlobal(g)) {
+    if (isCombStorageGlobal(g) || isUnresetSignalGlobal(g)) {
       // Read by a comb cone (D-13): signal storage, flattened, shared by the
       // thread (writes) and the SC_METHOD (reads). Catapult CIN-197 refuses a
       // plain member here. Unreset storage (D-14) is the same signal storage,
@@ -2764,8 +2799,8 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
       os << "sc_signal< "
          << getStreamPayloadTypeName(at.getElementType(), g->hasAttr("unsigned"))
          << " > " << g.getSymName() << "[" << total << "];  // "
-         << (isUnresetGlobal(g) ? "@ Stateful(reset=False), unreset signal storage (D-14)"
-                                : "@ Stateful, comb storage")
+         << (isUnresetSignalGlobal(g) ? "@ Stateful(reset=False), unreset signal storage (D-14)"
+                                      : "@ Stateful, comb storage")
          << "\n";
       continue;
     }
@@ -2773,7 +2808,8 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
     os << " " << g.getSymName();
     for (auto &s : at.getShape())
       os << "[" << s << "]";
-    os << ";  // @ Stateful\n";
+    os << (isUnresetGlobal(g) ? ";  // @ Stateful(reset=False), unreset member (D-14)\n"
+                              : ";  // @ Stateful\n");
   }
   // Kernel-local arrays read by a comb cone (D-13): the same signal storage,
   // declared here instead of in the thread, zeroed in the reset action.
@@ -2863,6 +2899,9 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
     for (auto &gname : unrst.globals)
       os << " " << gname;
     os << "\n";
+    // The process that writes it, which run.tcl scopes -RESET_CLEARS_ALL_REGS
+    // to: the clock-edge method, or the thread for member storage (C2).
+    indent(); os << "// allo unreset process: " << (unrst.member ? "run" : "wr") << "\n";
   }
   reduceIndent();
   indent(); os << "}\n";

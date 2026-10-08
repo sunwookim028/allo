@@ -1,0 +1,22 @@
+RTL dma:o4: 15639 cycles in 13 traces, 317520 defined slots, RTL vs reference on defined: 317520/317520 (0.9s)
+UNIT-MATCH dma:o4 bits simulator 317520/317520 defined (26538 masked: landing empty=26516, power-up=22; allo==rtl on 26511) cycle=order-only (build 2.4s, run 0.3s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+[13:38:31] Compiling with g++ ...
+[13:38:35] Running simulation ...
+UNIT-MATCH dma:o4 bits systemc 317520/317520 defined (26538 masked: landing empty=26516, power-up=22; allo==rtl on 26511) cycle=per-iteration, time unchecked (build 2.1s, run 6.6s)
+UNIT-MATCH dma:o4 streams simulator 317520/317520 defined (26538 masked: landing empty=26516, power-up=22; allo==rtl on 26511) cycle=order-only (build 3.3s, run 1.8s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+[13:38:45] Compiling with g++ ...
+[13:38:51] Running simulation ...
+UNIT-MATCH dma:o4 streams systemc 317520/317520 defined (26538 masked: landing empty=26516, power-up=22; allo==rtl on 26511) cycle=per-iteration, time unchecked (build 2.7s, run 20.7s)
+
+real	0m45.996s
+user	0m44.001s
+sys	0m2.042s

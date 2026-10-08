@@ -280,7 +280,9 @@ emitted as ``sc_signal<T> name[N]`` -- crosses the same way through
 (sc_signal's one-writer rule): comb storage by the thread after its reset
 action, unreset storage in ``start_of_simulation()``, before the clock-edge
 ``wr`` method first runs (it has no reset action, and the RTL keeps that
-storage across a reset too). In **RTL** the contract is "between
+storage across a reset too). Unreset storage in a kernel that is not Wire-only
+(Stream, channel or array ports; D-14's lowering extended, U4 C2) is a plain
+member the thread writes, and is reloaded with the thread's other members. In **RTL** the contract is "between
 resets": a ``static`` local on Vitis, a reset-initialised member on
 SystemC/Catapult. *Not done:* SystemC **cosim** (SCVerify drives its own run)
 and the Vitis/Catapult csim host restart per call; the Allo-driven cosims

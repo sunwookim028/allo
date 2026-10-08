@@ -300,6 +300,24 @@ stores to unreset storage:
   induction variable, nothing loop-carried; and the iteration reads the storage
   only before its stores (signal storage reads old until the next edge). Comb reads
   of it (D-13) are unchanged.
+- **A kernel that is not Wire-only** (a ``Stream``, channel or array port: one
+  iteration per token, not per clock edge) cannot meet the rule, and does not
+  need to (README D-14, lowering extended 2026-10-08; U4 track C, C2). Its
+  unreset storage is a **plain module member** (``uint16_t mem[32];  // @
+  Stateful(reset=False), unreset member``) that the thread reads and writes as
+  any ``@ Stateful`` member, with no reset-action write; the kernel is marked
+  ``// allo unreset process: run`` and ``run.tcl`` scopes the directive to the
+  thread, ``directive set /<top>/<kernel>/run -RESET_CLEARS_ALL_REGS no``.
+  Scoped to ``run`` it also leaves unreset the thread's registers whose reset
+  value the C semantics do not need (A1's hazard, confined to the kernel that
+  declared unreset storage); every register the reset action assigns keeps it.
+  Catapult 2024.2 builds the member form with no CIN-233 (the check applies to
+  signals): on ``test_systemc_unreset._regfile_stream`` the array maps to a
+  ``ccs_ram_sync_1R1W`` RAM, whose contents have no reset
+  (``dev/records/limitations/core_fixes_4_2026-10-08.rst``). The one refused
+  combination is a ``Wire[T, comb]`` output reading such storage in a kernel
+  that is not Wire-only: comb storage is a signal the thread writes, and
+  Catapult resets every such signal (CIN-233).
 - **Other backends refuse it**, naming the storage: Vitis and the Catapult C++ flow
   raise ``NotImplementedError`` (no measured unreset form; Vitis' default
   ``config_rtl -reset control`` may well leave a static array unreset, but that is

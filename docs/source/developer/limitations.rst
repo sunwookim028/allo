@@ -383,6 +383,12 @@ checked-in snapshot.
        (``allo/dependence.py``) and the ``s.split`` defect it found are live,
        not closed.
 
+   * - :ref:`K <limitation-k>`
+     - ``@ Stateful(reset=False)`` refused by SystemC in any kernel that is not
+       Wire-only (U4 track C, C2)
+     - none yet (closed on ``core-fixes-4``; draft upstream text in
+       ``dev/records/limitations/core_fixes_4_2026-10-08.rst``)
+
 :ref:`Item 13 <limitation-13>` is **not** in this table: it was largely
 retracted, but a real convenience gap (no ``allo.dma`` intrinsic) remains
 under the same item number, so its status is not unambiguous enough to close
@@ -684,3 +690,19 @@ hangs in ``malloc`` (0 of 13 runs at 128 bits, 6 of 14 at 129-160). Repro
 ``tests/limits/new_sim_wide_stream_heap.py``; analysis and workaround (split
 the token into streams of at most 128 bits):
 ``dev/records/minitpu/u4_track_a_2026-10-08.rst`` (T-1).
+
+.. _limitation-k:
+
+K. ``@ Stateful(reset=False)`` was refused by SystemC in any kernel that is not Wire-only -- closed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Found by U4 track C (C2): the DMA's landing payload (``dma`` ``bits``,
+``streams``; ``dma_vmem`` ``d12``) had no csim or Catapult path in its
+declared form. Closed by README D-14's extended lowering: a kernel with a
+``Stream``, channel or array port holds unreset storage as a plain module
+member its thread writes with no reset action, and ``run.tcl`` scopes
+``-RESET_CLEARS_ALL_REGS no`` to that thread (:doc:`/backends/systemc`).
+Still refused, naming the storage: a ``Wire[T, comb]`` output reading it in
+such a kernel (CIN-233). Tests: ``tests/dataflow/test_systemc_unreset.py``
+(``test_unreset_stream_kernel_*``); record
+``dev/records/limitations/core_fixes_4_2026-10-08.rst``.

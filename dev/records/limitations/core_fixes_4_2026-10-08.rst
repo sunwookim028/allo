@@ -1,0 +1,105 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+##############################################################################
+Core fixes 4: unreset storage in every kernel kind, the D-12 latency rule,
+flushable streams
+##############################################################################
+
+:Date: 2026-10-08
+:Host: zhang-21
+:Branch: ``core-fixes-4`` (worktree ``scratch/wt-fix4``), from
+   ``origin/u1-pilot`` at ``c7abcce4`` (README D-25, D-12 amended, D-14
+   lowering extended); one commit per decision, this record growing with each
+:Decisions: README D-14 (lowering extended), D-12 (amended: a port's latency
+   in the owner's own iterations on every link kind), D-25 (flushable streams)
+:Found by: U4 track C (C2, C8: ``dev/records/minitpu/u4_track_c_2026-10-08.rst``),
+   track A (T-2, T-4/H6, T-5: ``u4_track_a_2026-10-08.rst``); triage
+   ``u4_matrix.rst``
+:Bindings: the worktree's own ``mlir/build`` (Ninja; ``LLVM_DIR``/``MLIR_DIR``
+   under ``/work/shared/common/llvm-project-main/build-rhel8``; gcc-toolset-13
+   13.3.1; the ``allo`` env's python 3.12), 336 steps clean, rebuilt after
+   every C++ change
+:Tools: SystemC 2.3.3 and Catapult 2024.2 (``nangate-45nm_beh``) through
+   ``examples/minitpu/harness/env-zhang21.sh``; Verilator 5.052; MiniTPU at
+   ``b3ba0a4d``, read only
+
+Evidence files: ``core_fixes_4_2026-10-08/`` (``logs/``: one log per harness
+run; ``catapult_c2/``: the one Catapult run of fix 1).
+
+1. D-14, lowering extended (U4 C2)
+==================================
+
+**Before.** ``@ Stateful(reset=False)`` was lowered by the SystemC emitter
+only in a Wire-only kernel: its stores moved to a clock-edge ``SC_METHOD(wr)``
+with no reset action, under a rule that holds only when one iteration is one
+clock edge. Any kernel with a Stream, channel or array port was refused ("the
+write runs at every clock edge, which matches the kernel's iterations only
+when every port is a Wire"), so the DMA's landing payload (P-7) had no csim
+or Catapult path in its declared form: ``dma`` ``bits``/``streams`` and
+``dma_vmem`` ``d12`` ran only as ``*_reset`` deviations.
+
+**Change** (``mlir/lib/Translation/EmitSystemC.cpp`` ``planUnreset``,
+``UnresetPlan::member``; ``allo/backend/catapult.py`` ``unreset_process_in``,
+``unreset_directives``; ``allo/backend/hls.py``). A kernel that is not
+Wire-only holds its unreset storage as a **plain module member** that the
+thread reads and writes as any ``@ Stateful`` member, with no reset-action
+write (the reset action prints ``// <sym>: @ Stateful(reset=False), not reset
+(D-14)``). D-11's csim state save reloads it with the thread's other members.
+The emitter marks each kernel ``// allo unreset process: wr|run``, and
+``run.tcl`` scopes ``-RESET_CLEARS_ALL_REGS no`` to that process
+(``/<top>/<kernel>/run`` for the member form). Wire-only kernels are
+unchanged (``wr``, the rule and its refusals). Still refused, naming the
+storage: a ``Wire[T, comb]`` output reading member storage ("a comb output
+reads it in a kernel that is not Wire-only"; comb storage is a signal the
+thread writes, which Catapult resets, CIN-233).
+
+**Catapult** (one run, ``catapult_c2/``: ``_regfile_stream(16)``,
+``synth_top=rf_0``, 3.33 ns, 43 s): no CIN-233 -- the check applies to
+signals, not members -- and the member maps to ``ccs_ram_sync_1R1W`` (32 x 16),
+whose ``mem`` has no reset in ``concat_rtl.v``. Final schedule ``/rf_0/run``
+latency 2. The scoped directive on ``run`` also leaves unreset any thread
+register whose reset value the C semantics do not need (U2 A1's hazard, now
+confined to the kernel that declares unreset storage).
+
+**Tests** (``tests/dataflow/test_systemc_unreset.py``, 18 pass, csim
+included): ``test_unreset_stream_kernel_emit`` (Stream-port and array-port
+kernels: plain member, no ``wr``, no reset write, the thread writes it,
+``directive set /top/rf_0/run -RESET_CLEARS_ALL_REGS no`` once);
+``test_unreset_stream_kernel_comb_refused``; ``test_unreset_stream_kernel_csim``
+(two calls with no reset between: the first writes every word, the second
+only reads; simulator and csim equal on every iteration of both calls, the
+never-written words of call 1 masked, and call 2 returns the last write per
+word). ``_regfile_stream`` left ``test_unreset_refusals``; the Wire-only
+refusals (read-modify-write, inner loop) stay.
+
+**U4 verdicts, before -> after** (``logs/c2_*.log``; the simulator column
+was already a match):
+
+.. list-table::
+   :header-rows: 1
+
+   * - unit:instance / variant
+     - SystemC csim before (track C)
+     - after
+   * - ``dma:core`` ``bits`` / ``streams``
+     - refused (C2) / refused (C2)
+     - **UNIT-MATCH** 805,652/805,652 / **UNIT-MATCH** 805,652/805,652
+   * - ``dma:o1`` ``bits`` / ``streams``
+     - refused / refused
+     - **UNIT-MATCH** 764,284 / **UNIT-MATCH** 764,284
+   * - ``dma:o4`` ``bits`` / ``streams``
+     - refused / refused
+     - **UNIT-MATCH** 317,520 / **UNIT-MATCH** 317,520
+   * - ``dma:bw`` ``bits`` / ``streams``
+     - refused / refused
+     - **UNIT-MATCH** 394,464 / **UNIT-MATCH** 394,464
+   * - ``dma_vmem:core`` ``d12``
+     - refused (C2)
+     - builds; csim "Simulation failed": **C7** (the server's 4,096 x 1,024 b
+       ``mem`` is a local of ``run()`` on the SC_THREAD stack -- the same
+       segfault as ``d12_reset``; not in this branch's scope)
+
+Masked counts are track C's, unchanged (e.g. ``core`` 68,144: landing empty
+68,122, power-up 22). The ``bits``/``streams`` verdicts equal their
+``_reset`` twins on every instance.

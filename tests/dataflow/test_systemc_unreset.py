@@ -122,7 +122,9 @@ def _regfile_rmw(n):
 
 def _regfile_stream(n):
     """The writing kernel takes a stream: its iterations are not clock
-    cycles, so a per-edge write would not match them."""
+    cycles, so the per-edge write method does not apply; the storage is a
+    plain member the thread writes, with no reset action (README D-14, the
+    lowering extended; U4 track C, C2)."""
 
     @df.region()
     def top(WA: A5[n], WD: D16[n], WE: uint1[n], QA: D16[n]):
@@ -435,7 +437,6 @@ def test_uint_stateful_unsigned():
     "make,why",
     [
         (_regfile_rmw, "not storage"),
-        (_regfile_stream, "only when every port is a Wire"),
         (_regfile_inner_loop, "inside a loop within the iteration"),
     ],
 )
@@ -583,6 +584,124 @@ def test_signal_storage_persists_across_csim_calls(reset):
         q = obj([0] * n)
         mod(wa, wa, wd, np.zeros(n, np.uint8), q)
         assert all(int(v) == 0 for v in q), "reset() did not clear the state"
+
+
+def test_unreset_stream_kernel_emit():
+    """C2 (README D-14, lowering extended): a kernel with Stream ports holds
+    unreset storage as a plain module member -- not an ``sc_signal``, no
+    ``wr`` method, no reset-action write -- and ``run.tcl`` scopes
+    ``-RESET_CLEARS_ALL_REGS no`` to that kernel's thread. An array-port kernel
+    (one ``@df.kernel`` with boundary arrays, the DMA's ``bits`` form) the same."""
+    for make, name in ((_regfile_stream, "rf_0"), (lambda n: _plain_regfile(n, reset=False), "rf_0")):
+        with tempfile.TemporaryDirectory() as tmp:
+            mod = df.build(make(8), target="systemc", mode="csyn", project=tmp)
+            tcl = open(tmp + "/run.tcl").read()
+        rf = _kernel_module(mod.hls_code, name)
+        sym = re.search(r"\n\s*(?:uint16_t|ac_int<16, false>) (__stateful_rf_0_mem\w*)\[32\];  "
+                        r"// @ Stateful\(reset=False\), unreset member", rf)
+        assert sym, rf
+        mem = sym.group(1)
+        assert f"> {mem}[" not in rf  # not an sc_signal array
+        assert "SC_METHOD(wr)" not in rf and "void wr()" not in rf
+        assert f"// allo unreset storage: {mem}" in rf
+        assert "// allo unreset process: run" in rf
+        assert not re.search(re.escape(mem) + r"\w*\[_sr\w*\] = ", rf)  # no reset action
+        assert f"// {mem}: @ Stateful(reset=False), not reset (D-14)" in rf
+        thread = rf[rf.index("void run()") :]
+        assert re.search(re.escape(mem) + r"\[.*\] = ", thread)  # the thread writes it
+        assert f"go compile\ndirective set /top/{name}/run -RESET_CLEARS_ALL_REGS no\n" in tcl, tcl
+        assert tcl.count("RESET_CLEARS_ALL_REGS") == 1
+
+
+def _regfile_stream_comb(n):
+    """A comb output reading unreset storage in a kernel that is not Wire-only:
+    comb storage is a signal the thread writes, which Catapult resets
+    (CIN-233) -- the one form that genuinely cannot be unreset there."""
+
+    @df.region()
+    def top(RA: A5[n], WA: A5[n], WD: D16[n], QA: D16[n]):
+        w_ra: Wire[A5]
+        s_wa: Stream[A5, 2]
+        s_wd: Stream[D16, 2]
+        w_qa: Wire[D16, comb]
+
+        @df.kernel(mapping=[1], args=[RA, WA, WD])
+        def src(ra: A5[n], wa: A5[n], wd: D16[n]):
+            for t in range(n):
+                w_ra.put(ra[t])
+                s_wa.put(wa[t])
+                s_wd.put(wd[t])
+
+        @df.kernel(mapping=[1], args=[])
+        def rf():
+            mem: D16[32] @ Stateful(reset=False)
+            for _ in range(n):
+                a5: A5 = w_ra.get()
+                a: int32 = a5
+                x5: A5 = s_wa.get()
+                x: int32 = x5
+                d: D16 = s_wd.get()
+                w_qa.put(mem[a])
+                mem[x] = d
+
+        @df.kernel(mapping=[1], args=[QA])
+        def sink(qa: D16[n]):
+            for t in range(n):
+                qa[t] = w_qa.get()
+
+    return top
+
+
+def test_unreset_stream_kernel_comb_refused():
+    with pytest.raises(Exception) as ex:
+        df.build(_regfile_stream_comb(8), target="systemc")
+    msg = str(ex.value)
+    assert "unreset storage `mem` (rf_0): a comb output reads it" in msg, msg
+
+
+def _stream_calls(n):
+    """Two calls with no reset between them (D-11): the first writes every
+    address, the second reads every address and writes nothing."""
+    wa = np.array([i % 32 for i in range(n)], np.uint8)
+    wd = np.array([(i * 977 + 5) & 0xFFFF for i in range(n)], np.uint16)
+    return [(wa, wd, np.ones(n, np.uint8)), (wa, wd, np.zeros(n, np.uint8))]
+
+
+def _run_calls(mod, n):
+    outs = []
+    for wa, wd, we in _stream_calls(n):
+        q = np.zeros(n, np.uint16)
+        mod(wa, wd, we, q)
+        outs.append(q)
+    return outs
+
+
+@needs_csim
+def test_unreset_stream_kernel_csim():
+    """C2: a Stream-port kernel holding unreset storage builds and runs in
+    csim, and the storage survives the reset-free call sequence exactly as
+    the simulator shows -- every iteration of both calls equal, the
+    never-written words of the first call masked (undefined, D-14)."""
+    n = 64
+    sim = _run_calls(df.build(_regfile_stream(n), target="simulator"), n)
+    with tempfile.TemporaryDirectory() as tmp:
+        mod = df.build(_regfile_stream(n), target="systemc", mode="csim", project=tmp)
+        sc = _run_calls(mod, n)
+    # call 1 reads mem[x] before writing it: defined only once x was written
+    seen, defined = set(), []
+    for wa, _, _ in _stream_calls(n)[:1]:
+        for x in wa:
+            defined.append(int(x) in seen)
+            seen.add(int(x))
+    defined = np.array(defined)
+    assert np.array_equal(sim[0][defined], sc[0][defined]), (sim[0], sc[0])
+    assert np.array_equal(sim[1], sc[1]), (sim[1], sc[1])
+    # and the second call returns what the first wrote (the last write per word)
+    last = {}
+    wa, wd, _ = _stream_calls(n)[0]
+    for x, d in zip(wa, wd):
+        last[int(x)] = int(d)
+    assert [int(v) for v in sc[1]] == [last[int(x)] for x in wa]
 
 
 if __name__ == "__main__":

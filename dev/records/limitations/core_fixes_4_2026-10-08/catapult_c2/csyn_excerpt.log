@@ -1,0 +1,22 @@
+# Catapult 2024.2 csyn of test_systemc_unreset._regfile_stream(16), synth_top rf_0, 3.33 ns (43 s wall, exit 0)
+# Warning: $PROJECT_HOME/../kernel.cpp(612): statement is unreachable (CRD-111)
+# Warning: $PROJECT_HOME/../kernel.cpp(566): SystemC thread 'run' should be scheduled with 'iomode=fixed' since it writes to sc_signal 'done'. (CIN-124)
+# Warning: $PROJECT_HOME/../kernel.cpp(566): SystemC thread 'run' should be scheduled with 'iomode=fixed' since it writes to sc_signal 'done'. (CIN-124)
+# > directive set /rf_0/run -RESET_CLEARS_ALL_REGS no
+# /rf_0/run/RESET_CLEARS_ALL_REGS no
+# Warning: Component library 'nangate-45nm_beh' created with a newer version of Catapult Library Builder, 2025.1/1129627 > 2024.2/1130128 (LIB-83)
+# $PROJECT_HOME/../kernel.cpp(543): Memory Resource '/rf_0/run/__stateful_rf_0_mem_1:rsc' (from var: __stateful_rf_0_mem_1) mapped to 'ccs_sample_mem.ccs_ram_sync_1R1W' (size: 32 x 16). (MEM-4)
+# Info: $PROJECT_HOME/../kernel.cpp(566): Final schedule of SEQUENTIAL '/rf_0/run': Latency = 2, Area (Datapath, Register, Total) = 0.00, 94.96, 94.96 (CRAAS-12)
+# Warning: Extrapolation detected. Script '/work/shared/users/phd/sk3463/scratch/fix4/cat_c2/stream/build/Catapult/rf_0.v1/adjust_char_library.tcl' generated. (LIB-142)
+# concat_rtl.v: storage module and reset lines
+96:module ccs_ram_sync_1R1W
+116:	reg [data_width-1:0] mem [depth-1:0];
+146:module rf_0_ccs_sample_mem_ccs_ram_sync_1R1W_rwport_9_16_5_32_32_16_5_gen (
+228:    if ( ~ rst ) begin
+266:    if ( ~ rst ) begin
+301:    if ( ~ rst ) begin
+416:    if ( ~ rst ) begin
+508:    if ( ~ rst ) begin
+600:    if ( ~ rst ) begin
+1091:    if ( ~ rst ) begin
+1099:    if ( ~ rst ) begin

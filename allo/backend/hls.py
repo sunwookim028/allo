@@ -47,6 +47,7 @@ from .catapult import (
     parse_catapult_report,
     write_latency_manifest,
     unreset_storage_in,
+    unreset_process_in,
     catapult_failure_cause,
     io_latency_tcl,
     parse_catapult_hierarchical_report,
@@ -592,10 +593,12 @@ class HLSModule:
         buf.seek(0)
         self.hls_code = buf.read()
         # README D-14: the emitter marks every kernel that holds unreset storage;
-        # run.tcl then tells Catapult not to reset the registers of that
-        # kernel's clock-edge write process (`wr`), and only of it.
+        # run.tcl then tells Catapult not to reset the registers of the process
+        # that writes it -- the clock-edge `wr` method of a Wire-only kernel, the
+        # thread `run` of any other (the lowering extended, U4 C2) -- and only of it.
         if platform == "systemc" and "// allo unreset storage:" in self.hls_code:
             configs["unreset_storage"] = sorted(unreset_storage_in(self.hls_code))
+            configs["unreset_process"] = unreset_process_in(self.hls_code)
         # README D-12: a ported memory's kernels synthesized as one unit.
         if platform == "systemc" and configs.get("synth_group"):
             from .systemc_group import add_synth_group  # noqa: PLC0415

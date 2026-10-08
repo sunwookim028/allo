@@ -358,7 +358,7 @@ def resolve_ppa_testbench(configs):
     return tb
 
 
-def unreset_directives(kernels, top, design_top, group=None):
+def unreset_directives(kernels, top, design_top, group=None, processes=None):
     """``run.tcl`` lines for unreset storage (README D-14), one per kernel.
 
     ``kernels`` are the SC_MODULEs holding ``@ Stateful(reset=False)`` storage
@@ -376,17 +376,27 @@ def unreset_directives(kernels, top, design_top, group=None):
     ``synth_group`` top (``/rf_d12g/srv_0/wr``, README D-12: a ported memory's
     server or replicas hold the unreset storage, and the group is what is
     synthesized); a kernel outside the synthesized design gets no line.
+
+    ``processes`` (``unreset_process_in``) names the writing process per
+    kernel: ``wr`` for a Wire-only kernel, ``run`` (the thread) for a kernel
+    with Stream, channel or array ports, where the storage is a plain member
+    the thread writes with no reset action (D-14's lowering extended, U4 C2).
+    Scoped to ``run``, the directive also leaves unreset the thread's registers
+    whose reset value the C semantics do not need (A1's hazard, confined to
+    the kernel that declared unreset storage); every register the reset
+    action assigns keeps its reset.
     """
     out = ""
     for k in kernels or ():
+        proc = (processes or {}).get(k, "wr")
         if design_top == k:
-            path = f"/{k}/wr"
+            path = f"/{k}/{proc}"
         elif group and design_top == group["name"]:
             if k not in group["kernels"]:
                 continue
-            path = f"/{design_top}/{k}/wr"
+            path = f"/{design_top}/{k}/{proc}"
         elif design_top == top:
-            path = f"/{top}/{k}/wr"
+            path = f"/{top}/{k}/{proc}"
         else:
             continue
         out += f"directive set {path} -RESET_CLEARS_ALL_REGS no\n"
@@ -749,7 +759,8 @@ go analyze
 
     out_str += "go compile\n"
     out_str += unreset_directives(
-        configs.get("unreset_storage"), top, design_top, configs.get("synth_group")
+        configs.get("unreset_storage"), top, design_top, configs.get("synth_group"),
+        configs.get("unreset_process"),
     )
     out_str += memory_directives(configs.get("memories"))
 
@@ -1332,6 +1343,19 @@ def unreset_storage_in(kernel_cpp):
         names = re.search(r"// allo unreset storage:((?: \w+)+)", m.group(2))
         if names:
             out[m.group(1)] = names.group(1).split()
+    return out
+
+
+def unreset_process_in(kernel_cpp):
+    """``{kernel module: process}`` writing its unreset storage (README D-14):
+    ``wr`` (the clock-edge method of a Wire-only kernel) or ``run`` (the thread,
+    where the storage is a plain member: the lowering extended, U4 C2), from
+    the emitter's ``// allo unreset process: <name>`` marker."""
+    out = {}
+    for m in re.finditer(r"SC_MODULE\((\w+)\) \{(.*?)\n\};", kernel_cpp, flags=re.S):
+        proc = re.search(r"// allo unreset process: (\w+)", m.group(2))
+        if proc:
+            out[m.group(1)] = proc.group(1)
     return out
 
 
