@@ -1,0 +1,8 @@
+[latency] issue_0: latency=1 ii=2 unreliable (I/O in several loops ['l_S_j_1_j', 'l_S_t_0_t'])
+[latency] mrx_0: latency=1 ii=1 scheduled
+[latency] vrx_0: latency=1 ii=1 scheduled
+[latency] xrx_0: latency=1 ii=1 scheduled
+BUILD vpu_cmd streams_d1 inst=shipped n=52236 unroll=[] pipeline=['issue_0:t', 'vrx_0:k', 'xrx_0:k', 'mrx_0:k'] partition=[] tcl=[] {'clock_period': 3.33}: ok 93s
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:42.27
+	Maximum resident set size (kbytes): 900336
+RUN_EXIT 0

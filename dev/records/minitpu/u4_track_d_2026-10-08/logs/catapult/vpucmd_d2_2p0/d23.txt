@@ -1,0 +1,4 @@
+D23-RTL vpucmd_d2_2p0.prj: rows 52236, stall cycles 0, rows at interval 1 52235/52235; issues 5447, issue edge - RTL cycle: 5447/5447 at +2 (the RTL's cycle), latest +2 {2: 5447}
+    V: 753 commands; row accept -> receiver token {3: 753}; receiver token intervals min 1
+    X: 908 commands; row accept -> receiver token {3: 908}; receiver token intervals min 1
+    M: 9 commands; row accept -> receiver token {3: 9}; receiver token intervals min 16
