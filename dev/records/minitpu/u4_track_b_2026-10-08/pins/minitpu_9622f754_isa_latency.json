@@ -1,0 +1,512 @@
+{
+  "_comment": [
+    "The ISA scheduling contract, and the one source of every number and rule the two schedulers use.",
+    "Edit here, then run: python3 tools/gen_isa_doc.py --write",
+    "It generates the tables and the scheduling rules in docs/ISA_AND_INTERFACES.md,",
+    "tb/isa_latency_pkg.sv (what the conformance testbenches hold the RTL to) and",
+    "tb/isa_schedule.svh (the constants tb/bundle_scheduler.svh schedules with).",
+    "asm_constant names board_package/asm.py's copy, checked by gen_isa_doc.py --check; asm.py ships",
+    "to boards without this file, so its copies stay written out. A wrong value there reads a",
+    "stale register and returns a plausible number without faulting.",
+    "\"versions\" names every ISA version; the top level is the base (v1) and each other version states only its deltas.",
+    "tools/check_scheduler_agreement.py holds asm.schedule() and the svh to the same delays."
+  ],
+  "profile": {
+    "num_lanes": 16,
+    "num_sublanes": 4,
+    "vreg_entries": 32,
+    "vreg_elements": 64,
+    "note": "W is the cycle offset at which the op claims the single VREG write port; the earliest dependent consumer is L = W + 1."
+  },
+  "operations": [
+    {
+      "slot": "V",
+      "ops": [
+        "vadd",
+        "vsub",
+        "vmul"
+      ],
+      "vreg_reads": "A+B",
+      "vreg_writes": "1 full VREG",
+      "w": 5,
+      "rtl_param": "WB_W_ALU",
+      "asm_constant": "W_ALU",
+      "issue": "II=1; one V op per bundle"
+    },
+    {
+      "slot": "V",
+      "ops": [
+        "vmax",
+        "vmin"
+      ],
+      "vreg_reads": "A+B",
+      "vreg_writes": "1 full VREG",
+      "w": 5,
+      "rtl_param": "WB_W_ALU",
+      "asm_constant": "W_ALU",
+      "issue": "II=1; elementwise across two VREGs (vredmax reduces within one). Ordering is vpu_pkg::bf16_gt, the same key the reduction tree uses"
+    },
+    {
+      "slot": "V",
+      "ops": [
+        "vmov"
+      ],
+      "vreg_reads": "A",
+      "vreg_writes": "1 full VREG",
+      "w": 5,
+      "rtl_param": "WB_W_ALU",
+      "asm_constant": "W_ALU",
+      "issue": "II=1"
+    },
+    {
+      "slot": "V",
+      "ops": [
+        "vgelu",
+        "vexp",
+        "vrecip",
+        "vrsqrt"
+      ],
+      "vreg_reads": "A",
+      "vreg_writes": "1 full VREG",
+      "w": 7,
+      "rtl_param": "WB_W_SFU",
+      "asm_constant": "W_SFU",
+      "issue": "II=1; SFU arithmetic includes a multiplier"
+    },
+    {
+      "slot": "V",
+      "ops": [
+        "vredsum",
+        "vredmax"
+      ],
+      "vreg_reads": "A, all 64 elements",
+      "vreg_writes": "1 broadcast VREG",
+      "w": 15,
+      "rtl_param": "WB_W_REDUCE",
+      "asm_constant": "W_REDUCE",
+      "issue": "II=1; W adds the two registered writeback stages to the reduction unit's own latency"
+    },
+    {
+      "slot": "V",
+      "ops": [
+        "vlanered"
+      ],
+      "vreg_reads": "A, all 64 elements",
+      "vreg_writes": "1 VREG, one result per sublane broadcast across that sublane's lanes",
+      "w": 11,
+      "rtl_param": "WB_W_LANE_REDUCE",
+      "asm_constant": "W_LANE_REDUCE",
+      "issue": "II=1. rb[0] selects sum (0) or max (1); rb is not a register operand, so it creates no dependence. The assembler spells it vlanesum and vlanemax. Taken from a middle level of xlu_reduction_tree, {REDUCE_TAP_SLACK} stages before its 64-wide result"
+    },
+    {
+      "slot": "V",
+      "ops": [
+        "vtxin"
+      ],
+      "vreg_reads": "A",
+      "vreg_writes": "none -- the staging tile",
+      "w": null,
+      "rtl_param": null,
+      "issue": "II=1. Four fill a 16x16 tile: beat q takes tile rows 4q..4q+3 from the four sublanes of VREG A. The tile is held in the transpose unit until vtxout"
+    },
+    {
+      "slot": "V",
+      "ops": [
+        "vtxout"
+      ],
+      "vreg_reads": "the staging tile, not a VREG",
+      "vreg_writes": "1 full VREG",
+      "w": 3,
+      "rtl_param": "WB_W_TXOUT",
+      "asm_constant": "W_TRANSPOSE",
+      "issue": "II=1. Four drain the tile: beat q writes sublane s, lane l from tile[l][4q+s]. W measured by tb_vpu_latency_probe"
+    },
+    {
+      "slot": "MEM-LDST",
+      "ops": [
+        "vld"
+      ],
+      "vreg_reads": "VMEM compute port",
+      "vreg_writes": "1 whole VREG (one VMEM word)",
+      "w": 6,
+      "rtl_param": "WB_W_VLD",
+      "asm_constant": "W_VLD",
+      "issue": "II=1. VMEM's read latency (vpu_pkg VMEM_READ_LATENCY), then shared writeback staging. Each access holds the VMEM compute port for one cycle (vpu_word_array.sv)"
+    },
+    {
+      "slot": "MEM-LDST",
+      "ops": [
+        "vst"
+      ],
+      "vreg_reads": "C",
+      "vreg_writes": "VMEM compute port",
+      "w": null,
+      "issue": "II=1; the only port-C reader outside the M slot, so a bundle may carry a store or a matrix read, not both (isa/slots.json)"
+    },
+    {
+      "slot": "M",
+      "ops": [
+        "vmatload"
+      ],
+      "vreg_reads": "C over four VREGs",
+      "vreg_writes": "MXU weight input",
+      "w": null,
+      "issue": "Stream engine; {VMATLOAD_ISSUE_INTERVAL} cycles to the next vmatload or vmatpush, 1 to a vmatpop (tb_matrix_command_ii); streams VREG read port C over +1..+{VMATLOAD_PORT_C_LAST}, one weight row a cycle from the last, so VREG base+k is read last at +{VMATLOAD_PORT_C_LAST} - {NUM_SUBLANES}k. Its weights take effect from the next vmatpush. Loads alternate between {MXU_WEIGHT_BANKS} pending weight banks, so it may issue while the tiles before it drain, but no earlier than {MATRIX_WEIGHT_SWITCH_SPAN} cycles after the first vmatpush since the vmatload {MXU_WEIGHT_BANKS} before it"
+    },
+    {
+      "slot": "M",
+      "ops": [
+        "vmatpush"
+      ],
+      "vreg_reads": "C over one VREG",
+      "vreg_writes": "MXU activation input",
+      "w": null,
+      "issue": "Stream engine; {VMATPUSH_ISSUE_INTERVAL} cycles to the next vmatload or vmatpush, 1 to a vmatpop (tb_matrix_command_ii); streams VREG read port C over +1..+{VMATPUSH_PORT_C_LAST}. First result at +{VMATPUSH_RESULT_LATENCY}; an earlier vmatpop waits for it beat by beat rather than reading a partial result"
+    },
+    {
+      "slot": "M",
+      "ops": [
+        "vmatpop"
+      ],
+      "vreg_reads": "MXU output",
+      "vreg_writes": "1 full VREG in one write",
+      "w": 3,
+      "rtl_param": "WB_W_MPOP_FIRST",
+      "asm_constant": "W_MPOP_FIRST",
+      "issue": "Pop engine; {VMATPOP_ISSUE_INTERVAL} cycles to the next vmatpop, 1 to a vmatload or vmatpush (tb_matrix_command_ii). The MXU output FIFO carries a whole VREG per entry, so the write port is reserved once, at +{WB_W_MPOP_FIRST}, whatever the stream engine is doing"
+    },
+    {
+      "slot": "S",
+      "ops": [
+        "scalar move/add/shift/MAC"
+      ],
+      "vreg_reads": "no VREG",
+      "vreg_writes": "one of four SREGs",
+      "w": null,
+      "issue": "No SREG scoreboard: a descriptor reading an SREG must issue at least {S_LAT} bundles after the op that writes it. Every op except SMOV_ARG uses the bundle's shared 24-bit IMM"
+    },
+    {
+      "slot": "MEM-DESC",
+      "ops": [
+        "vmemld",
+        "vmemst"
+      ],
+      "vreg_reads": "VMEM, flat word address; no VREG",
+      "vreg_writes": "no VREG",
+      "w": null,
+      "consumer_override": "fence",
+      "issue": "Issues asynchronously; wait.channel waits for completion. The DESC kind of the MEM slot, so it cannot share a bundle with vld/vst but can with V, M and S. Row count and VMEM address are in words"
+    },
+    {
+      "slot": "C",
+      "ops": [
+        "loop/control/halt"
+      ],
+      "vreg_reads": "none",
+      "vreg_writes": "none",
+      "w": null,
+      "issue": "loop.begin uses the shared 24-bit IMM for {{lo, step, hi}}; loop.begin.r (C opcode {C_OP_LBEGIN_R}) uses it for {{lo, step, skip}} and reads hi at issue from an SREG, which must be written {S_LAT} bundles before, or from a kernel argument, saturated to {LOOP_BOUND_MAX}. hi <= lo runs no trip: nothing is pushed and fetch resumes after the matching loop.end, 3 cycles after the loop.begin.r in simulation. loop.end, wait.channel and halt use no IMM, so they can share a bundle with a scalar immediate. halt waits for DMA to go idle, not for VREG writes in flight: halting with one in flight is a schedule error that simulation asserts and hardware does not catch"
+    }
+  ],
+  "rtl_params": {
+    "WB_W_ALU": 5,
+    "WB_W_SFU": 7,
+    "WB_W_REDUCE": 15,
+    "WB_W_LANE_REDUCE": 11,
+    "WB_W_VLD": 6,
+    "WB_W_MPOP_FIRST": 3,
+    "WB_W_MPOP_LAST": 3,
+    "WB_W_TXOUT": 3
+  },
+  "rtl_params_asm_constants": {
+    "_comment": "asm.py's copy of an rtl_params value that no operation row names (vmatpop's row names only its first beat).",
+    "W_MPOP_LAST": "WB_W_MPOP_LAST"
+  },
+  "matrix": {
+    "_comment": [
+      "Timing facts per matrix command, all scheduling inputs; tb_matrix_command_ii measures each.",
+      "engine: the M slot has two. vmatload and vmatpush share the stream engine (port C into the MXU input);",
+      "vmatpop has the pop engine (MXU output into the VREG write port). A command on one engine may issue",
+      "the bundle after a command on the other.",
+      "issue_interval: cycles from a command's issue to the next command on the same engine. A stream command",
+      "moves one row a cycle from t+1 and retires on its last row, and its engine takes the next command in that",
+      "same cycle, so back-to-back commands stream without a gap.",
+      "result_latency: cycles from vmatpush to the first vmatpop that finds its result waiting.",
+      "A vmatpop issued earlier waits for its result beat by beat, so its writeback lands later than the",
+      "calendar booked it: the result latency is a correctness bound, not only a speed one.",
+      "vmatpop's interval is not its writeback span; the span is modelled separately, and is one cycle because a FIFO entry is a whole VREG."
+    ],
+    "engines": [
+      "stream",
+      "pop"
+    ],
+    "engine": {
+      "vmatload": "stream",
+      "vmatpush": "stream",
+      "vmatpop": "pop"
+    },
+    "engine_asm_constants": {
+      "_M_ENGINE[1]": "vmatload",
+      "_M_ENGINE[2]": "vmatpush",
+      "_M_ENGINE[3]": "vmatpop"
+    },
+    "issue_interval": {
+      "vmatload": 16,
+      "vmatpush": 4,
+      "vmatpop": 1
+    },
+    "issue_interval_asm_constants": {
+      "_M_ISSUE_INTERVAL[1]": "vmatload",
+      "_M_ISSUE_INTERVAL[2]": "vmatpush",
+      "_M_ISSUE_INTERVAL[3]": "vmatpop"
+    },
+    "result_latency": {
+      "vmatpush": 85
+    },
+    "result_latency_asm_constants": {
+      "_M_RESULT_LATENCY": "vmatpush"
+    },
+    "port_c_last": {
+      "_comment": [
+        "The last cycle, counted from issue, in which the command drives VREG read port C.",
+        "It streams from t+1 (the controller registers the command), one row a cycle, so a port-C reader",
+        "(vst) is legal from t+last+1. Which port it holds is in isa/slots.json."
+      ],
+      "vmatload": 16,
+      "vmatpush": 4
+    },
+    "port_c_last_asm_constants": {
+      "_M_PORT_C_LAST[1]": "vmatload",
+      "_M_PORT_C_LAST[2]": "vmatpush"
+    },
+    "weight_switch": {
+      "_comment": [
+        "Each PE switches to the loaded weights as the first activation of the next tile passes it,",
+        "so the last PE switches `span` cycles after that tile's first vmatpush. Each PE holds `banks`",
+        "pending weight registers and consecutive vmatloads alternate between them, so a vmatload refills",
+        "the bank of the vmatload `banks` before it. Issued sooner than `span` after the first vmatpush",
+        "since that vmatload, it overwrites weights some PE has not switched to yet.",
+        "tb_matrix_weight_pipelining measures the span; tb_matrix_weight_banks runs loads at the stream",
+        "engine's spacing, which the banks allow."
+      ],
+      "span": 75,
+      "rtl_param": "MATRIX_WEIGHT_SWITCH_SPAN",
+      "asm_constant": "_M_WEIGHT_SWITCH_SPAN",
+      "banks": 2,
+      "banks_rtl_param": "MXU_WEIGHT_BANKS",
+      "banks_asm_constant": "_M_WEIGHT_BANKS"
+    }
+  },
+  "resources": {
+    "_comment": [
+      "Capacities a schedule can exceed. gen_isa_doc.py --check holds asm.py to these;",
+      "tb_isa_conformance holds the RTL to each rtl_param."
+    ],
+    "mxu_output_fifo": {
+      "depth": 64,
+      "rtl_param": "MXU_OUTPUT_FIFO_DEPTH",
+      "entries_per_vmatpush": 4,
+      "entries_per_vmatpop": 4,
+      "asm_constants": {
+        "_MXU_OUTPUT_FIFO_DEPTH": "depth",
+        "_MXU_ENTRIES_PER_PUSH": "entries_per_vmatpush",
+        "_MXU_ENTRIES_PER_POP": "entries_per_vmatpop"
+      },
+      "note": "One per lane (mxu.sv gen_lane_output), counted in result rows: the storage is depth/NUM_SUBLANES entries of NUM_SUBLANES gathered rows, so depth must be a multiple of NUM_SUBLANES. A vmatpush adds NUM_SUBLANES rows and a vmatpop removes as many. Overflow drops results silently; there is no replay."
+    },
+    "loop_buffer": {
+      "capacity_bundles": 24,
+      "rtl_param": "LB_CAP",
+      "asm_constants": {
+        "LB_CAP": "capacity_bundles"
+      },
+      "note": "A longer body refetches from IRAM on every iteration instead of replaying: 2 more cycles per iteration in simulation. Costs time, not correctness; nothing warns."
+    },
+    "dma_channels": {
+      "count": 2,
+      "rtl_param": "DMA_CHANNEL_COUNT",
+      "asm_constants": {
+        "DMA_CHANNELS": "count"
+      },
+      "note": "Descriptor channels (minitpu_config_pkg). A descriptor names one and a wait.channel mask holds a bit for each; a channel the RTL does not have never finishes, so a wait naming it hangs."
+    },
+    "delay_field": {
+      "width_bits": 7,
+      "rtl_param": "DELAY_W",
+      "asm_constants": {
+        "DELAY_W": "width_bits"
+      },
+      "note": "One bundle can wait at most 2**width-1 = {MAX_DELAY} cycles, which covers the {VMATPUSH_RESULT_LATENCY}-cycle vmatpush result latency in one bundle. Longer gaps need filler bundles."
+    }
+  },
+  "scalar": {
+    "latency": 2,
+    "rtl_param": "S_LAT",
+    "asm_constant": "S_LAT",
+    "note": "A scalar op writes its SREG this many bundles after issue, with no bypass or interlock: a descriptor or a loop.begin.r reading that SREG must issue at least this many bundles later, across a loop back edge too."
+  },
+  "loop": {
+    "_comment": [
+      "loop.begin.r: its C opcode, the width of the bound the loop frame holds, and how many of them one image may carry.",
+      "tb_isa_conformance holds the RTL to the first two; gen_isa_doc.py --check holds asm.py to all three."
+    ],
+    "register_bound_opcode": 5,
+    "opcode_rtl_param": "C_OP_LBEGIN_R",
+    "opcode_asm_constant": "C_OP_LBEGIN_R",
+    "bound_bits": 16,
+    "bound_rtl_param": "L_HI_W",
+    "bound_asm_constant": "L_HI_W",
+    "max_skippable": 8,
+    "max_skippable_asm_constant": "MAX_SKIPPABLE_LOOPS"
+  },
+  "field_extensions": {
+    "_comment": [
+      "Encoding fields widened as HIGH-ORDER extensions: each high bit was spare before, so an image built",
+      "against the narrow field decodes to the same value, and a version without the extension has the bit",
+      "as spare (zero). gen_isa_doc.py --check holds asm.py to each width and the datasheet holds",
+      "sequencer_pkg.sv's default to it. docs/ISA_HEADROOM.md states the rule."
+    ],
+    "agu_shift_hi": {
+      "bits": 1,
+      "rtl_param": "X_SHIFT_HI_W",
+      "asm_constant": "AGU_SHIFT_HI_W",
+      "note": "The MEM-LDST agu_shift's high bit (3bcf0b7): with it the field is 4 bits and spells a stride of 1 to 2**15 VMEM words; without it, 3 bits and 128 words."
+    },
+    "level_sel_hi": {
+      "bits": 1,
+      "rtl_param": "LEVEL_SEL_HI_W",
+      "asm_constant": "LEVEL_SEL_HI_W",
+      "note": "The loop level's high bit, in MEM-LDST agu_level and the S slot's level: the loop stack holds 2**(2 + bits) loops, 8 with it and 4 without."
+    }
+  },
+  "compiler_tuning": {
+    "_comment": [
+      "Compiler policy, not ISA: what an LLVM subtarget calls a tuning feature. A version may set one so that",
+      "what it compiles is what its users were taught and graded on; the ISA rules above hold either way.",
+      "The environment still overrides each one, as its reader says."
+    ],
+    "gemm_pipeline": true,
+    "gemm_pipeline_note": "compiler/emit.py gemm_pipelining(): a GEMM's steps placed as one pipelined run (ca41310). MINITPU_CC_GEMM_PIPELINE=on|off overrides."
+  },
+  "scheduler": {
+    "_comment": [
+      "The rules asm.schedule() and tb/bundle_scheduler.svh both apply, rendered into the ISA doc.",
+      "Names in braces are the published constants ({NAME_NEXT} is the value plus one); the operation and resource notes use them too.",
+      "Change a rule in both schedulers and here in one commit; tools/check_scheduler_agreement.py",
+      "fails when the two schedulers give any image different delays."
+    ],
+    "intro": "`schedule()` in `asm.py` and `tb/bundle_scheduler.svh` implement one model: they walk the bundles in program order, each loop body once, and only raise delay fields; they never reorder. Where a `loop.begin.r` can run no trip they walk every combination of such bodies skipped too, the path skipping all of them first, and repeat until no walk raises a delay. Change a rule in both, and in `isa/latency.json`, in one commit: `tools/check_scheduler_agreement.py` runs both on every kernel image and fails if any delay differs. `asm.pack()`, which does move bundles, keeps the S and M slots in place.",
+    "delays": [
+      "Read after write: a bundle issues no earlier than W + 1 after the producer of any VREG it reads. `vtxout` reads the transpose tile, not a VREG.",
+      "Write after write: a bundle issues no earlier than W + 1 after the producer of any VREG it writes, so writes land in program order. sequencer.sv asserts on a write to a VREG still in flight.",
+      "Write port: the single VREG write port is booked cycle by cycle; a bundle moves later until none of its write cycles is taken. A `vmatpop` books +{WB_W_MPOP_FIRST} alone, since it writes every sublane together.",
+      "Matrix engines: an M command issues no earlier than *t* + interval after the previous command on its engine ({VMATLOAD_ISSUE_INTERVAL} after `vmatload`, {VMATPUSH_ISSUE_INTERVAL} after `vmatpush`, both on the stream engine; {VMATPOP_ISSUE_INTERVAL} after `vmatpop`, on the pop engine). Commands on different engines are ordered only by program order.",
+      "Result latency: a `vmatpop` issues no earlier than {VMATPUSH_RESULT_LATENCY} cycles after the oldest `vmatpush` not yet popped. An earlier pop waits for its result beat by beat, so its writes land later than the write port was booked for.",
+      "Weight switch: a `vmatload` issues no earlier than {MATRIX_WEIGHT_SWITCH_SPAN} cycles after the first `vmatpush` since the `vmatload` {MXU_WEIGHT_BANKS} before it, whose pending bank it refills.",
+      "Port C: a `vst` issues no earlier than the cycle after a `vmatload` or `vmatpush` stops streaming, {VMATLOAD_PORT_C_LAST_NEXT} or {VMATPUSH_PORT_C_LAST_NEXT} cycles after it. A stream command reads port C from the cycle after it issues, so its engine interval alone keeps it off the stream before it.",
+      "Matrix read: a bundle that writes a VREG a `vmatload` or `vmatpush` streams lands that write no earlier than the last cycle the stream reads that VREG, so the stream reads the value it was issued against. Rows stream one a cycle from +1, {NUM_SUBLANES} to a VREG: a `vmatpush` reads its VREG through +{VMATPUSH_PORT_C_LAST}, and a `vmatload`, which streams its last row first, reads VREG base+k through +{VMATLOAD_PORT_C_LAST} - {NUM_SUBLANES}k. A `vmatpop` can run beside a stream, so its destination is held to this too; vpu.sv asserts on a write that lands sooner.",
+      "Halt: `halt` issues only after every VREG write in flight has landed. The hardware's halt waits only for the DMA to go idle; simulation asserts on a write in flight.",
+      "Zero trip: every rule above holds on each path with any combination of `loop.begin.r` bodies removed, since a skipped body lets what follows its `loop.end` issue as soon as the bundle after the `loop.begin.r` would. A gap the skip needs lands on the `loop.begin.r`, paid once per entry, and the taken path keeps it.",
+      "A gap longer than one delay field holds ({MAX_DELAY} cycles) is split over empty filler bundles."
+    ],
+    "refused": [
+      "Two port-C readers in one bundle (`vst` with `vmatload` or `vmatpush`): the matrix read wins the port and the store writes the wrong register.",
+      "Two writes to one VREG in one bundle: they issue together, so no delay orders them.",
+      "Two writes in one bundle on one write-port cycle, such as a `vld` (+{WB_W_VLD}) beside a `vmatpop` (+{WB_W_MPOP_FIRST}): they issue together, so no delay separates them.",
+      "A `vmatpush` that would leave more than {MXU_OUTPUT_FIFO_DEPTH} results in a lane's output FIFO, counted in program order. `asm.py` runs every loop its trip count, a `loop.begin.r` at 0, 1 and 3 trips; the svh counts each body once. A delay cannot help, because the pops that drain it come later and nothing reorders.",
+      "A descriptor beside a control op, two slots claiming the shared immediate, or a MEM kind the decoder does not define: checked when the bundle is built, and again on every word `asm.schedule` is given, since a word OR-ed by hand never passed through the builder (`asm.py` only).",
+      "A descriptor, a `loop.begin.r` reading its bound from an SREG, or a scalar op reading its source SREG (`saddi`, `smac`, `sshl`), issued fewer than {S_LAT} bundles after the write to that SREG, counted with any `loop.begin.r` body between them skipped and around loop back edges too (`asm.py` only). A scalar op reading the SREG its own bundle writes reads the old value by definition and is not refused.",
+      "A `vmatpop` with no `vmatpush` outstanding, or a `halt` with results never popped, counted over every loop trip as the FIFO is: the first leaves the pop engine armed and the second leaves results for the next launch's first pop, and neither faults (`asm.py` only).",
+      "A `vmatload` base above v{VMATLOAD_BASE_MAX}: it streams {VMATLOAD_VREGS} VREGs and the address wraps (`asm.py` only, in the builder and in `schedule`).",
+      "More than {MAX_SKIPPABLE_LOOPS} `loop.begin.r` in one image: the walks double with each.",
+      "A C opcode the sequencer does not decode: it runs as a nop, silently (`asm.py` only; the svh sees the decoder's nop)."
+    ],
+    "not_modelled": [
+      "Loop back edges: the walk is straight through, so a hazard carried from the end of a loop body to its start is the kernel's to space. `tools/check_back_edges.py` (in `make host`) replays every image's loops under these rules, each `loop.begin.r` at 0, 1 and 3 trips, and fails on one.",
+      "Stalls the walk cannot see: a descriptor's detour through `S_D_WAIT`, `wait.channel`, loop-buffer refetch and a `loop.begin.r` skip's branch make later bundles issue later than modelled in real time, but not in the units' time: every pipeline that carries a result toward the VREG write port, the scalar writeback, VMEM's load delivery and the matrix pop hold through each (ISA-E03, `sequencer.sv`'s issue-time enable), so a write lands W issue cycles after its bundle however long the stall, and the walk's issue cycles are the hardware's. What runs free through a stall (VMEM's array and DMA port, the matrix engines and array) only does so where every rule is a lower bound on distance. `tools/check_issue_stall_freeze.py` (in `tb/run_all.sh`, and with `--board` on silicon) shows it with probes that collide on the machine before ISA-E03.",
+      "Which of compute and DMA owns a VMEM region. Scalar-register spacing is refused, never delayed, by the check above.",
+      "`vexp` of a positive input (a value, not a schedule; see `AGENTS.md`)."
+    ]
+  },
+  "versions": {
+    "_comment": [
+      "One target, several subtargets: the top level of this file is the base, which is version v1, and each",
+      "version below states only its deltas, as {path: value} into the base (dotted keys; operations[op] picks",
+      "the row listing op). compiler/isa/versions.py resolves a version; asm.py carries the same deltas written",
+      "out (it ships without this file) and gen_isa_doc.py --check holds every implemented version's constants",
+      "to it, version by version. MINITPU_ISA_VERSION, or minitpu-cc --isa, selects one; nothing falls back.",
+      "A version whose deltas are null is reserved: named, so a reader refuses it by name, and not implemented.",
+      "bitstreams maps each board build_id known to implement a version; run_image.py refuses an image on a bitstream of another version, and on one in no list unless --isa states it."
+    ],
+    "default": "v1",
+    "list": {
+      "v1": {
+        "status": "current",
+        "describes": "this tree's RTL (master)",
+        "deltas": [],
+        "bitstreams": {
+          "0xB1E37C21": "minitpu e37c210 (the packaged bitstream): one-beat vmatpop, latency 85, 4-bit agu_shift, but the loop stack 4 deep (before 49d895d), so a v1 image nesting five or more loops is wrong there",
+          "0xB108D8C3": "minitpu 08d8c3b (branch e03): v1 with freeze-on-stall"
+        }
+      },
+      "v1-course": {
+        "status": "frozen",
+        "describes": "the course machine: Lab 2's released RTL (lab2 3b9d06d, bitstream 0xB13B9D06) and the Lab 3 compiler (lab3-compiler-v1, 0741e95, on minitpu 613190d); docs/DECISIONS.md 2026-09-30",
+        "deltas": [
+          {
+            "what": "MXU result latency",
+            "set": {
+              "matrix.result_latency.vmatpush": 82
+            },
+            "source": "lab2 3b9d06d tb/lab2_harness.svh RESULT_LATENCY = 82 (tb_lab2_matrix measures it); 613190d docs/isa_latency.json"
+          },
+          {
+            "what": "vmatpop writes four masked beats, one sublane a cycle, and the pop engine is busy for them",
+            "set": {
+              "matrix.issue_interval.vmatpop": 4,
+              "rtl_params.WB_W_MPOP_LAST": 6
+            },
+            "source": "lab2 3b9d06d sequencer_pkg.sv WB_W_MPOP_LAST = WB_W_MPOP_FIRST + NUM_SUBLANES - 1, tb/lab2_harness.svh POP_INTERVAL = 4; 613190d docs/isa_latency.json. The one-beat vmatpop is 05e1bdf"
+          },
+          {
+            "what": "loop stack 4 deep (no level_hi bit)",
+            "set": {
+              "field_extensions.level_sel_hi.bits": 0
+            },
+            "source": "lab2 3b9d06d sequencer_pkg.sv STACK_DEPTH = 4; 613190d board_package/asm.py LEVEL_SEL_W = 2. Eight is 49d895d"
+          },
+          {
+            "what": "agu_shift 3 bits (no agu_shift_hi bit)",
+            "set": {
+              "field_extensions.agu_shift_hi.bits": 0
+            },
+            "source": "lab2 3b9d06d sequencer_pkg.sv X_SHIFT_W = 3; 613190d board_package/asm.py AGU_SHIFT_W = 3. Four bits is 3bcf0b7"
+          },
+          {
+            "what": "loop.begin.r guards one image may carry (a compile-time budget, not a machine limit)",
+            "set": {
+              "loop.max_skippable": 6
+            },
+            "source": "613190d board_package/asm.py MAX_SKIPPABLE_LOOPS = 6"
+          },
+          {
+            "what": "GEMM steps drain one at a time (compiler tuning)",
+            "set": {
+              "compiler_tuning.gemm_pipeline": false
+            },
+            "source": "lab3-compiler-v1 has no pipelined GEMM (ca41310 is after 613190d); Lab 3's answer keys, e.g. Task 1's 204/356/956 bundles at BLOCK_N 16/32/64, are the draining emitter's"
+          }
+        ],
+        "bitstreams": {
+          "0xB13B9D06": "lab2 3b9d06d, the Lab 2 reference build the course grades on"
+        }
+      },
+      "v2": {
+        "status": "reserved",
+        "describes": "the draft on branch isa-v2-spec, docs/ISA_V2.md: a re-layout (branches, semaphores, matrix interlocks, a fault register) that nothing here implements",
+        "deltas": null,
+        "bitstreams": {}
+      }
+    }
+  }
+}
