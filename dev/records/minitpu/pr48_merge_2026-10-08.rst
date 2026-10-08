@@ -1,0 +1,251 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+#####################################################################
+PR #48 (RTLModule) merged on ``pr48-merge``, and its follow-up commit
+#####################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-08.** zhang-21, branch ``pr48-merge``
+   (worktree ``scratch/wt-pr48m``) from ``origin/u1-pilot`` ``d1116048``. Not
+   merged into ``u1-pilot`` or ``main``; the PR on GitHub was not touched.
+   Probe this follows: ``pr48_probe_2026-10-08.md``. Host load 20-50 on 64
+   cores throughout (other sessions), so wall times are upper bounds.
+
+Pins
+====
+
+.. list-table::
+   :header-rows: 1
+
+   * - What
+     - Pin
+   * - PR #48
+     - ``sunwookim028/allo#48`` head ``d83a988786b51ca305f19b7ebdd4134dd7f4ed18``
+       (``vincent-yeet:feature/ipmodule-rtlmodule``; its base is fork ``main``
+       ``d7377398``)
+   * - Base
+     - ``origin/u1-pilot`` ``d1116048``
+   * - Commits
+     - merge ``da96e3d2``; follow-up ``1d75b012``; this record on top
+   * - Verilator
+     - 5.052 ``2026-09-05 rev conda-forge build``, ``VERILATOR=/work/shared/users/phd/sk3463/tools/verilator/bin/verilator``,
+       its ``bin`` appended to ``PATH`` (``dev/toolchains.rst``)
+   * - C++
+     - g++ 13.3.1 (``gcc-toolset-13`` first on ``PATH``, ``CXX`` set to it)
+   * - Bindings
+     - built in the worktree (``mlir/build``, Ninja, ``LLVM_DIR``/``MLIR_DIR``
+       under ``/work/shared/common/llvm-project-main/build-rhel8/lib/cmake``,
+       gcc-toolset-13, ``nice ninja -j16``: 336 steps, 1 min 30 s).
+       ``mlir/`` is identical to ``main`` ``552db66a``'s (same last commit
+       ``ad41b5e8``), so these are the same bindings the main checkout has.
+   * - MiniTPU (core build only)
+     - the M-R0 export ``scratch/mr0/minitpu-b3ba0a4d`` (``b3ba0a4d``, see
+       ``minitpu_rtl_m0_2026-10-08.rst``)
+
+1. The merge (``da96e3d2``)
+===========================
+
+``git merge --no-ff pr48-head`` into ``u1-pilot``: **three** one-hunk
+conflicts, not the two the probe saw against ``main`` ``9b33ee03``. Each was
+resolved by keeping both sides:
+
+- ``allo/backend/simulator.py``: the PR's stream-aware ``ext_libs`` loop
+  (``compile_shared_lib(stream_sim=True)`` for stream IPs), then
+  ``self._shared_libs = shared_libs`` (kept for ``reset()``). As in the probe.
+- ``allo/dataflow.py``: the ``!allo.wire``/``!allo.channel`` refusal, then the
+  PR's ``LLVMOMPModule(s.module, s.top_func_name, s.ext_libs)``. As in the probe.
+- ``allo/passes.py`` (new against ``u1-pilot``): ``u1-pilot`` adds
+  ``materialize_returned_arguments`` directly above ``call_ext_libs_in_ptr``,
+  where the PR adds ``_nested_ops``; kept ``materialize_returned_arguments``,
+  then the PR's ``_nested_ops`` and ``call_ext_libs_in_ptr(...,
+  allow_stream_ip=False)``.
+
+2. The follow-up (``1d75b012``)
+===============================
+
+- **validate_rtl on Verilator 5**: ``--json-only`` instead of ``--xml-only``,
+  from the probe's patch, with one change: the top is the ``MODULE`` with
+  ``level == 1`` *and* ``origName == top`` (the probe matched ``origName``
+  only, which a parameterised submodule could share). ``xml.etree`` import
+  dropped.
+- **verilator_args** on ``RTLModule`` (list, or one string split with
+  ``shlex``), appended to the ``--json-only`` run and the ``--cc --build``
+  run; passed on to the generated adapter's inner ``RTLModule``.
+- **max_stall** on ``RTLModule`` (positive int, default 500000), emitted as
+  the transactor's ``MAX_STALL``; passed on to the adapter too.
+- **Verilator binary**: ``verilator=`` / ``$VERILATOR`` / ``PATH`` was already
+  the PR's order; now documented in the class docstring, the docs page and
+  ``dev/toolchains.rst`` (RTLModule paragraph beside the 5.052 pin).
+- **Docs**: ``docs/RTL_MODULE.md``, ``docs/IP_STREAM_INTEGRATION.md``,
+  ``docs/IP_STREAM_SIM_SHIM.md`` -> ``docs/source/backends/rtl_module.rst``
+  (in the Backends toctree; content kept, converted by a small script, plus
+  "On this fork": Verilator 5, the two knobs, the probe's limits, the
+  ``vitis.py`` ``depth=`` and ``-pipeline_loops 0`` side effects, the wiring
+  check). Markdown files deleted; references in ``allo/``, ``tests/``,
+  ``examples/ip_integration/`` updated; CLAUDE.md fork-pages row added.
+  ``sphinx-build -b html -D plot_gallery=0``: 0 warnings for the page (the
+  first conversion had 4 bold/literal nesting warnings, fixed).
+
+Two things the task did not list, both found by the gates:
+
+- **The region wiring check refused every stream-IP region.** ``u1-pilot``
+  (and ``main`` since ``6de9b8eb``, which is *not* in the probe's
+  ``9b33ee03``) refuses a plain-kernel region's stream with one blocking end
+  only (``allo/ir/units.py``, ``_check_kernel_streams``). It only scanned
+  ``.put/.get/...`` method calls, so ``ip(a, c)`` was not a use: **14 of the
+  PR's tests failed** with ``NetlistError: unconnected-stream`` (first run of
+  the suite on the merge: 14 failed, 48 passed, 1 skipped). Fixed by
+  ``_ip_stream_uses``: a call to a name that resolves to an object with
+  ``has_stream_args`` makes the kernel a reader of the streams in its
+  ``input_idx`` and a writer of those in ``output_idx`` (blocking, like
+  ``get``/``put``). Two PR tests (``test_signedness_mismatch``,
+  ``test_multiple_static_calls_rejected``) built regions whose streams had
+  only the IP's end; they now get a ``feed``/``drain`` kernel, since the
+  refusal is correct for them. New test ``test_one_ended_ip_stream_refused``.
+- **TinyTPU's ``cosim.py`` would have emitted two ``depth=``.** The PR's
+  ``vitis.py`` now emits ``depth=<static element count>`` on every ``m_axi``
+  pragma of a ``vitis_hls`` project; ``patch_axi_depths`` appended its own,
+  giving e.g. ``bundle=gmem0 depth=56 depth=56`` (values equal: 56, 4096 x 3).
+  It now replaces an existing ``depth=``. ``csynth_sweep.py``,
+  ``parity_sweep.py``, ``act/measure.py``, ``act_cosim.py``,
+  ``impact/cosim_variant.py`` and ``export_rtl.py`` call the same function.
+
+New tests: ``test_verilator_args_and_max_stall`` (no Verilator),
+``test_verilator_args_reach_verilator`` (an unknown option must fail
+``validate_rtl``), ``test_one_ended_ip_stream_refused``.
+
+3. Gates
+========
+
+All on ``1d75b012`` (the record commit changes no code), from the worktree
+root, ``conda activate allo``, ``OMP_NUM_THREADS=8``, the Verilator/g++ above.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Gate
+     - Result
+     - Wall
+   * - ``pytest tests/ip_integration/ tests/utils/test_backend_utils.py``
+       ``--deselect test_stream_ip.py::test_stream_ip_csynth``
+       ``--deselect test_external.py::test_lib_gemm``
+     - **63 passed, 1 skipped**, 2 deselected (60 + the 3 new tests; the
+       probe's 60 passed, 1 skipped with the JSON patch)
+     - 202 s
+   * - ``test_external.py::test_lib_gemm``
+     - fails: ``XILINX_XRT variable is not set`` from the ``sw_emu`` make.
+       **Fails identically on** ``main`` ``552db66a`` (main checkout, same
+       env); pre-existing, as the probe said
+     - 10 s
+   * - ``python tests/dataflow/test_df_unit.py``
+     - 3 x "Passed!"
+     - 7 s
+   * - ``python tests/dataflow/test_region_stateful.py``
+     - rc 0, but the file has no ``__main__`` block, so as a script it runs
+       nothing; ``pytest tests/dataflow/test_region_stateful.py``: **16 passed**
+     - 6 s / 12 s
+   * - ``pytest tests/dataflow/test_stream_ports.py tests/test_compose_*.py -q``
+     - **46 passed, 3 skipped**
+     - 27 s
+   * - ``gen_isa.py --check``
+     - ISA OK: the spec, its 2 generated artefacts and all 9 consumers agree
+     - 82 s
+   * - ``stress_isa.py``
+     - **STRESS OK: 640/640 runs exact**; validator 18 bad rejected, 582 accepted
+     - 253 s (load ~50)
+   * - ``bench_isa.py``
+     - ALL EXACT
+     - 14 s
+   * - TinyTPU emission sha256 (``hash_tinytpu.py`` of
+       ``u2_d12_prototype_2026-10-04/scripts`` plus ``systemc``)
+     - vhls ``6bc774bc...b2ef95`` (166,563 B), catapult ``ade1ab5d...88e038``
+       (170,812 B), systemc ``06d36533...8646b7`` (267,151 B): **identical** to
+       the values ``u3_fixes_2026-10-04.rst`` records
+     -
+   * - TinyTPU ``vitis_hls`` ``csyn`` project, ``kernel.cpp`` (not a gate;
+       shows the ``vitis.py`` change)
+     - differs from before the merge only by ``depth=56/4096/4096/4096`` on
+       the four ``m_axi`` pragmas (sha256 ``57a0b731...``, 167,019 B)
+     -
+   * - TinyTPU cosim, default TB (``TPU_PRJ`` in scratch)
+     - see section 5: **fails on this host for main too** with the
+       committed ``-B/usr/bin``; with ``-B`` pointed at gcc-toolset-13's
+       binutils, **COSIM OK**, mismatches 0 at all five shapes, cycles
+       222 / 361 / 567 / 676 / 868 -- **identical to** ``main`` ``552db66a``
+       under the same override, and the patched ``kernel.cpp`` is
+       byte-identical to main's (sha256 ``57a0b731...``)
+     - 358 s
+   * - ``minitpu_core`` through ``RTLModule`` (``core_build.py``,
+       ``verilator_args=["--build-jobs", "16"]``)
+     - JSON validation elaborates the core (1.3 s) and refuses 9 unbound inputs, as
+       designed; ``--cc --build ... --build-jobs 16`` builds
+       ``Vminitpu_core__ALL.a`` (5,027,072 B)
+     - 70 s build, 77 s total
+
+The emission hashes were taken after the merge and before the follow-up; the
+follow-up does not touch any emitter (``vitis.py``, ``hls.py``, the MLIR
+emitters) -- the ``cosim.py`` change is to the harness's post-processing.
+
+4. ``minitpu_core`` through the new build path
+===============================================
+
+``pr48_merge_2026-10-08/core_build.py`` builds M-R0's standalone core as an
+``RTLModule`` (core.f expanded, ``include_paths=[src/pkg]``, one placeholder
+``Port`` on real pins, ``done="done"``), logging every Verilator command line:
+
+.. code-block:: text
+
+   CMD verilator --top-module minitpu_core -I<M>/src/pkg --json-only -Wno-fatal --json-only-output <tmp>/ports.tree.json --json-only-meta-output <tmp>/ports.meta.json --Mdir <tmp>/json --build-jobs 16
+   VALIDATE ValueError after 1.3s: Unbound RTL input pins: ['instr_write_en', 'iram_addr', 'dma_iram_din', 'kernel_arg_csr', 'dm_req_ready', 'dm_rsp_valid', 'dm_rsp_data', 'dm_rsp_last', 'dm_rsp_resp']
+   VALIDATE unbound inputs: 9
+   CMD verilator --top-module minitpu_core -I<M>/src/pkg --cc --build --Mdir <tmp>/vgen -CFLAGS -fPIC -fvisibility=hidden --build-jobs 16
+   CMD verilator --getenv VERILATOR_ROOT
+   BUILD ok wall=70s Vminitpu_core__ALL.a 5027072 B
+   # /usr/bin/time: 1:16.94 elapsed, 232 s user, 314 % CPU, 842 MB max RSS (load ~25)
+   # (an earlier run of the same script under load ~45: build 95 s)
+
+- ``validate_rtl`` (JSON) elaborates the whole core in ~1.4 s and stops at
+  the pin check with the unbound inputs, as designed (every top input must be
+  bound; the 128/256-bit ones cannot be by any ``Port``). So the JSON port
+  reads a 40-file SystemVerilog design, not only the PR's small tests.
+- ``--build-jobs 16`` reaches both Verilator runs. The model build took
+  70 s here against M-R0's 253 s serial (first run 430 s) with the
+  PR's exact flags -- different load, so the ratio is indicative only.
+  The archive is the same size as M-R0's (5.0 MB).
+
+5. Differences from the probe's expectations
+============================================
+
+- **Three conflicts, not two** (``passes.py``; ``u1-pilot`` is not ``main``).
+- **The JSON port alone was not enough on this base**: the wiring check
+  (``6de9b8eb``, newer than the probe's base) refused 14 of the PR's tests
+  until IP calls were counted (section 2). ``main`` has that check too, so a
+  merge of #48 into ``main`` needs the same fix.
+- **The ``vitis.py`` ``depth=`` change does reach TinyTPU**, through
+  ``cosim.py``: not through the hashed emissions (``vhls``/``catapult``/
+  ``systemc``, unchanged) but through the ``vitis_hls`` project cosim builds.
+- Test count 63 rather than 60: the three new tests.
+- **TinyTPU cosim does not run on zhang-21 as committed, on any branch.**
+  ``cosim.py`` links with ``-ldflags "-B/usr/bin"``; here ``/usr/bin/ld`` is
+  binutils 2.30 (RHEL 8), which cannot read the objects Vitis 2023.2 compiles
+  (``unable to initialize decompress status for section .debug_info`` ...
+  ``file not recognized``), so every shape ends with "no TB line". Same
+  failure on ``main`` ``552db66a``, with gcc-toolset-13 on ``PATH`` or not.
+  With ``TCL_COSIM``'s ``-B`` replaced by ``/opt/rh/gcc-toolset-13/root/usr/bin``
+  (ld 2.40), done from a ``python -c`` wrapper, not committed, cosim passes
+  -- but at **222 / 361 / 567 / 676 / 868** cycles, not the published
+  175 / 265 / 421 / 482 / 674, on ``main`` exactly as on this branch. So the
+  PR changes nothing in cosim (same ``kernel.cpp`` byte for byte); the gap to
+  the published numbers is this host's toolchain path, or something on
+  ``main`` since they were published, and is not this branch's to settle.
+- ``test_region_stateful.py`` as a script is a no-op (no ``__main__``); its
+  pytest run is the meaningful gate. Worth fixing in CLAUDE.md's golden-test
+  recipe separately.
+
+Not run: ``mutate.py`` (the ``cosim.py`` change touches only the pragma
+rewrite, which no mutant targets; the cosim run above exercises it, and
+cosim is not usable here as committed anyway),
+``TPU_TB=stress`` cosim, ``test_stream_ip_csynth`` (vendor synthesis, as the
+PR's own README deselects it), lint beyond ``black`` on changed Python files.
