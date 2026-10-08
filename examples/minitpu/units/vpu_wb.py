@@ -101,7 +101,7 @@ def run(mod, cmd, n, w):
 
 # ---------------------------------------------------------------------------------
 import allo.dataflow as df  # noqa: E402
-from allo.ir.types import Stateful, UInt, int32, uint8, uint16, uint32, uint64  # noqa: E402,F401
+from allo.ir.types import Stateful, Stream, UInt, int32, uint1, uint8, uint16, uint32, uint64  # noqa: E402,F401
 
 # field positions in the slot payloads (seq_issue.V_PAY / X_PAY / M_PAY, LSB = 0)
 P_TXOUT_VD = (23, 28)
@@ -515,4 +515,138 @@ def h7_probe(n=8):
         return "refused: " + str(e).splitlines()[0]
 
 
-VARIANTS = {"locked": (locked, run), "units": (units_variant, run)}
+# ---------------------------------------------------------------------------------
+# ``selftimed`` (README D-24): the same VPU side as dataflow, for the comparison
+# ---------------------------------------------------------------------------------
+# ``cmd`` replays the trace's commands as D-23 tokens (V, X, M; one token per
+# valid command, in its issue cycle -- the issue unit's form, which csim showed
+# stall-free at depth >= 2). Three class units turn a command into a write
+# claim token with no notion of a cycle (the self-timed form: a unit's latency
+# is whatever its backend builds, D-10); the write port's owner merges the three
+# claim streams by polling, one write a cycle (a merge onto one port is an
+# arbiter: the OR-collision the RTL has cannot happen, and a second claim waits),
+# then the same two registers. It is csim-only: its merge polls ``empty()``,
+# which means nothing on the untimed simulator and which Catapult lowers to a
+# blocking read (limitations register item 18).
+ST_DEPTH = 2
+
+
+def selftimed(n, w=16, inst="shipped"):
+    @df.region()
+    def top(RST: uint8[n], VV: uint8[n], VP: uint64[n], XV: uint8[n], XP: uint32[n], MV: uint8[n],
+            MP: uint16[n], SRC: uint8[n], STV: uint8[n], LV: uint8[n], LA: uint8[n]):
+        sv: Stream[UInt(64), ST_DEPTH]
+        sx: Stream[UInt(32), ST_DEPTH]
+        sm: Stream[UInt(32), ST_DEPTH]
+        rv: Stream[UInt(16), ST_DEPTH]
+        rx: Stream[UInt(16), ST_DEPTH]
+        rm: Stream[UInt(16), ST_DEPTH]
+
+        @df.kernel(mapping=[1], args=[RST, VV, VP, XV, XP, MV, MP])
+        def cmd(rst: uint8[n], vv: uint8[n], vp: uint64[n], xv: uint8[n], xp: uint32[n], mv: uint8[n],
+                mp: uint16[n]):
+            kv: uint32 = 0
+            kx: uint32 = 0
+            km: uint32 = 0
+            for t in range(n):
+                r: uint8 = rst[t]
+                a_vv: uint8 = vv[t]
+                a_vp: uint64 = vp[t]
+                a_xv: uint8 = xv[t]
+                a_xp: uint32 = xp[t]
+                a_mv: uint8 = mv[t]
+                a_mp: uint16 = mp[t]
+                if r != 0 and a_vv != 0:
+                    vt: uint64 = 0
+                    vt[42:47] = a_vv
+                    vt[0:42] = a_vp
+                    sv.put(vt)
+                    kv = kv + 1
+                if r != 0 and a_xv != 0:
+                    xt: uint32 = 0
+                    xt[19:20] = 1
+                    xt[0:19] = a_xp
+                    sx.put(xt)
+                    kx = kx + 1
+                if r != 0 and a_mv != 0:
+                    mt: uint32 = 0
+                    mt[15:18] = a_mv
+                    mt[0:15] = a_mp
+                    sm.put(mt)
+                    km = km + 1
+            for j in range(n):
+                jj: uint32 = j
+                if jj >= kv:
+                    sv.put(0)
+                if jj >= kx:
+                    sx.put(0)
+                if jj >= km:
+                    sm.put(0)
+
+        @df.kernel(mapping=[1])
+        def vunit():
+            for k in range(n):
+                c: uint64 = sv.get()
+                v5: uint8 = c[42:47]
+                tag: uint16 = 0
+                if v5[4:5] != 0:
+                    tag = (2 << 5) | c[AD0:AD1]
+                elif v5[1:2] != 0:
+                    tag = (4 << 5) | c[SD0:SD1]
+                elif v5[0:1] != 0:
+                    tag = (8 << 5) | c[RD0:RD1]
+                elif v5[2:3] != 0:
+                    tag = (32 << 5) | c[TX0:TX1]
+                if tag != 0:
+                    rv.put(tag)
+
+        @df.kernel(mapping=[1])
+        def xunit():
+            for k in range(n):
+                c: uint32 = sx.get()
+                if c[19:20] != 0 and c[P_XOP:P_XOP + 1] == 0:
+                    tg: uint16 = (1 << 5) | c[XI0:XI1]
+                    rx.put(tg)
+
+        @df.kernel(mapping=[1])
+        def munit():
+            pend: uint8 = 0
+            for k in range(n):
+                c: uint32 = sm.get()
+                m3: uint8 = c[15:18]
+                if m3[1:2] != 0:
+                    pend = pend + 1
+                if m3[0:1] != 0 and pend != 0:
+                    pend = pend - 1
+                    tg: uint16 = (16 << 5) | c[MD0:MD1]
+                    rm.put(tg)
+
+        @df.kernel(mapping=[1], args=[SRC, STV, LV, LA])
+        def wbst(src: uint8[n], stv: uint8[n], lv: uint8[n], la: uint8[n]):
+            s_v: uint8 = 0
+            s_a: uint8 = 0
+            l_v: uint8 = 0
+            l_a: uint8 = 0
+            for c in range(n):
+                tag: uint16 = 0
+                if not rv.empty():
+                    tag = rv.get()
+                elif not rx.empty():
+                    tag = rx.get()
+                elif not rm.empty():
+                    tag = rm.get()
+                sb: uint8 = tag[5:11]
+                adr: uint8 = tag[0:5]
+                src[c] = sb
+                stv[c] = s_v
+                lv[c] = 15 if l_v != 0 else 0
+                la[c] = l_a
+                l_v = s_v
+                l_a = s_a
+                s_v = 1 if sb != 0 else 0
+                s_a = adr
+
+    return top
+
+
+VARIANTS = {"locked": (locked, run), "units": (units_variant, run), "selftimed": (selftimed, run)}

@@ -92,14 +92,17 @@ def _allo_commit():
         return "?"
 
 
-def calendar_deltas(base, cal, *, measured=None, allo_commit="?", pin="b3ba0a4d", backend="cycle-locked"):
+def calendar_deltas(base, cal, *, measured=None, allo_commit="?", pin="b3ba0a4d", backend="cycle-locked",
+                    unresolved_keys=None):
     """``{"deltas": [...], "unresolved": [...]}`` for one calendar.
 
     ``measured``: an optional ``{key: value}`` of the same quantities measured on
     the composed instance (csim/RTL); a disagreement with the derived value
     goes to ``unresolved`` instead of the delta -- the seam's "pin to a
     measurement" rule -- so a derived number is never published against a
-    measurement that refutes it."""
+    measurement that refutes it. ``unresolved_keys``: ``{WB_W_*: why}`` for
+    quantities whose bound latency has no scheduled manifest (D-10: not
+    consumed); they go to ``unresolved`` with the value they would have."""
     vals = cal.rtl_params()
     src = (f"allo {allo_commit}, template/calendar.Calendar '{cal.name}' ({backend}; "
            f"hop {cal.hop}, WB_STAGES {cal.WB_STAGES}, bound: "
@@ -108,6 +111,9 @@ def calendar_deltas(base, cal, *, measured=None, allo_commit="?", pin="b3ba0a4d"
     for key, v in vals.items():
         path = f"rtl_params.{key}"
         get(base, path)  # overrides only: refuses a path the base lacks
+        if unresolved_keys and key in unresolved_keys:
+            unresolved.append({"what": path, "would_be": v, "why": unresolved_keys[key]})
+            continue
         if measured is not None and key in measured and measured[key] != v:
             unresolved.append({"what": path, "derived": v, "measured": measured[key],
                                "why": "the composed instance's measurement disagrees with the derived booking"})

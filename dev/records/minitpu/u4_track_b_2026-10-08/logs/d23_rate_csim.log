@@ -1,0 +1,45 @@
+/work/shared/users/phd/sk3463/scratch/wt-u4b/allo/ir/infer.py:644: UserWarning: Cannot infer the bitwidth of the slice, use UInt(32) as default
+stamped: loop 1, command pushes 3, receiver pops 3
+D23-RATE vpu_cmd streams_d1 n=52236: values equal vs reference; 5447 issues; csim run 17.1s
+   n: 52236
+   first: 1
+   last: 52724
+   interval_all: {1: 51747, 2: 488}
+   interval_put: {1: 931, 2: 488}
+   interval_noput: {1: 50816}
+   puts: {'v60': 908, 'v59': 753, 'v61': 9}
+   cycles_per_iteration: 1.0093423949459175
+   locked: False
+   issue_offsets: {'at_rtl_cycle': 19, 'late': 5428, 'max_late': 488, 'issues': 5447}
+   stall_cycles: 488
+   put_to_pop: {'v59->vrx_0': {2: 379, 3: 374}, 'v60->xrx_0': {2: 323, 3: 585}, 'v61->mrx_0': {2: 9}}
+/work/shared/users/phd/sk3463/scratch/wt-u4b/allo/ir/infer.py:644: UserWarning: Cannot infer the bitwidth of the slice, use UInt(32) as default
+stamped: loop 1, command pushes 3, receiver pops 3
+D23-RATE vpu_cmd streams n=52236: values equal vs reference; 5447 issues; csim run 16.7s
+   n: 52236
+   first: 1
+   last: 52236
+   interval_all: {1: 52235}
+   interval_put: {1: 1419}
+   interval_noput: {1: 50816}
+   puts: {'v60': 908, 'v59': 753, 'v61': 9}
+   cycles_per_iteration: 1.0
+   locked: True
+   issue_offsets: {'at_rtl_cycle': 5447, 'late': 0, 'max_late': 0, 'issues': 5447}
+   stall_cycles: 0
+   put_to_pop: {'v59->vrx_0': {2: 753}, 'v60->xrx_0': {2: 908}, 'v61->mrx_0': {2: 9}}
+/work/shared/users/phd/sk3463/scratch/wt-u4b/allo/ir/infer.py:644: UserWarning: Cannot infer the bitwidth of the slice, use UInt(32) as default
+stamped: loop 1, command pushes 3, receiver pops 3
+D23-RATE vpu_cmd streams_d4 n=52236: values equal vs reference; 5447 issues; csim run 17.1s
+   n: 52236
+   first: 1
+   last: 52236
+   interval_all: {1: 52235}
+   interval_put: {1: 1419}
+   interval_noput: {1: 50816}
+   puts: {'v60': 908, 'v59': 753, 'v61': 9}
+   cycles_per_iteration: 1.0
+   locked: True
+   issue_offsets: {'at_rtl_cycle': 5447, 'late': 0, 'max_late': 0, 'issues': 5447}
+   stall_cycles: 0
+   put_to_pop: {'v59->vrx_0': {2: 753}, 'v60->xrx_0': {2: 908}, 'v61->mrx_0': {2: 9}}

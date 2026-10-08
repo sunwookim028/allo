@@ -1,0 +1,5 @@
+minitpu_9622f754_isa_latency.json: sunwookim028/minitpu-tmp isa/latency.json at master
+9622f754acfeb20d8a696e3859504f8320d960f1 (2026-10-08; 18 commits ahead of f1e978e, the
+ISA-JSON move the seam pins --check to). Fetched with
+  gh api "repos/sunwookim028/minitpu-tmp/contents/isa/latency.json?ref=9622f754acfeb20d8a696e3859504f8320d960f1" -H "Accept: application/vnd.github.raw"
+blob sha 7a72f31023cc68de0029183ca6cd8196c6b2c8de; sha256 in SHA256SUMS.txt.
