@@ -1,0 +1,117 @@
+2026. 10. 08. (목) 01:25:07 EDT
+b3ba0a4d4fb69d39091c55f5f00d1f237082a4f1
+== fetch:fq_a8: sequencer_fetch_queue (trace) params={'ADDR_WIDTH': 8, 'DEPTH': 4} defines=[]
+   ok  straight-line                legal       66 cyc  defined 444/444 masked 18  seed-diff 0  asserts 0  pop empty=2
+   ok  fill-drain                   legal       22 cyc  defined 136/136 masked 18  seed-diff 0  asserts 0  pop empty=4
+   ok  flushes                      legal       42 cyc  defined 276/276 masked 18  seed-diff 0  asserts 0  flush=4, pop empty=6
+   ok  random-tb-0                  legal     4002 cyc  defined 27996/27996 masked 18  seed-diff 0  asserts 0  flush=63, pop empty=182
+   ok  random-tb-1                  legal     4002 cyc  defined 27986/27986 masked 28  seed-diff 0  asserts 0  flush=57, pop empty=199
+   ok  random-dense-0               legal     4002 cyc  defined 27996/27996 masked 18  seed-diff 0  asserts 0  flush=388, pop empty=672
+   ok  random-dense-1               legal     4002 cyc  defined 27994/27994 masked 20  seed-diff 0  asserts 0  flush=411, pop empty=694
+   ok  tb_fetch_queue_shift         legal     2004 cyc  defined 13999/13999 masked 29  seed-diff 0  asserts 0 TB-REPLAY 13999/13999  flush=37, pop empty=106
+   undefined-slot census (slots, guess matched, moved with seed):
+      bundle_addr_o      reset                  17  guess        0  seed-moved       17
+      bundle_addr_o      uninit                 24  guess        0  seed-moved       24
+      bundle_data_o      reset                  17  guess        0  seed-moved       17
+      bundle_data_o      uninit                 24  guess        0  seed-moved       24
+      bundle_valid_o     reset                  17  guess        9  seed-moved        8
+      empty_o            reset                  17  guess        9  seed-moved        8
+      full_o             reset                  17  guess       17  seed-moved        0
+      rd_addr_o          reset                  17  guess        9  seed-moved        8
+      rd_addr_valid_o    reset                  17  guess       17  seed-moved        0
+   events: flush=960, pop empty=1865
+   LATENCY-OK   pop -> next head: declared 1, step probe 1
+   LATENCY-OK   bram_data_i (landing cycle) -> bundle_data_o: declared 1, step probe 1
+   REF-MATCH fetch:fq_a8 (3.3s)
+== fetch:fq: sequencer_fetch_queue (trace) params={'ADDR_WIDTH': 12, 'DEPTH': 4} defines=[]
+   ok  straight-line                legal       66 cyc  defined 444/444 masked 18  seed-diff 0  asserts 0  pop empty=2
+   ok  fill-drain                   legal       22 cyc  defined 136/136 masked 18  seed-diff 0  asserts 0  pop empty=4
+   ok  flushes                      legal       42 cyc  defined 276/276 masked 18  seed-diff 0  asserts 0  flush=4, pop empty=6
+   ok  random-tb-0                  legal     4002 cyc  defined 27990/27990 masked 24  seed-diff 0  asserts 0  flush=66, pop empty=211
+   ok  random-tb-1                  legal     4002 cyc  defined 27990/27990 masked 24  seed-diff 0  asserts 0  flush=74, pop empty=213
+   ok  random-dense-0               legal     4002 cyc  defined 27996/27996 masked 18  seed-diff 0  asserts 0  flush=391, pop empty=674
+   ok  random-dense-1               legal     4002 cyc  defined 27996/27996 masked 18  seed-diff 0  asserts 0  flush=418, pop empty=715
+   undefined-slot census (slots, guess matched, moved with seed):
+      bundle_addr_o      reset                  14  guess        0  seed-moved       14
+      bundle_addr_o      uninit                 20  guess        0  seed-moved       20
+      bundle_data_o      reset                  14  guess        0  seed-moved       14
+      bundle_data_o      uninit                 20  guess        0  seed-moved       20
+      bundle_valid_o     reset                  14  guess        7  seed-moved        7
+      empty_o            reset                  14  guess        7  seed-moved        7
+      full_o             reset                  14  guess       14  seed-moved        0
+      rd_addr_o          reset                  14  guess        7  seed-moved        7
+      rd_addr_valid_o    reset                  14  guess       14  seed-moved        0
+   events: flush=953, pop empty=1825
+   LATENCY-OK   pop -> next head: declared 1, step probe 1
+   LATENCY-OK   bram_data_i (landing cycle) -> bundle_data_o: declared 1, step probe 1
+   REF-MATCH fetch:fq (2.5s)
+== fetch:iram: u4_fetch (trace) params={} defines=[]
+   ok  program-0                    legal      951 cyc  defined 6212/6212 masked 445  seed-diff 0  asserts 0  fetch of unwritten IRAM=314, flush=52, pop empty=88
+   ok  program-1                    legal      951 cyc  defined 6239/6239 masked 418  seed-diff 0  asserts 0  fetch of unwritten IRAM=294, flush=47, pop empty=83
+   ok  program-2                    legal      951 cyc  defined 6287/6287 masked 370  seed-diff 0  asserts 0  fetch of unwritten IRAM=267, flush=48, pop empty=85
+   ok  program-3                    legal      951 cyc  defined 6244/6244 masked 413  seed-diff 0  asserts 0  fetch of unwritten IRAM=278, flush=41, pop empty=70
+   undefined-slot census (slots, guess matched, moved with seed):
+      bundle_addr        reset                   8  guess        0  seed-moved        8
+      bundle_addr        uninit                 10  guess        0  seed-moved       10
+      bundle_data        reset                   8  guess        0  seed-moved        8
+      bundle_data        uninit               1580  guess        0  seed-moved     1580
+      bundle_valid       reset                   8  guess        4  seed-moved        0
+      empty              reset                   8  guess        4  seed-moved        0
+      full               reset                   8  guess        8  seed-moved        0
+      rd_addr            reset                   8  guess        4  seed-moved        4
+      rd_addr_valid      reset                   8  guess        4  seed-moved        0
+   events: fetch of unwritten IRAM=1153, flush=188, pop empty=326
+   LATENCY-OK   fetch request -> bundle_valid (IRAM_MEM_LATENCY + 1): declared 2, step probe 2
+   LATENCY-OK   flush -> target bundle at head (2 empty cycles + 1): declared 3, step probe 3
+   REF-MATCH fetch:iram (1.5s)
+== loop_ctrl:shipped: u4_loop_ctrl (trace) params={} defines=[]
+   ok  nest8                        legal     2853 cyc  defined 39910/39910 masked 32  seed-diff 0  asserts 0
+   ok  nest9-overflow               illegal     35 cyc  defined 447/447 masked 43  seed-diff 0  asserts 0  stack overflow=1, stack underflow=1
+   ok  nest9-overflow-2trips        illegal   3945 cyc  defined 55192/55192 masked 38  seed-diff 0  asserts 0  stack overflow=1, stack underflow=2
+   ok  underflow                    illegal     14 cyc  defined 156/156 masked 40  seed-diff 0  asserts 0  stack underflow=1
+   ok  body-24-warm                 legal      129 cyc  defined 1775/1775 masked 31  seed-diff 0  asserts 0
+   ok  body-25-cold                 legal      137 cyc  defined 1886/1886 masked 32  seed-diff 0  asserts 0  capture overflow=76
+   ok  exit-cold                    legal       90 cyc  defined 1229/1229 masked 31  seed-diff 0  asserts 0  capture overflow=38
+   ok  exit-warm                    legal      109 cyc  defined 1495/1495 masked 31  seed-diff 0  asserts 0
+   ok  skip                         legal       56 cyc  defined 749/749 masked 35  seed-diff 0  asserts 0  skip=6
+   ok  wide-iv                      legal      160 cyc  defined 2209/2209 masked 31  seed-diff 0  asserts 0
+   ok  program-0                    legal      166 cyc  defined 2293/2293 masked 31  seed-diff 0  asserts 0  skip=2
+   ok  program-1                    legal      150 cyc  defined 2054/2054 masked 46  seed-diff 0  asserts 0  skip=5
+   ok  program-2                    legal       21 cyc  defined 247/247 masked 47  seed-diff 0  asserts 0
+   ok  program-3                    legal      788 cyc  defined 10989/10989 masked 43  seed-diff 0  asserts 0  skip=5
+   ok  program-4                    legal     1668 cyc  defined 23269/23269 masked 83  seed-diff 0  asserts 0  capture overflow=51, skip=5
+   ok  program-5                    legal      407 cyc  defined 5667/5667 masked 31  seed-diff 0  asserts 0  skip=14
+   ok  raw-0                        illegal   4002 cyc  defined 55941/55941 masked 87  seed-diff 0  asserts 0  begin+end together=156, skip=59, stack overflow=383, stack underflow=13
+   ok  raw-1                        illegal   4002 cyc  defined 55988/55988 masked 40  seed-diff 0  asserts 0  begin+end together=166, skip=57, stack overflow=392, stack underflow=4
+   ok  tb_bundle_loop               legal       69 cyc  defined 911/911 masked 55  seed-diff 0  asserts 0 TB-REPLAY 845/845
+   ok  tb_loop_begin_r              legal    18169 cyc  defined 254249/254249 masked 117  seed-diff 0  asserts 0 TB-REPLAY 236083/236083  skip=16
+   ok  tb_loop_buffer_cap           legal      759 cyc  defined 10426/10426 masked 200  seed-diff 0  asserts 0 TB-REPLAY 9679/9679  capture overflow=252
+   undefined-slot census (slots, guess matched, moved with seed):
+      branch_taken       reset                  54  guess       54  seed-moved        0
+      branch_target      reset                  54  guess       33  seed-moved       21
+      depth              reset                  54  guess       54  seed-moved       21
+      iv_by_level        reset                  54  guess       33  seed-moved       21
+      iv_tos             reset                  54  guess       33  seed-moved       21
+      lb_capture_en      reset                  54  guess       54  seed-moved        0
+      lb_capture_overflow reset                  54  guess       54  seed-moved        0
+      lb_replay_en       reset                  54  guess       54  seed-moved       21
+      lb_replay_idx      reset                  54  guess       33  seed-moved       21
+      lb_reset           reset                  54  guess       54  seed-moved        0
+      level_tos          reset                  54  guess       54  seed-moved        0
+      overflow           reset                  54  guess       54  seed-moved        0
+      replay_data        reset                  54  guess        9  seed-moved       45
+      replay_data        uninit                368  guess        0  seed-moved      368
+      underflow          reset                  54  guess       54  seed-moved        0
+   events: begin+end together=322, capture overflow=417, skip=169, stack overflow=777, stack underflow=21
+   LATENCY-OK   loop.begin -> depth: declared 1, step probe 1
+   LATENCY-OK   loop.begin -> iv_by_level (iv = lo): declared 1, step probe 1
+   LATENCY-OK   loop.end (cold continue) -> branch_taken: declared 0, step probe 0
+   LATENCY-OK   loop.begin.r skip -> branch_taken (+3 in fetch = isa_latency.json's 3): declared 0, step probe 0
+   LATENCY-OK   completing loop.end -> lb_replay_en: declared 1, step probe 1
+   LATENCY-OK   refetch cost per iteration, body 25 vs 24 (+2 cycles): declared 2, step probe 2
+   REF-MATCH loop_ctrl:shipped (10.0s)
+
+real	0m29.937s
+user	0m9.949s
+sys	0m1.867s
+exit 0
