@@ -76,16 +76,25 @@ trace produced by Phase 0's bit-exact part references while the reference
 runs the same program (``seq_issue._Tap``, one model stepped across the
 joined traces):
 
-======================  =====================================  ===========================
-stubbed (plan name)     side columns                           source
-======================  =====================================  ===========================
-F1 fetch head           ``HV`` and the head word               ``ref_ctrl_issue.Fetch`` / loop-buffer replay
-C1 ``decode``           ``VS MS XS DS CS DLY`` (per-slot       ``seq_issue.decode`` =
-                        packed records, P-8)                   ``ref_ctrl_decode.decode`` (25,416 bundles)
-L1 ``iv_by_level``      ``IV0`` .. ``IV7``                     ``ref_ctrl_front.LoopCtrl``
-S1 read ports           ``SB`` / ``SS`` (``rd_data_d_base_o``, ``ref_ctrl_decode.ScalarAgu``
-                        ``rd_data_d_stride_o``)
-======================  =====================================  ===========================
+.. list-table::
+   :header-rows: 1
+   :widths: 18 40 42
+
+   * - stubbed (plan name)
+     - side columns
+     - source
+   * - F1 fetch head
+     - ``HV`` and the head word
+     - ``ref_ctrl_issue.Fetch`` / loop-buffer replay
+   * - C1 ``decode``
+     - ``VS MS XS DS CS DLY`` (per-slot packed records, P-8)
+     - ``seq_issue.decode`` = ``ref_ctrl_decode.decode`` (REF-MATCH on 25,416 bundles)
+   * - L1 ``iv_by_level``
+     - ``IV0`` .. ``IV7``
+     - ``ref_ctrl_front.LoopCtrl``
+   * - S1 read ports
+     - ``SB`` / ``SS`` (``rd_data_d_base_o``, ``rd_data_d_stride_o``)
+     - ``ref_ctrl_decode.ScalarAgu``
 
 C1 ``resolve`` is an Allo function in ``seq_issue.py``; ``adapt`` is inline
 in the kernel (an Allo function returns one value; the three slot words would
@@ -217,14 +226,30 @@ reference): the cycle at the top of each issue-loop iteration, after each
 command ``Push``, after each receiver ``Pop``. Loop iteration ``t`` is RTL
 cycle ``t``.
 
-=========  ==================  ===============  ========================  ==============
-depth      intervals of 1      stall cycles     issues at the RTL cycle   put -> pop
-=========  ==================  ===============  ========================  ==============
-1          51,747 / 52,235     **488** (all on  19 / 5,447 (max 488 late) 2 or 3
-                               command puts)
-2          52,235 / 52,235     0                **5,447 / 5,447**         2 (all)
-4          52,235 / 52,235     0                **5,447 / 5,447**         2 (all)
-=========  ==================  ===============  ========================  ==============
+.. list-table::
+   :header-rows: 1
+   :widths: 10 20 22 28 20
+
+   * - depth
+     - intervals of 1
+     - stall cycles
+     - issues at the RTL cycle
+     - put -> pop
+   * - 1
+     - 51,747 / 52,235
+     - **488** (all on command puts)
+     - 19 / 5,447 (up to 488 late)
+     - 2 or 3
+   * - 2
+     - 52,235 / 52,235
+     - 0
+     - **5,447 / 5,447**
+     - 2 (all)
+   * - 4
+     - 52,235 / 52,235
+     - 0
+     - **5,447 / 5,447**
+     - 2 (all)
 
 **Result: in csim the three Streams cost neither a deadlock nor an issue
 cycle at depth >= 2; the sequencer issues cycle for cycle as the RTL does on
@@ -258,17 +283,42 @@ cycle (a merge onto one port is an arbiter), then the same two registers.
 **A. Claim latency, issue -> write-port mux, in csim** on ``vpu_writeback``'s
 traces (W = L + 2):
 
-==============  ==========  ===========  =========================================
-class           RTL L       locked L     self-timed L (median, range, claims)
-==============  ==========  ===========  =========================================
-vld             4           4            7 (5..56; behind the merge), 1,540
-ALU             3           3            5 (5..5), 708
-SFU             5           5            5, 808
-vredsum         13          13           5, 886
-vlanered        9           9            5, 845
-vtxout          1           1            5, 681
-vmatpop         1 (+wait)   = RTL        5, 4 (no MXU in the composition)
-==============  ==========  ===========  =========================================
+.. list-table::
+   :header-rows: 1
+   :widths: 16 14 14 56
+
+   * - class
+     - RTL L
+     - locked L
+     - self-timed L (median, range, claims)
+   * - vld
+     - 4
+     - 4
+     - 7 (5..56; behind the merge), 1,540
+   * - ALU
+     - 3
+     - 3
+     - 5 (5..5), 708
+   * - SFU
+     - 5
+     - 5
+     - 5, 808
+   * - vredsum
+     - 13
+     - 13
+     - 5, 886
+   * - vlanered
+     - 9
+     - 9
+     - 5, 845
+   * - vtxout
+     - 1
+     - 1
+     - 5, 681
+   * - vmatpop
+     - 1 (+ wait for the result)
+     - = RTL
+     - 5, 4 (no MXU in the composition)
 
 csim cannot see a unit's latency (``u1_pipe``: every one-kernel unit reads 2
 whatever its arithmetic), so the self-timed claim is two hops and a poll for
@@ -281,12 +331,22 @@ tree and the MXU pop have no scheduled manifest and keep their declared L).
 against each calendar: RAW reads of a register still in flight / WAW pairs
 landing out of issue order / cycles with two claims at the port):
 
-======================  ============  ================  =======================
-programs                locked (RTL)  self-timed csim   self-timed Catapult
-======================  ============  ================  =======================
-11 legal asm-scheduled  **0 / 0 / 0** 77 / 0 / 53       165 / 0 / 81
-``unscheduled``         7 / 0 / 3     8 / 0 / 2         8 / 0 / 2
-======================  ============  ================  =======================
+.. list-table::
+   :header-rows: 1
+   :widths: 28 24 24 24
+
+   * - programs
+     - locked (RTL)
+     - self-timed csim
+     - self-timed Catapult
+   * - 11 legal asm-scheduled
+     - **0 / 0 / 0**
+     - 77 / 0 / 53
+     - 165 / 0 / 81
+   * - ``unscheduled``
+     - 7 / 0 / 3
+     - 8 / 0 / 2
+     - 8 / 0 / 2
 
 The legal programs (scheduled by ``asm.schedule()`` for v1's calendar) are
 clean under the locked calendar and wrong under either self-timed one: a
