@@ -1,0 +1,85 @@
+{
+ "clock_period_ns": 3.33,
+ "definition": "latency: rising edges from the input-accepting edge to the edge after which the output is visible, no stall; ii: cycles between iterations of the I/O loop",
+ "solution": "/work/shared/users/phd/sk3463/scratch/fix5/cat/regwf_after.prj/build/Catapult/reg_wf128.v1",
+ "tool": "catapult",
+ "units": {
+  "m_mem_0": {
+   "ii": 1,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 1,
+   "port_style": "wire",
+   "process": "/reg_wf128/m_mem_0/run",
+   "process_latency": 1,
+   "status": "scheduled",
+   "storage": {
+    "__stateful_m_mem_0_mem_1": "unreset"
+   }
+  },
+  "reader_0": {
+   "ii": 1,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 1,
+   "port_style": "wire",
+   "ports": {
+    "v49": "comb"
+   },
+   "process": "/reg_wf128/reader_0/run",
+   "process_latency": 1,
+   "status": "scheduled"
+  },
+  "sink_0": {
+   "ii": 1,
+   "io": {
+    "v69.Push()": 0,
+    "v70.Push()": 0
+   },
+   "iterations": 64,
+   "latency": null,
+   "loop": "l_S_t_0_t3",
+   "loop_c_steps": 1,
+   "port_style": "connections",
+   "process": "/reg_wf128/sink_0/run",
+   "reason": "no Pop or no Push in the I/O loop",
+   "status": "unreliable"
+  },
+  "src_0": {
+   "ii": 1,
+   "io": {
+    "v0.Pop()": 0,
+    "v1.Pop()": 0,
+    "v2.Pop()": 0,
+    "v3.Pop()": 0,
+    "v4.Pop()": 0,
+    "v5.Pop()": 0,
+    "v6.Pop()": 0,
+    "v7.Pop()": 0
+   },
+   "iterations": 64,
+   "latency": null,
+   "loop": "l_S_t_0_t",
+   "loop_c_steps": 1,
+   "port_style": "connections",
+   "process": "/reg_wf128/src_0/run",
+   "reason": "no Pop or no Push in the I/O loop",
+   "status": "unreliable"
+  },
+  "writer_0": {
+   "ii": 1,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 1,
+   "port_style": "wire",
+   "ports": {
+    "v28": "comb",
+    "v29": "comb",
+    "v30": "comb"
+   },
+   "process": "/reg_wf128/writer_0/run",
+   "process_latency": null,
+   "status": "scheduled"
+  }
+ }
+}

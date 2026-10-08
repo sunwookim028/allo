@@ -389,6 +389,28 @@ private:
   void emitChannelPut(allo::ChannelPutOp op) override;
   void emitWireGet(allo::WireGetOp op) override;
   void emitWirePut(allo::WirePutOp op) override;
+  void emitAffineYield(affine::AffineYieldOp op) override;
+
+  // README D-12 / U4 D-6 (core-fixes-5): in a kernel that is NOT Wire-only (a
+  // Stream, channel or array port), Catapult may spread one iteration's I/O over
+  // several c-steps of the pipelined loop -- each `sc_out` write goes where its
+  // handshake read went -- so the Wire outputs of ONE iteration reached their
+  // readers on DIFFERENT edges (track D's `src`: `v1`-`v3.Pop()` in c-step 0,
+  // `v0`, `v4`-`v7` in c-step 1; the IRAM's writer then ran one row ahead of its
+  // reader, which looked like a write-first memory). Such a kernel's Wire puts
+  // assign a shadow, and every shadow is written to its port once, at the end of
+  // the iteration (the loop's yield), after the iteration's last handshake.
+  struct WireDefer {
+    Operation *loop = nullptr;       // the kernel's iteration loop (entry block)
+    SmallVector<Value, 4> wires;     // the Wire out args it publishes
+  };
+  WireDefer wdefer;
+  void planWireDefer(func::FuncOp func);
+  bool wireDeferred(Value w) const {
+    return wdefer.loop && llvm::is_contained(wdefer.wires, w) &&
+           (combMode == CombMode::Normal || combMode == CombMode::Thread);
+  }
+  std::string wireShadow(Value w) { return "__wput_" + std::string(getName(w).str()); }
 
   // README D-13: a kernel's declared combinational outputs (`Wire[T, comb]`).
   // Each such port's cone becomes an SC_METHOD over SIGNAL storage; the clocked
@@ -1156,6 +1178,15 @@ bool SystemCModuleEmitter::isSteadyStateLoop(affine::AffineForOp op) {  // new (
 }
 
 void SystemCModuleEmitter::emitAffineFor(affine::AffineForOp op) {  // override (base emitter)
+  if (wdefer.loop == op.getOperation() &&
+      (combMode == CombMode::Normal || combMode == CombMode::Thread))
+    for (Value w : wdefer.wires) {  // each deferred Wire's value, from its reset value
+      auto wt = llvm::cast<WireType>(w.getType());
+      indent();
+      os << getStreamPayloadTypeName(wt.getBaseType(), linkPayloadUnsigned(w)) << " "
+         << wireShadow(w) << " = 0;  // Wire " << getName(w)
+         << ": written at the iteration's end (D-6)\n";
+    }
   if (!isSteadyStateLoop(op)) {
     CatapultModuleEmitter::emitAffineFor(op);
     return;
@@ -2532,6 +2563,7 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
     state.encounteredError = true;
     return;
   }
+  planWireDefer(func);  // after planComb: comb outputs are not deferred
   // Member unreset storage (C2) is written by the thread; a comb cone (D-13)
   // can read only signal storage, and Catapult resets every signal a thread
   // writes (CIN-233). That combination genuinely cannot be unreset.
@@ -3245,12 +3277,69 @@ void SystemCModuleEmitter::emitWireGet(WireGetOp op) {  // override (base emitte
 
 // Wire put: <wire>.write(<value>);  (raw combinational, no handshake)
 void SystemCModuleEmitter::emitWirePut(WirePutOp op) {  // override (base emitter)
+  if (wireDeferred(op->getOperand(0))) {  // published at the iteration's end (D-6)
+    indent();
+    os << wireShadow(op->getOperand(0)) << " = ";
+    emitValue(op->getOperand(1));
+    os << ";";
+    emitInfoAndNewLine(op);
+    return;
+  }
   indent();
   emitValue(op->getOperand(0), 0, false);
   os << ".write(";
   emitValue(op->getOperand(1));
   os << ");";
   emitInfoAndNewLine(op);
+}
+
+// The end of the iteration of a kernel whose Wire puts are deferred (D-6): every
+// Wire it publishes is written here, together, after the iteration's handshakes.
+void SystemCModuleEmitter::emitAffineYield(affine::AffineYieldOp op) {  // override
+  if (wdefer.loop && op->getParentOp() == wdefer.loop &&
+      (combMode == CombMode::Normal || combMode == CombMode::Thread))
+    for (Value w : wdefer.wires) {
+      indent();
+      os << getName(w) << ".write(" << wireShadow(w)
+         << ");  // the iteration's Wire outputs, published together (D-6)\n";
+    }
+  CatapultModuleEmitter::emitAffineYield(op);
+}
+
+void SystemCModuleEmitter::planWireDefer(func::FuncOp func) {  // new (SystemC-only)
+  wdefer = WireDefer();
+  bool wireOnly = llvm::all_of(func.getArguments(), [](BlockArgument a) {
+    return llvm::isa<WireType>(a.getType());
+  });
+  func.walk([&](Operation *o) {
+    if (llvm::isa<StreamGetOp, StreamTryGetOp, ChannelGetOp, ChannelTryGetOp,
+                  StreamPutOp, StreamTryPutOp, ChannelPutOp, ChannelTryPutOp>(o))
+      wireOnly = false;
+  });
+  if (wireOnly)
+    return;  // one iteration is one clock edge already
+  Block &entry = func.front();
+  Operation *loop = nullptr;
+  SmallVector<Value, 4> wires;
+  bool ok = true;
+  func.walk([&](WirePutOp p) {
+    Value w = p->getOperand(0);
+    if (llvm::is_contained(comb.outPorts, w))
+      return;  // a comb output (D-13) is the SC_METHOD's, not the thread's
+    Operation *top = entry.findAncestorOpInBlock(*p);
+    if (!llvm::isa_and_nonnull<affine::AffineForOp>(top) || (loop && loop != top) ||
+        !llvm::isa<BlockArgument>(w)) {
+      ok = false;  // no single iteration loop to publish at: left as written
+      return;
+    }
+    loop = top;
+    if (!llvm::is_contained(wires, w))
+      wires.push_back(w);
+  });
+  if (!ok || !loop)
+    return;
+  wdefer.loop = loop;
+  wdefer.wires = wires;
 }
 
 // Connections channel get: <result> = <channel>.Pop();  (scalar handshake link)

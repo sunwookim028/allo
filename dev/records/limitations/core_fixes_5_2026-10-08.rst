@@ -1,0 +1,220 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+##############################################################################
+Core fixes 5: one iteration's Wire outputs on one edge (D-6); wide integer
+literals (E-F1)
+##############################################################################
+
+:Date: 2026-10-08
+:Host: zhang-21
+:Branch: ``core-fixes-5`` (worktree ``scratch/wt-fix5``), from
+   ``origin/u1-pilot`` at ``0e6f950a`` (checkpoint 31: U4 track D landed); one
+   commit per fix, this record growing with each
+:Found by: U4 track D (D-6: ``dev/records/minitpu/u4_track_d_2026-10-08.rst``
+   section 4 and the findings table), U4 track E (E-F1:
+   ``u4_track_e_2026-10-08.rst``; repro ``tests/limits/new_wide_literal_shift.py``)
+:Decisions: README D-12 (a port's ``visible``; the amendment's "simulator,
+   csim and Catapult must agree, a regression test per link kind"), D-14
+   (unreset storage, unchanged here)
+:Bindings: the worktree's own ``mlir/build`` (Ninja; ``LLVM_DIR``/``MLIR_DIR``
+   under ``/work/shared/common/llvm-project-main/build-rhel8``; gcc-toolset-13
+   13.3.1; the ``allo`` env's python 3.12; ``scripts/build.sh``), 336 steps
+   clean, rebuilt after every C++ change
+:Tools: SystemC 2.3.3 and Catapult Ultra Synthesis 2024.2 (``nangate-45nm_beh``,
+   3.33 ns) through ``examples/minitpu/harness/env-zhang21.sh``; Verilator
+   5.052; MiniTPU at ``b3ba0a4d``, read only. Every Catapult job ran alone
+   (``flock`` on ``scratch/u4d/catapult.lock``), under ``ulimit -v 32000000``
+   and ``timeout 90m``; the longest took 1 min 45 s, the largest peak RSS was
+   902 MB
+
+Evidence files: ``core_fixes_5_2026-10-08/`` (``logs/d6/``, ``logs/ef1/``,
+``logs/impact/``; ``catapult/<build>/``: ``latency.json``, ``cycle.rpt.gz``,
+``run.tcl.gz``, ``SHA256SUMS.txt`` of ``kernel.cpp`` and ``concat_rtl.v``;
+``scripts/``).
+
+1. D-6: the server was read-first; the writer and reader saw rows one edge apart
+================================================================================
+
+**The finding as filed.** Track D's amended ``fetch:iram`` form
+(``forms/fetch_d12_packed.py``, ``U4D_BODY=amended``) matched MiniTPU on
+24,971 of 25,002 slots at shift 4. The 31 that differed were all
+``bundle_data``, all in the first cycles after a reset, and they were exactly
+the slots a write-first IRAM would get wrong. D-6 put the cause in the
+``registers`` server: "the server's pipeline samples the storage one c-step
+after the address". The task here was to make the server honour
+``visible=1``.
+
+**What the RTL shows** (``scripts/probe_fd12.py``: track D's own
+``u4d_check`` driver, built with ``--public-flat-rw``, printing the server's
+pins every cycle; track D's project ``scratch/u4d/fd12a_3p33.prj``, unchanged):
+
+* **The server is read-first.** ``iram_mem_0_run`` registers
+  ``v233 <= MUX(mem flops, v232)``, and ``iram_mem_0_wr`` writes the flops at
+  the same edge. On every cycle where the write pins and the read address
+  name the same row, the next ``q`` is the **old** word: 3 of 3
+  (``logs/d6/probe_trackd_fd12a_collisions.txt``).
+* **The writer was one row ahead of the reader.** In cycle 955 the loader's
+  write pins carry trace row 953 (``we=1, wa=0, wd=…cc41afe7``, the first
+  write after a reset). The fetch queue's ``c_rst`` Wire still carries row
+  952, which is in reset. One cycle later the queue leaves reset and reads
+  word 0, after that word was written: the new word
+  (``logs/d6/probe_trackd_fd12a_cycles_950_962.txt``). The driver's per-input
+  row counters agree on all 3,803 rows: ``src`` accepts ``xwe``/``xwa``/``xwd``
+  one row ahead of ``xrst``/``xpause``/``xflush``/``xraddr``/``xpop``
+  (``logs/d6/probe_trackd_fd12a_src_rows.txt``).
+* **Why: Catapult's schedule of ``src``.** ``src`` (the form's stimulus
+  adapter: array ports in, ``Wire`` channels out) pops each port and puts the
+  value to a ``Wire``, interleaved. Its pipelined loop was 2 c-steps, with
+  ``v1``/``v2``/``v3.Pop()`` in c-step 0 and ``v0``, ``v4``-``v7`` in c-step 1
+  (track D's own ``latency.json``, ``io``). Each ``sc_out`` write followed its
+  pop. So the loader's three Wires were registered one edge before the
+  queue's five. A writer that runs one row ahead of the reader is a
+  write-first memory on every same-row collision, and on nothing else. That
+  is why the write-first reference explained 31 of 31.
+
+So D-6 is not a server bug. It is a lowering gap in the SystemC flow: in a
+kernel that is not Wire-only, one iteration's ``Wire`` outputs were not
+published on one edge. Any Wire-linked composite fed by such a kernel is
+exposed, whatever memory it holds.
+
+**Confirming experiment** (``scripts/fetch_d12_packed_popsfirst.diff``: the
+form's ``src`` with all eight pops first, then all eight puts; same flags,
+``catapult/fd12a_popsfirst``): ``src``'s loop becomes 1 c-step with all eight
+pops in c-step 0, and the form matches at shift 3:
+**UNIT-MATCH 25,008/25,008, cycle for cycle, 0 stalls**.
+
+**Change** (``mlir/lib/Translation/EmitSystemC.cpp``: ``planWireDefer``,
+``emitWirePut``, ``emitAffineYield``, ``emitAffineFor``). A kernel that is
+not Wire-only (a ``Stream``, channel or array port, or a stream/channel op),
+whose ``Wire`` puts (comb outputs excluded) all sit in one top-level loop,
+gets the following:
+
+* one shadow per Wire it writes (``__wput_<port>``, starting at the port's
+  reset value 0), declared before the loop;
+* each put assigns the shadow;
+* at the end of every iteration (the loop's ``affine.yield``), after the
+  iteration's last handshake, each shadow is written to its port once.
+
+A Wire that is not written in an iteration keeps its value, as a register
+does. A kernel with puts outside one iteration loop is emitted as before.
+Wire-only kernels (one iteration is one edge already), the D-12 servers and
+owners among them, are unchanged. The rule is written in
+``docs/source/backends/systemc.rst`` (after the link table).
+
+The emitted ``src`` of the form, before and after
+(``logs/d6/fd12a_src_0_emission.diff``): eight ``vN.write(x)`` become
+``__wput_vN = x``, and eight ``vN.write(__wput_vN)`` follow the last pop.
+Nothing else in the design changes. (The other differences from track D's
+``kernel.cpp`` come from core-fixes-4, which is on ``u1-pilot`` and was not
+on track D's base: S-2's port order and the ``allo unreset process`` marker.)
+
+**Track D's command, re-run** (``U4D_BODY=amended u4d_run.sh fd12a_3p33 fetch
+form:fetch_d12_packed --inst iram --clock 3.33 --pipeline-all
+--unroll-nested``, the form unchanged; ``catapult/fd12a_3p33``, 81 s, 893 MB):
+``src`` is 1 c-step, all pops in c-step 0. The shift is now 3: two Wire hops
+and no extra skew. The extra row track D counted was ``src``'s split.
+
+.. list-table:: ``fetch:iram`` amended body (``f1_d12`` T-2 form), Catapult RTL in Verilator
+   :header-rows: 1
+
+   * - build
+     - verdict
+     - ``kernel.cpp`` / ``concat_rtl.v`` sha256
+   * - track D ``fd12a_3p33`` (before), shift 4
+     - UNIT-DIFF 24,971/25,002, 31 ``bundle_data`` (write-first)
+     - ``bd6249ff…`` / ``c4699864…``
+   * - core-fixes-5 ``fd12a_3p33`` (after), shift 3
+     - **UNIT-MATCH 25,008/25,008, CYCLE-FOR-CYCLE yes**, 0 stalls
+       (``logs/d6/d6_fd12a_3p33_shift3.log``)
+     - ``07bd24f3…`` / ``e45dadac…``
+   * - same build, shift 4 (track D's alignment)
+     - UNIT-DIFF 15,910/25,002 (the control outputs too: wrong alignment)
+     - as above
+   * - pops-first form, old emitter (the experiment), shift 3
+     - UNIT-MATCH 25,008/25,008, cycle for cycle
+     - ``e6287ad3…`` / ``c444701a…``
+
+**Regression test** ``tests/dataflow/test_compose_registers_write_first.py``.
+It reproduces the shape in small: ``src`` (track D's interleaving, one
+128-bit pop first) -> ``writer`` (owns ``m.w``) and ``reader`` (owns ``m.r``,
+latency 1) -> ``sink``, ``Wire`` channels, 8 unreset words. 64 rows, every row
+writes, and the read row equals the written row on 3 rows in 4 (46
+collisions). The reader puts ``(tag, q)`` together. Verdict: every ``q`` is
+the word as of before its row's write.
+
+* ``test_registers_read_first_simulator`` (Stream links) and
+  ``test_registers_read_first_csim`` (the declared Wire links; 64-bit words,
+  since the simulator's array ports stop at 64 bits): pass.
+* ``test_wire_puts_published_at_iteration_end``: the emitted ``src`` writes
+  each of its 8 Wires once, after its last pop, from a shadow; the Wire-only
+  ``writer``, ``reader`` and ``m_mem`` have no shadow.
+* ``test_registers_read_first_catapult_rtl``: opt-in
+  (``ALLO_TEST_CATAPULT=1``, Catapult and Verilator on PATH; 55 s). Every
+  kernel's loop is pipelined, built at 3.33 ns, and driven through track D's
+  ``CatapultRtl``.
+
+.. list-table:: The test's Catapult case (``logs/d6/test_*.log``, ``logs/d6/wf_check.txt``)
+   :header-rows: 1
+
+   * - bindings
+     - ``src`` schedule
+     - verdict (52 or 51 tagged pairs)
+     - ``kernel.cpp`` / ``concat_rtl.v`` sha256
+   * - before (HEAD's ``EmitSystemC.cpp``)
+     - 2 c-steps; ``v0``-``v2`` c-step 0, ``v3``-``v7`` c-step 1
+     - **FAILED**: 42/51 differ from read-first; 51/51 equal a write-first
+       memory (9/51 read-first: rows that do not collide)
+     - ``a292eb67…`` / ``1497d10e…``
+   * - after
+     - 1 c-step, all pops in c-step 0
+     - **passed**: 52/52 read-first
+     - ``951c8a1f…`` / ``81d91929…``
+
+So the property D-6 asked for -- a same-cycle read returns the old word on
+the simulator, in csim and on Catapult RTL -- holds, and the test fails
+without the fix. ``visible=k > 1`` needs no change: the server's lowering
+refuses any ``visible`` other than 1 (``compose.py``: "only visible=1 has a
+lowering"). The skew fixed here would have shifted every ``visible`` by the
+same row.
+
+**Unchanged** (``logs/d6/checks/``, local ``TMPDIR``):
+
+.. list-table::
+   :header-rows: 1
+
+   * - ``check`` (simulator / SystemC csim)
+     - result
+   * - ``fetch`` ``f1`` on ``iram`` / ``fq`` / ``fq_a8``
+     - UNIT-MATCH 25,026 / 112,864 / 126,871, both backends
+   * - ``fetch`` ``f1_d12``
+     - UNIT-MATCH 25,026/25,026, both backends
+   * - ``loop_ctrl`` ``l1_d12``
+     - UNIT-MATCH 527,446/527,446, both backends
+
+TinyTPU's emission hashes are unchanged (``logs/d6/tinytpu_hashes.txt``):
+TinyTPU has no ``Wire``. The SystemC/compose suites: 203 passed and 6 failed
+in the first run (``logs/d6/pytest/``). All 6 were ``TemporaryDirectory``
+cleanup errors, "Directory not empty", because ``TMPDIR`` was on NFS, where
+an open handle leaves ``.nfs`` files. Re-run with a local ``TMPDIR`` and this
+fix alone (``rerun_local_tmp.txt``): 12 passed, 1 skipped (the opt-in
+Catapult case). The full impact check is section 3.
+
+**Draft upstream issue text** (cornell-zhang/allo: the SystemC emitter is
+fork-only, so this is not filed upstream; it belongs in the fork's issue list
+with limitation 22, ``Wire`` semantics).
+
+   *Title:* SystemC: a kernel with stream/array ports writes one iteration's
+   ``Wire`` outputs on different clock edges
+
+   In a kernel that is not Wire-only (it pops array or stream ports), Catapult
+   2024.2 may pipeline the loop over several c-steps and place each ``sc_out``
+   write in the c-step of the handshake read before it. A stimulus kernel
+   that pops 8 array ports and puts each to a ``Wire``, interleaved, ran 2
+   c-steps: 3 Wires were registered one edge before the other 5. Downstream,
+   two owners of one D-12 memory then saw rows one edge apart, and every
+   same-row read returned the word being written (a write-first memory,
+   though the server is read-first on the RTL). The fix publishes each
+   iteration's Wire outputs together, from shadows, after the iteration's
+   last handshake: the loop is 1 c-step and a 25,008-slot trace matches the
+   reference RTL cycle for cycle.

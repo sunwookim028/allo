@@ -171,6 +171,22 @@ A ``Wire`` has zero storage **and** zero alignment: it reads garbage unless the 
 cycle-locked. ``valid_only`` drops a datum if the consumer is not looking that cycle. Both are
 deliberate performance points -- take them only when you own the timing.
 
+**One iteration's ``Wire`` outputs reach their readers on one edge.** In a kernel
+whose every port is a ``Wire``, one iteration is one clock cycle. In any other kernel
+(a ``Stream``, channel or array port), Catapult may spread one iteration's I/O over
+several c-steps of the pipelined loop, and an ``sc_out`` written next to a handshake
+went with that handshake. Before core-fixes-5, a stimulus kernel that popped eight
+array ports and put each value to a ``Wire`` was scheduled in two c-steps. The writer
+of a D-12 memory then saw row ``t`` one edge before the reader did, and every
+same-row read returned the new word (U4 track D's D-6, which looked like a
+write-first memory). So such a kernel's ``Wire`` puts now assign a shadow
+(``__wput_<port>``, starting at the port's reset value 0), and each shadow is
+written to its port once, at the end of the iteration, after the iteration's last
+handshake. The kernel must have one top-level iteration loop holding every put;
+otherwise the puts are emitted as written. Comb outputs (below) are not affected.
+Record: ``dev/records/limitations/core_fixes_5_2026-10-08.rst``; test
+``tests/dataflow/test_compose_registers_write_first.py``.
+
 Boundary arrays are not all alike either. A 1-D array scanned strictly in order becomes a
 stream port (``a[i]`` lowers to ``.Pop()``); anything 2-D, strided, random or re-read becomes an
 addressable memory port behind a request/response channel.

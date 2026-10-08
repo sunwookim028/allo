@@ -1,0 +1,90 @@
+{
+ "clock_period_ns": 3.33,
+ "definition": "latency: rising edges from the input-accepting edge to the edge after which the output is visible, no stall; ii: cycles between iterations of the I/O loop",
+ "solution": "/work/shared/users/phd/sk3463/scratch/fix5/cat/fd12a_popsfirst.prj/build/Catapult/fetch_d12_amended.v1",
+ "tool": "catapult",
+ "units": {
+  "fq_amended_0": {
+   "ii": 1,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 1,
+   "port_style": "wire",
+   "ports": {
+    "v56": "comb"
+   },
+   "process": "/fetch_d12_amended/fq_amended_0/run",
+   "process_latency": 2,
+   "status": "scheduled"
+  },
+  "iram_mem_0": {
+   "ii": 1,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 1,
+   "port_style": "wire",
+   "process": "/fetch_d12_amended/iram_mem_0/run",
+   "process_latency": 1,
+   "status": "scheduled",
+   "storage": {
+    "__stateful_iram_mem_0_mem_1": "unreset"
+   }
+  },
+  "loader_0": {
+   "ii": 1,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 1,
+   "port_style": "wire",
+   "ports": {
+    "v35": "comb",
+    "v36": "comb",
+    "v37": "comb"
+   },
+   "process": "/fetch_d12_amended/loader_0/run",
+   "process_latency": null,
+   "status": "scheduled"
+  },
+  "sink_0": {
+   "ii": 1,
+   "io": {
+    "v217.Push()": 0,
+    "v218.Push()": 0,
+    "v219.Push()": 0,
+    "v220.Push()": 0,
+    "v221.Push()": 0,
+    "v222.Push()": 0,
+    "v223.Push()": 0
+   },
+   "iterations": 3804,
+   "latency": null,
+   "loop": "l_S_t_0_t3",
+   "loop_c_steps": 1,
+   "port_style": "connections",
+   "process": "/fetch_d12_amended/sink_0/run",
+   "reason": "no Pop or no Push in the I/O loop",
+   "status": "unreliable"
+  },
+  "src_0": {
+   "ii": 1,
+   "io": {
+    "v0.Pop()": 0,
+    "v1.Pop()": 0,
+    "v2.Pop()": 0,
+    "v3.Pop()": 0,
+    "v4.Pop()": 0,
+    "v5.Pop()": 0,
+    "v6.Pop()": 0,
+    "v7.Pop()": 0
+   },
+   "iterations": 3804,
+   "latency": null,
+   "loop": "l_S_t_0_t",
+   "loop_c_steps": 1,
+   "port_style": "connections",
+   "process": "/fetch_d12_amended/src_0/run",
+   "reason": "no Pop or no Push in the I/O loop",
+   "status": "unreliable"
+  }
+ }
+}

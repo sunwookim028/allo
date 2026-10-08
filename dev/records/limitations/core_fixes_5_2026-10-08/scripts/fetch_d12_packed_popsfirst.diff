@@ -1,0 +1,41 @@
+--- /work/shared/users/phd/sk3463/scratch/wt-fix5/dev/records/minitpu/u4_track_d_2026-10-08/forms/fetch_d12_packed.py	2026-10-08 11:36:03.138240240 -0400
++++ /work/shared/users/phd/sk3463/scratch/fix5/td/forms/fetch_d12_packed.py	2026-10-08 11:43:56.117719291 -0400
+@@ -45,14 +45,21 @@
+         xflush: uint1[N], xraddr: UInt(AW)[N], xpop: uint1[N]):
+     for t in range(N):
+         d: UInt(128) = xwd[t]
+-        h_we.put(xwe[t])
+-        h_wa.put(xwa[t])
++        e_: uint1 = xwe[t]
++        a_: UInt(AW) = xwa[t]
++        r_: uint1 = xrst[t]
++        p_: uint1 = xpause[t]
++        f_: uint1 = xflush[t]
++        ra_: UInt(AW) = xraddr[t]
++        po_: uint1 = xpop[t]
++        h_we.put(e_)
++        h_wa.put(a_)
+         h_wd.put(d)
+-        c_rst.put(xrst[t])
+-        c_pause.put(xpause[t])
+-        c_flush.put(xflush[t])
+-        c_raddr.put(xraddr[t])
+-        c_pop.put(xpop[t])
++        c_rst.put(r_)
++        c_pause.put(p_)
++        c_flush.put(f_)
++        c_raddr.put(ra_)
++        c_pop.put(po_)
+ 
+ 
+ @unit(memories=("iram.host",), reads=("h_we", "h_wa", "h_wd"), parameters=("N", "AW", "IRM"))
+@@ -321,7 +328,8 @@
+                         units=(src, loader, fq, sink))
+ 
+ 
+-BODY = "landed"  # u4d_build/u4d_check: --form-arg body=amended (env U4D_BODY)
++BODY = "landed"
++SRC_ORDER = "pops_first"  # fix5 experiment  # u4d_build/u4d_check: --form-arg body=amended (env U4D_BODY)
+ 
+ 
+ def make(n, w=128, inst="iram"):
