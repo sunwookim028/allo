@@ -28,7 +28,10 @@ rid of what a flush strands in ``fifo``:
            one get per cycle, so this loop is the cost hidden from both.
 ``epoch``  tokens carry the producer's epoch; a flush flips both epochs and
            the queue drops stale tokens as it meets them, one ``get`` per
-           cycle (the only per-cycle-honest form with today's Stream). The
+           cycle (the only per-cycle-honest form with today's Stream). A
+           1-bit epoch is not enough: two flushes before the stranded tokens
+           drain flip it back and stale bundles issue (measured: T-5); in
+           lockstep the queue drops by its stale COUNT, which is exact. The
            stranded tokens still occupy ``fifo``, so the fetcher's room test
            must count them -- or ``fifo`` must be ``2 * DEPTH - 1`` deep, or
            the producer blocks on ``put`` while the consumer waits on its
@@ -241,7 +244,10 @@ def queue_epoch():
         if stale > 0 or (head_live == 0 and live > 0):
             tok: UInt(128) = fifo.get()
             tag: UInt(13) = ftag.get()
-            if tag[12] != epoch:
+            # stale by COUNT: in lockstep the queue knows exactly how many tokens a
+            # flush stranded. The 1-bit tag alone is wrong: two flushes before the
+            # stranded tokens drain flip it back, and they are taken as live (T-5)
+            if stale > 0:
                 stale = stale - 1
             else:
                 head = tok
