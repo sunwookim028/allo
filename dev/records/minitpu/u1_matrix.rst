@@ -510,6 +510,24 @@ not a requirement). Issue audit recorded
 ``main``, prune the 13 merged branches, add the README naming paragraph
 (after the cleanup lands).
 
+**Checkpoint 29 (2026-10-08, U4 track E landed).** ``u4-openhls``
+(``71546a54``): RTLGen matches every combinational U4 unit (II=1 inlined;
+lane-array ports cost II=2..9, called functions become sequenced
+sub-regions -- U3's D2/D3 again) except the scalar AGU as written, which is
+silently wrong through **E-R1** (RTLGen frontend: a narrow unsigned
+parameter compared with a literal whose top bit is set is never equal);
+AMC matches every unit it can build after U1's A2/A4 rewrites, crashes on
+the scalar AGU (**E-A6**, ``loopschedule.await`` destroyed with uses), lowers
+IRAM (registered read, old word on a same-cycle write) and the loop buffer
+(combinational read) but refuses VMEM's ``rw(3,1)+rw(2,1)`` (**E-A3**, the
+write port is given the read latency). **E-F1 (Allo, silent wrong answer):**
+an untyped literal is ``int32``, so ``x | (1 << 35)`` on a ``UInt(64)``
+leaves bit 35 clear with no warning (repro
+``tests/limits/new_wide_literal_shift.py``). Six draft issues in the record
+§5, none filed (owner's call: RTLGen E-R1; AMC E-A3, E-A6 + A-D2, the minor
+trio, a #126 comment; Allo E-F1 upstream). Not done: H9 (the full DMA on
+either tool), DC on the tools' RTL.
+
 **Checkpoint 28 (2026-10-08, the sequencer loop is closed).**
 ``u4-seqloop`` (``818bf772``): fetch, loop control, scalar AGU and issue run
 as one cycle-locked composition (``template/sequencer.py``), IRAM and loop
