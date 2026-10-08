@@ -442,6 +442,40 @@ rests on is a legality condition.**
   equal Phase 0's measurements (push->valid 12/22/82, span 5/15/75, PE 4,
   `vmatpush` 85, tree 13/9 and 9/5), five wrong declarations refused.
 
+**D-21 (2026-10-08). A short-term working baseline: MiniTPU's RTL obtained
+from Allo, mostly as RTL IP; and Allo's MXU integrated into MiniTPU.**
+- `examples/minitpu-rtl/` makes one demonstration claim: a MiniTPU is built
+  from an Allo design in which most or all units are the real RTL, wrapped as
+  IP (PR #48's `RTLModule` where its ready/valid adapters fit; a less general
+  shim for the core's AXI top where they do not), driven by an Allo program
+  end to end. The whole-core shim is planned first; the hybrid (the real
+  `mxu.sv` inside the ladder's Allo units) runs in parallel. The feature may
+  be less general than the ladder's units; it is a baseline, not the ladder.
+- The inverse angle counts equally: the MXU Allo already models (U3) is
+  synthesized by Allo and integrated into MiniTPU's RTL tree in place of
+  `mxu.sv`, held to MiniTPU's own testbenches. Its latency differs from the
+  shipped MXU's, so it is a declared ISA version in the agreed
+  `versions.<name>` seam, not a silent change.
+- Neither replaces the ladder (U4, U5) nor moves the pin (D-16).
+- Evidence as it lands: `dev/records/minitpu/minitpu_rtl_*.rst`.
+
+**D-22 (2026-10-08). TinyTPU is the toy instance for communication; MiniTPU
+is the design driver.**
+- TinyTPU-isa (`examples/tinytpu/`, frozen, D-4) exists to communicate the
+  Allo co-design programming model and the compiler -- docs, demos, the
+  tutorial -- and as the regression reference for the toolchain. It need not
+  be a real implementation instance of the MiniTPU family.
+- MiniTPU is the practical design driver: the unit ladder (U1-U5), the
+  template, the ISA seam with its compiler, and the physical-design numbers
+  are MiniTPU's. A "TinyTPU as an instance" of the template is a probe of the
+  template's mechanisms (an int8 engine, an accumulator option), informative
+  when it reproduces TinyTPU-isa's gates and cycles and not required to.
+  D-4's retirement of the frozen copy is therefore optional, not a milestone.
+- Naming: "TinyTPU-isa" is the shipped design; "TinyTPU" bare is the family
+  name of that toy; both stay. `mvoutrelu.patch` is a demonstration variant
+  of the shipped design; the parity baselines are its measurement
+  configurations.
+
 ## Milestones
 
 Each milestone passes on **one acceptance check** and names the tools it uses
