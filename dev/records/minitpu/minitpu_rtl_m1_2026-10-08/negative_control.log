@@ -1,0 +1,22 @@
+note: layernorm_4: sim_kernel's judging raised IndexError after 1 launch(es) were recorded
+note: rmsnorm_4_w896: sim_kernel's judging raised IndexError after 1 launch(es) were recorded
+note: swiglu_2: sim_kernel's judging raised IndexError after 1 launch(es) were recorded
+staged 4 launch(es) in 0.8 s
+region built (Verilator model + simulator) in 70 s
+gemm_structured            IDENTICAL drain 886e377e tb 886e377e  cycles    1348 tb    1350 (-2)  bundles 349/349  halted=1 dma_err=0x0 readmem_warnings=128 staged=ok  0.7s
+    | %Warning: src/core/sfu/gelu_bf16.mem:0: $readmem file not found
+    | %Warning: src/core/sfu/exp_bf16.mem:0: $readmem file not found
+gemm_varying_gelu          DIFFERS   drain 80422bc3 tb d94353e8  cycles    2540 tb    2542 (-2)  bundles 572/572  halted=1 dma_err=0x0 readmem_warnings=128 staged=ok  0.7s
+    | %Warning: src/core/sfu/gelu_bf16.mem:0: $readmem file not found
+    | %Warning: src/core/sfu/exp_bf16.mem:0: $readmem file not found
+softmax_8                  DIFFERS   drain dfc81457 tb f2ed46f3  cycles     731 tb     734 (-3)  bundles 77/77  halted=1 dma_err=0x0 readmem_warnings=128 staged=ok  0.6s
+    | %Warning: src/core/sfu/gelu_bf16.mem:0: $readmem file not found
+    | %Warning: src/core/sfu/exp_bf16.mem:0: $readmem file not found
+layernorm_4                IDENTICAL drain c9f5b422 tb c9f5b422  cycles    3789 tb    3801 (-12)  bundles 797/797  halted=1 dma_err=0x0 readmem_warnings=128 staged=ok  0.8s
+    | %Warning: src/core/sfu/gelu_bf16.mem:0: $readmem file not found
+    | %Warning: src/core/sfu/exp_bf16.mem:0: $readmem file not found
+2/4 drains bit-identical to tb_kernel_image; build 70 s; pins: MiniTPU b3ba0a4d, oracle round_trip_cycles=0
+
+real	1m18.909s
+user	3m38.824s
+sys	0m10.300s

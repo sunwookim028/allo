@@ -1,0 +1,62 @@
+note: layernorm_4: sim_kernel's judging raised IndexError after 1 launch(es) were recorded
+note: rmsnorm_4_w896: sim_kernel's judging raised IndexError after 1 launch(es) were recorded
+note: swiglu_2: sim_kernel's judging raised IndexError after 1 launch(es) were recorded
+staged 52 launch(es) in 0.7 s
+region built (Verilator model + simulator) in 67 s
+gemm_structured            IDENTICAL drain 886e377e tb 886e377e  cycles    1348 tb    1350 (-2)  bundles 349/349  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.8s
+gemm_varying               IDENTICAL drain aab61c80 tb aab61c80  cycles    1348 tb    1350 (-2)  bundles 349/349  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.7s
+gemm_varying_gelu          IDENTICAL drain d94353e8 tb d94353e8  cycles    2540 tb    2542 (-2)  bundles 572/572  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.9s
+gemm_c4g2_fuse             IDENTICAL drain 5f0e471e tb 5f0e471e  cycles    6987 tb    6992 (-5)  bundles 2461/2461  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  1.2s
+gemm_c4g2                  IDENTICAL drain 54fb566a tb 54fb566a  cycles    8253 tb    8270 (-17)  bundles 2791/2791  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  1.3s
+softmax_8                  IDENTICAL drain f2ed46f3 tb f2ed46f3  cycles     731 tb     734 (-3)  bundles 77/77  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.6s
+layernorm_4                IDENTICAL drain c9f5b422 tb c9f5b422  cycles    3789 tb    3801 (-12)  bundles 797/797  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.9s
+layernorm_32_packed        IDENTICAL drain b2215a09 tb b2215a09  cycles   32444 tb   31069 (+1375)  bundles 6314/6314  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  3.4s
+add                        IDENTICAL drain 48f27937 tb 48f27937  cycles   10951 tb   10975 (-24)  bundles 1494/1494  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  1.5s
+add_bias                   IDENTICAL drain f627505f tb f627505f  cycles    9588 tb    9626 (-38)  bundles 1477/1477  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  1.4s
+add_bias_gelu_3072         IDENTICAL drain 4858ad7c tb 4858ad7c  cycles   40236 tb   40386 (-150)  bundles 7805/7805  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  3.9s
+softmax_packed_12          IDENTICAL drain a9af09ae tb a9af09ae  cycles   18882 tb   18918 (-36)  bundles 3245/3245  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  2.2s
+softmax_packed_2_span128   IDENTICAL drain ddcf96c4 tb ddcf96c4  cycles    5350 tb    5354 (-4)  bundles 961/961  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  1.1s
+rmsnorm_4_w896             IDENTICAL drain 6ea18856 tb 6ea18856  cycles    3061 tb    3073 (-12)  bundles 565/565  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.8s
+rmsnorm_32_w896_packed     IDENTICAL drain a07a1071 tb a07a1071  cycles   27412 tb   25781 (+1631)  bundles 4458/4458  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  3.2s
+rope_2                     IDENTICAL drain 7acc77b0 tb 7acc77b0  cycles    2119 tb    2125 (-6)  bundles 460/460  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.8s
+swiglu_2                   IDENTICAL drain 1c8d2101 tb 1c8d2101  cycles    2735 tb    2739 (-4)  bundles 854/854  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.9s
+gqa_2_2.0                  IDENTICAL drain b22cd595 tb b22cd595  cycles    4381 tb    4400 (-19)  bundles 1299/1299  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  1.1s
+gqa_2_2.1                  IDENTICAL drain 3c0eeb26 tb 3c0eeb26  cycles    4383 tb    4402 (-19)  bundles 1301/1301  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  1.1s
+head_scatter.0             IDENTICAL drain 9cd1c2da tb 9cd1c2da  cycles    1925 tb    1973 (-48)  bundles 420/420  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.7s
+head_scatter.1             IDENTICAL drain e45dfc07 tb e45dfc07  cycles    2842 tb    2914 (-72)  bundles 609/609  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.8s
+head_scatter.2             IDENTICAL drain ac3db020 tb ac3db020  cycles    1925 tb    1973 (-48)  bundles 420/420  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.7s
+head_scatter.3             IDENTICAL drain 6b84c21d tb 6b84c21d  cycles    1435 tb    1459 (-24)  bundles 74/74  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.7s
+head_scatter.4             IDENTICAL drain 35692694 tb 35692694  cycles    2047 tb    2065 (-18)  bundles 60/60  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.7s
+head_scatter.5             IDENTICAL drain 8df3ea60 tb 8df3ea60  cycles    1437 tb    1461 (-24)  bundles 76/76  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.7s
+loop_begin_r.0             IDENTICAL drain 7bef7079 tb 7bef7079  cycles      22 tb      23 (-1)  bundles 8/8  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.5s
+loop_begin_r.1             IDENTICAL drain 7bef7079 tb 7bef7079  cycles      24 tb      25 (-1)  bundles 10/10  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.6s
+loop_begin_r.2             IDENTICAL drain 417ce8b3 tb 417ce8b3  cycles      44 tb      47 (-3)  bundles 12/12  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.6s
+loop_begin_r.3             IDENTICAL drain 417ce8b3 tb 417ce8b3  cycles      46 tb      49 (-3)  bundles 14/14  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.6s
+loop_begin_r.4             IDENTICAL drain 19a93954 tb 19a93954  cycles     142 tb     153 (-11)  bundles 28/28  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.6s
+loop_begin_r.5             IDENTICAL drain 19a93954 tb 19a93954  cycles     144 tb     155 (-11)  bundles 30/30  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.6s
+loop_begin_r.6             IDENTICAL drain 5d408de1 tb 5d408de1  cycles     430 tb     465 (-35)  bundles 76/76  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.7s
+loop_begin_r.7             IDENTICAL drain 5d408de1 tb 5d408de1  cycles     432 tb     467 (-35)  bundles 78/78  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.6s
+loop_begin_r.8             IDENTICAL drain 0badf96c tb 0badf96c  cycles     325 tb     350 (-25)  bundles 63/63  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.6s
+loop_begin_r.9             IDENTICAL drain 7bef7079 tb 7bef7079  cycles      31 tb      32 (-1)  bundles 13/13  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.6s
+loop_begin_r.10            IDENTICAL drain 7bef7079 tb 7bef7079  cycles      23 tb      24 (-1)  bundles 9/9  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.6s
+loop_begin_r.11            IDENTICAL drain 375007ec tb 375007ec  cycles     907 tb     980 (-73)  bundles 161/161  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.6s
+loop_begin_r.12            IDENTICAL drain 7bef7079 tb 7bef7079  cycles      31 tb      32 (-1)  bundles 11/11  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.6s
+loop_begin_r.13            IDENTICAL drain 417ce8b3 tb 417ce8b3  cycles      53 tb      56 (-3)  bundles 15/15  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.6s
+loop_begin_r.14            IDENTICAL drain c9d5b0c5 tb c9d5b0c5  cycles      97 tb     104 (-7)  bundles 23/23  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.6s
+loop_begin_r.15            IDENTICAL drain 0d9620e5 tb 0d9620e5  cycles     119 tb     128 (-9)  bundles 27/27  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.6s
+loop_begin_r.16            IDENTICAL drain 0d9620e5 tb 0d9620e5  cycles     119 tb     128 (-9)  bundles 27/27  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.6s
+loop_begin_r.17            IDENTICAL drain e7d966e9 tb e7d966e9  cycles  104878 tb  113617 (-8739)  bundles 17484/17484  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  10.1s
+loop_begin_r.18            IDENTICAL drain e7d966e9 tb e7d966e9  cycles  104878 tb  113617 (-8739)  bundles 17484/17484  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  9.0s
+flash_attention.0          IDENTICAL drain 5a961446 tb 5a961446  cycles   10091 tb   10081 (+10)  bundles 2377/2377  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  1.4s
+flash_attention.1          IDENTICAL drain 910f3b03 tb 910f3b03  cycles   23904 tb   23892 (+12)  bundles 6495/6495  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  2.6s
+flash_attention.2          IDENTICAL drain ffa7692e tb ffa7692e  cycles   30479 tb   30473 (+6)  bundles 8639/8639  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  3.3s
+flash_attention.3          IDENTICAL drain 1e92158d tb 1e92158d  cycles   22390 tb   22380 (+10)  bundles 6284/6284  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  2.5s
+flash_attention.4          IDENTICAL drain 97ea2f6b tb 97ea2f6b  cycles   13967 tb   13949 (+18)  bundles 3205/3205  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  1.8s
+flash_attention.5          IDENTICAL drain 75c96a6c tb 75c96a6c  cycles    3951 tb    3941 (+10)  bundles 421/421  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  0.9s
+flash_attention.6          IDENTICAL drain 74cd6fcc tb 74cd6fcc  cycles   23459 tb   23441 (+18)  bundles 6297/6297  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  2.6s
+flash_attention.7          IDENTICAL drain 03e5e469 tb 03e5e469  cycles   29615 tb   29597 (+18)  bundles 8253/8253  halted=1 dma_err=0x0 readmem_warnings=0 staged=ok  3.2s
+52/52 drains bit-identical to tb_kernel_image; build 67 s; memory=direct; cycles equal to the TB on 0/52; pins: MiniTPU b3ba0a4d, oracle round_trip_cycles=0
+
+real	2m32.896s
+user	5m6.336s
+sys	0m12.070s
