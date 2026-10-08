@@ -510,6 +510,25 @@ not a requirement). Issue audit recorded
 ``main``, prune the 13 merged branches, add the README naming paragraph
 (after the cleanup lands).
 
+**Checkpoint 27 (2026-10-08, main = sync 5; U4 wave 1 closed; wave 2 approved).**
+``main`` fast-forwarded to ``9efa9de0`` (sync 5: emissions identical, gates
+equal, pytest 1052/67 vs 1025/84 with 17 fail->pass from the ``TPU_MAXDIM``
+leak fix and none pass->fail; PR #48, the RTL-wrapped core, U4 A/B/C and
+the integration are on ``main``). ``u4_matrix.rst`` filled (16 units; the
+sequencer still replays A's stateful units' traces -- closing that loop is
+wave 2). Owner decisions: **D-25 flushable streams approved as drafted**
+(``Stream[T, D, flush=True]``, consumer-only ``s.flush()``, synchronous
+clear, refuse by name where unbuildable; epoch + flush link for self-timed
+pairs); **D-12 amended**: a port's latency means iterations in the owner's
+own terms on every link kind (T-2, C8), lowering absorbs the difference;
+**C2 implemented**: unreset storage lowers in Stream kernels too (D-14
+unchanged); **wave 2 starts all three**: track D (Catapult + DC; drop the
+harness pad loop first, F-B10), track E (RTLGen/AMC), and closing the
+sequencer loop. Sync hazard for the next regression: run
+``tests/ip_integration`` as its own pytest invocation in the plain env with
+``VERILATOR`` set (a Catapult-g++ module + a newer-g++ RTL model in one
+process aborts the interpreter).
+
 **Checkpoint 26 (2026-10-08, the RTL-wrapped core passes; #48 on u1-pilot).**
 M-R1, M-R2 and M-R2b landed (``minitpu_rtl_m1_2026-10-08.rst``,
 ``minitpu_rtl_m2b_2026-10-08.rst``): the whole ``minitpu_core.sv`` as one
