@@ -553,3 +553,8 @@ def run_l1(mod, cmd, n, w):
 
 
 VARIANTS = {"l1": (l1, run_l1)}
+
+# L1 with the loop buffer declared as a D-12 memory, two units (Stream links)
+from examples.minitpu.units import loop_ctrl_d12 as _d12  # noqa: E402
+
+VARIANTS["l1_d12"] = (_d12.make("simulator"), run_l1)

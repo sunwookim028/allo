@@ -424,3 +424,8 @@ def run_f1(mod, cmd, n, w):
 
 
 VARIANTS = {"f1": (f1, run_f1)}
+
+# F1 with the IRAM declared as a D-12 memory (Stream links: simulator, csim)
+from examples.minitpu.units import fetch_d12 as _d12  # noqa: E402
+
+VARIANTS["f1_d12"] = (_d12.make("simulator"), _d12.run)
