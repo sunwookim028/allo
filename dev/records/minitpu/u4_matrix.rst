@@ -651,7 +651,9 @@ then a workaround or missing abstraction. Ids as in the track records.
 6. **T-2** (semantic mismatch, D-12 lowering; A). A port's ``L`` delivers at
    ``t + L - 1`` on Stream links but "registered link + L-deep pipe" on Wire
    links: one cycle-locked body is off by a register on one of the two, and
-   nothing reports it. Owner decision below.
+   nothing reports it. **Confirmed on Catapult RTL** (track D section 4: Wire
+   links deliver at ``t + L``, the D-12 amendment's rule; a Stream-written body
+   is one register late, 2,010 slots). Owner decision below.
 7. **C8** (semantic mismatch, D-12 server; C). The server's read token is
    post-edge; a pre-sampling owner is one cycle off unless it adds a ``hold``
    register that is not hardware.
@@ -688,7 +690,8 @@ then a workaround or missing abstraction. Ids as in the track records.
     process's ``done`` port: g++ error (the simulator runs it).
 17. **F-B10** (Catapult, budget; B). ``vpu_cmd:streams`` csyn ran away in
     ``architect`` (86 GB, stopped); likely the unrolled harness pad loop.
-    Track D's.
+    Resolved by track D: the unrolled harness pad loop; kept rolled, 1 min 33 s
+    at 886 MB.
 
 **Refusal**
 
@@ -757,14 +760,17 @@ What the owner decides
    self-timed producer, refusal where a backend cannot build the clear.
    Until then ``drain`` / ``epoch`` stay the recorded workarounds.
 2. **T-2: "a port's L means iterations on every link kind"** (deliver at
-   ``t + L``; the Wire link's register is one of the ``L`` stages), to be
-   checked on Catapult by track D.
+   ``t + L``; the Wire link's register is one of the ``L`` stages), **confirmed
+   on Catapult RTL by track D** (``u4_track_d_2026-10-08.rst`` section 4: Wire
+   links already deliver at ``t + L``, so the Stream lowering is the one to
+   change; a regression test per link kind needs D-3's form).
 3. **C2's lowering**: for a kernel whose ports are Streams, emit unreset
    storage as a module member with no reset action (as reset ``Stateful``
    members, minus the reset); keep the clock-edge ``SC_METHOD`` for all-Wire
    kernels. Until then csim and Catapult run the ``*_reset`` deviation.
 4. **Tracks D (Catapult + DC) and E (RTLGen/AMC): approved 2026-10-08; E
-   landed (``u4_track_e_2026-10-08.rst``), D running.** (Was: both now, on the landed
+   landed (``u4_track_e_2026-10-08.rst``), D landed
+   (``u4_track_d_2026-10-08.rst``).** (Was: both now, on the landed
    variants?** Every Allo column above is landed and matches; D would start
    with ``seq_issue``/``vpu_cmd`` at depth 2 and 4 (D-23's open Catapult
    half; drop the pad loop, F-B10), ``vpu_wb``, ``dma`` ``bits_reset``,
@@ -786,3 +792,12 @@ What the owner decides
    simulator and csim, a wire on Catapult). Until then every one-cycle
    exchange is a Stream at 29 csim cycles per RTL cycle
    (``u4_seqloop_2026-10-08.rst`` section 6, S-1).
+9. **D-5's consequence: declare memories as D-12 ``sram`` / ``registers``
+   instead of body arrays?** A body array read and written in one II=1
+   iteration maps to a single-port RAM model and is refused (SCHD-30): the full
+   IRAM, the DMA landing FIFO, VMEM's two ports. Only a small array partitioned
+   by hand builds. Is the rule for U5 that memories are declared as D-12
+   ``sram`` / ``registers`` (honoured on a kernel-local array, U3 C5's
+   proposal), never as body arrays? Beside it: ``registers`` is refused above a
+   declared size (D-4), and D-6's same-cycle read/write test per link kind
+   (``u4_track_d_2026-10-08.rst`` sections 5.4, 7, findings D-4, D-5, D-6).
