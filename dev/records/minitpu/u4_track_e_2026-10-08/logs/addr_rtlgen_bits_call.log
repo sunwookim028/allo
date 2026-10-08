@@ -1,0 +1,4 @@
+SCHED bits_call: latency 114689 | cyclic II [] | QOR lat 114689 fmax 566.9 area Utilization(lut=83, logic_lut=83, srl=0, ff=168, dsp=3, carry8=5, muxf=0, bram36=0, uram288=0)
+COSIM 13 chunks of 16384: cycles/chunk [114689] (240.6s)
+UNIT-MATCH dma_addr_gen bits_call rtlgen: 200700/200700 (chunk N=16384: [114689] cycles)
+WALL 242s rc=0

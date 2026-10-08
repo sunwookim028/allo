@@ -1,0 +1,697 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+##############################################################################
+U4 track E: the control units and the D-12 memories through RTLGen and AMC
+##############################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-08.** zhang-21, branch ``u4-openhls``
+   (worktree ``scratch/wt-u4e``) from ``origin/u1-pilot`` at ``c7abcce4``,
+   with its own bindings (``mlir/build``: Ninja, ``LLVM_DIR``/``MLIR_DIR``
+   under ``/work/shared/common/llvm-project-main/build-rhel8``,
+   gcc-toolset-13 13.3.1; used only to dump the oracles and for the Allo-side
+   repro). MiniTPU ``b3ba0a4d4fb69d39091c55f5f00d1f237082a4f1``, read only
+   (clean). Plan: ``u4_plan_2026-10-08.rst`` section 5, track E (H1, H2, H9
+   columns; AMC on the D-12 memories), approved by the owner on 2026-10-08.
+   The owner is away: every call below is **provisional** (D-9). Nothing
+   under ``allo/`` or ``mlir/`` changed, nothing in the tools' clones, and
+   ``u4_matrix.rst`` is not edited (section 6 proposes its cells). Tool
+   defects are recorded with draft issue text, **not filed** (section 5).
+
+Pins (all reused, nothing rebuilt):
+
+=====================  =====================================================================
+RTLGen                 Kai Shao's ``kkkaishao/allo`` branch ``allo-rtlgen`` @ ``13b55a63``
+                       (``13b55a6344ad167d679835467575dd5bd6b12d45``); CIRCT ``af5369d7``;
+                       OR-Tools 9.15.6755 prebuilt; env ``scratch/rtlgen/env`` (python
+                       3.12, cocotb 2.1.0, Verilator 5.052 conda-forge). Default SDC
+                       scheduler, device ``u55c``, 300 MHz (the export's default).
+                       No Vivado: area/fmax are RTLGen's own QoR model.
+AMC                    ``cornell-zhang/amc-dialect`` @ ``fe60c1219df3c838947794dcf69d18f3e59c0334``,
+                       CIRCT ``a470836d08c630cea25beb5de18f587c9fd37c97`` (andrewb1999
+                       ``amc-hls``), LLVM ``62797005``; env ``scratch/amc/env``; target
+                       ``amc`` (Vivado operator library), ``AMC_TARGET_CLOCK_PERIOD_NS``
+                       unset (10 ns default)
+Verilator              5.052 2026-09-05 (conda-forge) for both tools' cosims and the memory
+                       testbench (``/work/shared/users/phd/sk3463/tools/verilator``)
+Vivado                 2022.1 (``module load xilinx-2022.1``), out of context on AMC's
+                       dumps only, ``xcu55c-fsvh2892-2L-e`` at 3.333 ns (U3's
+                       ``synth_u3d.tcl`` as ``amc/synth_u4e.tcl``)
+=====================  =====================================================================
+
+Method (U3 track D's, reused). The Phase 0 oracles are dumped once from the
+Allo env (``dump_oracles.py``: exactly ``check.py``'s joined trace per unit,
+the RTL's response from ``harness/rtl.py`` and the defined-slot mask; RTL ==
+reference on every defined slot asserted at dump time; counts equal the
+matrix's: ``dma_addr_gen`` 200,700 vectors, ``seq_decoder`` 25,458,
+``agu_resolve`` 38,432, ``vpu_adapter`` 24,866, ``scalar_agu:lat2`` 201,065
+defined slots on 40,214 cycles, ``dma_desc_adapter`` 180,495 on 20,056). The
+tools then run in their own environments and compare with ``verdict``, the
+``check.py`` defined-slot rule. A stateless unit runs in chunks of ``N`` rows
+(one cosim per chunk); a stateful one (``scalar_agu``, ``dma_desc_adapter``)
+runs as **one** kernel call over the whole trace, one iteration per cycle,
+``pre`` outputs first and then the edge (the trace convention), so its match
+is **per cycle**.
+
+Forms. Every unit is first run **as written** -- track A's / C's Allo body
+with only the type names respelled for the tool (``UInt(46)`` ->
+``apint(46, signed=False)`` in RTLGen; AMC's frontend takes ``UInt(k)``), and
+the C1 functions kept as **called functions** (``*_call`` / ``written``) --
+and then in the form the tool needs: the function body **inlined** into the
+row loop (generated text, as U3's tree), lane-array ports **split** into 1-D
+ports where a lane array cost II, and for AMC U1's workarounds (A2 single bits
+as ``x[k:k+1]``, A4 inlining, A8 slice stores as shift-and-or, A5 two-operand
+booleans) plus U3's register discipline (A-D3) for state. Every form is in
+the scripts below; nothing was hand-edited after generation.
+
+Reproduce (each script's docstring has its arguments; logs are condensed by
+``condense.sh``: verdict, schedule, warning and error lines, wall time)::
+
+   # Allo env (this checkout's bindings): the oracles
+   (source examples/minitpu/harness/env-zhang21.sh; export PYTHONPATH=$PWD
+    $ALLO_PYTHON dev/records/minitpu/u4_track_e_2026-10-08/dump_oracles.py <oracles>)
+   # RTLGen (source rtlgen/env.sh; cwd = a scratch directory)
+   python rtlgen/addr_rtlgen.py <oracles>/dma_addr_gen.npz {bits,c1}_{inline,call} 16384
+   python rtlgen/agu_rtlgen.py  <oracles>/agu_resolve.npz {inline,call} 16384
+   python rtlgen/dec_rtlgen.py  <oracles>/seq_decoder.npz {inline,inline_split,call} 16384
+   python rtlgen/vpa_rtlgen.py  <oracles>/vpu_adapter.npz {inline,inline_split,gated_split,call} 16384
+   python rtlgen/sagu_rtlgen.py <oracles>/scalar_agu.npz {written,written_e1,regs,regs_split} 40214
+   python rtlgen/desc_rtlgen.py <oracles>/dma_desc_adapter.npz {written,split} 20056
+   python rtlgen/repro_param_cmp.py
+   # AMC (source amc/env.sh; TMPDIR on a local disk; under scl enable gcc-toolset-13 --)
+   python amc/addr_amc.py <oracles>/dma_addr_gen.npz {bits,c1}_{inline,call} {llvm,amc} {none,pipeline} 16384
+   python amc/{agu,dec,vpa,sagu,desc}_amc.py <oracles>/<unit>.npz {written,amc} {llvm,amc} {none,pipeline} <N>
+   python amc/mem_frontend_amc.py {iram,loopbuf} amc {none,pipeline} 64
+   python amc/repro_top_name.py; python amc/repro_sagu_await.py; python amc/repro_cond_copy.py uncond
+   (cd amc/mem && ./run_mem.sh)            # AMC's memory lowering of the D-12 declarations
+   # the lowered memories in Verilator: see amc/mem/tb_mem.sv's header
+   # Allo side
+   python tests/limits/new_wide_literal_shift.py
+
+Wall time: the whole track ran in about 1 h 30 min of wall time (09:20-10:50) on the
+shared machine (logs' ``WALL`` lines: the longest single run 9 min, RTLGen's
+cosim of ``scalar_agu``'s ``written`` form at ~31 cycles per row). One
+Verilator build and one tool flow at a time, as asked.
+
+1. Verdicts (per unit, per tool)
+================================
+
+**match** = every defined slot of the Phase 0 oracle equal on the whole
+trace/stimulus (no prefix anywhere below unless named). Cycles are the
+tool's cosim count for a chunk of ``N`` rows: both tools wrap a function in
+a ``start``/``done`` kernel over array ports (U1 F3/P1), so the
+latency the tool adds is the count minus ``N`` (``N + k``) at II=1. Area:
+RTLGen's QoR model on ``u55c`` at 300 MHz; AMC: Vivado OOC at 3.333 ns
+(section 7). Not like for like.
+
+1.1 RTLGen (``allo-rtlgen`` 13b55a63)
+-------------------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 22 30 32
+
+   * - unit
+     - form
+     - verdict
+     - II / cycles / estimate (u55c, 300 MHz)
+   * - ``dma_addr_gen``
+     - C ``bits`` and A ``c1``, **inlined**
+     - **match** 200,700/200,700 (both)
+     - II=1, N+4 (16,388 for 16,384); 106 LUT, 163 FF, 3 DSP, fmax 567 MHz
+   * -
+     - both, as **called** functions
+     - **match** 200,700/200,700 (both)
+     - no pipelined region ("Detected imperfect nest, decomposing into
+       sub-regions scheduled in program order"): 7N+1 (114,689); 83 LUT,
+       168 FF, 3 DSP
+   * - ``agu_resolve``
+     - A ``c1`` ``resolve``, inlined
+     - **match** 38,432/38,432
+     - II=1, N+2; 140 LUT, 127 FF, fmax 489 MHz
+   * -
+     - called (``iv`` row copied into a ``u32[8]``, as A's region)
+     - **match** 38,432/38,432
+     - 15N+1 (245,761): the copy loop at II=1 then the call
+   * - ``seq_decoder``
+     - A's seven ``decode_*`` inlined, lane-array ports (A's region:
+       ``B[N, 4]``, ``V[N, 2]`` ...)
+     - **match** 25,458/25,458
+     - **II=2** ("one iteration takes 4 slots of a resource serving 2 per
+       cycle"), 2N+2; 911 LUT, 601 FF
+   * -
+     - inlined, 1-D ports (``inline_split``)
+     - **match** 25,458/25,458
+     - II=1, N+2; 623 LUT, 247 FF, fmax 307 MHz
+   * -
+     - called (seven nested ``@kernel``\ s)
+     - **match** 25,458/25,458
+     - 13N+1 (212,993); 929 LUT, 523 FF
+   * - ``vpu_adapter``
+     - A ``slots`` (``adapt_v/x/m``) inlined, lane arrays
+     - **match** 24,866/24,866
+     - II=2, 2N+1; 464 LUT, 128 FF
+   * -
+     - inlined, 1-D ports
+     - **match** 24,866/24,866
+     - II=1, N+1; 368 LUT, 76 FF, fmax 567 MHz
+   * -
+     - ``slots_gated`` (D-23's deviation), 1-D ports
+     - **CONTRACT-MATCH** 318,113/318,113 sampled fields (250,483
+       unsampled payload fields zeroed) -- track A's numbers
+     - II=1, N+2; 956 LUT, 177 FF, fmax 417 MHz
+   * -
+     - called
+     - **match** 24,866/24,866
+     - 9N+1 (147,457); 469 LUT, 272 FF
+   * - ``scalar_agu:lat2``
+     - A ``s1`` **as written** (arrays, inner loops, ``scalar_result``
+       called)
+     - **finding** E-R1 (bug, silent): **152,372/201,065** -- 48,693
+       defined slots wrong (every ``SSHL`` writes 0, and everything
+       downstream); 16 in ``every-op``, 18 in ``tb_bundle_scalar_agu:A``,
+       the rest in the two random traces
+     - decomposed into 9 sub-regions, each II=1; 924,539 cycles (~23 per
+       row); 1,649 LUT, 1,021 FF, 3 DSP
+   * -
+     - ``written_e1``: the same text, ``scalar_result``'s ``op`` passed as
+       ``u32`` and narrowed inside (E-R1 avoided, nothing else changed)
+     - **match** 201,065/201,065, per cycle
+     - as above (1,206,425 cycles); so U3's D1 (carried pipe collapsed by
+       decomposition) does **not** bite here: the pipe is arrays
+   * -
+     - ``regs``: every register a scalar, loops expanded, selects as
+       if-chains (U3's "RTLGen cell" spelling); ``SREG[N, 4]`` lane array
+     - **match** 201,065/201,065, per cycle
+     - **II=4** ("8 slots of a resource serving 2"): 4N+1; 1,690 LUT,
+       1,174 FF, 3 DSP
+   * -
+     - ``regs_split`` (``SREG`` as four 1-D ports)
+     - **match** 201,065/201,065, per cycle
+     - **II=1**, N+4 (40,218); 1,591 LUT, 1,312 FF, 3 DSP; **fmax 249 MHz**
+       (below the 300 MHz target: SMAC's 32x24 multiply sits in the same
+       iteration as the select and the add, the RTL's one-cycle path)
+   * - ``dma_desc_adapter``
+     - C ``bits`` as written (``IN: u64[N, 6]``, ``OUT: u64[N, 9]``)
+     - **match** 180,495/180,495, per cycle
+     - **II=9** ("18 slots of a resource serving 2"), 9N+2; 1,133 LUT,
+       1,023 FF
+   * -
+     - ``split`` (1-D ports)
+     - **match** 180,495/180,495, per cycle
+     - II=1, N+1; 502 LUT, 331 FF, fmax 521 MHz
+
+1.2 AMC (fe60c121)
+------------------
+
+``llvm`` = AMC's own frontend compiled for the CPU (its semantics);
+``amc`` = Verilator on the SystemVerilog AMC emits. ``none`` = unscheduled,
+``pipeline`` = ``s.pipeline`` on the row loop.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 26 30 28
+
+   * - unit
+     - form
+     - verdict
+     - cycles
+   * - ``dma_addr_gen``
+     - ``bits`` / ``c1`` **called**
+     - ``llvm`` **match** 200,700; ``amc`` **blocked**: ``updateCallOp:
+       result type is not memref`` then ``IRMapping.h:74 ... Assertion`` (U1
+       A4, a scalar-returning call)
+     - --
+   * -
+     - ``bits`` / ``c1`` inlined
+     - **match** 200,700/200,700 (both, pipelined); unscheduled **match**
+       on a 16,384 prefix
+     - pipelined II=1, N+6 (16,390); unscheduled 6N+1 (98,305)
+   * - ``agu_resolve``
+     - ``resolve`` called
+     - ``llvm`` **match** 38,432; ``amc`` **blocked** (A4, as above)
+     - --
+   * -
+     - inlined
+     - **match** 38,432/38,432 (both schedules) in chunks of 4,096; in one
+       chunk of 38,432 the testbench does not build (E-A5)
+     - pipelined II=1, N+3 (4,099); unscheduled 3N+1 (12,289)
+   * - ``seq_decoder``
+     - as written
+     - **refused** by the frontend: ``RuntimeError: Unsupported bit
+       operation`` (U1 A2: single-bit ``x[k]``)
+     - --
+   * -
+     - inlined, shift-and-or, typed wide constants
+     - **match** 25,458/25,458 (both schedules)
+     - pipelined II=1, N+2 (25,460); unscheduled 3N+1 (76,375)
+   * - ``vpu_adapter``
+     - as written
+     - **refused** (A2)
+     - --
+   * -
+     - inlined, every slice store rewritten mechanically as shift-and-or
+     - **match** 24,866/24,866 (both schedules)
+     - pipelined N+2 (24,868); unscheduled 3N+1 (74,599)
+   * - ``scalar_agu:lat2``
+     - as written
+     - **refused** (A2)
+     - --
+   * -
+     - ``regs`` with the A-D3 register discipline
+     - ``llvm`` **match** 201,065/201,065; ``amc`` **blocked** on both
+       schedules by **E-A6** (crash: ``'loopschedule.await' op operation
+       destroyed but still has uses``; pipelined first prints ``problem is
+       infeasible``)
+     - --
+   * - ``dma_desc_adapter``
+     - as written
+     - **refused** (A2)
+     - --
+   * -
+     - A-D3 discipline, single bits as slices, typed sign extension
+     - **match** 180,495/180,495, per cycle (both schedules)
+     - pipelined N+8 (20,064); unscheduled 3N+7 (60,175)
+
+2. The D-12 memories through AMC
+================================
+
+AMC's memory lowering was driven two ways: (a) **its own memory
+declaration** -- an ``amc.memory`` whose ports are the D-12 ``Port``\ s
+spelled as AMC port types (``amc/mem/*.mlir``; ``amctool --memory-only
+--emit-verilog``), which is the place AMC can be *told* a port; and (b)
+**its frontend**, a trace kernel that owns the memory as a local array, one
+host write and one read per iteration (``mem_frontend_amc.py``), where
+AMC's allocation *infers* the ports. The emitted SV of (a) was then held to
+the D-12 declarations in Verilator (``amc/mem/tb_mem.sv``, 10/10 checks,
+``logs/amc_mem_tb.log``).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 26 56
+
+   * - memory (D-12 declaration)
+     - AMC spelling
+     - result
+   * - fetch ``f1_d12`` IRAM: ``UInt(128)`` x 4,096,
+       ``Port("host", "w", visible=1)``, ``Port("fetch", "r", latency=1)``,
+       ``collision="refuse"``, ``reset=False``
+     - ``static w(1)`` + ``static r(1)`` on ``!amc.ram<4096xi128>``
+     - **accepted, lowers to the declaration.** ``reg [127:0]
+       mem0[0:4095]`` with an empty reset branch (unreset storage, as D-14
+       asks), a write at the edge, a registered read (``rd_hold_s0``) that
+       **holds** while ``rd_en`` is low. Verilator: data one edge after the
+       address; a write visible the next cycle; a read of the row being
+       written returns the **old** word (D-12 says "refuse" -- the
+       composition promises it never happens; AMC has no collision
+       attribute and builds "old", d12_memory_ports' prediction). Through
+       the frontend (b): ports inferred as ``dyn w(1)``, ``dyn r(1)``,
+       ``dyn w(1)`` (the zero-initialising loop is a third port; an
+       unannotated local ``m: UInt(128)[4096]`` has no init loop), match
+       unscheduled; pipelined prints ``problem is infeasible`` and still
+       matches
+   * - ``loop_ctrl`` ``l1_d12`` loop buffer: ``UInt(128)`` x 24,
+       ``Port("cap", "w", visible=1)``, ``Port("replay", "r", latency=0)``,
+       ``collision="refuse"``, ``reset=False``
+     - ``static w(1)`` + ``static r(0)``
+     - **accepted, lowers to the declaration**: ``assign p1_rd_data =
+       mem0[p1_addr]`` (asynchronous, ``done = rd_en`` combinationally),
+       unreset. Verilator: combinational read, an address change seen
+       without an edge, a write visible the next cycle, same-cycle read of
+       the row being written = old. 24 rows on a 5-bit address: rows 24..31
+       are not checked (an out-of-range read returns whatever the array
+       model gives). Through the frontend (b): the read becomes ``dyn r(1)``
+       -- **the frontend cannot ask for a latency-0 port** (it has no port
+       API; d12_memory_ports' gap) -- unscheduled match; **pipelined prints
+       ``problem is infeasible`` and returns a design that computes wrong
+       read-back values** (the class of the AMC #126 comment, a failed
+       schedule still returns a design)
+   * - ``dma_vmem`` VMEM: ``UInt(1024)`` x 4,096, ``Port("c", "rw",
+       latency=3, visible=1)``, ``Port("d", "rw", latency=2, visible=1)``,
+       ``collision="obligation"``, ``reset=False`` (H11)
+     - ``static rw(3, 1)`` + ``static rw(2, 1)``
+     - **refused**: ``error: failed to legalize operation 'seq.hlmem' that
+       was explicitly marked illegal`` -- **E-A3** (bug: the port type
+       accepts split latencies, the lowering gives the write port the read
+       latency and ``LowerSeqHLMem`` refuses write latency != 1; the reason
+       never reaches the user). Minimal: one ``rw(2, 1)`` port on 64 x
+       i32 (``repro_rw_split_latency.mlir``). Two workarounds lower:
+       (i) each ``rw`` as ``r(L)`` + ``w(1)`` -- a **2R2W** memory, not the
+       2RW D-12 declares; Verilator: ``c`` data 3 edges after the address,
+       ``d`` 2 (latencies as declared); (ii) both ports ``rw(1, 1)`` with
+       the extra stages outside the memory. In (ii) two writes to one row in
+       one cycle leave **port 0's** word silently (fixed priority by
+       statement order): D-12's ``collision="obligation"`` has no
+       counterpart and no check (semantic mismatch, recorded, not judged)
+
+**H11 answered for AMC:** the DMA port beside the compute port can be
+*stated* in AMC's own IR (two ``static rw`` ports of different latencies on
+one bank) but not *lowered* at fe60c121 (E-A3). Nothing in AMC refuses II=1
+on a read-or-write port the way Catapult does (``asic_memories`` s.2.2); the
+dual-ported ``seq.hlmem`` is a behavioural array, not a macro.
+
+3. Hypotheses
+=============
+
+* **H1 (C1 functions match first time; RTLG/AMC refuse a ``comb`` port,
+  take a registered one).** RTLGen: **yes** -- every C1 function
+  (``addr``/``addr_gen``, ``resolve``, the seven ``decode_*``, ``adapt_v/x/m``
+  and the gated deviation) matched at the first run in every form, inlined or
+  called, with only the type names respelled; RTLGen's frontend takes
+  Allo's bit-slice reads, slice stores and single-bit indexes as written.
+  AMC: **no** as written (A2 refuses every slice-heavy body; A4 aborts on
+  every called function); **yes** once inlined and rewritten with U1's
+  workarounds -- plus one new one, typed constants for shifts past bit 31
+  (E-F1, which is Allo's too). The second half of H1 does not arise: neither
+  tool has a port-level choice between a combinational and a registered
+  port. Both wrap the function in a ``start``/``done`` kernel over array
+  ports, so the C1 function is "registered" by construction. The added
+  latency is a kernel depth: RTLGen N+1..N+4 and AMC N+2..N+6 for the
+  comb units at II=1, with nothing pinned (D-10).
+* **H2 (opt; S1 at ``latency=S_LAT``).** RTLGen: S1 matches **per cycle**
+  at ``S_LAT`` = 2 (the shipped ``lat2``) in three spellings once E-R1 is
+  avoided. The pipe is data, so the tool's own pipelining only adds kernel
+  depth (N+4 at II=1 for ``regs_split``), as U3's PE. As written, it is
+  silently wrong (E-R1). AMC: **blocked** (E-A6). ``lat1``/``lat3`` were
+  not run.
+* **H9 (opt; D1 ``dma``).** **Not run** (time went to E-R1/E-A6 and the
+  memories). ``dma_desc_adapter`` (A1, the DMA's front) was run instead and
+  matches per cycle on both tools.
+* **AMC on the D-12 memories** (the plan's last line): IRAM and the loop
+  buffer lower **exactly** to their declarations when stated as
+  ``amc.memory`` ports, latency 0 included; the frontend cannot state
+  them; VMEM's two ports are refused by a lowering bug (E-A3).
+
+4. Findings
+===========
+
+Classified per D-9. ``E-R`` RTLGen, ``E-A`` AMC, ``E-F`` Allo.
+
+RTLGen
+------
+
+**E-R1 -- bug, silent miscompile (high).** Inside a nested ``@kernel``, a
+narrow unsigned **parameter** compared with a literal whose top bit (at the
+parameter's width) is set is never equal: ``def is4(op: u3) -> u32: ... if
+op == 4`` is false for every ``op``, on RTLGen's own ``cpu`` target as well
+as in the RTL (so the frontend lowers it, not the backend). The same compare
+on a local (``op: u3 = x`` inside the callee), at top level, or against 3
+is right (``rtlgen/repro_param_cmp.py``, ``logs/rtlgen_repro_param_cmp.log``).
+Presumably the literal is materialised at the parameter's width as a
+*signed* value (4 in 3 bits = -4) and compared with the zero-extended
+parameter. In S1 it turns every ``SSHL`` into a write of 0: 48,693 wrong
+defined slots, no warning. Passing ``op`` as ``u32`` and narrowing inside
+restores 201,065/201,065 (``written_e1``).
+
+**E-R2 -- missing abstraction / QoR (U3 D3 again).** Every lane-array port
+is a memory with two ports per cycle, so II = (accesses per iteration) / 2:
+the decoder's and the adapter's 2-lane in/out ports give II=2, S1's
+four-lane ``SREG`` output II=4, the descriptor adapter's ``IN[N, 6]`` /
+``OUT[N, 9]`` (64-bit words, counted twice) II=9. The scheduler says so and
+names the remedy ("Banking or replicating what this access reaches"); the
+1-D-port spellings are II=1 everywhere. P-8's lane arrays are right for
+Allo's backends and cost II here, as U3 recorded for the tree.
+
+**E-R3 -- workaround (U3 D2 again): a called function is a sequenced
+sub-region.** Every called C1 function decomposes the row loop ("Detected
+imperfect nest, decomposing into sub-regions scheduled in program order"):
+7 (addr), 9 (adapter), 13 (decoder), 15 (resolve) cycles per row, instead of
+II=1 inlined. The values are right (no carried state). RTLGen has no
+``inline`` directive (``Schedule`` has none; ``consteval`` is compile-time
+only), so a library of C1 functions is reused at II=1 only by textual
+inlining.
+
+**E-R4 -- frontend notes (no class).** No ``u24`` alias in ``allo.lang``
+(``apint(24, signed=False)``); host arrays at most 64 bits (lanes, as
+Allo's); a ``u1`` used as a condition (``if agu_valid:``) is fine; S1's
+``regs_split`` reaches only 249 MHz in RTLGen's model (the multiply, select
+and add in one iteration, which is the RTL's own one-cycle path).
+
+AMC
+---
+
+**E-A1 -- bug (loud).** A kernel named ``top`` builds on ``llvm`` and fails
+on ``amc`` at FSM emission: ``error: redefinition of symbol named 'top'``
+then ``RuntimeError: FSM verilog emission failed``. Renamed, it builds
+(``amc/repro_top_name.py``). U1's R4 met the same message on a textual
+hand-off and read it as a duplicate wrapper; it is the name.
+
+**E-A2 -- bug (minor).** ``amctool --memory-only --emit-verilog`` prints the
+SystemVerilog and then exits 4 with ``error: unknown operation
+(SharedEmitterState::gatherFiles)`` on the ``amc.memory`` op left in the
+module (every memory in ``logs/amc_mem_lowering.log``). The emitted SV is
+complete; a script that trusts the exit code calls it a failure.
+
+**E-A3 -- bug (blocks VMEM, H11).** A ``static rw(R, W)`` port with ``R !=
+W`` is legal at the type level (``test/errors/dyn-rw-latency.mlir``: "Static
+`rw` with split latencies is allowed") but cannot be lowered:
+``AmcToHW.cpp`` ``unpackPortType`` folds the port to ``max(R, W)`` and
+``lowerCreatePort`` passes that number to ``seq::WritePortOp``
+(``AmcToHW.cpp:359``); ``LowerSeqHLMem`` refuses a write latency != 1 with
+a ``notifyMatchFailure`` that surfaces only as ``failed to legalize
+operation 'seq.hlmem'``. (For ``R < W`` the read would also be delayed to
+``W``.) Minimal repro: ``amc/mem/repro_rw_split_latency.mlir`` (one
+``rw(2, 1)`` port, 64 x i32).
+
+**E-A4 -- note (E-F1 in AMC's lineage).** An untyped literal is ``int32`` in
+AMC's frontend too: ``x | (1 << 35)`` on a ``UInt(64)`` leaves bit 35 clear.
+It made the first hand-written decoder 11,953/25,458 on ``llvm``; typed
+constants fixed it.
+
+**E-A5 -- bug (testbench, minor).** AMC's Verilator testbench declares
+each argument memory by the DUT's address width; a 2-D argument
+``uint32[38432, 8]`` gets a 29-bit address and ``reg [31:0]
+mem0[0:536870911]``, which Verilator refuses (``Width of bit range is huge;
+vector of over 1 billion bits``). 1-D arguments of 40,214 rows build. The
+workaround is chunks of 4,096 rows for a stateless unit; a stateful one
+with 2-D arguments (S1's ``KA``/``IV``) would need 1-D lane ports.
+
+**E-A6 -- bug, crash (blocks S1).** S1 in the A-D3 register discipline
+(``llvm``: match 201,065/201,065) aborts the ``amc`` build on both schedules:
+``error: 'loopschedule.await' op operation destroyed but still has uses`` /
+``LLVM ERROR: operation destroyed but still has uses``; pipelined it first
+prints ``problem is infeasible``. Greedy line deletion (``amc/ddmin.py``)
+reduces the 175-line kernel to 55 (``amc/repro_sagu_await.py``): fifteen
+1-element-array registers read at the top of the iteration, four stores
+to a 2-D output, and a 2-deep pipe's five copies ``p1_x = p0_x`` under
+``if live == 1``, each written back at the bottom. No single construct
+alone triggers it. ``repro_cond_copy.py``: the copies under ``if`` alone build
+and are right. **A-D2 is reachable at depth 2**: the *unconditional*
+2-deep shift with the output read *before* the shift (S1's ``pre`` order)
+aborts in ``LoopSchedule/Utils.cpp:442``. U3's repro reads after the shift
+and needed depth 3.
+
+**E-A7 -- instance of the filed #126 comment.** The loop buffer's frontend
+kernel, pipelined: ``problem is infeasible``, then a design that simulates
+and returns wrong read-back rows. No exception. Same class as #126's
+A1 comment; one more repro (``mem_frontend_amc.py loopbuf amc pipeline``),
+no new issue.
+
+**Confirmed again (U1):** A2 (``Unsupported bit operation`` on
+``seq_decoder``, ``vpu_adapter``, ``scalar_agu``, ``dma_desc_adapter`` as
+written), A4 (every called C1 function on ``amc``; ``llvm`` is right).
+
+Allo
+----
+
+**E-F1 -- bug, silent (Allo front end; repro
+``tests/limits/new_wide_literal_shift.py``, REPRODUCES).** An untyped
+literal is ``int32``, so ``y: UInt(64) = x | (1 << 35)`` leaves bit 35 clear
+on ``customize(...).build("llvm")`` and on the dataflow simulator alike, with
+no warning. It was found when the decoder was rewritten as shift-and-or for
+AMC: ``1 << 56`` (``d.valid``) and every field above bit 31 vanished. No
+landed U4 unit is affected: the Allo bodies use slice stores, not literal
+shifts, and every Allo column matches. Workaround: a typed one
+(``ONE: UInt(64) = 1``). Proposal: type a literal shift by its annotated
+target, or refuse a shift amount >= the literal's width. Not added to
+``limitations.rst`` here (docs are not this track's to edit); for the
+integrator.
+
+5. Draft issues (not filed; the owner approves case by case)
+=============================================================
+
+**kkkaishao/allo (RTLGen) -- E-R1:**
+
+  *Title:* Narrow unsigned kernel parameter compared with a literal whose
+  top bit is set is never equal (cpu and rtl)
+
+  *Body:* At ``13b55a63``, in a nested ``@kernel``, ``def is4(op: u3) -> u32:
+  r: u32 = 0; if op == 4: r = 1; return r`` returns 0 for every ``op``
+  (0..7), on ``export("cpu")`` and in the RTL cosim. The same compare on a
+  local copy (``o: u3 = op``), at top level, or against ``3`` is right.
+  Repro: ``rtlgen/repro_param_cmp.py`` (4 cases, one wrong). It looks like
+  the literal is built at the parameter's width as a signed value (4 ->
+  -4 in ``i3``) and compared with the zero-extended parameter. Found on a
+  MiniTPU scalar AGU (its ``SSHL`` op = 4), where it silently corrupted a
+  quarter of a per-cycle trace.
+
+**cornell-zhang/amc-dialect -- E-A3:**
+
+  *Title:* ``static rw(R, W)`` with ``R != W`` is accepted by the type but
+  fails ``seq.hlmem`` legalization
+
+  *Body:* ``amc.memory @m() -> !amc.port<64xi32, static rw(2, 1)>`` (one
+  bank, one port) fails ``amctool --memory-only --emit-verilog`` with
+  ``failed to legalize operation 'seq.hlmem' that was explicitly marked
+  illegal``. ``unpackPortType`` (``AmcToHW.cpp``) folds the port's latency to
+  ``max(read, write)``, and ``lowerCreatePort`` creates the
+  ``seq::WritePortOp`` with that latency (``AmcToHW.cpp:359``), which
+  ``LowerSeqHLMem`` refuses ("only supports write ports with latency == 1",
+  a match failure the user never sees). ``rw(1, 1)``, ``r(2)``, ``r(3)``
+  and ``r(L)`` + ``w(1)`` on one bank lower. Expected: the read side
+  lowered at R and the write side at W, or a diagnostic naming the port.
+  Context: a VMEM with a latency-3 compute port and a latency-2 DMA port
+  (``vmem.mlir``).
+
+**cornell-zhang/amc-dialect -- E-A6 (+ A-D2 at depth 2):**
+
+  *Title:* ``'loopschedule.await' op operation destroyed but still has
+  uses`` on a register-pipe kernel (1-element-array registers)
+
+  *Body:* ``repro_sagu_await.py`` (55 lines, reduced by line deletion from a
+  scalar address unit) builds on ``llvm`` and aborts on ``amc`` with the
+  message above, unscheduled and pipelined (the pipelined build first
+  reports ``problem is infeasible``). Related, smaller:
+  ``repro_cond_copy.py uncond`` -- ``q0``/``q1`` 1-element-array registers,
+  ``O[t] = q1; q1 = q0; q0 = A[t]`` -- aborts in
+  ``LoopSchedule/Utils.cpp:442 getChainingSharedOperatorsProblem ...
+  Assertion 'succeeded(depInserted)'``; with the read after the shift it
+  takes three registers to abort.
+
+**cornell-zhang/amc-dialect -- E-A1, E-A2, E-A5 (one issue, minor):** a
+kernel named ``top`` fails FSM emission (``redefinition of symbol named
+'top'``); ``--memory-only --emit-verilog`` exits 4 after a complete
+emission; the Verilator testbench sizes a 2-D argument by a 29-bit address
+and fails to build. Each with its repro above.
+
+**#126 (comment, if the owner wants one):** E-A7, the loop buffer's
+pipelined frontend kernel -- infeasible schedule, wrong values, no error.
+
+**Allo (fork issue or ``limitations.rst``): E-F1** -- the repro is committed;
+the text is the repro's docstring.
+
+6. Proposed RTLGen / AMC cells for ``u4_matrix.rst``
+====================================================
+
+For the integrator (this track does not edit the matrix). "As written" =
+the track's Allo body, types respelled.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 42 42
+
+   * - row
+     - RTLGen
+     - AMC
+   * - ``fetch``
+     - n/a (as the matrix)
+     - **match** (IRAM as an ``amc.memory`` ``w(1)`` + ``r(1)``: lowers to
+       an unreset array with a registered read, latency 1 as declared, old
+       word on a same-cycle collision; Verilator 3/3). Frontend: ports
+       inferred, never declared (missing abstraction, d12's gap)
+   * - ``loop_ctrl``
+     - n/a
+     - **match** (loop buffer ``w(1)`` + ``r(0)``: combinational read;
+       Verilator 3/3). **finding** E-A7 (bug, #126 class: frontend
+       pipelined kernel infeasible -> wrong values); latency 0 not
+       expressible from the frontend (missing abstraction)
+   * - ``seq_decoder``
+     - **match** 25,458/25,458 as written (inlined II=2 on lane ports, II=1
+       on 1-D ports; called 13N+1). **finding** E-R2 (missing abstraction:
+       lane-array port costs II), E-R3 (workaround: no inline directive)
+     - **match** 25,458/25,458 after U1's workarounds (II=1, N+2); as
+       written **refused** (A2). **finding** E-A4/E-F1 (typed constants)
+   * - ``agu_resolve``
+     - **match** 38,432/38,432 (inlined II=1 N+2; called 15N+1)
+     - **match** 38,432/38,432 inlined (II=1); called **blocked** (A4);
+       E-A5 (testbench, chunks of 4,096)
+   * - ``scalar_agu``
+     - **finding** E-R1 (bug, silent: 152,372/201,065 as written); **match**
+       201,065/201,065 per cycle at ``S_LAT`` 2 with E-R1 avoided
+       (``written_e1``, ``regs``, ``regs_split`` II=1 N+4, 249 MHz est.)
+     - **blocked** E-A6 (crash; ``llvm`` 201,065/201,065)
+   * - ``dma_desc_adapter``
+     - **match** 180,495/180,495 per cycle (II=9 on the lane ports, II=1 on
+       1-D ports) -- the matrix has n/a; run because the task listed it
+     - **match** 180,495/180,495 per cycle after workarounds (A2, A-D3);
+       as written **refused** (A2)
+   * - ``vpu_adapter``
+     - **match** ``slots`` 24,866/24,866 (II=2 lanes / II=1 split / called
+       9N+1); ``slots_gated`` **CONTRACT-MATCH** 318,113/318,113
+     - **match** ``slots`` 24,866/24,866 after workarounds; as written
+       **refused** (A2)
+   * - ``dma_addr_gen``
+     - **match** 200,700/200,700, ``bits`` and ``c1``, inlined (II=1 N+4)
+       and called (7N+1)
+     - **match** 200,700/200,700 inlined (II=1 N+6); called **blocked** (A4)
+   * - ``dma``
+     - **open** (H9 optional; not run)
+     - n/a
+   * - ``dma_vmem``
+     - n/a
+     - **refused** E-A3 (bug: ``rw(3,1)`` + ``rw(2,1)`` not lowered);
+       workarounds lower (2R2W split: latencies 3/2 verified; ``rw(1,1)`` x 2:
+       collision silently port 0 -- semantic mismatch with
+       ``collision="obligation"``)
+
+7. AMC area (Vivado 2022.1 OOC, 3.333 ns)
+=========================================
+
+The pipelined dumps (AMC scheduled at its default 10 ns target), kernel +
+FSM + the per-argument BRAM adapters, zero I/O delays so the datapath from
+a BRAM ``dout`` to a ``din`` is timed (``amc/synth_u4e.tcl`` = U3's script;
+reports in ``amc/vivado/``; each run 100-115 s). The array ports are the
+testbench's BRAMs, outside the kernel, as in U1/U3.
+
+=====================  ==========  =====  =====  ===  ==========================
+unit (dump, N)         form        LUT    FF     DSP  WNS at 3.333 ns
+=====================  ==========  =====  =====  ===  ==========================
+``dma_addr_gen``       ``bits``    77     267    3    +1.785 (all met)
+(16,384)               inlined
+``agu_resolve``        inlined     78     68     0    +2.014
+(4,096)
+``seq_decoder``        ``amc``     226    42     0    +2.061
+(25,458)
+``vpu_adapter``        ``amc``     83     42     0    +2.061
+(24,866)
+``dma_desc_adapter``   ``amc``     609    323    0    +2.087
+(20,056)
+=====================  ==========  =====  =====  ===  ==========================
+
+Every comb unit closes 300 MHz with margin in AMC's RTL: these are wiring
+plus a few adders, and AMC registers each BRAM read. RTLGen's model prices
+the same functions higher (623 LUT for the decoder's split form against
+226), because its estimate counts the start/done shell and 32-bit locals
+(U1 F5). The two flows are not like for like.
+
+8. Provisional calls made (D-9)
+===============================
+
+* **P-E1.** The tools read frozen ``.npz`` oracles, not the harness (U3
+  P-D1); the comparison is ``check.py``'s defined-slot rule.
+* **P-E2.** A unit's verdict is taken on the form that the tool needs and
+  that is still the same function: inlined bodies, split ports, and for AMC
+  U1's rewrites and A-D3's register spelling. The as-written run is
+  recorded beside it as the H1 evidence. No form changes a computed bit.
+* **P-E3.** ``scalar_agu``'s RTLGen cell is the E-R1 **finding**, with the
+  matches beside it: the as-written form is what a user would write, and it
+  is silently wrong.
+* **P-E4.** E-F1 is classed a **bug** (silent; the annotated target is
+  64-bit), not a semantic choice. It is recorded as a ``tests/limits``
+  repro, not as a limitations-register item: the docs belong to the
+  integrator.
+* **P-E5.** Only ``scalar_agu`` ``lat2`` was run; ``lat1``/``lat3`` were left
+  out, since the pipe is data and ``S_LAT`` only changes the generated
+  depth.
+
+9. Not done
+===========
+
+* H9 (``dma`` D1 on RTLGen, optional); ``scalar_agu`` lat1/lat3; RTLGen's
+  CP-SAT scheduler; any 2 ns clock; DC on either tool's RTL (track D's
+  flow).
+* The frontend-inferred memories were checked on a 64-row directed probe,
+  not on the fetch / loop-control traces (those units are not in track E's
+  list for the tools; their D-12 memories are).

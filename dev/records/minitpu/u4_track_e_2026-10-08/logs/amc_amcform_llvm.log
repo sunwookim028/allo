@@ -1,0 +1,16 @@
+BUILT dec_amc llvm none 0.3s
+RAN dec_amc llvm: 1 chunks of 25458, cycles/chunk [] (0.1s)
+UNIT-MATCH seq_decoder amc amc-llvm none: 25458/25458 defined slots (rows 25458)
+BUILT vpa_amc llvm none 0.2s
+RAN vpa_amc llvm: 1 chunks of 24866, cycles/chunk [] (0.0s)
+UNIT-MATCH vpu_adapter amc amc-llvm none: 24866/24866 defined slots (rows 24866)
+BUILT sagu_amc llvm none 0.2s
+RAN sagu_amc llvm: 1 chunks of 40214, cycles/chunk [] (0.0s)
+UNIT-MATCH scalar_agu:lat2 amc amc-llvm none: 201065/201065 defined slots (rows 40214)
+BUILT desc_amc llvm none 0.1s
+RAN desc_amc llvm: 1 chunks of 20056, cycles/chunk [] (0.0s)
+UNIT-MATCH dma_desc_adapter amc amc-llvm none: 180495/180495 defined slots (rows 20056)
+BUILT agu_amc llvm none 0.1s
+RAN agu_amc llvm: 1 chunks of 38432, cycles/chunk [] (0.0s)
+UNIT-MATCH agu_resolve amc amc-llvm none: 38432/38432 defined slots (rows 38432)
+WALL 5s rc=0

@@ -1,0 +1,4 @@
+RESULT cond llvm: OK
+cycle time: 39
+RESULT cond amc: OK
+WALL 15s rc=0

@@ -1,0 +1,3 @@
+loc("-":37:13): error: updateCallOp: result type is not memref
+python: ~/scratch/amc/amc-dialect/circt/llvm/mlir/include/mlir/IR/IRMapping.h:74: auto mlir::IRMapping::lookup(T) const [with T = mlir::Value]: Assertion `result && "expected 'from' to be contained within the map"' failed.
+WALL 3s rc=134

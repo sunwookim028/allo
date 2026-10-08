@@ -1,0 +1,13 @@
+WARN: [PREP] Conditional left as an opaque scheduling unit because 'affine.for' cannot be predicated; the enclosing loop cannot pipeline across it (at 'written' u4e_sagu_written_40214.py:41:8)
+WARN: [PREP] Conditional left as an opaque scheduling unit because 'func.call' cannot be predicated; the enclosing loop cannot pipeline across it (at 'written' u4e_sagu_written_40214.py:66:8)
+SCHED written: latency 1246639 | cyclic II [1, 1, 1, 1, 1, 1, 1, 1, 1] | QOR lat None fmax 430.1 area Utilization(lut=1649, logic_lut=1630, srl=19, ff=1021, dsp=3, carry8=52, muxf=0, bram36=0, uram288=0)
+COSIM 1 chunks of 40214: cycles/chunk [924539] (539.7s)
+UNIT-DIFF  scalar_agu:lat2 written rtlgen: 152372/201065 defined slots (rows 40214)
+    by trace: every-op=16, random-0=24629, random-1=24030, tb_bundle_scalar_agu:A=18
+    e.g. every-op row 28 sreg_o: tool ['0x0', '0xff7ffffe', '0xfffffd', '0x1000095'] rtl ['0x1fffffe0', '0xff7ffffe', '0xfffffd', '0x1000095']
+    e.g. every-op row 29 sreg_o: tool ['0x0', '0xff7ffffe', '0xfffffd', '0x800095'] rtl ['0x1fffffe0', '0xff7ffffe', '0xfffffd', '0x800095']
+    e.g. every-op row 30 sreg_o: tool ['0x0', '0xff7ffffe', '0xfffffd', '0x800095'] rtl ['0x1fffffe0', '0xff7ffffe', '0xfffffd', '0x800095']
+    e.g. every-op row 28 rd_data_d_base_o: tool ['0x0'] rtl ['0x1fffffe0']
+    e.g. every-op row 29 rd_data_d_base_o: tool ['0x0'] rtl ['0x1fffffe0']
+    e.g. every-op row 30 rd_data_d_base_o: tool ['0x0'] rtl ['0x1fffffe0']
+WALL 541s rc=0

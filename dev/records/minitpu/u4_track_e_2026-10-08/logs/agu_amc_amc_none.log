@@ -1,0 +1,20 @@
+BUILT agu_amc amc none 0.2s
+FAIL RuntimeError: verilator build failed (see /tmp/sk3463-u4e-amc/amc_fsm_tb_szvv4z6_/verilator_compile.log):
+%Error: /tmp/sk3463-u4e-amc/amc_fsm_tb_szvv4z6_/top.sv:39:19: Width of bit range is huge; vector of over 1 billion bits: 0x20000000
+                                                            : ... note: In instance 'top'
+      |                   ^
+        ... See the manual at https://verilator.org/verilator_doc.html?v=5.052 for more assistance.
+%Error: Exiting due to 1 error(s)
+Traceback (most recent call last):
+    return fn(*a, **k)
+           ^^^^^^^^^^^
+    f(*[np.ascontiguousarray(a[sl]) for a in ins], *o)
+    return self._call(list(args), vcdFile=vcdFile, inputData=inputData)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: verilator build failed (see /tmp/sk3463-u4e-amc/amc_fsm_tb_szvv4z6_/verilator_compile.log):
+%Error: /tmp/sk3463-u4e-amc/amc_fsm_tb_szvv4z6_/top.sv:39:19: Width of bit range is huge; vector of over 1 billion bits: 0x20000000
+                                                            : ... note: In instance 'top'
+      |                   ^
+        ... See the manual at https://verilator.org/verilator_doc.html?v=5.052 for more assistance.
+%Error: Exiting due to 1 error(s)
+WALL 2s rc=0

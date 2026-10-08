@@ -1,0 +1,5 @@
+RESULT top-level local == 4     cpu OK | rtl OK
+RESULT callee param u3 == 3     cpu OK | rtl OK
+RESULT callee local u3 == 4     cpu OK | rtl OK
+RESULT callee param u3 == 4     cpu WRONG [0, 0, 0, 0, 0, 0, 0, 0] | rtl WRONG [0, 0, 0, 0, 0, 0, 0, 0]
+WALL 12s rc=0

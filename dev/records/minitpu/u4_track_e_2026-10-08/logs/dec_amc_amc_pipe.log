@@ -1,0 +1,5 @@
+BUILT dec_amc amc pipeline 0.4s
+cycle time: 25460
+RAN dec_amc amc: 1 chunks of 25458, cycles/chunk [25460] (18.0s)
+UNIT-MATCH seq_decoder amc amc-amc pipeline: 25458/25458 defined slots (rows 25458)
+WALL 20s rc=0

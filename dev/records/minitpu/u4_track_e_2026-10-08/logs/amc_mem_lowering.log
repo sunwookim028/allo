@@ -1,0 +1,6 @@
+LOWER iram rc=4 -> iram.sv (45 lines; ports: p0_wr_en p1_rd_en )  stderr: error: unknown operation (SharedEmitterState::gatherFiles)
+LOWER loopbuf rc=4 -> loopbuf.sv (33 lines; ports: p0_wr_en p1_rd_en )  stderr: error: unknown operation (SharedEmitterState::gatherFiles)
+REFUSE vmem rc=4: error: failed to legalize operation 'seq.hlmem' that was explicitly marked illegal: 
+LOWER vmem_split rc=4 -> vmem_split.sv (122 lines; ports: p0_rd_en p1_wr_en p2_rd_en p3_wr_en )  stderr: error: unknown operation (SharedEmitterState::gatherFiles)
+LOWER vmem_rw11 rc=4 -> vmem_rw11.sv (57 lines; ports: p0_rd_en p0_wr_en p1_rd_en p1_wr_en )  stderr: error: unknown operation (SharedEmitterState::gatherFiles)
+REFUSE repro_rw_split_latency rc=4: error: failed to legalize operation 'seq.hlmem' that was explicitly marked illegal: 

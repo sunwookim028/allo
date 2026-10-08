@@ -510,6 +510,50 @@ not a requirement). Issue audit recorded
 ``main``, prune the 13 merged branches, add the README naming paragraph
 (after the cleanup lands).
 
+**Standing order (owner, 2026-10-08): the main checkout is frozen.** No
+command, build, test or fast-forward in ``/work/shared/users/phd/sk3463/allo``
+and no merge to ``main`` until the owner explicitly authorizes each merge.
+Everything integrates into ``u1-pilot``; regressions run in a throwaway
+baseline worktree; the owner's demo work is in ``scratch/ace-demo`` (branch
+``ace-demo``). ``main`` stays at ``870265c2`` until then.
+
+**Checkpoint 29 (2026-10-08, U4 track E landed).** ``u4-openhls``
+(``71546a54``): RTLGen matches every combinational U4 unit (II=1 inlined;
+lane-array ports cost II=2..9, called functions become sequenced
+sub-regions -- U3's D2/D3 again) except the scalar AGU as written, which is
+silently wrong through **E-R1** (RTLGen frontend: a narrow unsigned
+parameter compared with a literal whose top bit is set is never equal);
+AMC matches every unit it can build after U1's A2/A4 rewrites, crashes on
+the scalar AGU (**E-A6**, ``loopschedule.await`` destroyed with uses), lowers
+IRAM (registered read, old word on a same-cycle write) and the loop buffer
+(combinational read) but refuses VMEM's ``rw(3,1)+rw(2,1)`` (**E-A3**, the
+write port is given the read latency). **E-F1 (Allo, silent wrong answer):**
+an untyped literal is ``int32``, so ``x | (1 << 35)`` on a ``UInt(64)``
+leaves bit 35 clear with no warning (repro
+``tests/limits/new_wide_literal_shift.py``). Six draft issues in the record
+§5, none filed (owner's call: RTLGen E-R1; AMC E-A3, E-A6 + A-D2, the minor
+trio, a #126 comment; Allo E-F1 upstream). Not done: H9 (the full DMA on
+either tool), DC on the tools' RTL.
+
+**Checkpoint 28 (2026-10-08, the sequencer loop is closed).**
+``u4-seqloop`` (``818bf772``): fetch, loop control, scalar AGU and issue run
+as one cycle-locked composition (``template/sequencer.py``), IRAM and loop
+buffer as D-12 memories, the V/X/M commands as D-23 Streams; UNIT-MATCH on
+every defined slot (1,286,132/1,286,132 with the replayed testbenches) on
+simulator and csim; 0 stall cycles at command depth 1, 2 and 4. D-25's flush
+was not needed: the fetch queue is the fetch unit's own state. Findings:
+S-1 (missing abstraction) every same-cycle exchange between units must be a
+Stream -- Wire ports on units are not wired, Wire exchanges give wrong
+values in csim, ``comb`` is refused in these bodies -- a declared same-cycle
+link kind is proposed; S-2 (bug) the D-12 memory server serves ports in
+declaration order with blocking reads and hangs silently when a write port
+is declared first (repro ``tests/limits/new_d12_server_port_order_deadlock.py``);
+S-3 D-12 memories lower to combinational pins on SystemC and fail the
+combinational rule, blocking the Catapult path for these memories; S-4 a
+conditional read of a boundary array costs the SystemC thread 2 cycles.
+``main`` = ``870265c2`` (demo verified end to end from the main checkout;
+the section-3 failure was ``git apply`` run from the subdirectory).
+
 **Checkpoint 27 (2026-10-08, main = sync 5; U4 wave 1 closed; wave 2 approved).**
 ``main`` fast-forwarded to ``9efa9de0`` (sync 5: emissions identical, gates
 equal, pytest 1052/67 vs 1025/84 with 17 fail->pass from the ``TPU_MAXDIM``

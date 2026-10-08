@@ -1,0 +1,3 @@
+RESULT uncond llvm: OK
+python: ~/scratch/amc/amc-dialect/circt/lib/Dialect/LoopSchedule/Utils.cpp:442: circt::loopschedule::getChainingSharedOperatorsProblem(mlir::scf::WhileOp, circt::analysis::LoopScheduleDependenceAnalysis&)::<lambda(mlir::Operation*)>: Assertion `succeeded(depInserted)' failed.
+WALL 2s rc=134

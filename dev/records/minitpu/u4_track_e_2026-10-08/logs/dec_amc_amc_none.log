@@ -1,0 +1,5 @@
+BUILT dec_amc amc none 0.4s
+cycle time: 76375
+RAN dec_amc amc: 1 chunks of 25458, cycles/chunk [76375] (17.5s)
+UNIT-MATCH seq_decoder amc amc-amc none: 25458/25458 defined slots (rows 25458)
+WALL 19s rc=0

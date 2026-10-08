@@ -1,0 +1,12 @@
+CHECK-OK   iram r(1): same-cycle read of the row being written = the OLD word
+CHECK-OK   iram r(1): write visible at the next cycle, data 1 edge after the address
+CHECK-OK   iram r(1): rd_en low holds the last word (rd_hold)
+CHECK-OK   loopbuf r(0): same-cycle read is combinational and the OLD word
+CHECK-OK   loopbuf r(0): write visible the next cycle, read combinational
+CHECK-OK   loopbuf r(0): an address change is seen without an edge
+CHECK-OK   vmem c r(3): 1 edge after the address: not yet
+CHECK-OK   vmem d r(2): data 2 edges after the address
+CHECK-OK   vmem c r(3): 2 edges: not yet
+CHECK-OK   vmem c r(3): data 3 edges after the address
+NOTE vmem rw(1,1) x2: two writes to row 2 in one cycle leave port 0's word (p0 wins) (no collision check, no X)
+TB-MEM PASS
