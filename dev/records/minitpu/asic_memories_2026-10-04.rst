@@ -453,7 +453,10 @@ and ``w512`` (``catapult/small_sram_ii2``, ``catapult/w512_sram_ii2``).
 
 **Regression**: ``pytest tests/dataflow/test_systemc*.py tests/test_memory.py
 tests/dataflow/test_compose_memory_ports.py tests/dataflow/test_compose_sram.py``
-REGRESS_RESULT; TinyTPU emission unchanged (``vhls`` sha256 ``6bc774bc…``
+132 passed (6 min 49 s; run 2026-10-08 on zhang-21 at ``cf876207``, the
+branch's own ``mlir/build``, the SystemC environment of ``env-zhang21.sh``,
+``TMPDIR`` on local disk -- with it on NFS two ``test_systemc_csim_regress``
+cases fail in ``TemporaryDirectory`` cleanup, ``Directory not empty``); TinyTPU emission unchanged (``vhls`` sha256 ``6bc774bc…``
 166,563 B, ``catapult`` ``ade1ab5d…`` 170,812 B, ``hash_tinytpu.py``);
 ``pylint`` on ``compose.py``/``catapult.py`` adds no message.
 
@@ -613,7 +616,7 @@ As s.2.4 (``dc/dc_sram.tcl``, 3.33 ns, the bank macro's ``.db`` linked).
      -
      -
    * - MiniTPU flop-mapped (``mtpu_word_array_flops.sv``)
-     - see s.5.6
+     - not measured (DC killed at its 4 h timeout, s.5.6)
      -
      -
      -
@@ -645,12 +648,17 @@ ring, escape routing or DRC/LVS (s.1.3).
 * **MiniTPU's flop-mapped ``mid``**: no earlier record has it (``u2_word_array``
   and ``u2_d12_prototype`` measured ``narrow``; s.2.4 ``small`` and ``w512``).
   DC on ``mtpu_word_array_flops.sv`` with ``MINITPU_NUM_LANES=1`` was started
-  here (``scratch/asicmem2_dc``, 4 h timeout) and was still in its first
-  mapping pass when this section was committed; its number is recorded below
-  when it ends. Linear scale from ``w512`` (262,797.6 um^2 x 8 = 2,102,381) is
-  an estimate only.
+  here (``scratch/asicmem2_dc``, ``out_m_mid_3p33.log``, 12:49, 4 h timeout)
+  and **produced no number**: it was still in ``Beginning Pass 1 Mapping``
+  (4,099 hierarchies) when the timeout's
+  SIGTERM ended it at 16:49 (checked 2026-10-08: no report, no netlist, no
+  ``dc_shell`` left running). Linear scale from ``w512`` (262,797.6 um^2 x 8
+  = 2,102,381) remains an estimate only; a measurement needs a longer
+  budget than 4 h (``compile_ultra -gate_clock``, ``dc_sram.tcl``).
 * **The one-macro ``mid`` OpenRAM job** (s.1.3, started 11:07, 4 h timeout):
-  still running at 13:30 (CPU 2 h). Its result is recorded below when it ends.
+  **killed at its timeout** (``run.log``: ``EXIT 124`` after 240 min, 15:07);
+  no ``.v``/``.lib``/``.lef``/``.gds`` was written. The eight-bank build of
+  s.5 stands as ``mid``'s SRAM form.
 
 6. II=1 on MiniTPU's two read/write ports
 =========================================
