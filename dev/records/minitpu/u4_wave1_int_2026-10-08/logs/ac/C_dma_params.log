@@ -1,0 +1,22 @@
+core {'CHANNELS': 2, 'OUTSTANDING': 2, 'LANDING_DEPTH': 8, 'TIMEOUT_CYCLES': 1024, 'LANES': 8, 'LANE_BITS': 32, 'BEAT_BITS': 256, 'PAGE_WORDS': 128, 'ROW_BITS': 14, 'DESC_BEAT_ROWS_W': 14, 'CRED_W': 2, 'OUT_PTR_W': 1, 'LND_PTR_W': 3, 'TO_W': 10, 'VMEM_DMA_READ_LATENCY': 2, 'STORE_BEAT_INTERVAL': 4}
+o1 {'CHANNELS': 2, 'OUTSTANDING': 1, 'LANDING_DEPTH': 8, 'TIMEOUT_CYCLES': 1024, 'LANES': 8, 'LANE_BITS': 32, 'BEAT_BITS': 256, 'PAGE_WORDS': 128, 'ROW_BITS': 14, 'DESC_BEAT_ROWS_W': 14, 'CRED_W': 1, 'OUT_PTR_W': 1, 'LND_PTR_W': 3, 'TO_W': 10, 'VMEM_DMA_READ_LATENCY': 2, 'STORE_BEAT_INTERVAL': 4}
+o4 {'CHANNELS': 2, 'OUTSTANDING': 4, 'LANDING_DEPTH': 4, 'TIMEOUT_CYCLES': 1024, 'LANES': 8, 'LANE_BITS': 32, 'BEAT_BITS': 256, 'PAGE_WORDS': 128, 'ROW_BITS': 14, 'DESC_BEAT_ROWS_W': 14, 'CRED_W': 3, 'OUT_PTR_W': 2, 'LND_PTR_W': 2, 'TO_W': 10, 'VMEM_DMA_READ_LATENCY': 2, 'STORE_BEAT_INTERVAL': 4}
+bw {'CHANNELS': 2, 'OUTSTANDING': 2, 'LANDING_DEPTH': 8, 'TIMEOUT_CYCLES': 0, 'LANES': 8, 'LANE_BITS': 32, 'BEAT_BITS': 256, 'PAGE_WORDS': 128, 'ROW_BITS': 14, 'DESC_BEAT_ROWS_W': 14, 'CRED_W': 2, 'OUT_PTR_W': 1, 'LND_PTR_W': 3, 'TO_W': 1, 'VMEM_DMA_READ_LATENCY': 2, 'STORE_BEAT_INTERVAL': 4}
+LEGALITY landing below outstanding: refused: LANDING_DEPTH=2 < OUTSTANDING=4
+LEGALITY no credit: refused: OUTSTANDING=0
+LEGALITY row counter narrower than the descriptor: refused: ROW_BITS=12 != DESC_BEAT_ROWS_W=14 (= DESC_WORD_ROWS_W 12 + SUBLANE_SEL_W 2)
+LEGALITY beat narrower than VMEM's: refused: BEAT_BITS=128 (LANES 4 x LANE_BITS 32) != VMEM_BEAT_BITS=256
+LEGALITY asynchronous VMEM DMA port: refused: VMEM_DMA_READ_LATENCY=0
+LEGALITY 64-bit lanes (S8): refused: LANE_BITS=64
+DERIVED-OK  core store beat interval: declared 4 measured [4]
+DERIVED-OK  core accept -> first request (store: + read): declared 2 measured 2
+DERIVED-OK  o1 store beat interval: declared 4 measured [4]
+DERIVED-OK  o1 accept -> first request (store: + read): declared 2 measured 2
+DERIVED-OK  o4 store beat interval: declared 4 measured [4]
+DERIVED-OK  o4 accept -> first request (store: + read): declared 2 measured 2
+DERIVED-OK  bw store beat interval: declared 4 measured [4]
+DERIVED-OK  bw accept -> first request (store: + read): declared 2 measured 2
+
+real	0m4.375s
+user	0m3.403s
+sys	0m0.809s

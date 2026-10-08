@@ -1,0 +1,13 @@
+RTL u4_dma_desc_adapter:base: 20056 cycles in 3 traces, 180495 defined slots, RTL vs reference on defined: 180495/180495 (7.6s)
+UNIT-MATCH dma_desc_adapter:base bits simulator 180495/180495 defined (9 masked: before reset=9; allo==rtl on 3) cycle=order-only (build 0.3s, run 0.1s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+[11:09:15] Compiling with g++ ...
+[11:09:19] Running simulation ...
+UNIT-MATCH dma_desc_adapter:base bits systemc 180495/180495 defined (9 masked: before reset=9; allo==rtl on 3) cycle=per-iteration, time unchecked (build 0.2s, run 4.6s)
+
+real	0m16.900s
+user	0m19.231s
+sys	0m1.910s

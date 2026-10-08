@@ -1,0 +1,31 @@
+RTL u4_dma_vmem:o1: 6405 cycles in 7 traces, 128260 defined slots, RTL vs reference on defined: 128260/128260 (7.6s)
+/work/shared/users/phd/sk3463/scratch/wt-u4int/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mNumPy does not support bitwidths larger than 512, so you cannot use NumPy for simulation, but you can still generate the corresponding MLIR module.[0m
+  warnings.warn(self.message, category=self.category)
+UNIT-MATCH dma_vmem:o1 d12 simulator 128260/128260 defined (12650 masked: landing empty=11048, power-up=22, vmem uninit=1580; allo==rtl on 11033) cycle=order-only (build 5.0s, run 1.9s)
+loc("-":1643:11): error: unreset storage `lnd_ch` (dma_engine_0): the kernel has a non-Wire argument (`x_desc`); the write runs at every clock edge, which matches the kernel's iterations only when every port is a Wire (README D-14: its write is a clock-edge process with no reset action)
+UNIT-FAIL  dma_vmem d12 systemc: RuntimeError: Failed to emit HLS code. Check error messages above for details. Common issues: nested functions with multi-dimensional arrays when wrap_io=False.
+loc("-":1643:11): error: unreset storage `lnd_ch` (dma_engine_0): the kernel has a non-Wire argument (`x_desc`); the write runs at every clock edge, which matches the kernel's iterations only when every port is a Wire (README D-14: its write is a clock-edge process with no reset action)
+UNIT-MATCH dma_vmem:o1 d12_reset simulator 128260/128260 defined (12650 masked: landing empty=11048, power-up=22, vmem uninit=1580; allo==rtl on 11033) cycle=order-only (build 5.0s, run 1.9s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+/bin/sh: line 1: 2127621 Segmentation fault      (core dumped) ./sim
+[11:15:50] Compiling with g++ ...
+[11:15:57] Running simulation ...
+UNIT-FAIL  dma_vmem d12_reset systemc: RuntimeError: Simulation failed.
+UNIT-MATCH dma_vmem:o1 d12_reset_r256 simulator 128260/128260 defined (12650 masked: landing empty=11048, power-up=22, vmem uninit=1580; allo==rtl on 11033) cycle=order-only (build 4.8s, run 1.8s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+[11:16:09] Compiling with g++ ...
+[11:16:16] Running simulation ...
+UNIT-MATCH dma_vmem:o1 d12_reset_r256 systemc 128260/128260 defined (12650 masked: landing empty=11048, power-up=22, vmem uninit=1580; allo==rtl on 11033) cycle=per-iteration, time unchecked (build 3.5s, run 13.0s)
+
+real	1m4.570s
+user	1m8.532s
+sys	0m3.339s

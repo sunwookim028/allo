@@ -1,0 +1,11 @@
+/work/shared/users/phd/sk3463/scratch/wt-u4int/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui1[0m
+  warnings.warn(self.message, category=self.category)
+/work/shared/users/phd/sk3463/scratch/wt-u4int/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui16 vs ui12[0m
+  warnings.warn(self.message, category=self.category)
+CONTRACT-MATCH vpu_adapter slots_gated simulator: 318113/318113 sampled fields equal (250483 unsampled payload fields zeroed where the RTL drives the fetch head's)
+
+real	0m5.276s
+user	0m5.124s
+sys	0m0.676s

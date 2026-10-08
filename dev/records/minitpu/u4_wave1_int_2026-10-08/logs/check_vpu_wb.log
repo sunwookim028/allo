@@ -1,0 +1,47 @@
+RTL u4_vpu_wb:shipped: 24218 cycles in 6 traces, 121075 defined slots, RTL vs reference on defined: 121075/121075 (78.8s)
+/work/shared/users/phd/sk3463/scratch/wt-u4int/allo/ir/infer.py:644: UserWarning: Cannot infer the bitwidth of the slice, use UInt(32) as default
+  warnings.warn(
+UNIT-MATCH vpu_wb:shipped locked simulator 121075/121075 defined (96887 masked: not modelled=96872, reset=15; allo==rtl on 49024) cycle=order-only (build 1.7s, run 0.3s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[11:03:00] Compiling with g++ ...
+[11:03:05] Running simulation ...
+UNIT-MATCH vpu_wb:shipped locked systemc 121075/121075 defined (96887 masked: not modelled=96872, reset=15; allo==rtl on 49024) cycle=per-iteration, time unchecked (build 1.4s, run 6.1s)
+UNIT-MATCH vpu_wb:shipped units simulator 121075/121075 defined (96887 masked: not modelled=96872, reset=15; allo==rtl on 49024) cycle=order-only (build 1.6s, run 1.0s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[11:03:10] Compiling with g++ ...
+[11:03:16] Running simulation ...
+UNIT-MATCH vpu_wb:shipped units systemc 121075/121075 defined (96887 masked: not modelled=96872, reset=15; allo==rtl on 49024) cycle=per-iteration, time unchecked (build 1.5s, run 6.5s)
+
+real	1m44.042s
+user	7m43.413s
+sys	0m14.436s
+RTL u4_vpu_wb:shipped: 24218 cycles in 6 traces, 121075 defined slots, RTL vs reference on defined: 121075/121075 (2.6s)
+/work/shared/users/phd/sk3463/scratch/wt-u4int/allo/ir/infer.py:644: UserWarning: Cannot infer the bitwidth of the slice, use UInt(32) as default
+  warnings.warn(
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[11:03:26] Compiling with g++ ...
+[11:03:31] Running simulation ...
+UNIT-DIFF  vpu_wb:shipped selftimed systemc 94493/121075 defined (96887 masked: not modelled=96872, reset=15; allo==rtl on 49024) cycle=per-iteration, time unchecked (build 0.8s, run 6.5s)
+    differing defined slots by trace: singles=158, pairs=7501, random-legal-0=6323, random-legal-1=5971, random-any-2=6593, matrix-pops=36
+    e.g. singles cycle 10 wb_src_o: allo 0 rtl 1
+    e.g. singles cycle 11 wb_src_o: allo 1 rtl 0
+    e.g. singles cycle 29 wb_src_o: allo 0 rtl 2
+    e.g. singles cycle 31 wb_src_o: allo 2 rtl 0

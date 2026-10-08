@@ -1,0 +1,33 @@
+EQUAL A_check_agu_resolve.log: 2 verdict lines
+CHANGED A_check_dma_addr_gen.log:
+   + UNIT-MATCH dma_addr_gen bits simulator 200700/200700 latency=untimed (rtl 0)
+   + UNIT-MATCH dma_addr_gen bits systemc 200700/200700 latency=unchecked (rtl 0)
+EQUAL A_check_fetch_fq.log: 2 verdict lines
+EQUAL A_check_fetch_fq_a8.log: 2 verdict lines
+EQUAL A_check_fetch_iram.log: 2 verdict lines
+EQUAL A_check_fetch_iram_d12.log: 2 verdict lines
+EQUAL A_check_loop_ctrl.log: 4 verdict lines
+EQUAL A_check_scalar_agu_lat1.log: 2 verdict lines
+EQUAL A_check_scalar_agu_lat2.log: 2 verdict lines
+EQUAL A_check_scalar_agu_lat3.log: 2 verdict lines
+EQUAL A_check_seq_decoder.log: 2 verdict lines
+EQUAL A_check_vpu_adapter.log: 4 verdict lines
+EQUAL A_control_geometry.log: 19 verdict lines
+EQUAL A_gated_contract_sc.log: 1 verdict lines
+EQUAL A_gated_contract_sim.log: 1 verdict lines
+EQUAL C_check_dma_bw.log: 8 verdict lines
+EQUAL C_check_dma_core.log: 8 verdict lines
+EQUAL C_check_dma_desc_adapter.log: 2 verdict lines
+EQUAL C_check_dma_o1.log: 8 verdict lines
+EQUAL C_check_dma_o4.log: 8 verdict lines
+EQUAL C_check_dma_vmem_core.log: 6 verdict lines
+EQUAL C_check_dma_vmem_o1.log: 6 verdict lines
+EQUAL C_check_dma_vmem_o4.log: 6 verdict lines
+EQUAL C_dma_params.log: 8 verdict lines
+NO-RECORD-LOG C_lim_local_array_stack.log (1 lines)
+NO-RECORD-LOG C_lim_reserved_names.log (1 lines)
+EQUAL C_selftimed.log: 18 verdict lines
+EQUAL check_seq_issue.log: 2 verdict lines
+EQUAL check_vpu_cmd.log: 6 verdict lines
+EQUAL check_vpu_wb.log: 5 verdict lines
+27/28 logs equal

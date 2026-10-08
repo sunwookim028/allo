@@ -1,0 +1,40 @@
+RTL u4_seq_cmd:shipped: 52236 cycles in 15 traces, 888217 defined slots, RTL vs reference on defined: 888217/888217 (4.5s)
+/work/shared/users/phd/sk3463/scratch/wt-u4int/allo/ir/infer.py:644: UserWarning: Cannot infer the bitwidth of the slice, use UInt(32) as default
+  warnings.warn(
+UNIT-MATCH vpu_cmd:shipped streams simulator 888217/888217 defined (156503 masked: payload, slot not valid (D-23 gate)=154378, reset=900, uninit IRAM=1225; allo==rtl on 153489) cycle=order-only (build 1.7s, run 2.3s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[11:00:46] Compiling with g++ ...
+[11:00:53] Running simulation ...
+UNIT-MATCH vpu_cmd:shipped streams systemc 888217/888217 defined (156503 masked: payload, slot not valid (D-23 gate)=154378, reset=900, uninit IRAM=1225; allo==rtl on 153489) cycle=per-iteration, time unchecked (build 1.0s, run 9.7s)
+UNIT-MATCH vpu_cmd:shipped streams_d1 simulator 888217/888217 defined (156503 masked: payload, slot not valid (D-23 gate)=154378, reset=900, uninit IRAM=1225; allo==rtl on 153489) cycle=order-only (build 1.7s, run 3.8s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[11:01:03] Compiling with g++ ...
+[11:01:09] Running simulation ...
+UNIT-MATCH vpu_cmd:shipped streams_d1 systemc 888217/888217 defined (156503 masked: payload, slot not valid (D-23 gate)=154378, reset=900, uninit IRAM=1225; allo==rtl on 153489) cycle=per-iteration, time unchecked (build 1.1s, run 10.4s)
+UNIT-MATCH vpu_cmd:shipped streams_d4 simulator 888217/888217 defined (156503 masked: payload, slot not valid (D-23 gate)=154378, reset=900, uninit IRAM=1225; allo==rtl on 153489) cycle=order-only (build 1.7s, run 1.5s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[11:01:17] Compiling with g++ ...
+[11:01:23] Running simulation ...
+UNIT-MATCH vpu_cmd:shipped streams_d4 systemc 888217/888217 defined (156503 masked: payload, slot not valid (D-23 gate)=154378, reset=900, uninit IRAM=1225; allo==rtl on 153489) cycle=per-iteration, time unchecked (build 1.0s, run 9.7s)
+
+real	0m58.465s
+user	0m54.076s
+sys	0m2.697s

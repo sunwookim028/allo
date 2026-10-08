@@ -1,0 +1,97 @@
+RTL dma:core seed 0: 12 descriptors, 187 requests in 1557 cycles; burst rule == RTL: True
+/work/shared/users/phd/sk3463/scratch/wt-u4int/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mNumPy does not support bitwidths larger than 512, so you cannot use NumPy for simulation, but you can still generate the corresponding MLIR module.[0m
+  warnings.warn(self.message, category=self.category)
+CONTRACT-MATCH dma_selftimed:core seed 0 simulator: requests 187 (== RTL's: True), DM after == reference: True, completions store 4/4 load 8/8 (3.8s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+[11:17:38] Compiling with g++ ...
+[11:17:45] Running simulation ...
+CONTRACT-MATCH dma_selftimed:core seed 0 systemc: requests 187 (== RTL's: True), DM after == reference: True, completions store 4/4 load 8/8 (9.4s)
+RTL dma:core seed 1: 12 descriptors, 58 requests in 523 cycles; burst rule == RTL: True
+CONTRACT-MATCH dma_selftimed:core seed 1 simulator: requests 58 (== RTL's: True), DM after == reference: True, completions store 8/8 load 4/4 (3.8s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+[11:17:51] Compiling with g++ ...
+[11:17:58] Running simulation ...
+CONTRACT-MATCH dma_selftimed:core seed 1 systemc: requests 58 (== RTL's: True), DM after == reference: True, completions store 8/8 load 4/4 (9.1s)
+RTL dma:core seed 2: 12 descriptors, 201 requests in 1268 cycles; burst rule == RTL: True
+CONTRACT-MATCH dma_selftimed:core seed 2 simulator: requests 201 (== RTL's: True), DM after == reference: True, completions store 5/5 load 7/7 (3.8s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+[11:18:04] Compiling with g++ ...
+[11:18:12] Running simulation ...
+CONTRACT-MATCH dma_selftimed:core seed 2 systemc: requests 201 (== RTL's: True), DM after == reference: True, completions store 5/5 load 7/7 (9.4s)
+RTL dma:o1 seed 0: 12 descriptors, 187 requests in 2066 cycles; burst rule == RTL: True
+CONTRACT-MATCH dma_selftimed:o1 seed 0 simulator: requests 187 (== RTL's: True), DM after == reference: True, completions store 4/4 load 8/8 (3.9s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+[11:18:17] Compiling with g++ ...
+[11:18:25] Running simulation ...
+CONTRACT-MATCH dma_selftimed:o1 seed 0 systemc: requests 187 (== RTL's: True), DM after == reference: True, completions store 4/4 load 8/8 (9.1s)
+RTL dma:o1 seed 1: 12 descriptors, 58 requests in 645 cycles; burst rule == RTL: True
+CONTRACT-MATCH dma_selftimed:o1 seed 1 simulator: requests 58 (== RTL's: True), DM after == reference: True, completions store 8/8 load 4/4 (3.8s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+[11:18:30] Compiling with g++ ...
+[11:18:38] Running simulation ...
+CONTRACT-MATCH dma_selftimed:o1 seed 1 systemc: requests 58 (== RTL's: True), DM after == reference: True, completions store 8/8 load 4/4 (9.0s)
+RTL dma:o1 seed 2: 12 descriptors, 201 requests in 1751 cycles; burst rule == RTL: True
+CONTRACT-MATCH dma_selftimed:o1 seed 2 simulator: requests 201 (== RTL's: True), DM after == reference: True, completions store 5/5 load 7/7 (3.9s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+[11:18:43] Compiling with g++ ...
+[11:18:51] Running simulation ...
+CONTRACT-MATCH dma_selftimed:o1 seed 2 systemc: requests 201 (== RTL's: True), DM after == reference: True, completions store 5/5 load 7/7 (9.2s)
+RTL dma:o4 seed 0: 12 descriptors, 187 requests in 1291 cycles; burst rule == RTL: True
+CONTRACT-MATCH dma_selftimed:o4 seed 0 simulator: requests 187 (== RTL's: True), DM after == reference: True, completions store 4/4 load 8/8 (3.8s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+[11:18:56] Compiling with g++ ...
+[11:19:04] Running simulation ...
+CONTRACT-MATCH dma_selftimed:o4 seed 0 systemc: requests 187 (== RTL's: True), DM after == reference: True, completions store 4/4 load 8/8 (9.2s)
+RTL dma:o4 seed 1: 12 descriptors, 58 requests in 491 cycles; burst rule == RTL: True
+CONTRACT-MATCH dma_selftimed:o4 seed 1 simulator: requests 58 (== RTL's: True), DM after == reference: True, completions store 8/8 load 4/4 (3.8s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+[11:19:10] Compiling with g++ ...
+[11:19:17] Running simulation ...
+CONTRACT-MATCH dma_selftimed:o4 seed 1 systemc: requests 58 (== RTL's: True), DM after == reference: True, completions store 8/8 load 4/4 (9.0s)
+RTL dma:o4 seed 2: 12 descriptors, 201 requests in 1062 cycles; burst rule == RTL: True
+CONTRACT-MATCH dma_selftimed:o4 seed 2 simulator: requests 201 (== RTL's: True), DM after == reference: True, completions store 5/5 load 7/7 (3.8s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+[11:19:23] Compiling with g++ ...
+[11:19:30] Running simulation ...
+CONTRACT-MATCH dma_selftimed:o4 seed 2 systemc: requests 201 (== RTL's: True), DM after == reference: True, completions store 5/5 load 7/7 (9.7s)
+
+real	2m1.966s
+user	2m10.326s
+sys	0m6.541s

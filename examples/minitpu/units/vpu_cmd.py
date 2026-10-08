@@ -43,7 +43,8 @@ from examples.minitpu.units.seq_issue import (  # noqa: F401  (constants the ker
     M_SO0, M_SO1, S_D_WAIT, S_FLUSH_WAIT, S_HALT_DRAIN, S_IDLE, S_RUN, V_AD0, V_AD1, V_AO0, V_AO1,
     V_AV, V_RA0, V_RA1, V_RB0, V_RB1, V_RD0, V_RD1, V_RL, V_RO, V_RV, V_SD0, V_SD1, V_SO0, V_SO1,
     V_SV, V_TD0, V_TD1, V_TI0, V_TI1, V_TIV, V_TO0, V_TO1, V_TOV, X_AV, X_L0, X_L1, X_LV0, X_LV1,
-    X_OP, X_SH0, X_SH1, X_V, X_VI0, X_VI1, resolve)
+    X_OP, X_SH0, X_SH1, X_V, X_VI0, X_VI1, adapt_m, adapt_v, adapt_x, decode_c, decode_d, decode_m, decode_v,
+    decode_x, resolve)
 
 RTL = SI.RTL
 INSTANCES = SI.INSTANCES
@@ -59,7 +60,7 @@ def REF(inst, cmd):
 
 
 import allo.dataflow as df  # noqa: E402
-from allo.ir.types import Stream, UInt, uint8, uint16, uint32, uint64  # noqa: E402,F401
+from allo.ir.types import Stream, UInt, int32, uint1, uint8, uint16, uint32, uint64  # noqa: E402,F401
 
 
 def _streams(n, depth):
@@ -71,7 +72,7 @@ def _streams(n, depth):
 
     @df.region()
     def top(RST: uint8[n], START: uint8[n], CHD: uint8[n], DIDLE: uint8[n], ACC: uint8[n], HV: uint8[n],
-            VS: uint64[n], MS: uint8[n], XS: uint32[n], DS: uint64[n], CS: uint8[n], DLY: uint8[n],
+            HW0: uint32[n], HW1: uint32[n], HW2: uint32[n], HW3: uint32[n],
             IV0: uint32[n], IV1: uint32[n], IV2: uint32[n], IV3: uint32[n], IV4: uint32[n], IV5: uint32[n],
             IV6: uint32[n], IV7: uint32[n], SB: uint32[n], SS: uint32[n],
             ISS: uint8[n], DONE: uint8[n], CLR: uint8[n], SIDLE: uint8[n], SRUN: uint8[n], XADDR: uint16[n],
@@ -82,12 +83,12 @@ def _streams(n, depth):
         sx: Stream[UInt(32), depth]
         sm: Stream[UInt(32), depth]
 
-        @df.kernel(mapping=[1], args=[RST, START, CHD, DIDLE, ACC, HV, VS, MS, XS, DS, CS, DLY, IV0, IV1, IV2,
+        @df.kernel(mapping=[1], args=[RST, START, CHD, DIDLE, ACC, HV, HW0, HW1, HW2, HW3, IV0, IV1, IV2,
                                       IV3, IV4, IV5, IV6, IV7, SB, SS, ISS, DONE, CLR, SIDLE, SRUN, XADDR, DV,
                                       DST, DCH, DROW, DROWS, DBASE, DSTR, VV, XV, MV])
         def issue(rst: uint8[n], start: uint8[n], chd: uint8[n], didle: uint8[n], acc: uint8[n],
-                  hv: uint8[n], vs: uint64[n], ms: uint8[n], xs: uint32[n], ds: uint64[n], cs: uint8[n],
-                  dly: uint8[n], iv0: uint32[n], iv1: uint32[n], iv2: uint32[n], iv3: uint32[n],
+                  hv: uint8[n], hw0: uint32[n], hw1: uint32[n], hw2: uint32[n], hw3: uint32[n],
+                  iv0: uint32[n], iv1: uint32[n], iv2: uint32[n], iv3: uint32[n],
                   iv4: uint32[n], iv5: uint32[n], iv6: uint32[n], iv7: uint32[n], sb: uint32[n],
                   ss: uint32[n], iss: uint8[n], done: uint8[n], clr: uint8[n], sidle: uint8[n],
                   srun: uint8[n], xaddr: uint16[n], dv: uint8[n], dst: uint8[n], dch: uint8[n],
@@ -126,12 +127,18 @@ def _streams(n, depth):
                     d_str = 0
                 # every port read unconditionally (S6)
                 h: uint8 = hv[t]
-                v: uint64 = vs[t]
-                m: uint8 = ms[t]
-                x: uint32 = xs[t]
-                d: uint64 = ds[t]
-                c: uint8 = cs[t]
-                dl: uint8 = dly[t]
+                w: UInt(128) = 0  # the head bundle (F1 / loop-buffer replay: still a side column)
+                w[0:32] = hw0[t]
+                w[32:64] = hw1[t]
+                w[64:96] = hw2[t]
+                w[96:128] = hw3[t]
+                # C1 decode (track A, units/seq_decoder.py): per-slot records, sequencer_pkg's layout
+                v: UInt(46) = decode_v(w)
+                m: UInt(8) = decode_m(w)
+                x: UInt(27) = decode_x(w)
+                d: UInt(57) = decode_d(w)
+                c: UInt(7) = decode_c(w)
+                dl: uint8 = w[15:22]
                 go: uint8 = start[t]
                 cd: uint8 = chd[t]
                 idl: uint8 = didle[t]
@@ -158,83 +165,70 @@ def _streams(n, depth):
                 clr[t] = clr_q
                 sidle[t] = 1 if st == S_IDLE else 0
                 srun[t] = 1 if st == S_RUN else 0
-                # resolve: the X address (payload, follows the head)
-                lev: uint8 = x[X_LV0:X_LV1]
-                ivs: uint32 = i0
-                if lev == 1:
-                    ivs = i1
-                elif lev == 2:
-                    ivs = i2
-                elif lev == 3:
-                    ivs = i3
-                elif lev == 4:
-                    ivs = i4
-                elif lev == 5:
-                    ivs = i5
-                elif lev == 6:
-                    ivs = i6
-                elif lev == 7:
-                    ivs = i7
-                lit: uint16 = x[X_L0:X_L1]
-                agv: uint8 = x[X_AV:X_AV + 1]
-                shf: uint8 = x[X_SH0:X_SH1]
-                xa: uint16 = resolve(ivs, lit, agv, shf)
+                # C1 resolve (track A, units/agu_resolve.py): the X address (payload, follows the head)
+                ivs: UInt(32)[8]
+                ivs[0] = i0
+                ivs[1] = i1
+                ivs[2] = i2
+                ivs[3] = i3
+                ivs[4] = i4
+                ivs[5] = i5
+                ivs[6] = i6
+                ivs[7] = i7
+                lev: UInt(3) = x[X_LV0:X_LV1]
+                lit: UInt(12) = x[X_L0:X_L1]
+                agv: uint1 = x[X_AV:X_AV + 1]
+                shf: UInt(4) = x[X_SH0:X_SH1]
+                xa: UInt(12) = resolve(ivs, lit, agv, lev, shf)
                 xaddr[t] = xa
-                # adapt: V/X/M commands -- the valids gated by run_accept, the payload not
+                # C1 adapt (track A, units/vpu_adapter.py): the three D-23 slot commands
+                iss1: uint1 = ra
+                vc: UInt(47) = adapt_v(v, iss1)
+                xc: UInt(20) = adapt_x(x, iss1, xa)
+                mc: UInt(18) = adapt_m(m, iss1)
+                # the commands split into the wrapper's valid and payload vectors
                 vval: uint8 = 0
-                vval[4:5] = ra & v[V_AV:V_AV + 1]
-                vval[3:4] = ra & v[V_TIV:V_TIV + 1]
-                vval[2:3] = ra & v[V_TOV:V_TOV + 1]
-                vval[1:2] = ra & v[V_SV:V_SV + 1]
-                vval[0:1] = ra & v[V_RV:V_RV + 1]
+                vval[4:5] = vc[36:37]  # alu_valid
+                vval[3:4] = vc[35:36]  # txin_valid
+                vval[2:3] = vc[32:33]  # txout_valid
+                vval[1:2] = vc[15:16]  # sfu_valid
+                vval[0:1] = vc[7:8]  # reduce_valid
                 vv[t] = vval
                 vpay: uint64 = 0
-                vpay[37:42] = v[V_RA0:V_RA1]
-                vpay[32:37] = v[V_RB0:V_RB1]
-                vpay[30:32] = v[V_TI0:V_TI1]
-                vpay[28:30] = v[V_TO0:V_TO1]
-                vpay[23:28] = v[V_TD0:V_TD1]
-                vpay[19:22] = v[V_AO0:V_AO1]  # alu_op: 3 bits cast to 4 (bit 22 stays 0)
-                vpay[14:19] = v[V_AD0:V_AD1]
-                vpay[12:14] = v[V_SO0:V_SO1]
-                vpay[7:12] = v[V_SD0:V_SD1]
-                vpay[6:7] = v[V_RO:V_RO + 1]
-                vpay[5:6] = v[V_RL:V_RL + 1]
-                vpay[0:5] = v[V_RD0:V_RD1]
+                vpay[0:7] = vc[0:7]
+                vpay[7:14] = vc[8:15]
+                vpay[14:23] = vc[16:25]
+                vpay[23:30] = vc[25:32]
+                vpay[30:32] = vc[33:35]
+                vpay[32:42] = vc[37:47]
                 if vval != 0:  # D-23: a V command is a token, sent in its issue cycle
                     vtok: uint64 = 0
                     vtok[42:47] = vval
                     vtok[0:42] = vpay
                     sv.put(vtok)
                     kv = kv + 1
-                xvalid: uint8 = x[X_V:X_V + 1]
-                xop: uint8 = x[X_OP:X_OP + 1]
-                xv[t] = ra & xvalid
-                xpay: uint32 = 0
-                xpay[18:19] = xop
-                xpay[13:18] = x[X_VI0:X_VI1]
-                xpay[1:13] = xa
-                xpay[0:1] = xvalid & xop
-                if (ra & xvalid) != 0:
+                xval: uint8 = xc[19:20]
+                xv[t] = xval
+                xpay: uint32 = xc[0:19]
+                if xval != 0:
                     xtok: uint32 = 0
                     xtok[19:20] = 1
                     xtok[0:19] = xpay
                     sx.put(xtok)
                     kx = kx + 1
-                msub: uint8 = m[M_SO0:M_SO1]
-                mreg: uint16 = m[M_RI0:M_RI1]
                 mval: uint8 = 0
-                if ra != 0 and msub == 1:
-                    mval = 4
-                elif ra != 0 and msub == 2:
-                    mval = 2
-                elif ra != 0 and msub == 3:
-                    mval = 1
+                mval[2:3] = mc[17:18]  # vmatload_valid
+                mval[1:2] = mc[11:12]  # vmatpush_valid
+                mval[0:1] = mc[5:6]  # vmatpop_valid
                 mv[t] = mval
+                mpay: uint32 = 0
+                mpay[10:15] = mc[12:17]
+                mpay[5:10] = mc[6:11]
+                mpay[0:5] = mc[0:5]
                 if mval != 0:
                     mtok: uint32 = 0
                     mtok[15:18] = mval
-                    mtok[0:15] = (mreg << 10) | (mreg << 5) | mreg
+                    mtok[0:15] = mpay
                     sm.put(mtok)
                     km = km + 1
                 # A1 outputs

@@ -1,0 +1,22 @@
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+/bin/sh: line 1: 2132619 Segmentation fault      (core dumped) ./sim
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[11:19:53] Compiling with g++ ...
+[11:19:57] Running simulation ...
+[11:19:57] Compiling with g++ ...
+[11:20:01] Running simulation ...
+{1024: [1, 2, 3, 4, 5, 6, 7, 8], 262144: 'RuntimeError: Simulation failed.', 'simulator 262144': [1, 2, 3, 4, 5, 6, 7, 8]}
+[item new-systemc-local-array-stack] REPRODUCES: {1024: [1, 2, 3, 4, 5, 6, 7, 8], 262144: 'RuntimeError: Simulation failed.', 'simulator 262144': [1, 2, 3, 4, 5, 6, 7, 8]}
+
+real	0m16.663s
+user	0m14.548s
+sys	0m1.831s

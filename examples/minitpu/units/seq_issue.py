@@ -14,23 +14,28 @@ What is Allo here (track B's units):
 * the **issue FSM** of ``sequencer.sv:254-550`` (IDLE, RUN, D_WAIT,
   FLUSH_WAIT, HALT_DRAIN; the ``delay`` hold; ``run_accept``);
 * **A1**, the descriptor adapter (``dma_desc_adapter.sv``): snapshot at start,
-  words to beats, held until accepted;
-* ``resolve`` (``agu_resolve``) and ``adapt`` (``vpu_adapter``, the producer
-  of the V/X/M commands), as Allo functions named as the plan's C1.
+  words to beats, held until accepted.
 
-What is **stubbed** (track A's units; the integrator swaps them): the per-cycle
-inputs a composed sequencer gets from fetch (F1), loop control (L1), the
-decoder (C1 ``decode``) and the scalar AGU (S1). They are side columns of the
-trace, produced by Phase 0's bit-exact references of those parts while the
-reference runs the same program (``_Tap``): the head bundle's ``valid`` and
-its decoded slots (``decode`` of the head word: the decoder's output, split per
-slot as P-8 asks), the loop frames' ``iv_by_level`` (L1's registered output),
-and S1's two descriptor read ports. The side columns are open-loop replays
-of a closed loop: they are what the front end did *given the RTL's issue
-decisions*, so an Allo issue unit that decided differently would diverge at
-its first wrong cycle and every later output would differ -- the check stays
-sound. Names: ``HV``, ``VS``/``MS``/``XS``/``DS``/``CS``/``DLY`` (decode),
-``IV0..7`` (L1 ``iv_by_level``), ``SB``/``SS`` (S1 ``rd_data_d_base_o`` /
+Track A's combinational C1 functions are called in the kernel (the U4
+wave-1 integration): ``seq_decoder.decode_v/m/x/d/c`` on the head word (and its
+``delay`` field), ``agu_resolve.resolve`` and ``vpu_adapter.adapt_v/x/m``.
+
+What is still **stubbed**: the per-cycle inputs a composed sequencer gets from
+track A's *stateful* units -- fetch (F1), loop control (L1) and the scalar
+AGU (S1), which are kernel bodies, not functions. They are side columns of
+the trace, produced by Phase 0's bit-exact references of those parts while
+the reference runs the same program (``_Tap``): the head bundle's ``valid``
+and its 128-bit word (fetch queue head or loop-buffer replay), the loop
+frames' ``iv_by_level`` (L1's registered output), and S1's two descriptor
+read ports. The side columns are open-loop replays of a closed loop: they are
+what the front end did *given the RTL's issue decisions*, so an Allo issue
+unit that decided differently would diverge at its first wrong cycle and
+every later output would differ -- the check stays sound. Closing the loop
+(F1, L1, S1 as kernels exchanging, per cycle, the head, the decoded L/S
+slots, ``run_accept``, the loop bound read and the branch/flush) is a
+composition of four stateful units, not a function swap. Names: ``HV``,
+``HW0..3`` (the head word, four 32-bit lanes, P-8), ``IV0..7`` (L1
+``iv_by_level``), ``SB``/``SS`` (S1 ``rd_data_d_base_o`` /
 ``rd_data_d_stride_o``).
 """
 
@@ -127,7 +132,7 @@ def REF(inst, cmd):
 
 
 # ---- the stubbed front end: side columns from Phase 0's part references ------------
-SIDE = ["HV", "VS", "MS", "XS", "DS", "CS", "DLY"] + [f"IV{k}" for k in range(8)] + ["SB", "SS"]
+SIDE = ["HV", "HW0", "HW1", "HW2", "HW3"] + [f"IV{k}" for k in range(8)] + ["SB", "SS"]
 
 
 class _Tap(R.Sequencer):
@@ -169,15 +174,6 @@ class _Tap(R.Sequencer):
         return o, why
 
 
-def decode(word):
-    """C1 ``decode``, STUBBED (track A owns it): a 128-bit bundle -> its per-slot decoded records
-    (``ref_ctrl_decode.decode``, REF-MATCH on 25,416 bundles), packed per slot."""
-    f = D.decode(word or 0)
-    sub = lambda pre, lay: D.pack(lay, {n: f[f"{pre}.{n}"] for n, _ in lay})  # noqa: E731
-    return {"VS": sub("v", D.V_SLOT), "MS": sub("m", D.M_SLOT), "XS": sub("x", D.X_SLOT),
-            "DS": sub("d", D.D_SLOT), "CS": sub("c", D.C_SLOT), "DLY": f["delay"]}
-
-
 def side_columns(cmd, tap=None):
     """Side columns for one trace. ``tap``: the model carried over from the
     previous trace -- the IRAM (and the loop buffer) are unreset, so a trace
@@ -192,8 +188,8 @@ def side_columns(cmd, tap=None):
     out = {p: [] for p in SIDE}
     for hv, word, ivs, sb, ss in m.rec[k0:]:
         out["HV"].append(hv)
-        for k, v in decode(word).items():
-            out[k].append(v)
+        for k in range(4):
+            out[f"HW{k}"].append(((word or 0) >> (32 * k)) & 0xFFFFFFFF)
         for k, v in enumerate(D.ivs_of(ivs)):
             out[f"IV{k}"].append(v)
         out["SB"].append(sb)
@@ -229,7 +225,12 @@ def seeds():
 # Allo: I1 (cycle-locked issue) + A1 (descriptor adapter), one kernel
 # ---------------------------------------------------------------------------------
 import allo.dataflow as df  # noqa: E402
-from allo.ir.types import UInt, uint8, uint16, uint32, uint64  # noqa: E402
+from allo.ir.types import UInt, int32, uint1, uint8, uint16, uint32, uint64  # noqa: E402,F401
+
+# track A's C1 functions (plain Allo functions the kernel calls)
+from examples.minitpu.units.agu_resolve import resolve  # noqa: E402
+from examples.minitpu.units.seq_decoder import decode_c, decode_d, decode_m, decode_v, decode_x  # noqa: E402
+from examples.minitpu.units.vpu_adapter import adapt_m, adapt_v, adapt_x  # noqa: E402
 
 
 def _offsets(layout):
@@ -282,24 +283,11 @@ M_RI0, M_RI1 = _M["reg_idx"]
 S_IDLE, S_RUN, S_D_WAIT, S_FLUSH_WAIT, S_HALT_DRAIN = range(5)
 
 
-def resolve(ivsel: uint32, literal: uint16, agu_valid: uint8, shift: uint8) -> uint16:
-    """C1 ``resolve`` (``sequencer_agu_resolve``): ``literal + (iv << shift)``
-    mod 2**12; only the low 12 bits of the shifted iv reach the sum."""
-    lo: uint32 = ivsel & 0xFFF
-    sh: uint32 = shift
-    wide: uint32 = 0
-    if agu_valid != 0:
-        wide = (lo << sh) & 0xFFF
-    lit: uint32 = literal
-    out: uint16 = (lit + wide) & 0xFFF
-    return out
-
-
 def _io(n):
     """(inputs, outputs) of the issue kernel: name -> numpy dtype."""
     ins = [("RST", np.uint8), ("START", np.uint8), ("CHD", np.uint8), ("DIDLE", np.uint8), ("ACC", np.uint8),
-           ("HV", np.uint8), ("VS", np.uint64), ("MS", np.uint8), ("XS", np.uint32), ("DS", np.uint64),
-           ("CS", np.uint8), ("DLY", np.uint8)] + [(f"IV{k}", np.uint32) for k in range(8)] + [
+           ("HV", np.uint8), ("HW0", np.uint32), ("HW1", np.uint32), ("HW2", np.uint32),
+           ("HW3", np.uint32)] + [(f"IV{k}", np.uint32) for k in range(8)] + [
            ("SB", np.uint32), ("SS", np.uint32)]
     outs = [("ISS", np.uint8), ("DONE", np.uint8), ("CLR", np.uint8), ("SIDLE", np.uint8), ("SRUN", np.uint8),
             ("XADDR", np.uint16), ("DV", np.uint8), ("DST", np.uint8), ("DCH", np.uint8), ("DROW", np.uint16),
@@ -347,19 +335,19 @@ def locked(n, w=16, inst="shipped"):
 
     @df.region()
     def top(RST: uint8[n], START: uint8[n], CHD: uint8[n], DIDLE: uint8[n], ACC: uint8[n], HV: uint8[n],
-            VS: uint64[n], MS: uint8[n], XS: uint32[n], DS: uint64[n], CS: uint8[n], DLY: uint8[n],
+            HW0: uint32[n], HW1: uint32[n], HW2: uint32[n], HW3: uint32[n],
             IV0: uint32[n], IV1: uint32[n], IV2: uint32[n], IV3: uint32[n], IV4: uint32[n], IV5: uint32[n],
             IV6: uint32[n], IV7: uint32[n], SB: uint32[n], SS: uint32[n],
             ISS: uint8[n], DONE: uint8[n], CLR: uint8[n], SIDLE: uint8[n], SRUN: uint8[n], XADDR: uint16[n],
             DV: uint8[n], DST: uint8[n], DCH: uint8[n], DROW: uint16[n], DROWS: uint16[n], DBASE: uint32[n],
             DSTR: uint32[n], VV: uint8[n], VP: uint64[n], XV: uint8[n], XP: uint32[n], MV: uint8[n],
             MP: uint16[n]):
-        @df.kernel(mapping=[1], args=[RST, START, CHD, DIDLE, ACC, HV, VS, MS, XS, DS, CS, DLY, IV0, IV1, IV2,
+        @df.kernel(mapping=[1], args=[RST, START, CHD, DIDLE, ACC, HV, HW0, HW1, HW2, HW3, IV0, IV1, IV2,
                                       IV3, IV4, IV5, IV6, IV7, SB, SS, ISS, DONE, CLR, SIDLE, SRUN, XADDR, DV,
                                       DST, DCH, DROW, DROWS, DBASE, DSTR, VV, VP, XV, XP, MV, MP])
         def issue(rst: uint8[n], start: uint8[n], chd: uint8[n], didle: uint8[n], acc: uint8[n],
-                  hv: uint8[n], vs: uint64[n], ms: uint8[n], xs: uint32[n], ds: uint64[n], cs: uint8[n],
-                  dly: uint8[n], iv0: uint32[n], iv1: uint32[n], iv2: uint32[n], iv3: uint32[n],
+                  hv: uint8[n], hw0: uint32[n], hw1: uint32[n], hw2: uint32[n], hw3: uint32[n],
+                  iv0: uint32[n], iv1: uint32[n], iv2: uint32[n], iv3: uint32[n],
                   iv4: uint32[n], iv5: uint32[n], iv6: uint32[n], iv7: uint32[n], sb: uint32[n],
                   ss: uint32[n], iss: uint8[n], done: uint8[n], clr: uint8[n], sidle: uint8[n],
                   srun: uint8[n], xaddr: uint16[n], dv: uint8[n], dst: uint8[n], dch: uint8[n],
@@ -395,12 +383,18 @@ def locked(n, w=16, inst="shipped"):
                     d_str = 0
                 # every port read unconditionally (S6)
                 h: uint8 = hv[t]
-                v: uint64 = vs[t]
-                m: uint8 = ms[t]
-                x: uint32 = xs[t]
-                d: uint64 = ds[t]
-                c: uint8 = cs[t]
-                dl: uint8 = dly[t]
+                w: UInt(128) = 0  # the head bundle (F1 / loop-buffer replay: still a side column)
+                w[0:32] = hw0[t]
+                w[32:64] = hw1[t]
+                w[64:96] = hw2[t]
+                w[96:128] = hw3[t]
+                # C1 decode (track A, units/seq_decoder.py): per-slot records, sequencer_pkg's layout
+                v: UInt(46) = decode_v(w)
+                m: UInt(8) = decode_m(w)
+                x: UInt(27) = decode_x(w)
+                d: UInt(57) = decode_d(w)
+                c: UInt(7) = decode_c(w)
+                dl: uint8 = w[15:22]
                 go: uint8 = start[t]
                 cd: uint8 = chd[t]
                 idl: uint8 = didle[t]
@@ -427,70 +421,57 @@ def locked(n, w=16, inst="shipped"):
                 clr[t] = clr_q
                 sidle[t] = 1 if st == S_IDLE else 0
                 srun[t] = 1 if st == S_RUN else 0
-                # resolve: the X address (payload, follows the head)
-                lev: uint8 = x[X_LV0:X_LV1]
-                ivs: uint32 = i0
-                if lev == 1:
-                    ivs = i1
-                elif lev == 2:
-                    ivs = i2
-                elif lev == 3:
-                    ivs = i3
-                elif lev == 4:
-                    ivs = i4
-                elif lev == 5:
-                    ivs = i5
-                elif lev == 6:
-                    ivs = i6
-                elif lev == 7:
-                    ivs = i7
-                lit: uint16 = x[X_L0:X_L1]
-                agv: uint8 = x[X_AV:X_AV + 1]
-                shf: uint8 = x[X_SH0:X_SH1]
-                xa: uint16 = resolve(ivs, lit, agv, shf)
+                # C1 resolve (track A, units/agu_resolve.py): the X address (payload, follows the head)
+                ivs: UInt(32)[8]
+                ivs[0] = i0
+                ivs[1] = i1
+                ivs[2] = i2
+                ivs[3] = i3
+                ivs[4] = i4
+                ivs[5] = i5
+                ivs[6] = i6
+                ivs[7] = i7
+                lev: UInt(3) = x[X_LV0:X_LV1]
+                lit: UInt(12) = x[X_L0:X_L1]
+                agv: uint1 = x[X_AV:X_AV + 1]
+                shf: UInt(4) = x[X_SH0:X_SH1]
+                xa: UInt(12) = resolve(ivs, lit, agv, lev, shf)
                 xaddr[t] = xa
-                # adapt: V/X/M commands -- the valids gated by run_accept, the payload not
+                # C1 adapt (track A, units/vpu_adapter.py): the three D-23 slot commands
+                iss1: uint1 = ra
+                vc: UInt(47) = adapt_v(v, iss1)
+                xc: UInt(20) = adapt_x(x, iss1, xa)
+                mc: UInt(18) = adapt_m(m, iss1)
+                # the commands split into the wrapper's valid and payload vectors
                 vval: uint8 = 0
-                vval[4:5] = ra & v[V_AV:V_AV + 1]
-                vval[3:4] = ra & v[V_TIV:V_TIV + 1]
-                vval[2:3] = ra & v[V_TOV:V_TOV + 1]
-                vval[1:2] = ra & v[V_SV:V_SV + 1]
-                vval[0:1] = ra & v[V_RV:V_RV + 1]
+                vval[4:5] = vc[36:37]  # alu_valid
+                vval[3:4] = vc[35:36]  # txin_valid
+                vval[2:3] = vc[32:33]  # txout_valid
+                vval[1:2] = vc[15:16]  # sfu_valid
+                vval[0:1] = vc[7:8]  # reduce_valid
                 vv[t] = vval
                 vpay: uint64 = 0
-                vpay[37:42] = v[V_RA0:V_RA1]
-                vpay[32:37] = v[V_RB0:V_RB1]
-                vpay[30:32] = v[V_TI0:V_TI1]
-                vpay[28:30] = v[V_TO0:V_TO1]
-                vpay[23:28] = v[V_TD0:V_TD1]
-                vpay[19:22] = v[V_AO0:V_AO1]  # alu_op: 3 bits cast to 4 (bit 22 stays 0)
-                vpay[14:19] = v[V_AD0:V_AD1]
-                vpay[12:14] = v[V_SO0:V_SO1]
-                vpay[7:12] = v[V_SD0:V_SD1]
-                vpay[6:7] = v[V_RO:V_RO + 1]
-                vpay[5:6] = v[V_RL:V_RL + 1]
-                vpay[0:5] = v[V_RD0:V_RD1]
+                vpay[0:7] = vc[0:7]
+                vpay[7:14] = vc[8:15]
+                vpay[14:23] = vc[16:25]
+                vpay[23:30] = vc[25:32]
+                vpay[30:32] = vc[33:35]
+                vpay[32:42] = vc[37:47]
                 vp[t] = vpay
-                xvalid: uint8 = x[X_V:X_V + 1]
-                xop: uint8 = x[X_OP:X_OP + 1]
-                xv[t] = ra & xvalid
-                xpay: uint32 = 0
-                xpay[18:19] = xop
-                xpay[13:18] = x[X_VI0:X_VI1]
-                xpay[1:13] = xa
-                xpay[0:1] = xvalid & xop
+                xval: uint8 = xc[19:20]
+                xv[t] = xval
+                xpay: uint32 = xc[0:19]
                 xp[t] = xpay
-                msub: uint8 = m[M_SO0:M_SO1]
-                mreg: uint16 = m[M_RI0:M_RI1]
                 mval: uint8 = 0
-                if ra != 0 and msub == 1:
-                    mval = 4
-                elif ra != 0 and msub == 2:
-                    mval = 2
-                elif ra != 0 and msub == 3:
-                    mval = 1
+                mval[2:3] = mc[17:18]  # vmatload_valid
+                mval[1:2] = mc[11:12]  # vmatpush_valid
+                mval[0:1] = mc[5:6]  # vmatpop_valid
                 mv[t] = mval
-                mp[t] = (mreg << 10) | (mreg << 5) | mreg
+                mpay: uint16 = 0
+                mpay[10:15] = mc[12:17]
+                mpay[5:10] = mc[6:11]
+                mpay[0:5] = mc[0:5]
+                mp[t] = mpay
                 # A1 outputs
                 dv[t] = di
                 dst[t] = d_st
