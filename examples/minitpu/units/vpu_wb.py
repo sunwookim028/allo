@@ -283,4 +283,236 @@ def locked(n, w=16, inst="shipped"):
     return top
 
 
-VARIANTS = {"locked": (locked, run)}
+# ---------------------------------------------------------------------------------
+# ``units``: the D-12 form -- ``wb`` is the one owner of ``vreg.w`` (README D-12)
+# ---------------------------------------------------------------------------------
+from allo.compose import Architecture, Channel, Memory, Port, unit  # noqa: E402
+
+CLASS_CH = ("c_ld", "c_alu", "c_sfu", "c_red", "c_lane", "c_tx", "c_pop")
+PARAMS = ("N", "L_LOAD", "L_ALU", "L_SFU", "L_RED", "L_LANE", "L_TX", "L_POP", "POP_FIRE", "PQ")
+
+
+@unit(memories=("RST", "VV", "VP", "XV", "XP", "MV", "MP"), writes=("c_rst",) + CLASS_CH, parameters=PARAMS)
+def sources(rst: UInt(8)[N], vv: UInt(8)[N], vp: UInt(64)[N], xv: UInt(8)[N], xp: UInt(32)[N], mv: UInt(8)[N],
+            mp: UInt(16)[N]):
+    """The VPU's writeback sources as tag pipelines, sized by the bound units'
+    declared latencies (the architecture's parameters, from ``Calendar``);
+    one token a cycle on every channel: the tag reaching the mux, or 0."""
+    p_ld: UInt(8)[L_LOAD] = 0
+    p_alu: UInt(8)[L_ALU] = 0
+    p_sfu: UInt(8)[L_SFU] = 0
+    p_red: UInt(8)[L_RED] = 0
+    p_lane: UInt(8)[L_LANE] = 0
+    p_tx: UInt(8)[L_TX] = 0
+    pq: UInt(32)[PQ] = 0
+    ph: UInt(8) = 0
+    pt: UInt(8) = 0
+    fq_t: UInt(32)[PQ] = 0
+    fq_v: UInt(8)[PQ] = 0
+    fh: UInt(8) = 0
+    ft: UInt(8) = 0
+    for t in range(N):
+        r: UInt(8) = rst[t]
+        a_vv: UInt(8) = vv[t]
+        a_vp: UInt(64) = vp[t]
+        a_xv: UInt(8) = xv[t]
+        a_xp: UInt(32) = xp[t]
+        a_mv: UInt(8) = mv[t]
+        a_mp: UInt(16) = mp[t]
+        if r == 0:
+            for k in range(L_LOAD):
+                p_ld[k] = 0
+            for k in range(L_ALU):
+                p_alu[k] = 0
+            for k in range(L_SFU):
+                p_sfu[k] = 0
+            for k in range(L_RED):
+                p_red[k] = 0
+            for k in range(L_LANE):
+                p_lane[k] = 0
+            for k in range(L_TX):
+                p_tx[k] = 0
+            ph = 0
+            pt = 0
+            fh = 0
+            ft = 0
+        e_pop: UInt(8) = 0
+        fhi: int32 = fh
+        tt: UInt(32) = t
+        if fh != ft:
+            if fq_t[fhi] == tt:
+                e_pop = 32 | fq_v[fhi]
+        c_rst.put(r)
+        c_ld.put(p_ld[L_LOAD - 1])
+        c_alu.put(p_alu[L_ALU - 1])
+        c_sfu.put(p_sfu[L_SFU - 1])
+        c_red.put(p_red[L_RED - 1])
+        c_lane.put(p_lane[L_LANE - 1])
+        c_tx.put(p_tx[L_TX - 1])
+        c_pop.put(e_pop)
+        if r != 0:
+            for k in range(L_LOAD - 1):
+                p_ld[L_LOAD - 1 - k] = p_ld[L_LOAD - 2 - k]
+            for k in range(L_ALU - 1):
+                p_alu[L_ALU - 1 - k] = p_alu[L_ALU - 2 - k]
+            for k in range(L_SFU - 1):
+                p_sfu[L_SFU - 1 - k] = p_sfu[L_SFU - 2 - k]
+            for k in range(L_RED - 1):
+                p_red[L_RED - 1 - k] = p_red[L_RED - 2 - k]
+            for k in range(L_LANE - 1):
+                p_lane[L_LANE - 1 - k] = p_lane[L_LANE - 2 - k]
+            for k in range(L_TX - 1):
+                p_tx[L_TX - 1 - k] = p_tx[L_TX - 2 - k]
+            t_ld: UInt(8) = 0
+            if a_xv != 0 and a_xp[18:19] == 0:
+                t_ld = 32 | a_xp[13:18]
+            p_ld[0] = t_ld
+            t_alu: UInt(8) = 0
+            if a_vv[4:5] != 0:
+                t_alu = 32 | a_vp[14:19]
+            p_alu[0] = t_alu
+            t_sfu: UInt(8) = 0
+            if a_vv[1:2] != 0:
+                t_sfu = 32 | a_vp[7:12]
+            p_sfu[0] = t_sfu
+            t_red: UInt(8) = 0
+            t_lane: UInt(8) = 0
+            if a_vv[0:1] != 0:
+                if a_vp[5:6] != 0:
+                    t_lane = 32 | a_vp[0:5]
+                else:
+                    t_red = 32 | a_vp[0:5]
+            p_red[0] = t_red
+            p_lane[0] = t_lane
+            t_tx: UInt(8) = 0
+            if a_vv[2:3] != 0:
+                t_tx = 32 | a_vp[23:28]
+            p_tx[0] = t_tx
+            if e_pop != 0:
+                fh = (fh + 1) & (PQ - 1)
+            if a_mv[1:2] != 0:
+                pti: int32 = pt
+                pq[pti] = tt
+                pt = (pt + 1) & (PQ - 1)
+            if a_mv[0:1] != 0 and ph != pt:
+                phi: int32 = ph
+                ready: UInt(32) = pq[phi] + POP_FIRE
+                fire: UInt(32) = tt + L_POP
+                if ready > fire:
+                    fire = ready
+                fti: int32 = ft
+                fq_t[fti] = fire
+                fq_v[fti] = a_mp[0:5]
+                ft = (ft + 1) & (PQ - 1)
+                ph = (ph + 1) & (PQ - 1)
+
+
+@unit(memories=("vreg.w", "SRC", "STV", "LV", "LA"), reads=("c_rst",) + CLASS_CH, parameters=("N",))
+def wb(mem, src: UInt(8)[N], stv: UInt(8)[N], lv: UInt(8)[N], la: UInt(8)[N]):
+    """W1: the one owner of ``vreg.w``. The claims are OR-ed, as ``vpu.sv``
+    does (a collision shows, nothing arbitrates: the one-claim-per-cycle rule
+    is the composition's obligation), then two registers; the second writes
+    the register file (its data here is the address: the calendar is what is
+    held to the RTL, the data path is U5's)."""
+    s_v: UInt(8) = 0
+    s_a: UInt(8) = 0
+    l_v: UInt(8) = 0
+    l_a: UInt(8) = 0
+    for t in range(N):
+        r: UInt(8) = c_rst.get()
+        e_ld: UInt(8) = c_ld.get()
+        e_alu: UInt(8) = c_alu.get()
+        e_sfu: UInt(8) = c_sfu.get()
+        e_red: UInt(8) = c_red.get()
+        e_lane: UInt(8) = c_lane.get()
+        e_tx: UInt(8) = c_tx.get()
+        e_pop: UInt(8) = c_pop.get()
+        sb: UInt(8) = 0
+        adr: UInt(8) = 0
+        if e_ld != 0:
+            sb = sb | 1
+            adr = adr | (e_ld & 31)
+        if e_alu != 0:
+            sb = sb | 2
+            adr = adr | (e_alu & 31)
+        if e_sfu != 0:
+            sb = sb | 4
+            adr = adr | (e_sfu & 31)
+        if e_red != 0:
+            sb = sb | 8
+            adr = adr | (e_red & 31)
+        if e_lane != 0:
+            sb = sb | 8
+            adr = adr | (e_lane & 31)
+        if e_pop != 0:
+            sb = sb | 16
+            adr = adr | (e_pop & 31)
+        if e_tx != 0:
+            sb = sb | 32
+            adr = adr | (e_tx & 31)
+        src[t] = sb
+        stv[t] = s_v
+        lv[t] = 15 if l_v != 0 else 0
+        la[t] = l_a
+        we: uint1 = 0
+        if r != 0 and l_v != 0:
+            we = 1
+        wa: int32 = l_a
+        if we:
+            mem[wa] = l_a
+        if r != 0:
+            l_v = s_v
+            l_a = s_a
+            s_v = 1 if sb != 0 else 0
+            s_a = adr
+        else:
+            l_v = 0
+            l_a = 0
+            s_v = 0
+            s_a = 0
+
+
+VREG_W = Memory("vreg", "UInt(8)", rows="32", ports=(Port("w", "w", visible=1),), collision="refuse")
+
+
+def architecture(n, units=None, cal=CAL):
+    L_ = cal.L
+    params = {"N": n, "L_LOAD": L_["load"], "L_ALU": L_["alu"], "L_SFU": L_["sfu"], "L_RED": L_["reduce"],
+              "L_LANE": L_["lane_reduce"], "L_TX": L_["txout"], "L_POP": L_["mpop"],
+              "POP_FIRE": cal.mpop_precondition + L_["mpop"], "PQ": PQ}
+    return Architecture(
+        name="vpu_wb_units",
+        parameters=params,
+        memories=(Memory("RST", "UInt(8)[N]"), Memory("VV", "UInt(8)[N]"), Memory("VP", "UInt(64)[N]"),
+                  Memory("XV", "UInt(8)[N]"), Memory("XP", "UInt(32)[N]"), Memory("MV", "UInt(8)[N]"),
+                  Memory("MP", "UInt(16)[N]"), Memory("SRC", "UInt(8)[N]"), Memory("STV", "UInt(8)[N]"),
+                  Memory("LV", "UInt(8)[N]"), Memory("LA", "UInt(8)[N]"), VREG_W),
+        channels=tuple(Channel(c, "UInt(8)", "2") for c in ("c_rst",) + CLASS_CH),
+        units=units or (sources, wb),
+    )
+
+
+def units_variant(n, w=16, inst="shipped"):
+    return architecture(n).region("simulator")
+
+
+@unit(memories=("vreg.w", "XV"), parameters=("N",))
+def alu_direct(mem, xv: UInt(8)[N]):
+    """H7 probe: an ALU that writes the register file itself (``vpu.sv``'s
+    OR-ed second driver of the write port)."""
+    for t in range(N):
+        if xv[t] != 0:
+            mem[0] = 1
+
+
+def h7_probe(n=8):
+    """The single-owner writeback refuses a second producer on ``vreg.w`` at
+    composition (plan H7). Returns the refusal, or ``ACCEPTED`` (a bug)."""
+    try:
+        architecture(n, units=(sources, wb, alu_direct))
+        return "ACCEPTED (bug)"
+    except AssertionError as e:
+        return "refused: " + str(e).splitlines()[0]
+
+
+VARIANTS = {"locked": (locked, run), "units": (units_variant, run)}
