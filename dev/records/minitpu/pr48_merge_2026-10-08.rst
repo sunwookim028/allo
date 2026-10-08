@@ -240,6 +240,8 @@ emitters) -- the ``cosim.py`` change is to the harness's post-processing.
   PR changes nothing in cosim (same ``kernel.cpp`` byte for byte); the gap to
   the published numbers is this host's toolchain path, or something on
   ``main`` since they were published, and is not this branch's to settle.
+  **Superseded by section 6:** the gap is ``TPU_MAXDIM`` (64 here, 16 in
+  ``reproduce.sh``), not the host.
 - ``test_region_stateful.py`` as a script is a no-op (no ``__main__``); its
   pytest run is the meaningful gate. Worth fixing in CLAUDE.md's golden-test
   recipe separately.
@@ -249,3 +251,43 @@ rewrite, which no mutant targets; the cosim run above exercises it, and
 cosim is not usable here as committed anyway),
 ``TPU_TB=stress`` cosim, ``test_stream_ip_csynth`` (vendor synthesis, as the
 PR's own README deselects it), lint beyond ``black`` on changed Python files.
+
+6. Reconciliation with ``reproduce.sh`` (cosim counts)
+======================================================
+
+Another run on this host today got the published counts with ``reproduce.sh``,
+against the 222 / 361 / 567 / 676 / 868 in section 5. Reconciled on
+``pr48-merge`` after merging ``origin/u1-pilot`` ``d6836fb7`` (merge
+``90b25588``; no conflicts; ``cosim.py`` keeps u1-pilot's ``linker_dir()``
+from ``e09aeb93`` *and* this branch's ``depth=`` replacement; no ``mlir/``
+changes).
+
+Run: ``cd -P`` into the worktree's ``examples/tinytpu``, ``isa_sweep.prj``
+removed first, no linker override, ``./reproduce.sh`` in full. Env:
+``XILINX_HLS=/opt/xilinx/Vitis_HLS/2023.2``, ``XILINX_VITIS``/``XILINX_VIVADO``
+2023.2, no ``TPU_*`` variable set (``reproduce.sh`` unsets any anyway);
+``vitis_hls -version``: v2023.2 (SW Build 4023990, Oct 11 2023). 567 s wall.
+
+.. code-block:: text
+
+   ISA OK / UNITS OK / STRESS OK: 492/492 runs exact / ACT GATE OK: 12/12
+   TinyTPU-isa: ONE build -- 4x4 array, MAXDIM=16; sweeping 5 shapes as data; testbench=default
+      4x 4x 4  cycles=175   TB 4x4x4 mismatches = 0 / 16
+      8x 8x 8  cycles=265   TB 8x8x8 mismatches = 0 / 64
+     12x12x12  cycles=421   TB 12x12x12 mismatches = 0 / 144
+     16x16x 8  cycles=482   TB 16x16x8 mismatches = 0 / 128
+     16x16x16  cycles=674   TB 16x16x16 mismatches = 0 / 256
+     COSIM OK (testbench=default)
+   REPRODUCED
+
+**Cause of 222 vs 175: the array size.** ``reproduce.sh`` exports
+``TPU_MAXDIM=16`` (the configuration the published counts were measured at);
+``cosim.py`` run directly with no ``TPU_*`` set builds at ``microarch_isa.py``'s
+default ``MAXDIM=64``, and section 5's runs printed exactly that
+(``ONE build -- 4x4 array, MAXDIM=64``). Bisect: ``TPU_MAXDIM=16 python
+cosim.py`` alone, fresh project, no linker override -> 175 / 265 / 421 / 482 /
+674, COSIM OK. The linker override in section 5 changed nothing (u1-pilot's
+``linker_dir()`` now does the same thing by default), and the PR changes
+nothing in cosim. Note: ``stress_isa.py`` gives 492/492 under
+``reproduce.sh`` (MAXDIM=16: 64 GEMM shapes) and 640/640 in section 3
+(MAXDIM=64: 96 shapes), for the same reason.
