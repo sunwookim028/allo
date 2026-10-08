@@ -1,0 +1,23 @@
+DERIVED-OK  fetch request -> bundle_valid                 2 == 2    (Phase 0 probe)
+DERIVED-OK  flush -> target at head                       3 == 3    (Phase 0 probe)
+DERIVED-OK  refetch cost per iteration over LB_CAP        2 == 2    (Phase 0 probe (25 vs 24))
+DERIVED-OK  loop.begin.r skip -> next issue               3 == 3    (Phase 0 sequencer probe)
+DERIVED-OK  S_LAT (scalar write -> read)                  2 == 2    (Phase 0 probe)
+DERIVED-OK  S_LAT vs asm.py                               2 == 2    (asm.py S_LAT)
+DERIVED-OK  S_LAT vs isa_latency.json                     2 == 2    (scalar.latency)
+DERIVED-OK  STACK_DEPTH vs asm.py                         8 == 8    (asm.py STACK_DEPTH)
+DERIVED-OK  LB_CAP vs asm.py                             24 == 24   (asm.py LB_CAP)
+DERIVED-OK  LB_CAP vs isa_latency.json                   24 == 24   (resources.loop_buffer)
+DERIVED-OK  SP_W (loop depth port)                        4 == 4    (u4_loop_ctrl depth width)
+DERIVED-OK  LB_IDX_W (replay index port)                  5 == 5    (u4_loop_ctrl lb_replay_idx width)
+REFUSED   STACK_DEPTH typed as 16 beside LEVEL_SEL_W=3: refused: STACK_DEPTH=16 must be 2**LEVEL_SEL_W = 8: agu_level and s.level are LEVEL_SEL_W bits, so a frame pa
+REFUSED   loop buffer count 4 bits for LB_CAP=24: refused: LB_COUNT_W=4 must be clog2(LB_CAP+1) = 5: wr_ptr == LB_CAP is the capture-overflow test; a narrower 
+REFUSED   replay index 4 bits for LB_CAP=24: refused: LB_IDX_W=4: 2**LB_IDX_W = 16 < LB_CAP=24, so the replay index cannot reach the buffer's last entries
+REFUSED   buffer CAP 32 beside LB_CAP=24: refused: the loop buffer's CAP=32 must equal LB_CAP=24 (sequencer_loop_buffer.sv: 'must equal sequencer_pkg::
+REFUSED   fetch queue depth 3: refused: FQ_DEPTH=3: the push index is IDX_W'(count) (sequencer_fetch_queue.sv), a truncation that is only th
+REFUSED   refetch cost still booked 2 after IRAM latency 2: refused: REFETCH_COST=2 (isa_latency.json resources.loop_buffer) must be the branch's bubbles, FLUSH_TO_TARGE
+REFUSED   S_LAT built 3, assembler still schedules 2: refused: the assembler schedules S reads 2 bundles after the write, the scalar AGU is built to S_LAT=3: a rea
+
+real	0m4.531s
+user	0m3.597s
+sys	0m0.712s

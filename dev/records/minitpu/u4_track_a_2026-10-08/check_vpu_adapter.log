@@ -1,0 +1,43 @@
+RTL u4_vpu_adapter:base: 24866 cycles in 3 traces, 24866 defined slots, RTL vs reference on defined: 24866/24866 (0.5s)
+/work/shared/users/phd/sk3463/scratch/wt-u4a/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui1[0m
+  warnings.warn(self.message, category=self.category)
+/work/shared/users/phd/sk3463/scratch/wt-u4a/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui16 vs ui12[0m
+  warnings.warn(self.message, category=self.category)
+UNIT-MATCH vpu_adapter:base slots simulator 24866/24866 defined (0 masked: ; allo==rtl on 0) cycle=order-only (build 0.4s, run 0.1s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[10:48:10] Compiling with g++ ...
+[10:48:15] Running simulation ...
+UNIT-MATCH vpu_adapter:base slots systemc 24866/24866 defined (0 masked: ; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.2s, run 6.7s)
+UNIT-DIFF  vpu_adapter:base slots_gated simulator 966/24866 defined (0 masked: ; allo==rtl on 0) cycle=order-only (build 0.5s, run 0.1s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+    differing defined slots by trace: images=3902, random=19996, tb_bundle_vpu_adapter=2
+    e.g. images cycle 0 vpu_ctrl_o: allo 0 rtl 6d380000
+    e.g. images cycle 1 vpu_ctrl_o: allo 0 rtl 7c700000
+    e.g. images cycle 2 vpu_ctrl_o: allo 0 rtl 41500000
+    e.g. images cycle 3 vpu_ctrl_o: allo 0 rtl 6b380000
+[10:48:17] Compiling with g++ ...
+[10:48:23] Running simulation ...
+UNIT-DIFF  vpu_adapter:base slots_gated systemc 966/24866 defined (0 masked: ; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.3s, run 7.1s)
+    differing defined slots by trace: images=3902, random=19996, tb_bundle_vpu_adapter=2
+    e.g. images cycle 0 vpu_ctrl_o: allo 0 rtl 6d380000
+    e.g. images cycle 1 vpu_ctrl_o: allo 0 rtl 7c700000
+    e.g. images cycle 2 vpu_ctrl_o: allo 0 rtl 41500000
+    e.g. images cycle 3 vpu_ctrl_o: allo 0 rtl 6b380000
+
+real	0m19.607s
+user	0m18.414s
+sys	0m1.697s

@@ -1,0 +1,42 @@
+RTL u4_loop_ctrl:shipped: 37729 cycles in 21 traces, 527446 defined slots, RTL vs reference on defined: 527446/527446 (1.2s)
+/work/shared/users/phd/sk3463/scratch/wt-u4a/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui1[0m
+  warnings.warn(self.message, category=self.category)
+/work/shared/users/phd/sk3463/scratch/wt-u4a/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui16 vs ui12[0m
+  warnings.warn(self.message, category=self.category)
+/work/shared/users/phd/sk3463/scratch/wt-u4a/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui3[0m
+  warnings.warn(self.message, category=self.category)
+/work/shared/users/phd/sk3463/scratch/wt-u4a/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui5[0m
+  warnings.warn(self.message, category=self.category)
+/work/shared/users/phd/sk3463/scratch/wt-u4a/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui4[0m
+  warnings.warn(self.message, category=self.category)
+UNIT-MATCH loop_ctrl:shipped l1 simulator 527446/527446 defined (760 masked: reset=756, uninit=4; allo==rtl on 750) cycle=order-only (build 0.9s, run 0.4s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[10:50:37] Compiling with g++ ...
+[10:50:45] Running simulation ...
+UNIT-MATCH loop_ctrl:shipped l1 systemc 527446/527446 defined (760 masked: reset=756, uninit=4; allo==rtl on 750) cycle=per-iteration, time unchecked (build 0.7s, run 13.8s)
+UNIT-MATCH loop_ctrl:shipped l1_d12 simulator 527446/527446 defined (760 masked: reset=756, uninit=4; allo==rtl on 750) cycle=order-only (build 1.7s, run 4.4s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[10:50:58] Compiling with g++ ...
+[10:51:07] Running simulation ...
+UNIT-MATCH loop_ctrl:shipped l1_d12 systemc 527446/527446 defined (760 masked: reset=756, uninit=4; allo==rtl on 750) cycle=per-iteration, time unchecked (build 1.2s, run 26.6s)
+
+real	0m55.843s
+user	0m51.762s
+sys	0m2.540s
