@@ -510,6 +510,20 @@ not a requirement). Issue audit recorded
 ``main``, prune the 13 merged branches, add the README naming paragraph
 (after the cleanup lands).
 
+**Landing procedure for ISA deltas (minitpu-comp, 2026-10-08).** Target
+``sunwookim028/minitpu-tmp`` branch ``master`` (``e5c2222`` at the time; the
+only maintained branch), from a pushed feature branch. The PR touches only
+``isa/latency.json`` ``versions.list.<name>`` entries plus what ``python3
+tools/gen_isa_doc.py --write`` regenerates (the generated docs,
+``board_package/asm.py``'s marker table if it changes, ``tb/isa_*.svh``), and
+must pass ``make host`` (includes ``gen_isa_doc --check`` and
+``check_no_docs_reads``). Each new version carries ``status: experimental``
+and no ``bitstreams`` entry until a board build exists (the runtime refuses an
+image on an unlisted bitstream). A board_package refactor is landing
+concurrently (code generation moving to ``compiler/``): on conflict, rebase
+onto master and rerun ``gen_isa_doc.py --write``; never hand-merge generated
+files. Opening the PR needs the owner's approval.
+
 **Checkpoint 25 (2026-10-08, the pin is ``v1``; U4 B and C landed).**
 minitpu-comp confirmed track B's measurement: ``b3ba0a4d`` is ISA ``v1``,
 not ``v1-course`` (v1-course = Lab 2's tree / minitpu ``613190d`` timing;
