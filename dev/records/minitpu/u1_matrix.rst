@@ -510,6 +510,25 @@ not a requirement). Issue audit recorded
 ``main``, prune the 13 merged branches, add the README naming paragraph
 (after the cleanup lands).
 
+**Checkpoint 24 (2026-10-08, D-21 re-scoped; the FPGA route started).**
+Owner: the RTL-wrapped baseline is worth doing only if meaningful. Provisional
+re-scope (README D-21 to be amended when M-R1 lands): the whole-core wrap is
+not a demo but the *substitution spine* for U4/U5 -- once ``minitpu_core.sv``
+runs inside an Allo region against the testbench-digest oracle, each
+Allo-modelled unit (the MXU first, then U1-U3's VPU units, then U4's control)
+replaces its RTL counterpart inside the same region, the same oracle on every
+step, until the core is all Allo (U5). Its probe target is the tool gap that
+PR #48's transaction seam cannot express a per-cycle sideband (``vpu_ctrl_t``),
+so unit-level substitution needs a cycle-level mixed RTL/Allo cosimulation
+seam; M-R3 becomes that first swap (the Allo MXU inside the wrapped core),
+not the AXI top. Issues filed: minitpu-tmp #41-#47, cornell-zhang/allo #621
+#622, fork #49 #50. Started: ``minitpu-fpga-mxu`` -- Allo's MXU through
+Vitis HLS into MiniTPU's own ZCU104 bitstream flow (``make bitstream``,
+Vivado 2023.2), held to ``tb_mxu_single_port``, published as
+``versions.list.allo-mxu-vitis``; the Catapult hold on (c2) does not apply
+to the FPGA route. Layout call pending the owner: fold ``examples/minitpu-rtl/``
+into ``examples/minitpu/rtl/`` (one design tree, two routes).
+
 **Checkpoint 23 (2026-10-08, U4 wave 1 started; D-23/D-24).** The owner
 answered the U4 and merge questions: D-23 (the VPU command as three
 valid-qualified slot Streams plus four declared resources, payload gating a
