@@ -477,6 +477,16 @@ each with the missing manifest named.
        The slice was not isolated.
      - Fold module constants before the width check, or refuse (D-1).
 
+.. list-table::
+   :header-rows: 0
+   :widths: 7 16 47 30
+
+   * - F-B10
+     - finding (Catapult, budget)
+     - The csyn of ``vpu_cmd:streams`` with ``--unroll-inner`` ran away in
+       ``architect`` (86 GB, 13 min) and was stopped (§7).
+     - Track D: build without the harness pad loop, or rolled; cap memory.
+
 MiniTPU (FYI, not filed, P-10): the reference that mirrors the sequencer's
 sim-only checker counts no port-A read for ``vtxin`` (only ALU, SFU and
 reduce add one); ``vtxin`` reads port A in ``vpu.sv``. [I] -- from
@@ -485,13 +495,17 @@ reduce add one); ``vtxin`` reads port A in ``vpu.sv``. [I] -- from
 7. Catapult
 ===========
 
-**Not built to RTL here.** A csyn of ``vpu_cmd:streams`` (n 64, 3.33 ns,
-every iteration loop pipelined, inner loops unrolled; track C's
-``u3c_build.py`` unchanged) was started to see whether Catapult schedules the
-issue loop at II 1 with three conditional pushes; it was still in
-``architect`` (3.5 min in) when this was written; see below if it finished. The
-cycle-for-cycle issue check on Catapult RTL and every area number are track
-D's (D-23's condition on Catapult RTL is open).
+**Not built to RTL here.** One csyn of ``vpu_cmd:streams`` (n 64, 3.33 ns,
+every iteration loop pipelined, inner loops unrolled -- which unrolls the
+64-iteration end-of-trace pad loop with its three conditional puts; track C's
+``u3c_build.py`` unchanged) passed ``go analyze``/``compile`` and spent 13 min
+in ``architect``, reaching **86 GB** of memory, and was stopped by hand on a
+shared host (no result, no manifest). Likely cause, untested: the unrolled
+pad loop (64 x 3 conditional ``Push``\ es) -- a harness artifact, not the
+issue logic; a Catapult build should drop the pad loop (the receivers' trip
+count is a harness need) or keep it rolled. The cycle-for-cycle issue check
+on Catapult RTL and every area number are **track D's** (D-23's condition on
+Catapult RTL is open). F-B10 in §6.
 
 8. Hypotheses and proposed matrix rows
 ======================================
@@ -528,7 +542,7 @@ Proposed rows for ``u4_matrix.rst`` (the integrator's file):
      - **match** 888,217 gated; four resources compose, three wrong owners
        **refused**
      - **match**; rate: depth >= 2 stall-free, depth 1 **finding** F-B3
-     - open (D): csyn started
+     - open (D): csyn stopped at 86 GB (F-B10)
    * - write-back W1 (``vpu_wb``)
      - match (Phase 0 ``vpu_writeback``)
      - **match** 121,075 (``locked``, ``units``); H7 **refused**
