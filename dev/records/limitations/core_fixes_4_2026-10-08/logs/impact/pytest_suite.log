@@ -1,0 +1,28 @@
+........................................................................ [ 39%]
+........................................................................ [ 78%]
+.......................................                                  [100%]
+=============================== warnings summary ===============================
+tests/dataflow/test_systemc_unreset.py::test_unreset_other_backends
+tests/dataflow/test_systemc_unreset.py::test_unreset_stream_kernel_csim
+tests/dataflow/test_compose_memory_ports.py::test_regfile_simulator[server]
+tests/dataflow/test_compose_memory_ports.py::test_regfile_simulator[replica]
+  /work/shared/users/phd/sk3463/scratch/wt-fix4/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+  [93m[Data Type][0m [94mInput type mismatch: ui8 vs ui5[0m
+    warnings.warn(self.message, category=self.category)
+
+tests/dataflow/test_systemc_unreset.py::test_unreset_other_backends
+tests/dataflow/test_systemc_unreset.py::test_unreset_stream_kernel_csim
+tests/dataflow/test_compose_memory_ports.py::test_regfile_simulator[server]
+tests/dataflow/test_compose_memory_ports.py::test_regfile_simulator[replica]
+tests/dataflow/test_stream_flush.py::test_flush_simulator
+tests/dataflow/test_stream_flush.py::test_flush_consecutive_csim
+  /work/shared/users/phd/sk3463/scratch/wt-fix4/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+  [93m[Data Type][0m [94mInput type mismatch: ui8 vs ui1[0m
+    warnings.warn(self.message, category=self.category)
+
+tests/test_compose_engines.py::test_tree_matrix_engine_verified_with_its_order
+  /work/shared/users/phd/sk3463/scratch/wt-fix4/allo/ir/infer.py:656: UserWarning: Cannot infer the bitwidth of the slice, use UInt(32) as default
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+183 passed, 11 warnings in 438.70s (0:07:18)

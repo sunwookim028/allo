@@ -351,3 +351,102 @@ the same way as ``fetch_d12``'s.
 
 Masked on both: 156,548 (D-23 gate 154,378, reset 945, uninit IRAM 1,225), as
 the sequencer record.
+
+5. Impact check (head ``cc66c904``, ``logs/impact/``)
+=====================================================
+
+Run by ``logs/impact/summary.txt``'s script under ``env-zhang21.sh`` with the
+conda python by path, ``PYTHONPATH`` = the worktree, ``OMP_NUM_THREADS=8``.
+
+.. list-table::
+   :header-rows: 1
+
+   * - gate
+     - result
+   * - TinyTPU emission hashes
+     - **unchanged**: ``vhls`` ``6bc774bc9d97f0e7…`` (166,563 B), ``catapult``
+       ``ade1ab5dfd20d72a…`` (170,812 B), ``systemc`` ``06d365336c307ffc…``
+       (267,151 B)
+   * - ``tests/dataflow/test_df_unit.py``
+     - pass
+   * - ``pytest tests/dataflow/test_region_stateful.py``
+     - 16 passed
+   * - ``pytest`` ``test_systemc_{backend,comb,csim_regress,unreset}``,
+       ``tests/test_compose_*``, ``test_stream_ports*``,
+       ``test_compose_{memory_ports,sram,port_latency,server_port_order}``,
+       ``test_stream_flush``
+     - **183 passed** (7 min 18 s; csim included)
+   * - ``examples/tinytpu/gen_isa.py --check``
+     - ISA OK
+   * - ``TPU_MAXDIM=16 stress_isa.py``
+     - STRESS OK 492/492
+   * - ``python -m examples.minitpu.template.run_u3e``
+     - **U3E-GATE OK** (51 s). Run as a script path it fails before
+       starting: ``template/calendar.py`` shadows the stdlib ``calendar``
+       (``email`` circular import) -- the ``-m`` form, as ``gates.sh`` uses, is
+       the gate; noted, not changed here.
+   * - ``check fetch`` ``f1`` on ``iram``/``fq``/``fq_a8``, ``f1_d12``
+     - UNIT-MATCH 25,026 / 112,864 / 126,871 / 25,026, both backends
+   * - ``check loop_ctrl`` ``l1``, ``l1_d12``
+     - UNIT-MATCH 527,446/527,446, both backends
+   * - ``check vpu_word_array:narrow d12_server``
+     - UNIT-MATCH 67,717/67,717, both backends
+
+6. Draft upstream issue text
+============================
+
+Two of the four are upstream-relevant; neither is filed (the owner files).
+
+**(a) Unreset storage in a kernel with stream ports (SystemC flow).**
+
+   *Title:* SystemC: ``@ Stateful(reset=False)`` storage in a kernel with
+   Stream/array ports
+
+   The SystemC emitter's unreset storage (``@ Stateful(reset=False)``: no
+   reset action; Catapult ``-RESET_CLEARS_ALL_REGS no``) was lowered only for
+   kernels whose every port is a ``Wire``, where the stores move to a
+   clock-edge ``SC_METHOD``. A kernel with a ``Stream``, channel or array port
+   iterates per token, not per edge, and was refused -- although such storage
+   is common (a DMA's landing buffer, a FIFO's payload). Proposal (implemented
+   on the fork): in such a kernel the storage is a plain module member the
+   thread writes, with no reset-action write, and the directive is scoped to
+   the thread (``directive set /<top>/<kernel>/run -RESET_CLEARS_ALL_REGS
+   no``). Catapult 2024.2 accepts it (CIN-233 applies to signals, not
+   members); a 32 x 16 array maps to ``ccs_ram_sync_1R1W`` with no reset.
+   The one combination still refused: a combinational output reading that
+   storage (comb storage is a signal the thread writes, which Catapult must
+   reset). Evidence: csim equal to the simulator across reset-free calls; a
+   MiniTPU DMA unit's declared form now matches the RTL per iteration in csim
+   on four instances (805,652 / 764,284 / 317,520 / 394,464 slots).
+
+**(b) Proposal: a flushable stream.**
+
+   *Title:* Proposal: ``Stream[T, D, flush]`` with ``s.flush()`` by the consumer
+
+   A processor's fetch queue is flushed on every taken branch (MiniTPU's
+   ``sequencer_fetch_queue.sv``: ``count_q <= 0`` and the landing response of
+   that cycle dropped). Allo's ``Stream`` has no way to discard its contents;
+   the workarounds either take several tokens in one iteration (a drain loop:
+   not one get per cycle, so not buildable as written) or drop stale tokens by
+   a count or an epoch tag (a 1-bit tag is wrong after two flushes closer than
+   the stale tokens take to drain; one run hung). Proposal, implemented on the
+   fork:
+
+   * ``s: Stream[T, D, flush]`` (a marker, as Python has no keyword
+     subscripts) declares the stream flushable; ``s.flush()`` is legal only in
+     its one consumer and refused elsewhere, naming the stream and kernel;
+   * semantics: at that edge every buffered token is discarded and a put of
+     the same edge is dropped; "the same edge" between untimed processes is
+     the composition's per-step ordering, a declared obligation;
+   * lowering: the simulator moves the consumer's head pointer to the tail; the
+     SystemC flow uses a FIFO with a synchronous clear (the vendor
+     ``Connections::Fifo`` cannot be cleared, so a small fork FIFO with the
+     same structure plus a clear the consumer drives as a toggle; zero cycles;
+     synthesises in Catapult 2024.2); every backend that cannot build the
+     clear refuses, naming the channel;
+   * a self-timed producer additionally needs an epoch of ``ceil(log2(F+1))``
+     bits for ``F`` flushes in flight (specified, not built).
+
+   Evidence: a fetch queue built on it matches MiniTPU's RTL on its contract
+   on 3,804- and 3,134-cycle traces on the simulator and in csim, where the
+   epoch workaround lost a bundle.

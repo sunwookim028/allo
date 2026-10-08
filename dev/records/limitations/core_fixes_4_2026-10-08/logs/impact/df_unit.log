@@ -1,0 +1,93 @@
+
+//===------------------------------------------------------------*- C++ -*-===//
+//
+// Automatically generated file for High-level Synthesis (HLS).
+//
+//===----------------------------------------------------------------------===//
+#include <algorithm>
+#include <ap_axi_sdata.h>
+#include <ap_fixed.h>
+#include <ap_int.h>
+#include <hls_math.h>
+#include <hls_stream.h>
+#include <hls_vector.h>
+#include <math.h>
+#include <stdint.h>
+using namespace std;
+
+extern "C" {
+
+void load_0(
+  uint16_t v0[2][2],
+  hls::stream< uint16_t >& v1
+) {	// L2
+  l_S_mt_nt_0_mt: for (int mt = 0; mt < 2; mt++) {	// L3
+    l_nt: for (int nt = 0; nt < 2; nt++) {	// L4
+      uint16_t v2 = v0[mt][nt];	// L5
+      v1.write(v2);	// L6
+    }
+  }
+}
+
+void store_0(
+  uint16_t v3[2][2],
+  hls::stream< uint16_t >& v4
+) {	// L11
+  l_S_mt_nt_0_mt1: for (int mt1 = 0; mt1 < 2; mt1++) {	// L12
+    l_nt1: for (int nt1 = 0; nt1 < 2; nt1++) {	// L13
+      uint16_t v5 = v4.read();	// L14
+      v3[mt1][nt1] = v5;	// L15
+    }
+  }
+}
+
+void load_buf0(
+  uint16_t v6[4],
+  uint16_t v7[2][2]
+) {	//
+  l_S_load_buf0_load_buf0_l_0: for (int load_buf0_l_0 = 0; load_buf0_l_0 < 2; load_buf0_l_0++) {	//
+    l_load_buf0_l_1: for (int load_buf0_l_1 = 0; load_buf0_l_1 < 2; load_buf0_l_1++) {	//
+    #pragma HLS pipeline II=1 rewind
+      uint16_t v8 = v6[((load_buf0_l_0 * 2) + load_buf0_l_1)];	//
+      v7[load_buf0_l_0][load_buf0_l_1] = v8;	//
+    }
+  }
+}
+
+void store_res1(
+  uint16_t v9[2][2],
+  uint16_t v10[4]
+) {	//
+  l_S_store_res1_store_res1_l_0: for (int store_res1_l_0 = 0; store_res1_l_0 < 2; store_res1_l_0++) {	//
+    l_store_res1_l_1: for (int store_res1_l_1 = 0; store_res1_l_1 < 2; store_res1_l_1++) {	//
+    #pragma HLS pipeline II=1 rewind
+      uint16_t v11 = v9[store_res1_l_0][store_res1_l_1];	//
+      v10[((store_res1_l_0 * 2) + store_res1_l_1)] = v11;	//
+    }
+  }
+}
+
+/// This is top function.
+void top(
+  uint16_t *v12,
+  uint16_t *v13
+) {	// L20
+  #pragma HLS interface m_axi port=v12 offset=slave bundle=gmem0 depth=4
+  #pragma HLS interface m_axi port=v13 offset=slave bundle=gmem1 depth=4
+  #pragma HLS dataflow
+  uint16_t buf0[2][2];	//
+  load_buf0(v12, buf0);	//
+  uint16_t buf1[2][2];	//
+  hls::stream< uint16_t > v14;
+  #pragma HLS stream variable=v14 depth=4	// L21
+  load_0(buf0, v14);	// L22
+  store_0(buf1, v14);	// L23
+  store_res1(buf1, v13);	//
+}
+
+
+} // extern "C"
+
+Dataflow Simulator Passed!
+Dataflow Simulator Passed!
+Dataflow Simulator (Arithmetic) Passed!

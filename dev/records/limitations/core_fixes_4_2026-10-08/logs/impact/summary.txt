@@ -1,0 +1,16 @@
+HEAD cc66c9049dbba26531f3caadedf72250277ca3da start 2026-10-08T11:15:45-04:00
+hashes EXIT 0 76s
+df_unit EXIT 0 5s
+region_stateful EXIT 0 10s
+pytest_suite EXIT 0 440s
+gen_isa EXIT 0 52s
+stress_isa_md16 EXIT 0 25s
+u3e EXIT 1 2s
+check_fetch_iram_f1 EXIT 0 12s
+check_fetch_fq_f1 EXIT 0 12s
+check_fetch_fq_a8_f1 EXIT 0 13s
+check_fetch_iram_f1_d12 EXIT 0 13s
+check_loop_ctrl EXIT 0 62s
+check_word_array EXIT 0 27s
+end 2026-10-08T11:28:14-04:00
+u3e(-m) EXIT 0

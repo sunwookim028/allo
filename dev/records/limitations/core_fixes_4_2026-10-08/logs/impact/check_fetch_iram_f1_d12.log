@@ -1,0 +1,18 @@
+RTL u4_fetch:iram: 3804 cycles in 4 traces, 25026 defined slots, RTL vs reference on defined: 25026/25026 (0.1s)
+/work/shared/users/phd/sk3463/scratch/wt-fix4/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui1[0m
+  warnings.warn(self.message, category=self.category)
+/work/shared/users/phd/sk3463/scratch/wt-fix4/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui16 vs ui12[0m
+  warnings.warn(self.message, category=self.category)
+UNIT-MATCH fetch:iram f1_d12 simulator 25026/25026 defined (1602 masked: reset=56, uninit=1546; allo==rtl on 48) cycle=order-only (build 1.1s, run 0.3s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[15:26:38] Compiling with g++ ...
+[15:26:44] Running simulation ...
+UNIT-MATCH fetch:iram f1_d12 systemc 25026/25026 defined (1602 masked: reset=56, uninit=1546; allo==rtl on 48) cycle=per-iteration, time unchecked (build 0.8s, run 7.2s)

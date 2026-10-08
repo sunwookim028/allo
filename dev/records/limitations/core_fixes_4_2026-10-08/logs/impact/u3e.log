@@ -1,0 +1,34 @@
+U3E-OK       mac_pe at bf16_acc24, own region  -- 4096/4096 bit-exact vs U1 references
+U3E-OK       mac_pe at int8_int32, own region  -- 1024/1024 bit-exact vs U1 references
+U3E-OK       H10: one PE source, two engines, ONE region (compose.Instance)  -- 512/512 + 512/512
+U3E-OK       C10: engine directive applied through the unit that binds it  -- s.unroll('leading_zeros19:offset') found its band
+/work/shared/users/phd/sk3463/scratch/wt-fix4/allo/ir/infer.py:656: UserWarning: Cannot infer the bitwidth of the slice, use UInt(32) as default
+  warnings.warn(
+U3E-OK       matrix engine systolic (sequential) at bf16, DIM=4  -- 256/256; model latency 22
+U3E-OK       matrix engine systolic (sequential) at bf16, DIM=16  -- 512/512; model latency 82
+U3E-OK       matrix engine tree (tree) at bf16, DIM=4  -- 256/256; model latency 9
+U3E-OK       matrix engine tree (tree) at bf16, DIM=16  -- 512/512; model latency 15
+U3E-OK       matrix engine systolic at int8, DIM=16  -- 256/256
+U3E-OK       matrix engine tree at int8, DIM=16  -- 256/256
+U3E-OK       matrix engine systolic at int8, DIM=4 (32-bit packed word)
+U3E-OK       H11: sequential vs tree at bf16 DIM=16, random data  -- 74/8192 results differ
+U3E-OK       H11: sequential vs tree at bf16 DIM=16, exact-sum data  -- 0/8192 results differ
+U3E-OK       H11: sequential vs tree at int8 (no rounding)  -- 0 differ
+U3E-OK       tree engine legality refuses DIM=6  -- DIM=6: the tree engine is a BALANCED binary tree over the co
+U3E-OK       VPU lane without SFU  -- 64/64; isa=('vadd',)
+U3E-OK         program with vgelu without SFU: refused, naming the module
+U3E-OK       VPU lane with SFU  -- 64/64; isa=('vadd', 'vgelu')
+U3E-OK         program with vgelu with SFU: assembled
+U3E-OK       H15: SFU added without rebinding writeback (two readers)  -- refused by compose: vpu_lane_sfu_norebind: channel 'alu_out' reads in both writeback and s
+U3E-OK       H15: SFU removed, its channel left declared (dangling)  -- refused by compose: lane_dangling: nothing writes 'sfu_out'
+U3E-OK       derived numbers == Phase 0 measurements  -- 12 relations
+U3E-OK       legality: mxu: stale PUSH_TO_VALID after an adder change  -- refused: PUSH_TO_VALID=82 must be 2 + DIM*(PE_LATENCY+1) = 114: it is the one ti
+U3E-OK       legality: mxu: OUTPUT_ROWS not a whole number of groups  -- refused: OUTPUT_ROWS=62 must hold whole groups of NUM_SUBLANES=4 results: a lane
+U3E-OK       legality: tree: tap level declared one off  -- refused: LANE_LEVELS=3 must be log2(NUM_LANES) = 4: a tap one level off broadcas
+U3E-OK       legality: tree: LEVELS declared beside N  -- refused: LEVELS=5 must be log2(N) = 6; xlu.sv passes it explicitly and the RTL $
+U3E-OK       legality: tree: max path delay hand-written for a 2-cycle adder, adder now 3  -- refused: MAX_PATH_DELAY=2 must equal ADDER_LATENCY=3: the max path's registers e
+U3E-GATE OK  (51 s)
+
+real	0m55.017s
+user	0m59.816s
+sys	0m2.245s
