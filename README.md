@@ -550,6 +550,35 @@ valid-qualified slot commands plus four declared resources.**
   `command_unit`, the bridge) stays with M3: the baseline wraps the core seam
   (D-21).
 
+**D-25 (2026-10-08). Flushable streams.**
+- `Stream[T, D, flush=True]` gains `s.flush()`, callable only by the
+  channel's one consumer. At that edge every buffered token is discarded and
+  a put in the same edge is dropped. It lowers to a FIFO with a synchronous
+  clear -- zero cycles, what MiniTPU's `sequencer_fetch_queue.sv` does. A
+  backend that cannot build the clear refuses, naming the channel.
+- A cycle-locked producer/consumer pair needs nothing more. A self-timed
+  pair additionally carries an epoch of ceil(log2(F+1)) bits for F flushes
+  in flight and declares a one-deep flush link; stranded tokens count against
+  the producer's room check, or the producer can block on a put that never
+  drains (U4 track A, T-5).
+- Why: the fetch queue of every sequencer with branches is flushed; the Allo
+  prototypes without it either read several tokens in one cycle (not
+  buildable) or lose a bundle under a full queue
+  (`u4_track_a_2026-10-08.rst`, H6). Until implemented, limitation entry;
+  the fetch unit drops stranded tokens by count, exact only when cycle-locked.
+
+**D-12, amended (2026-10-08): a port's latency is counted in the owner's own
+iterations on every link kind.** U4 found a read port with latency L
+delivering its data one iteration earlier on Stream links than on Wire links
+(T-2), and the shared-memory server returning read data as of after the
+clock edge so a unit sampling before it is one cycle off (C8). The rule: L
+means iterations in the owner body's own terms whatever the link; the
+lowering absorbs the difference; simulator, csim and Catapult must agree, a
+regression test per link kind. **D-14, lowering extended:** unreset storage
+(`Stateful(reset=False)`) lowers in every kernel kind, as a module member with
+no reset action, not only in all-Wire kernels (U4 track C, C2); D-14's
+declaration is unchanged.
+
 ## Milestones
 
 Each milestone passes on **one acceptance check** and names the tools it uses
