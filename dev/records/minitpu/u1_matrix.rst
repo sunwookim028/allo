@@ -456,6 +456,35 @@ numbers (asked, unanswered). Coordination: ``minitpu-comp`` will send the
 principle. Worktrees not in flight are removed; ``wt-u1`` is the integrator
 and has its own build at ``8ceb3011``.
 
+**Agreed seam with ``minitpu-comp``, 2026-10-08** (their master ``7676911``;
+the ISA JSON moves from ``docs/`` to a top-level ``isa/`` on branch
+``isa-tree``, unmerged -- **pin to a commit, not a path**):
+
+- Our generator ``gen_isa_delta.py`` emits ``versions.list.<name>.deltas`` as
+  a **list** of ``{"what": str, "set": {<dotted path>: value}, "source": str}``,
+  one entry per quantity, provenance (allo commit, backend, clock, MiniTPU
+  pin) in ``source``; an ``unresolved`` list stays outside the delta.
+  **Overrides only**: a path the base lacks is refused; new quantities are
+  added to their base first, with a reader.
+- Mapping: ``push_to_valid`` -> ``matrix.result_latency.vmatpush`` (85; v1-course
+  82); pop interval -> ``matrix.issue_interval.vmatpop`` (1; 4); pop beats ->
+  ``rtl_params.WB_W_MPOP_LAST`` = ``WB_W_MPOP_FIRST`` (3) + beats - 1 (no
+  separate beats key); ``switch_span`` -> ``matrix.weight_switch.span`` (75);
+  output FIFO -> ``resources.mxu_output_fifo.depth`` (64 result rows, one FIFO
+  per lane). Per-unit ``rtl_params.WB_W_{ALU 5, SFU 7, REDUCE 15,
+  LANE_REDUCE 11, VLD 6, TXOUT 3}`` are **W = unit latency + VPU_WB_STAGES**
+  (the cycle the op claims the VREG write port), not unit latencies: our
+  manifest latency must add the writeback stage count before mapping.
+- Units: cycles from the issuing bundle. v1 (E03) counts ISSUE cycles; v1-course
+  counts CLOCK cycles from issue (units run free through stalls; the scheduler
+  treats them as lower bounds). Our free-running RTL measurements at
+  ``b3ba0a4d`` are directly comparable to v1-course.
+- Landing: a PR to minitpu-tmp touching only ``isa/isa_latency.json``'s
+  ``versions.list.<name>`` and the regenerated outputs
+  (``tools/gen_isa_doc.py --write``); their ``make host`` and ``--check``
+  gates run on it; our ``gen_isa_delta.py --check`` re-derives against the
+  pinned commit. Nothing blocks before U5.
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
