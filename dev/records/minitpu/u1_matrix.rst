@@ -510,6 +510,27 @@ not a requirement). Issue audit recorded
 ``main``, prune the 13 merged branches, add the README naming paragraph
 (after the cleanup lands).
 
+**Checkpoint 31 (2026-10-08, U4 track D landed).** ``u4-catapult``
+(``79c350c5``): every landed cycle-locked U4 variant runs as Catapult RTL
+and matches the Phase 0 oracle cycle for cycle at 3.33 ns (most also at
+2.0 ns); DC area beside MiniTPU's per unit (Allo 2-4x on the combinational
+units: I/O registers, handshakes, reset where MiniTPU leaves storage
+unreset; the record works it through). **D-23 confirmed on Catapult RTL**
+at depth 2 and 4 (0 stalls, every issue on the RTL's cycle; depth 1 stalls
+808). **T-2 confirmed**: the D-12 amendment's rule is what Catapult already
+does on Wire links. Refused: the IRAM at its full 4,096 rows (D-5: a body
+array read and written in one II=1 iteration maps to a single-port RAM
+model), the VMEM DMA port (H11, same cause), the DMA at 2.0 ns.
+**D-6 (silent wrong answer):** the D-12 ``registers`` server for unreset
+storage returns the word being written in the same cycle on Catapult RTL
+where the declaration (visible=1) and MiniTPU return the old word. D-2:
+``s.unroll`` by name reaches only the first loop of that name. D-9: depth-2
+channels carrying a token every cycle sustain 2 tokens per 3 cycles (the
+DMA streams form runs at 1.333 cycles/row). D-8: the self-timed write-back
+probe stalls on RTL after 33 claims. The D-matrix cells and the D-6 fix
+(server: old word on a same-cycle write) are the next items; D-6 joins the
+triage above E-R1 (it is on the Catapult path only).
+
 **Checkpoint 30 (2026-10-08, core fixes 4 landed on u1-pilot).**
 ``core-fixes-4`` (``3b3a6ab9``): D-14's lowering extended (unreset storage as
 a module member in every kernel kind; the DMA's unreset forms now
