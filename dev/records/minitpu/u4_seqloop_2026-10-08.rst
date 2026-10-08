@@ -126,7 +126,7 @@ cycle (``logs/check_sequencer*.log``):
      - **UNIT-MATCH**
      - 940,408/940,408; masked 156,548 (D-23 gate 154,378, reset 945, uninit
        IRAM 1,225); build 4.9 / 3.6 s, run 13.8 / 50.5 s; 84 s wall
-   * - + ``tb_bundle_loop``, ``tb_bundle_interlocks``, ``tb_loop_begin_r``
+   * - the same, plus ``tb_bundle_loop``, ``tb_bundle_interlocks``, ``tb_loop_begin_r``
        replayed (18 traces, 70,507 cycles: Phase 0's set)
      - **UNIT-MATCH**
      - **UNIT-MATCH**
