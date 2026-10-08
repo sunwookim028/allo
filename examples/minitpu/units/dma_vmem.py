@@ -31,7 +31,7 @@ the landing payload while empty and row 0 as in ``units/dma.py``.
 Traces: closed-loop programs from Phase 0's generator (``dma.Program`` and
 its in-order ``Bridge``, ``vmem_gnt`` 1): load/store round trips (a store
 reading back what loads wrote, strides 1 and > 1), a partial word (the gather
-not committed, then mixed into the next word), two channels with
+never committed), two channels with
 backpressure, reset mid-transfer (VMEM survives it), random programs over a
 small hot set of VMEM rows so that stores read loaded words.
 """
@@ -219,8 +219,9 @@ def directed(inst):
     p.desc(0, 1, 0x240, 7, 0x700, 1)
     p.drain()
     out.append(("two channels, ready 0.6", _cmd(p), True))
-    # a partial word: 6 beats loaded (word 2 never committed), then stored back,
-    # then a fresh aligned load whose word-3 commit mixes the stale gather
+    # a partial word: 6 beats loaded (the second word's two beats gathered, never
+    # committed), stored back (its unwritten beats are undefined), then a fresh
+    # aligned load that overwrites the stale gather before committing
     p, _ = _program(inst, "partial", rtt=(2, 5))
     p.desc(0, 0, 0x40, 5, 0x800, 1)
     p.drain()
@@ -230,7 +231,7 @@ def directed(inst):
     p.drain()
     p.desc(1, 1, 0x80, 7, 0x980, 1)
     p.drain()
-    out.append(("partial word, then a mixed gather", _cmd(p), True))
+    out.append(("partial word, then an aligned load", _cmd(p), True))
     # a load across a 4 KiB page (two bursts), stored back across one too
     p, _ = _program(inst, "page", rtt=(2, 6), p_gap=0.05)
     p.desc(0, 0, 0x300, 4 * 40 - 1, 0x1000 * 3 + 100, 1)

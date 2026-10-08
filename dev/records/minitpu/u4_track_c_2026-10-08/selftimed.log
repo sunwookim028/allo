@@ -1,0 +1,28 @@
+RTL dma:core seed 0: 12 descriptors, 187 requests in 1557 cycles; burst rule == RTL: True
+CONTRACT-MATCH dma_selftimed:core seed 0 simulator: requests 187 (== RTL's: True), DM after == reference: True, completions store 4/4 load 8/8 (4.7s)
+CONTRACT-MATCH dma_selftimed:core seed 0 systemc: requests 187 (== RTL's: True), DM after == reference: True, completions store 4/4 load 8/8 (11.1s)
+RTL dma:core seed 1: 12 descriptors, 58 requests in 523 cycles; burst rule == RTL: True
+CONTRACT-MATCH dma_selftimed:core seed 1 simulator: requests 58 (== RTL's: True), DM after == reference: True, completions store 8/8 load 4/4 (4.3s)
+CONTRACT-MATCH dma_selftimed:core seed 1 systemc: requests 58 (== RTL's: True), DM after == reference: True, completions store 8/8 load 4/4 (10.5s)
+RTL dma:core seed 2: 12 descriptors, 201 requests in 1268 cycles; burst rule == RTL: True
+CONTRACT-MATCH dma_selftimed:core seed 2 simulator: requests 201 (== RTL's: True), DM after == reference: True, completions store 5/5 load 7/7 (4.3s)
+CONTRACT-MATCH dma_selftimed:core seed 2 systemc: requests 201 (== RTL's: True), DM after == reference: True, completions store 5/5 load 7/7 (10.4s)
+RTL dma:o1 seed 0: 12 descriptors, 187 requests in 2066 cycles; burst rule == RTL: True
+CONTRACT-MATCH dma_selftimed:o1 seed 0 simulator: requests 187 (== RTL's: True), DM after == reference: True, completions store 4/4 load 8/8 (4.2s)
+CONTRACT-MATCH dma_selftimed:o1 seed 0 systemc: requests 187 (== RTL's: True), DM after == reference: True, completions store 4/4 load 8/8 (10.0s)
+RTL dma:o1 seed 1: 12 descriptors, 58 requests in 645 cycles; burst rule == RTL: True
+CONTRACT-MATCH dma_selftimed:o1 seed 1 simulator: requests 58 (== RTL's: True), DM after == reference: True, completions store 8/8 load 4/4 (4.1s)
+CONTRACT-MATCH dma_selftimed:o1 seed 1 systemc: requests 58 (== RTL's: True), DM after == reference: True, completions store 8/8 load 4/4 (10.2s)
+RTL dma:o1 seed 2: 12 descriptors, 201 requests in 1751 cycles; burst rule == RTL: True
+CONTRACT-MATCH dma_selftimed:o1 seed 2 simulator: requests 201 (== RTL's: True), DM after == reference: True, completions store 5/5 load 7/7 (4.6s)
+CONTRACT-MATCH dma_selftimed:o1 seed 2 systemc: requests 201 (== RTL's: True), DM after == reference: True, completions store 5/5 load 7/7 (10.2s)
+RTL dma:o4 seed 0: 12 descriptors, 187 requests in 1291 cycles; burst rule == RTL: True
+CONTRACT-MATCH dma_selftimed:o4 seed 0 simulator: requests 187 (== RTL's: True), DM after == reference: True, completions store 4/4 load 8/8 (4.4s)
+CONTRACT-MATCH dma_selftimed:o4 seed 0 systemc: requests 187 (== RTL's: True), DM after == reference: True, completions store 4/4 load 8/8 (12.1s)
+RTL dma:o4 seed 1: 12 descriptors, 58 requests in 491 cycles; burst rule == RTL: True
+CONTRACT-MATCH dma_selftimed:o4 seed 1 simulator: requests 58 (== RTL's: True), DM after == reference: True, completions store 8/8 load 4/4 (3.9s)
+CONTRACT-MATCH dma_selftimed:o4 seed 1 systemc: requests 58 (== RTL's: True), DM after == reference: True, completions store 8/8 load 4/4 (10.2s)
+RTL dma:o4 seed 2: 12 descriptors, 201 requests in 1062 cycles; burst rule == RTL: True
+CONTRACT-MATCH dma_selftimed:o4 seed 2 simulator: requests 201 (== RTL's: True), DM after == reference: True, completions store 5/5 load 7/7 (4.1s)
+CONTRACT-MATCH dma_selftimed:o4 seed 2 systemc: requests 201 (== RTL's: True), DM after == reference: True, completions store 5/5 load 7/7 (10.4s)
+wall 138.53 s
