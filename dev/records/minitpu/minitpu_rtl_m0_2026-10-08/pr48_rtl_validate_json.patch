@@ -1,0 +1,93 @@
+diff --git a/allo/backend/rtl.py b/allo/backend/rtl.py
+index ca18aa50..7f58713d 100644
+--- a/allo/backend/rtl.py
++++ b/allo/backend/rtl.py
+@@ -743,39 +743,73 @@ class RTLModule(IPModule):
+         )
+ 
+     def validate_rtl(self):
+-        """Elaborate with Verilator and validate top-level names/directions/widths."""
++        """Elaborate with Verilator and validate top-level names/directions/widths.
++
++        pr48 probe patch: Verilator 5.052 removed ``--xml-only``; read the
++        ``--json-only`` tree instead (same checks, same error texts).
++        """
+         _, env = self._tool()
+-        xml = self.build_path / "ports.xml"
++        tree_path = self.build_path / "ports.tree.json"
++        meta_path = self.build_path / "ports.meta.json"
+         _run(
+             self._rtl_command()
+             + [
+-                "--xml-only",
++                "--json-only",
+                 "-Wno-fatal",
+-                "--xml-output",
+-                str(xml),
++                "--json-only-output",
++                str(tree_path),
++                "--json-only-meta-output",
++                str(meta_path),
+                 "--Mdir",
+-                str(self.build_path / "xml"),
++                str(self.build_path / "json"),
+             ],
+             env,
+         )
+-        tree = ET.parse(xml)
++        tree = json.loads(tree_path.read_text(encoding="utf-8"))
++        nodes = {}
++
++        def collect(node):
++            if isinstance(node, dict):
++                if "addr" in node:
++                    nodes[node["addr"]] = node
++                for value in node.values():
++                    collect(value)
++            elif isinstance(node, list):
++                for value in node:
++                    collect(value)
++
++        collect(tree)
+         module = next(
+-            (m for m in tree.findall(".//module") if m.get("topModule") == "1"), None
++            (
++                m
++                for m in tree.get("modulesp", [])
++                if m.get("type") == "MODULE" and m.get("origName") == self.rtl_top
++            ),
++            None,
+         )
+         if module is None:
+             raise ValueError("Cannot locate elaborated RTL top module")
+-        dtypes = {d.get("id"): d for d in tree.findall(".//typetable/*")}
+         actual = {}
+-        for var in module.findall("var"):
+-            if var.get("dir") not in ("input", "output", "inout"):
++        for var in module.get("stmtsp", []):
++            if var.get("type") != "VAR":
+                 continue
+-            dtype = dtypes[var.get("dtype_id")]
+-            if dtype.tag != "basicdtype":
++            direction = {"INPUT": "input", "OUTPUT": "output", "INOUT": "inout"}.get(
++                var.get("direction")
++            )
++            if direction is None:
++                continue
++            dtype = nodes[var["dtypep"]]
++            if dtype.get("type") != "BASICDTYPE":
+                 raise ValueError(
+                     f"Packed/unpacked aggregate pin unsupported: {var.get('name')}"
+                 )
+-            width = abs(int(dtype.get("left", "0")) - int(dtype.get("right", "0"))) + 1
+-            actual[var.get("name")] = (var.get("dir"), width)
++            rng = dtype.get("range")
++            if rng:
++                left, right = (int(x) for x in rng.split(":"))
++                width = abs(left - right) + 1
++            else:
++                width = 1
++            actual[var["name"]] = (direction, width)
+         expected = {name: (direction, width) for name, direction, width in self._pins()}
+         for name, spec in expected.items():
+             if actual.get(name) != spec:
