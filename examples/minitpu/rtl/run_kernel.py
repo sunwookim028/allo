@@ -8,10 +8,10 @@ against ``oracle.json``), run through ``minitpu_rtl.py``'s region on ``target="s
 the RTLModule), and judged by the sha256 of the drain against ``oracle.json``'s ``rtl.drain_sha256`` (MiniTPU's
 own ``tb_kernel_image``). Cycles are the core's own ``perf_cnt_cycles`` beside the testbench's.
 
-    python examples/minitpu-rtl/run_kernel.py                          # the looped GEMM (the M-R1 pass check)
-    python examples/minitpu-rtl/run_kernel.py --only gemm_varying_gelu softmax_8
-    python examples/minitpu-rtl/run_kernel.py --all --json out.json     # every oracle launch
-    python examples/minitpu-rtl/run_kernel.py --sfu-negative-control    # run from the wrong cwd once
+    python examples/minitpu/rtl/run_kernel.py                          # the looped GEMM (the M-R1 pass check)
+    python examples/minitpu/rtl/run_kernel.py --only gemm_varying_gelu softmax_8
+    python examples/minitpu/rtl/run_kernel.py --all --json out.json     # every oracle launch
+    python examples/minitpu/rtl/run_kernel.py --sfu-negative-control    # run from the wrong cwd once
 """
 
 from __future__ import annotations

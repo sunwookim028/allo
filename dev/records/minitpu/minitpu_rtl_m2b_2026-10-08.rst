@@ -28,8 +28,8 @@ below).
 
 Reproduce (env of ``reproduce.sh``)::
 
-   examples/minitpu-rtl/reproduce.sh                                    # bridge (default): 52/52 bits, 52/52 cycles
-   $ALLO_PYTHON examples/minitpu-rtl/run_kernel.py --all --memory direct   # M-R1's memory, for the "before" column
+   examples/minitpu/rtl/reproduce.sh                                    # bridge (default): 52/52 bits, 52/52 cycles
+   $ALLO_PYTHON examples/minitpu/rtl/run_kernel.py --all --memory direct   # M-R1's memory, for the "before" column
 
 Wall: bridge 2 min 32 s (build 65 s, the 52 launches 81 s), direct 2 min 33 s
 (build 67 s). Results: ``minitpu_rtl_m2b_2026-10-08/{results,run}_{bridge,direct}.{json,log}``.
@@ -176,3 +176,15 @@ R3. Not modelled: ``ROUND_TRIP_CYCLES > 0`` (the TB model's ``due``
     queue of up to 8 read bursts). The oracle was taken at 0; a round-trip
     knob in the slave (a delay line on ``rvalid``/``bvalid`` and an 8-deep AR
     queue) is the next step if the board-like setting (about 40) is wanted.
+
+4. The fold into ``examples/minitpu/rtl/``
+==========================================
+
+After the run above, ``examples/minitpu-rtl/`` was moved to
+``examples/minitpu/rtl/`` (one design tree, checkpoint 24's layout call; a
+``git mv``, the generated shims' header line and ``reproduce.sh``'s root
+depth the only content changes; paths in README D-21, ``rtl_module.rst`` and
+the ``minitpu_rtl_*`` records rewritten; ``oracle.json``'s ``schema`` id
+``allo/minitpu-rtl/oracle/1`` kept, being an identifier and not a path).
+``examples/minitpu/rtl/reproduce.sh --all``, run from ``/tmp``: shims up to
+date, **52/52 bit-identical, cycles equal on 52/52**, 2 min 45 s (build 73 s).

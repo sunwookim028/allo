@@ -452,7 +452,7 @@ rests on is a legality condition.**
 
 **D-21 (2026-10-08). A short-term working baseline: MiniTPU's RTL obtained
 from Allo, mostly as RTL IP; and Allo's MXU integrated into MiniTPU.**
-- `examples/minitpu-rtl/` makes one demonstration claim: a MiniTPU is built
+- `examples/minitpu/rtl/` makes one demonstration claim: a MiniTPU is built
   from an Allo design in which most or all units are the real RTL, wrapped as
   IP (PR #48's `RTLModule` where its ready/valid adapters fit; a less general
   shim for the core's AXI top where they do not), driven by an Allo program
@@ -478,7 +478,7 @@ from Allo, mostly as RTL IP; and Allo's MXU integrated into MiniTPU.**
   hybrid (real `mxu.sv` inside Allo units) runs in parallel; Allo's MXU
   inside MiniTPU's tree is queued behind Catapult II=1 and the `versions`
   seam. (4) The gate is **bits**: the drain bit-identical to MiniTPU's own
-  testbench digest (`examples/minitpu-rtl/oracle.json`); cycles are reported
+  testbench digest (`examples/minitpu/rtl/oracle.json`); cycles are reported
   beside the testbench's, a difference is a recorded finding. One looped GEMM
   first, then the `sim_kernel.py` set.
 - Re-scoped (owner, 2026-10-08): the wrapped core is not a demo but the

@@ -228,4 +228,4 @@ Not done
 * The weight-switch span at the ``mxu`` boundary on the Allo core
   (``tb_matrix_weight_pipelining``'s scenario; ``unresolved`` in the delta).
 * DC area of ``mxu_wide``; the ``bits`` PE and the ``vpu_fifo`` forms as RTL
-  IP inside ``mxu.sv`` (D-21's other direction, ``examples/minitpu-rtl/``).
+  IP inside ``mxu.sv`` (D-21's other direction, ``examples/minitpu/rtl/``).

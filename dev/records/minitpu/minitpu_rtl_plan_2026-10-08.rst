@@ -14,7 +14,7 @@ MiniTPU-rtl: plan for the D-21 baseline (2026-10-08)
 1. The claim, and what "obtained from Allo" must mean
 -----------------------------------------------------
 
-**Claim (proposed wording).** ``examples/minitpu-rtl/`` is an Allo design (one
+**Claim (proposed wording).** ``examples/minitpu/rtl/`` is an Allo design (one
 ``@df.region`` composed by ``compose.Architecture``) in which the MiniTPU
 compute core at ``b3ba0a4d`` runs as the real RTL, wrapped as IP. An Allo
 program -- a MiniTPU kernel image assembled by MiniTPU's own ``asm.py`` plus
@@ -278,7 +278,7 @@ Run (c1) in parallel as the D-21 hybrid; (c2) after Catapult II=1 on the MXU.
 Milestones (each with one pass check), on a branch ``minitpu-rtl`` in a
 worktree, merged after review:
 
-- **M-R0 -- oracle and fallback (1 d, no #48).** ``examples/minitpu-rtl/``
+- **M-R0 -- oracle and fallback (1 d, no #48).** ``examples/minitpu/rtl/``
   gets ``oracle.py``: assemble a kernel with the clone's ``asm.py``, run
   ``tb/run_kernel_image.sh`` (as ``sim_kernel.py`` does, ``:318-366``), run
   ``emulate_image.py``, record the drain digest, cycles and bundles per
@@ -300,7 +300,7 @@ worktree, merged after review:
 
 Parallel tracks: **T1** (a-K) above; **T2** (c1) from the probe's
 ``mxu_shim.sv`` to a DIM-16 row-serialized ``RTLModule`` under
-``examples/minitpu-rtl/mxu_ip/``, checked against ``ref_mxu`` and the U3
+``examples/minitpu/rtl/mxu_ip/``, checked against ``ref_mxu`` and the U3
 Allo MXU (2-3 d); **T3** #48 merge readiness: the two trivial conflicts in
 ``simulator.py``/``dataflow.py`` (resolutions in the probe), the
 ``--json-only`` ``validate_rtl`` port, ``-Wno-fatal``/``--assert``/``MAX_STALL``
@@ -369,7 +369,7 @@ Python-side ``IPModule`` stand-in -- weaker than #48's in-region call.
    list (M-R2), or a smaller subset.
 6. **Wording of the claim:** "all units are the real RTL" for (a); "mostly"
    only becomes true with (c1)/(c2). Which is the headline.
-7. **Where the shim RTL lives** (``examples/minitpu-rtl/rtl/``, Allo's) and
+7. **Where the shim RTL lives** (``examples/minitpu/rtl/rtl/``, Allo's) and
    whether it may ever be offered to minitpu-comp as a ``tb/`` harness.
 8. **(c2)'s version carrier:** a local overlay generator against the pinned
    JSON now, or wait for minitpu-comp's ``versions`` schema to land and re-pin.

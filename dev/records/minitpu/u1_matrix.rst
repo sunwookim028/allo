@@ -490,7 +490,7 @@ now fails on any code reading under ``docs/``. **Our generator targets
   pinned commit. Nothing blocks before U5.
 
 **Checkpoint 19, 2026-10-08:** README D-21 -- the owner's short-term
-baseline: ``examples/minitpu-rtl/`` claiming "MiniTPU RTL obtained from Allo,
+baseline: ``examples/minitpu/rtl/`` claiming "MiniTPU RTL obtained from Allo,
 mostly as RTL IP" (whole-core shim planned first, the hybrid real-``mxu.sv``
 in parallel), and the inverse angle, an Allo-synthesized MXU integrated into
 MiniTPU under its own ISA version. PR #48 (``RTLModule``) is being probed

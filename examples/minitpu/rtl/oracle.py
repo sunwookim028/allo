@@ -12,8 +12,8 @@ M-R1/M-R2 must reproduce (``dev/records/minitpu/minitpu_rtl_plan_2026-10-08.rst`
 The pinned clone is read-only: its tracked tree at ``PIN`` is exported (``git archive``) into ``--work``
 and everything -- Python imports, the Verilator build, the testbench's cwd-relative SFU ROMs -- runs there.
 
-    python examples/minitpu-rtl/oracle.py                  # every kernel, writes oracle.json
-    python examples/minitpu-rtl/oracle.py --only gemm_structured --no-write
+    python examples/minitpu/rtl/oracle.py                  # every kernel, writes oracle.json
+    python examples/minitpu/rtl/oracle.py --only gemm_structured --no-write
 """
 
 from __future__ import annotations

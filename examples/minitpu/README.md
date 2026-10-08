@@ -51,6 +51,11 @@ come to ~280 concurrent kernels, and the simulator gives each one an OS thread
 
 ## How it works
 
+`rtl/` beside them is the other route of README D-21: MiniTPU's real
+`minitpu_core.sv` wrapped as one Allo `RTLModule` and driven by an Allo region,
+held to MiniTPU's own testbench digests (`rtl/reproduce.sh`;
+`dev/records/minitpu/minitpu_rtl_m1_2026-10-08.rst`, `..._m2b_...`).
+
 Five files, no harness sprawl:
 
 | file | what it is |

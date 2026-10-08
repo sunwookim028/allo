@@ -5,7 +5,7 @@
 # Needs the pinned MiniTPU clone (oracle.py's CLONE), the pinned Verilator and gcc-toolset-13.
 set -euo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-root=$(cd "$here/../.." && pwd)
+root=$(cd "$here/../../.." && pwd)
 set +eu   # the env script (conda, module) is not written for -eu
 source "$root/examples/minitpu/harness/env-zhang21.sh" >/dev/null 2>&1
 set -eu

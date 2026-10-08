@@ -110,7 +110,7 @@ RTL shim around the core today:
 Whole-core use (MiniTPU M-R1)
 -----------------------------
 
-``examples/minitpu-rtl/`` wraps MiniTPU's whole ``minitpu_core`` as one
+``examples/minitpu/rtl/`` wraps MiniTPU's whole ``minitpu_core`` as one
 ``RTLModule`` (``dev/records/minitpu/minitpu_rtl_m1_2026-10-08.rst``): all 52
 oracle launches drain bit-identical to MiniTPU's own testbench. What it
 established about the descriptors:

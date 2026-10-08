@@ -56,7 +56,7 @@ Pins
 Reproduce::
 
    source examples/minitpu/harness/env-zhang21.sh
-   $ALLO_PYTHON examples/minitpu-rtl/oracle.py            # 1. oracle.json + the table (~45 s once the TB is built)
+   $ALLO_PYTHON examples/minitpu/rtl/oracle.py            # 1. oracle.json + the table (~45 s once the TB is built)
    dev/records/minitpu/minitpu_rtl_m0_2026-10-08/probe_core.sh \
        scratch/mr0/minitpu-b3ba0a4d scratch/mr0/probe2   # 2. standalone core build, lint, smoke
    $ALLO_PYTHON dev/records/minitpu/minitpu_rtl_m0_2026-10-08/boundary_array_sim.py   # 3a. this branch
