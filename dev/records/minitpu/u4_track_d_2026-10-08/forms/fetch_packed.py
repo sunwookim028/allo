@@ -32,6 +32,15 @@ def make(n, w=128, inst="iram"):
 
 
 def _iram(n):
+    # IRAM rows: 4,096 as the RTL; U4D_IRAM_ROWS (a power of two) cuts it, the
+    # address masked (exact on these traces: every write is below word 48 and a
+    # read above the written words is uninit, masked). As a body array Catapult
+    # maps it to ccs_ram_sync_1R1W and refuses II=1 (SCHD-30: read and write of
+    # one RAM in one iteration); partitioned into registers, 4,096 x 128 is the
+    # D-12 server's architect blow-up, so the register form is built at 256.
+    import os
+    ROWS = int(os.environ.get("U4D_IRAM_ROWS", "4096"))
+    RM = ROWS - 1
     A = UInt(12)
 
     @df.region()
@@ -45,7 +54,7 @@ def _iram(n):
                   raddr: A[n], pop_i: uint1[n],
                   data_o: W128[n], rda_o: A[n], rdv_o: uint1[n], valid_o: uint1[n], baddr_o: A[n],
                   empty_o: uint1[n], full_o: uint1[n]):
-            iram: W128[4096] = 0
+            iram: W128[ROWS] = 0
             rd_reg: W128 = 0  # sequencer_iram's read register
             fq_addr: A[4] = 0
             fq_data: W128[4] = 0
@@ -80,10 +89,10 @@ def _iram(n):
                 full_o[t] = count == 4
                 # ---- rising edge: IRAM (never reset) ----
                 bram: W128 = rd_reg
-                ir: int32 = next_addr
+                ir: int32 = next_addr & RM
                 rd_reg = iram[ir]
                 if e:
-                    iw: int32 = a_w
+                    iw: int32 = a_w & RM
                     iram[iw] = d_w
                 # ---- rising edge: the fetch queue ----
                 if r:

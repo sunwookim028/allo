@@ -1,0 +1,9 @@
+[latency] cmd_0: latency=1 ii=2 unreliable (I/O in several loops ['l_S_j_1_j', 'l_S_t_0_t'])
+[latency] munit_0: latency=1 ii=1 scheduled
+[latency] vunit_0: latency=1 ii=1 scheduled
+[latency] wbst_0: latency=1 ii=1 scheduled
+[latency] xunit_0: latency=1 ii=1 scheduled
+BUILD vpu_wb selftimed inst=shipped n=24218 unroll=[] pipeline=['cmd_0:t', 'vunit_0:k', 'xunit_0:k', 'munit_0:k', 'wbst_0:c'] partition=[] tcl=[] {'clock_period': 3.33}: ok 57s
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:03.56
+	Maximum resident set size (kbytes): 883052
+RUN_EXIT 0

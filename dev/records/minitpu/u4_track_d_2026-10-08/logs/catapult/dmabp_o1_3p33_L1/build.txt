@@ -1,0 +1,5 @@
+[latency] dma_0: latency=1 ii=1 scheduled
+BUILD dma form:dma_bits_packed inst=o1 n=37906 unroll=[] pipeline=['dma_0:t'] partition=['dma_0:lnd_data', 'dma_0:lnd_ch', 'dma_0:lnd_store', 'dma_0:lnd_dest', 'dma_0:lnd_r', 'dma_0:lnd_last'] tcl=[] {'clock_period': 3.33, 'latency': {'dma_0': 1}}: ok 159s
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:48.00
+	Maximum resident set size (kbytes): 930788
+RUN_EXIT 0

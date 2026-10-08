@@ -1,0 +1,9 @@
+RTL dma:core: 39718 cycles in 15 traces, 805652 defined slots, RTL vs reference on defined: 805652/805652 (3.0s)
+VERILATOR built /work/shared/users/phd/sk3463/scratch/u4d/hcache/cat-dma_streams_core_packed-502261b739e8b2de/Vdma_streams_core_packed in 15s
+UNIT-MATCH dma:core form:dma_packed catapult-rtl[dmasp_3p33] 805652/805652 defined (68144 masked: landing empty=68122, power-up=22; catapult==rtl on 68118) cycle=per-cycle: 1.3333 cyc/row (52963 cycles in all), stall cycles 13238, row->token offset [6, 7, 8, 9, 10, 11]; CYCLE-FOR-CYCLE no (run 16.7s)
+    L (accept edge -> token edge) over every row-aligned output: {5: 52958, 6: 26478}; first row accepted at cycle 1; rows at interval 1: 26479/39717
+    L {5: 26479, 6: 13239}: v1175, v1176
+    LATENCY-MISMATCH dma_engine_0+dma_sink_0+dma_src_0: kernel latencies [1, 1, 1] (sum 3), ii [1, 1, 1] (rate max 1), measured [5, 6] at 1.3333 cyc/vector
+      dma_engine_0: latency 1 ii 1 (scheduled)
+      dma_sink_0: latency 1 ii 1 (scheduled)
+      dma_src_0: latency 1 ii 1 (scheduled)

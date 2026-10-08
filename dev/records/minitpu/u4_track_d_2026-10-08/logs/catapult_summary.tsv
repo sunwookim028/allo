@@ -1,0 +1,48 @@
+build	clock	kernels latency/ii/status	cat_area	cat_slack	wall	peak_MB	verdict
+issue_3p33_L1	3.33	issue_0 1/1/sched	6065.1	0.553779	3:09.95	869	UNIT-MATCH 1042595/1042595 offset [2] c4c=yes stall=0
+issue_2p0_L1	2.0	issue_0 1/1/sched	6181.9	0.208723	2:55.27	875	UNIT-MATCH 1042595/1042595 offset [2] c4c=yes stall=0
+vpucmd_d1_3p33	3.33	issue_0 1/2/unrel; mrx_0 1/1/sched; vrx_0 1/1/sched; xrx_0 1/1/sched	10655.6	0.553779	1:42.27	879	UNIT-MATCH 888217/888217 offset [2, 3, 4, 5, ] c4c=no stall=808
+vpucmd_d2_3p33	3.33	issue_0 1/2/unrel; mrx_0 1/1/sched; vrx_0 1/1/sched; xrx_0 1/1/sched	11368.4	0.553779	1:32.63	886	UNIT-MATCH 888217/888217 offset [2] c4c=yes stall=0
+vpucmd_d4_3p33	3.33	issue_0 1/2/unrel; mrx_0 1/1/sched; vrx_0 1/1/sched; xrx_0 1/1/sched	12762.3	0.553779	1:33.19	886	UNIT-MATCH 888217/888217 offset [2] c4c=yes stall=0
+vpucmd_d2_2p0	2.0	issue_0 1/2/unrel; mrx_0 1/1/sched; vrx_0 1/1/sched; xrx_0 1/1/sched	11485.3	0.16283099999999995	1:38.76	885	UNIT-MATCH 888217/888217 offset [2] c4c=yes stall=0
+wb_locked_3p33_L1	3.33	wbk_0 1/1/sched	6188.5	1.3778915	1:19.95	852	UNIT-MATCH 121075/121075 offset [2] c4c=yes stall=0
+wb_locked_2p0_L1	2.0	wbk_0 1/1/sched	6458.8	0.2927665000000004	1:15.80	864	UNIT-MATCH 121075/121075 offset [2] c4c=yes stall=0
+wb_units_3p33	3.33	sources_0 1/1/sched; wb_0 1/1/sched	7971.9	1.3778915	1:15.30	866	UNIT-MATCH 121075/121075 offset [4] c4c=yes stall=0
+wb_units_2p0	2.0	sources_0 1/1/sched; wb_0 1/1/sched	8158.2	0.2757409999999998	1:10.41	860	UNIT-MATCH 121075/121075 offset [4] c4c=yes stall=0
+wb_selftimed_3p33	3.33	cmd_0 1/2/unrel; munit_0 1/1/sched; vunit_0 1/1/sched; wbst_0 1/1/sched; xunit_0 1/1/sched	6985.2	1.978744	1:03.56	862	UNIT-FAIL
+fp_fq_3p33_L1	3.33	fq_0 1/1/sched	6485.0	2.244516	0:53.82	858	UNIT-MATCH 112864/112864 offset [2] c4c=yes stall=0
+fp_fq_2p0_L1	2.0	fq_0 1/1/sched	6485.0	0.9145159999999999	0:51.02	847	UNIT-MATCH 112864/112864 offset [2] c4c=yes stall=0
+fp_iram_3p33_L1	3.33	no manifest	-	-	0:47.15	858	NO-RTL
+fp_iram_3p33_free	3.33	no manifest	-	-	0:42.95	846	-
+fpi256_3p33_L1	3.33	no manifest	-	-	0:42.48	861	NO-RTL
+fpi256t_3p33_L1	3.33	fetch_0 1/1/sched	251809.8	2.3462081	1:44.79	864	UNIT-MATCH 25026/25026 offset [2] c4c=yes stall=0
+fd12_amended_3p33	-	no manifest	-	-	-	-	-
+fd12a_3p33	3.33	fq_amended_0 1/1/sched; iram_mem_0 1/1/sched; loader_0 1/1/sched; sink_0 None/1/unrel; src_0 None/1/unrel	185675.4	2.1062839999999996	1:23.14	859	UNIT-DIFF 24971/25002 offset [1] c4c=no stall=-1
+fd12l_3p33	3.33	fq_landed_0 1/1/sched; iram_mem_0 1/1/sched; loader_0 1/1/sched; sink_0 None/1/unrel; src_0 None/1/unrel	185675.4	2.1062839999999996	1:20.36	864	UNIT-DIFF 22992/25002 offset [1] c4c=no stall=-1
+loop_3p33_L1	3.33	loop_0 1/1/sched	36080.1	1.1339413125000002	1:57.64	906	UNIT-MATCH 527446/527446 offset [2] c4c=yes stall=0
+loop_2p0_L1	2.0	loop_0 1/1/sched	36983.0	0.06528199999999984	2:06.97	892	UNIT-MATCH 527446/527446 offset [3] c4c=yes stall=0
+dec_3p33_L1	3.33	decoder_0 1/1/sched	3291.9	2.144083	0:51.15	847	UNIT-MATCH 25458/25458 offset [2] c4c=yes stall=0
+dec_2p0_L1	2.0	decoder_0 1/1/sched	3291.9	0.8140829999999999	0:49.41	859	UNIT-MATCH 25458/25458 offset [2] c4c=yes stall=0
+agu_3p33_L1	3.33	agu_0 1/1/sched	1926.7	1.5530499999999998	0:44.72	864	UNIT-MATCH 38432/38432 offset [2] c4c=yes stall=0
+agu_2p0_L1	2.0	agu_0 1/1/sched	1926.7	0.22304999999999975	0:43.22	846	UNIT-MATCH 38432/38432 offset [2] c4c=yes stall=0
+vad_3p33_L1	3.33	adapter_0 1/1/sched	1486.6	2.2485382857142855	0:46.82	859	UNIT-MATCH 24866/24866 offset [2] c4c=yes stall=0
+vad_2p0_L1	2.0	adapter_0 1/1/sched	1486.6	0.9185382857142854	0:44.51	847	UNIT-MATCH 24866/24866 offset [2] c4c=yes stall=0
+sagu1_3p33_L1	3.33	agu_0 1/1/sched	10193.5	0.7229869999999998	1:02.40	899	UNIT-MATCH 200885/200885 offset [2] c4c=yes stall=0
+sagu2_3p33_L1	3.33	agu_0 1/1/sched	9926.5	0.13543600000000033	0:59.89	897	UNIT-MATCH 201065/201065 offset [2] c4c=yes stall=0
+sagu3_3p33_L1	3.33	agu_0 1/1/sched	10478.2	0.13543600000000033	1:04.64	882	UNIT-MATCH 200755/200755 offset [2] c4c=yes stall=0
+sagu2_2p0_L1	2.0	agu_0 1/1/sched	10700.6	0.06254899999999974	1:02.38	897	UNIT-MATCH 201065/201065 offset [2] c4c=yes stall=0
+dag_bits_3p33_L1	3.33	agu_0 1/1/sched	2874.0	1.520264	0:43.73	846	UNIT-MATCH 200700/200700 stall=0
+dag_bits_2p0_L1	2.0	agu_0 1/1/sched	3043.9	0.4997020000000001	0:48.83	844	UNIT-MATCH 200700/200700 stall=0
+dag_c1_3p33_L1	3.33	gen_0 1/1/sched	2778.3	1.520264	0:40.05	861	UNIT-MATCH 200700/200700 stall=0
+desc_3p33_L1	3.33	adapter_0 1/1/sched	6193.8	0.5238990000000001	0:43.49	857	UNIT-MATCH 180495/180495 offset [2] c4c=yes stall=0
+desc_2p0_L1	2.0	adapter_0 1/1/sched	6307.9	0.7306680000000001	0:43.75	858	UNIT-MATCH 180495/180495 offset [2] c4c=yes stall=0
+dmab_3p33_L1	3.33	no manifest	-	-	1:24.92	897	-
+dmab_2p0_L1	2.0	no manifest	-	-	1:20.57	909	-
+dmabp_3p33_L1	3.33	dma_0 1/1/sched	44242.4	0.02323900000000112	2:56.63	892	UNIT-MATCH 805652/805652 offset [2] c4c=yes stall=0
+dmabp_2p0_L1	2.0	no manifest	-	-	1:29.44	892	NO-RTL
+dmabp_o1_3p33_L1	3.33	dma_0 1/1/sched	43525.5	9.800000000126374	2:48.00	908	UNIT-MATCH 764284/764284 offset [2] c4c=yes stall=0
+dmabp_o4_3p33_L1	3.33	dma_0 1/1/sched	34097.7	0.02323900000000112	2:38.36	907	UNIT-MATCH 317520/317520 offset [2] c4c=yes stall=0
+dmabp_bw_3p33_L1	3.33	dma_0 1/1/sched	43653.8	-0.080546	2:45.92	896	UNIT-MATCH 394464/394464 offset [2] c4c=yes stall=0
+dmas_3p33	3.33	no manifest	-	-	1:14.35	923	-
+dmasp_3p33	3.33	dma_engine_0 1/1/sched; dma_sink_0 1/1/sched; dma_src_0 1/1/sched	71524.7	0.24222300000000052	2:33.13	927	UNIT-MATCH 805652/805652 offset [6, 7, 8, 9, ] c4c=no stall=13238
+dmav_3p33	3.33	no manifest	-	-	1:31.64	977	-

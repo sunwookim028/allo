@@ -1,0 +1,5 @@
+[latency] loop_0: latency=1 ii=1 scheduled
+BUILD loop_ctrl form:loop_packed inst=shipped n=37729 unroll=[] pipeline=['loop_0:t'] partition=[] tcl=[] {'clock_period': 3.33, 'latency': {'loop_0': 1}}: ok 113s
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:57.64
+	Maximum resident set size (kbytes): 928392
+RUN_EXIT 0

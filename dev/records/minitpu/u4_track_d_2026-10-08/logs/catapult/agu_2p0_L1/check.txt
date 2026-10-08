@@ -1,0 +1,6 @@
+RTL u4_agu_resolve:base: 38432 cycles in 3 traces, 38432 defined slots, RTL vs reference on defined: 38432/38432 (0.6s)
+VERILATOR built /work/shared/users/phd/sk3463/scratch/u4d/hcache/cat-top-8254aa0a335d2122/Vtop in 7s
+UNIT-MATCH agu_resolve:base form:agu_packed catapult-rtl[agu_2p0_L1] 38432/38432 defined (0 masked: ; catapult==rtl on 0) cycle=per-cycle: 1.0000 cyc/row (38434 cycles in all), stall cycles 0, row->token offset [2]; CYCLE-FOR-CYCLE yes (run 7.8s)
+    L (accept edge -> token edge) over every row-aligned output: {1: 38432}; first row accepted at cycle 1; rows at interval 1: 38431/38431
+    L {1: 38432}: v53
+    LATENCY-MATCH agu_0: reported 1 ii=1 (scheduled), measured 1 at 1 cyc/vector; unit declares 1; pinned 1

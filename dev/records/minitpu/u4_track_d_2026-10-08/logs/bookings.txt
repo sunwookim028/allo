@@ -1,0 +1,48 @@
+== issue_3p33_L1 (clock 3.33): {"issue_0": 1}
+BOOKING-MATCH issue_0 booked=1 manifest=1 [catapult @ 3.33 ns]
+== wb_locked_3p33_L1 (clock 3.33): {"wbk_0": 1}
+BOOKING-MATCH wbk_0 booked=1 manifest=1 [catapult @ 3.33 ns]
+== fp_fq_3p33_L1 (clock 3.33): {"fq_0": 1}
+BOOKING-MATCH fq_0 booked=1 manifest=1 [catapult @ 3.33 ns]
+== dec_3p33_L1 (clock 3.33): {"decoder_0": 1}
+BOOKING-MATCH decoder_0 booked=1 manifest=1 [catapult @ 3.33 ns]
+== agu_3p33_L1 (clock 3.33): {"agu_0": 1}
+BOOKING-MATCH agu_0 booked=1 manifest=1 [catapult @ 3.33 ns]
+== vad_3p33_L1 (clock 3.33): {"adapter_0": 1}
+BOOKING-MATCH adapter_0 booked=1 manifest=1 [catapult @ 3.33 ns]
+== dag_bits_3p33_L1 (clock 3.33): {"agu_0": 1}
+BOOKING-MATCH agu_0 booked=1 manifest=1 [catapult @ 3.33 ns]
+== loop_3p33_L1 (clock 3.33): {"loop_0": 1}
+BOOKING-MATCH loop_0 booked=1 manifest=1 [catapult @ 3.33 ns]
+== desc_3p33_L1 (clock 3.33): {"adapter_0": 1}
+BOOKING-MATCH adapter_0 booked=1 manifest=1 [catapult @ 3.33 ns]
+== sagu2_3p33_L1 (clock 3.33): {"agu_0": 1}
+BOOKING-MATCH agu_0 booked=1 manifest=1 [catapult @ 3.33 ns]
+== issue_2p0_L1 (clock 2.0): {"issue_0": 1}
+BOOKING-MATCH issue_0 booked=1 manifest=1 [catapult @ 2.0 ns]
+== wb_locked_2p0_L1 (clock 2.0): {"wbk_0": 1}
+BOOKING-MATCH wbk_0 booked=1 manifest=1 [catapult @ 2.0 ns]
+== fp_fq_2p0_L1 (clock 2.0): {"fq_0": 1}
+BOOKING-MATCH fq_0 booked=1 manifest=1 [catapult @ 2.0 ns]
+== dec_2p0_L1 (clock 2.0): {"decoder_0": 1}
+BOOKING-MATCH decoder_0 booked=1 manifest=1 [catapult @ 2.0 ns]
+== agu_2p0_L1 (clock 2.0): {"agu_0": 1}
+BOOKING-MATCH agu_0 booked=1 manifest=1 [catapult @ 2.0 ns]
+== vad_2p0_L1 (clock 2.0): {"adapter_0": 1}
+BOOKING-MATCH adapter_0 booked=1 manifest=1 [catapult @ 2.0 ns]
+== dag_bits_2p0_L1 (clock 2.0): {"agu_0": 1}
+BOOKING-MATCH agu_0 booked=1 manifest=1 [catapult @ 2.0 ns]
+== loop_2p0_L1 (clock 2.0): {"loop_0": 1}
+BOOKING-MATCH loop_0 booked=1 manifest=1 [catapult @ 2.0 ns]
+== desc_2p0_L1 (clock 2.0): {"adapter_0": 1}
+BOOKING-MATCH adapter_0 booked=1 manifest=1 [catapult @ 2.0 ns]
+== sagu2_2p0_L1 (clock 2.0): {"agu_0": 1}
+BOOKING-MATCH agu_0 booked=1 manifest=1 [catapult @ 2.0 ns]
+== dag_c1_3p33_L1 (clock 3.33): {"gen_0": 1}
+BOOKING-MATCH gen_0 booked=1 manifest=1 [catapult @ 3.33 ns]
+== sagu1_3p33_L1 (clock 3.33): {"agu_0": 1}
+BOOKING-MATCH agu_0 booked=1 manifest=1 [catapult @ 3.33 ns]
+== sagu2_3p33_L1 (clock 3.33): {"agu_0": 2}
+BOOKING-MISMATCH agu_0 booked=2 manifest=1 [catapult @ 3.33 ns]
+== sagu3_3p33_L1 (clock 3.33): {"agu_0": 3}
+BOOKING-MISMATCH agu_0 booked=3 manifest=1 [catapult @ 3.33 ns]

@@ -1,0 +1,3 @@
+# Error: $PROJECT_HOME/../kernel.cpp(537): Splitting of Resource '/top/fetch_0/run/iram_rsc' into 256 variables could cause excessive runtime or memory requirements (MEM-8)
+# Error: $PROJECT_HOME/../kernel.cpp(537): Please select a library with memories or increase REGISTER_THRESHOLD (MEM-8)
+# Error: incomplete memory allocation

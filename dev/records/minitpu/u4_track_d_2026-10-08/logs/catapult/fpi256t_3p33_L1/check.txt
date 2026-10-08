@@ -1,0 +1,6 @@
+RTL u4_fetch:iram: 3804 cycles in 4 traces, 25026 defined slots, RTL vs reference on defined: 25026/25026 (0.1s)
+VERILATOR built /work/shared/users/phd/sk3463/scratch/u4d/hcache/cat-top-3d5de6e3841269c1/Vtop in 16s
+UNIT-MATCH fetch:iram form:fetch_packed catapult-rtl[fpi256t_3p33_L1] 25026/25026 defined (1602 masked: reset=56, uninit=1546; catapult==rtl on 48) cycle=per-cycle: 1.0000 cyc/row (3806 cycles in all), stall cycles 0, row->token offset [2]; CYCLE-FOR-CYCLE yes (run 16.4s)
+    L (accept edge -> token edge) over every row-aligned output: {1: 26628}; first row accepted at cycle 1; rows at interval 1: 3803/3803
+    L {1: 3804}: v120, v121, v122, v123, v124, v125, v126
+    LATENCY-MATCH fetch_0: reported 1 ii=1 (scheduled), measured 1 at 1 cyc/vector; unit declares 1; pinned 1

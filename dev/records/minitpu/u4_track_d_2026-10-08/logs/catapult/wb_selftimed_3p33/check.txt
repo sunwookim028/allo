@@ -1,0 +1,4 @@
+RTL u4_vpu_wb:shipped: 24218 cycles in 6 traces, 121075 defined slots, RTL vs reference on defined: 121075/121075 (3.1s)
+VERILATOR built /work/shared/users/phd/sk3463/scratch/u4d/hcache/cat-top-310daae73a2b8567/Vtop in 8s
+UNIT-FAIL  vpu_wb:shipped selftimed catapult-rtl wb_selftimed_3p33: RuntimeError: driver exited 4: stalled at cycle 20548: inputs 547 547 547 547 547 547 547; outputs 33 33 33 33
+

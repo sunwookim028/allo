@@ -1,0 +1,5 @@
+[latency] fetch_0: latency=1 ii=1 scheduled
+BUILD fetch form:fetch_packed inst=iram n=3804 unroll=[] pipeline=['fetch_0:t'] partition=['fetch_0:iram'] tcl=['directive set -REGISTER_THRESHOLD 4096'] {'clock_period': 3.33, 'latency': {'fetch_0': 1}}: ok 100s
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:44.79
+	Maximum resident set size (kbytes): 884808
+RUN_EXIT 0

@@ -1,0 +1,1 @@
+RUN_EXIT stopped by hand: architect at 15,700,756 kB after 583 s (4,096-row register IRAM)
