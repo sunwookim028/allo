@@ -30,6 +30,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Tools/mlir-translate/Translation.h"
 #include "llvm/Support/raw_ostream.h"
+#include <set>
 #include <cstdlib> // std::atoi (wideIntWidth)
 
 using namespace mlir;
@@ -465,6 +466,21 @@ private:
   // ap_int/ap_fixed while the body's uses print Catapult-native types.
   void emitStatefulGlobalElementType(Type type) override;
   static bool isStatefulGlobal(memref::GlobalOp g);
+  // A baked-in constant array (a memref.global with data that is not a
+  // written Stateful), emitted as `static const T name[...] = {...}` -- in a
+  // kernel's thread before its body, or once at file scope when a helper
+  // function reads it (A2: helpers are plain C++ functions with no other
+  // place to declare it). fileScopeConsts names the latter; a kernel that
+  // reads one of them uses the file-scope copy.
+  static bool isBakedConstGlobal(memref::GlobalOp g);
+  void emitStaticConstGlobal(memref::GlobalOp g);
+  llvm::StringSet<> fileScopeConsts;
+  // A4: a helper's array parameter that the helper only reads (loads, or
+  // passes on to a helper parameter that is itself read-only) is emitted
+  // `const`, so a kernel's `static const` table can be passed to it.
+  bool isConstArrayParam(func::FuncOp func, unsigned argIdx) override;
+  bool readOnlyArrayArg(func::FuncOp func, unsigned argIdx,
+                        std::set<std::pair<Operation *, unsigned>> &visiting);
   // One element of a dense initializer, as a C++ literal. Mirrors the base emitGlobal's
   // per-element formatting, which is only reachable there inside a full `= {...}` brace
   // list -- a reset action needs the values one at a time.
@@ -1602,9 +1618,18 @@ void SystemCModuleEmitter::emitGetSlice(allo::GetIntSliceOp op) {  // override (
   emitValue(num);
   os << ";\n";
   indent();
-  os << rn << " = _bs_" << rn << ".slc<" << w << ">(";
-  emitValue(op.getLo());
-  os << ");";
+  // A slice narrower than its result is zero-extended, as the LLVM lowering
+  // does; the temp is signed, so the slice is taken as unsigned first (E2).
+  if (unsigned sw = getSliceNarrowWidth(op)) {
+    os << rn << " = ac_int<" << sw << ", false>(_bs_" << rn << ".slc<" << sw
+       << ">(";
+    emitValue(op.getLo());
+    os << "));";
+  } else {
+    os << rn << " = _bs_" << rn << ".slc<" << w << ">(";
+    emitValue(op.getLo());
+    os << ");";
+  }
   emitInfoAndNewLine(op);
 }
 
@@ -1613,10 +1638,11 @@ void SystemCModuleEmitter::emitSetSlice(allo::SetIntSliceOp op) {  // override (
   Value num = op.getNum();
   unsigned nw = num.getType().getIntOrFloatBitWidth();
   // ac_int::set_slc(lo, val) requires an ac_int val (its width = #bits set);
-  // the emitted val may be a plain C int -> wrap it in an ac_int of the val's
-  // bit width so the right number of bits is written. The dst likewise needs an
-  // ac_int temp (a native int32_t has no .set_slc).
-  unsigned vw = op.getVal().getType().getIntOrFloatBitWidth();
+  // the emitted val may be a plain C int -> wrap it in an ac_int of the
+  // slice's width (setSliceValueWidth, E2) so the right number of bits is
+  // written. The dst likewise needs an ac_int temp (a native int32_t has no
+  // .set_slc).
+  unsigned vw = setSliceValueWidth(op);
   indent();
   emitValue(result); // "<T> <res>"
   os << ";\n";
@@ -3069,37 +3095,19 @@ void SystemCModuleEmitter::emitKernelModule(func::FuncOp func) {  // new (System
     func.walk([&](memref::GetGlobalOp gg) {
       auto g = gg->getParentOfType<ModuleOp>()
                    .lookupSymbol<memref::GlobalOp>(gg.getName());
-      if (!g || !g.getInitialValue().has_value())
-        return;
       // Stateful globals: handled by the reset-action block above.
-      if (isStatefulGlobal(g) && !g->hasAttr("constant"))
+      if (!g || !isBakedConstGlobal(g))
+        return;
+      // Already declared at file scope for a helper (A2).
+      if (fileScopeConsts.contains(g.getSymName()))
         return;
       for (auto &e : constGlobals)
         if (e.getSymName() == g.getSymName())
           return;
       constGlobals.push_back(g);
     });
-    for (auto &g : constGlobals) {
-      // Emit as `static const`. These are read-only baked-in constants (e.g.
-      // `W: T[M,N] = np_W` weights). Plain locals live on the SC_THREAD
-      // coroutine stack, which is small (~64KB); a large weight array overflows
-      // it and segfaults at run time (test_mlp: W0[256][128] = 128KB crashes
-      // linear1_0::run in the initializer). `static` moves it to static
-      // storage; `const` is correct (never written) and lets multiple kernel
-      // instances share one copy. It also synthesizes as a ROM under Catapult.
-      // (Reuses emitGlobal's static/const attr hooks; attrs restored after.)
-      bool hadStatic = g->hasAttr("static");
-      bool hadConst = g->hasAttr("constant");
-      if (!hadStatic)
-        g->setAttr("static", UnitAttr::get(g->getContext()));
-      if (!hadConst)
-        g->setAttr("constant", UnitAttr::get(g->getContext()));
-      emitGlobal(g);
-      if (!hadStatic)
-        g->removeAttr("static");
-      if (!hadConst)
-        g->removeAttr("constant");
-    }
+    for (auto &g : constGlobals)
+      emitStaticConstGlobal(g);
   }
   // Single-shot: run the body EXACTLY ONCE, then idle. Free-running (while(1)
   // around the body) is safe for stream kernels (they re-block on an empty input
@@ -4442,6 +4450,84 @@ void SystemCModuleEmitter::emitTopModule(func::FuncOp func) {  // new (SystemC-o
 // emitModule — header + dispatch each func to kernel/top emission.
 //===----------------------------------------------------------------------===//
 
+bool SystemCModuleEmitter::isConstArrayParam(func::FuncOp func,
+                                             unsigned argIdx) {
+  if (func->hasAttr("top") || func->hasAttr("df.kernel") ||
+      func->hasAttr("dataflow"))
+    return false;
+  std::set<std::pair<Operation *, unsigned>> visiting;
+  return readOnlyArrayArg(func, argIdx, visiting);
+}
+
+bool SystemCModuleEmitter::readOnlyArrayArg(
+    func::FuncOp func, unsigned argIdx,
+    std::set<std::pair<Operation *, unsigned>> &visiting) {
+  if (func.isExternal() || argIdx >= func.getNumArguments())
+    return false;
+  Value arg = func.getArgument(argIdx);
+  auto memref = llvm::dyn_cast<MemRefType>(arg.getType());
+  if (!memref || !memref.hasStaticShape())
+    return false;
+  if (auto space = memref.getMemorySpace())
+    if (auto str = llvm::dyn_cast<StringAttr>(space))
+      if (str.getValue().starts_with("stream"))
+        return false;
+  Type elt = memref.getElementType();
+  if (!elt.isIntOrIndexOrFloat())
+    return false;
+  // A recursive call chain back to this function: assume read-only on the
+  // way round; any store on it is still seen at its own use.
+  auto key = std::make_pair(func.getOperation(), argIdx);
+  if (!visiting.insert(key).second)
+    return true;
+  bool readOnly = true;
+  for (OpOperand &use : arg.getUses()) {
+    Operation *user = use.getOwner();
+    if (isa<affine::AffineLoadOp, memref::LoadOp>(user))
+      continue;
+    if (auto call = dyn_cast<func::CallOp>(user)) {
+      auto callee = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+          call, call.getCalleeAttr());
+      if (callee && !callee->hasAttr("top") && !callee->hasAttr("df.kernel") &&
+          !callee->hasAttr("dataflow") &&
+          readOnlyArrayArg(callee, use.getOperandNumber(), visiting))
+        continue;
+    }
+    readOnly = false;
+    break;
+  }
+  visiting.erase(key);
+  return readOnly;
+}
+
+bool SystemCModuleEmitter::isBakedConstGlobal(memref::GlobalOp g) {
+  if (!g.getInitialValue().has_value())
+    return false;
+  return !(isStatefulGlobal(g) && !g->hasAttr("constant"));
+}
+
+void SystemCModuleEmitter::emitStaticConstGlobal(memref::GlobalOp g) {
+  // Emit as `static const`. These are read-only baked-in constants (e.g.
+  // `W: T[M,N] = np_W` weights). Plain locals live on the SC_THREAD
+  // coroutine stack, which is small (~64KB); a large weight array overflows
+  // it and segfaults at run time (test_mlp: W0[256][128] = 128KB crashes
+  // linear1_0::run in the initializer). `static` moves it to static
+  // storage; `const` is correct (never written) and lets multiple kernel
+  // instances share one copy. It also synthesizes as a ROM under Catapult.
+  // (Reuses emitGlobal's static/const attr hooks; attrs restored after.)
+  bool hadStatic = g->hasAttr("static");
+  bool hadConst = g->hasAttr("constant");
+  if (!hadStatic)
+    g->setAttr("static", UnitAttr::get(g->getContext()));
+  if (!hadConst)
+    g->setAttr("constant", UnitAttr::get(g->getContext()));
+  emitGlobal(g);
+  if (!hadStatic)
+    g->removeAttr("static");
+  if (!hadConst)
+    g->removeAttr("constant");
+}
+
 void SystemCModuleEmitter::emitModule(ModuleOp module) {  // override (base emitter)
   // The SystemC backend is a DATAFLOW backend: it emits SC_MODULEs + a self-
   // contained sc_main testbench for @df.region / @df.kernel designs. A plain
@@ -5146,6 +5232,28 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
   // emitted first as plain C++ free functions (reusing the base emitter's
   // return-by-pointer convention, matching the `helper(a,b,&r)` call sites the
   // kernel bodies already emit). They must precede the modules that call them.
+  // A2: a helper is a plain C++ function, so a constant array it reads has no
+  // kernel thread to be declared in; declare each such array once at file
+  // scope, before the helpers. Kernels reading the same array use this copy.
+  {
+    bool any = false;
+    for (auto func : module.getOps<func::FuncOp>()) {
+      if (func.isExternal() || func->hasAttr("top") ||
+          func->hasAttr("df.kernel") || func->hasAttr("dataflow"))
+        continue;
+      func.walk([&](memref::GetGlobalOp gg) {
+        auto g = module.lookupSymbol<memref::GlobalOp>(gg.getName());
+        if (!g || !isBakedConstGlobal(g) ||
+            !fileScopeConsts.insert(g.getSymName()).second)
+          return;
+        emitStaticConstGlobal(g);
+        any = true;
+      });
+    }
+    if (any)
+      os << "\n";
+  }
+
   for (auto func : module.getOps<func::FuncOp>()) {
     // An external IP is a BODYLESS `func.func private`: its SC_MODULE lives in
     // the IP's own header, which copy_ext_libs brings in. Emitting it here would
@@ -5270,6 +5378,17 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
       maxTotal = std::max(maxTotal, a.total);
     for (auto &m : memArrays)
       maxTotal = std::max(maxTotal, m.total);
+    // A5: with memory-port outputs as well, the last sink's sc_stop() must
+    // not land before the kernels have finished: a kernel whose last
+    // iteration pushes its stream words and then stores to a memory had
+    // those stores cut off (only the first of them landed). The memories are
+    // read out after the run, so the last sink waits for the DUT's done, lets
+    // in-flight writes settle as the memory-only path does, then stops.
+    bool hasMemOut = false;
+    for (auto &m : memArrays)
+      if (m.dir != 'i')
+        hasMemOut = true;
+    int settleCycles = memInsts.empty() ? 64 : 256;
     if (hasStreamOut) {
       indent(); os << "int _snk_done = 0;  // stream sinks drained; the last one sc_stop()s\n";
     }
@@ -5328,7 +5447,16 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
              << "; ++f) _f << (" << (tbIntKind(a.ctype) == 'u' ? "unsigned long long" : "long long")
              << ")(ch_" << a.member
              << ".Pop()) << \"\\n\"; }\n";
-        indent(); os << "if (++_snk_done == " << numStreamOut << ") sc_stop();\n";
+        if (hasMemOut) {
+          indent();
+          os << "if (++_snk_done == " << numStreamOut
+             << ") { while (!done_sig.read()) wait(); for (int _w = 0; _w < "
+             << settleCycles
+             << "; ++_w) wait(); sc_stop(); }  // memory outputs: DUT done, "
+                "writes settled\n";
+        } else {
+          indent(); os << "if (++_snk_done == " << numStreamOut << ") sc_stop();\n";
+        }
         reduceIndent();
         indent(); os << "}\n";
       }
@@ -5403,7 +5531,9 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
       indent();
       os << "  std::cerr << \"TB DEADLOCK: stream outputs not drained after \" "
             "<< ALLO_TB_MAX_CYCLES << \" cycles (\" << t._snk_done << \" of "
-         << numStreamOut << " sinks done)\" << std::endl;\n";
+         << numStreamOut << " sinks done"
+         << (hasMemOut ? "; then waiting for the DUT's done" : "")
+         << ")\" << std::endl;\n";
       indent(); os << "  return 1;\n";
       indent(); os << "}\n";
     } else {
@@ -5416,7 +5546,7 @@ struct AlloFifoC : public Connections::Fifo<T, N> {
       os << "for (long long _c = 0; _c < " << capCycles
          << "LL && !t.done_sig.read(); ++_c) sc_start(1, SC_NS); // until DUT done\n";
       indent();
-      os << "sc_start(" << (memInsts.empty() ? 64 : 256)
+      os << "sc_start(" << settleCycles
          << ", SC_NS); // settle in-flight memory writes\n";
     }
     // Read each OUTPUT array out to output<k>.data (into B by hls.py). Shared-

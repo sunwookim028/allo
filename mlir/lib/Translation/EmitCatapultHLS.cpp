@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/IR/IntegerSet.h"
 #include "mlir/InitAllDialects.h"
@@ -725,17 +726,52 @@ void CatapultModuleEmitter::emitGetSlice(allo::GetIntSliceOp op) {
   emitValue(op.getNum());
   os << ";\n";
   indent();
-  os << rn << " = _bs_" << rn << ".slc<" << w << ">(";
-  emitValue(op.getLo());
-  os << ");";
+  // A slice narrower than its result is zero-extended, as the LLVM lowering
+  // does (E2).
+  if (unsigned sw = getSliceNarrowWidth(op)) {
+    os << rn << " = ac_int<" << sw << ", false>(_bs_" << rn << ".slc<" << sw
+       << ">(";
+    emitValue(op.getLo());
+    os << "));";
+  } else {
+    os << rn << " = _bs_" << rn << ".slc<" << w << ">(";
+    emitValue(op.getLo());
+    os << ");";
+  }
   emitInfoAndNewLine(op);
+}
+
+unsigned CatapultModuleEmitter::setSliceValueWidth(allo::SetIntSliceOp op) {
+  unsigned vw = op.getVal().getType().getIntOrFloatBitWidth();
+  auto hi = getConstantIntValue(op.getHi());
+  auto lo = getConstantIntValue(op.getLo());
+  if (hi && lo && *hi >= *lo) {
+    // The value's bits above the slice are not part of it: the LLVM lowering
+    // and the Vitis range assignment both drop them.
+    unsigned sw = static_cast<unsigned>(*hi - *lo + 1);
+    if (sw < vw)
+      return sw;
+  }
+  return vw;
+}
+
+unsigned CatapultModuleEmitter::getSliceNarrowWidth(allo::GetIntSliceOp op) {
+  unsigned w = op.getResult().getType().getIntOrFloatBitWidth();
+  auto hi = getConstantIntValue(op.getHi());
+  auto lo = getConstantIntValue(op.getLo());
+  if (hi && lo && *hi >= *lo) {
+    unsigned sw = static_cast<unsigned>(*hi - *lo + 1);
+    if (sw < w)
+      return sw;
+  }
+  return 0;
 }
 
 void CatapultModuleEmitter::emitSetSlice(allo::SetIntSliceOp op) {
   Value result = op.getResult();
   // set_slc(lo, v) writes exactly v's width, so the value has to be wrapped in
-  // an ac_int of the VALUE's width -- a plain C int would write 32 bits.
-  unsigned vw = op.getVal().getType().getIntOrFloatBitWidth();
+  // an ac_int of the slice's width -- a plain C int would write 32 bits.
+  unsigned vw = setSliceValueWidth(op);
   indent();
   emitValue(result);
   os << ";\n";

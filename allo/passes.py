@@ -33,6 +33,7 @@ from ._mlir.dialects import (
     scf as scf_d,
     linalg as linalg_d,
     arith as arith_d,
+    builtin as builtin_d,
 )
 from ._mlir.ir import StringAttr
 from ._mlir.passmanager import PassManager as mlir_pass_manager
@@ -449,8 +450,28 @@ def analyze_arg_load_store(mod):
     return res
 
 
+# The builder declares a library call ``gelu(x)`` as a bodiless private
+# ``func.func @gelu_<abs(hash(node))>`` (``build_Call``); only those are
+# replaced. A user symbol that merely starts with the same letters
+# (``gelu_rom``, ``layernorm_step``) is the user's.
+_LIBRARY_DECL_RE = re.compile(r"^(gelu|layernorm|tril)_\d+$")
+
+
+def _library_decl_name(op):
+    """The library op's name if ``op`` is a builder-generated declaration."""
+    if not isinstance(op, func_d.FuncOp) or not op.is_external:
+        return None
+    m = _LIBRARY_DECL_RE.match(op.attributes["sym_name"].value)
+    return m.group(1) if m else None
+
+
 def decompose_library_function(module):
     with module.context, Location.unknown():
+        library_decls = {}
+        for op in module.body.operations:
+            name = _library_decl_name(op)
+            if name is not None:
+                library_decls[op.attributes["sym_name"].value] = name
         # get all functions from origin module and find the function to replace
         body_op_to_remove = []
         for op in module.body.operations:
@@ -462,20 +483,54 @@ def decompose_library_function(module):
                         body_op_to_remove.append(body_op)
                     if isinstance(body_op, func_d.CallOp):
                         callee_value = body_op.attributes["callee"].value
-                        if callee_value.startswith(("gelu", "layernorm", "tril")):
-                            name = callee_value.split("_")[0]
-                        else:
+                        name = library_decls.get(callee_value)
+                        if name is None:
                             continue
                         generate_call_module(body_op, op, name)
                         body_op_to_remove.append(body_op)
-            elif op.attributes["sym_name"].value.startswith(
-                ("gelu", "layernorm", "tril")
-            ):
+            elif _library_decl_name(op) is not None:
                 body_op_to_remove.append(op)
         # need to erase at the end
         for op in body_op_to_remove:
             op.operation.erase()
         return module
+
+
+def materialize_returned_arguments(module):
+    """Give a function that returns a scalar argument as is a value to return.
+
+    The HLS emitters turn each result into an output pointer named after the
+    value that defines it, and skip a returned value that is an argument (an
+    array argument is returned in place). A *scalar* argument returned as is
+    -- ``def pack(v: int32) -> int32: return v`` -- was therefore emitted
+    with no output port, while every call site passes one: g++ "too many
+    arguments" (E3). A same-type ``unrealized_conversion_cast`` before the
+    return is the value the result port is named after, and every emitter
+    prints it as ``*out = v;``. Run on the emission copy only, after the
+    lowering passes (a canonicalizer would fold it back).
+    """
+    with module.context, Location.unknown():
+        for func in module.body.operations:
+            if not isinstance(func, func_d.FuncOp) or func.is_external:
+                continue
+            ret = func.entry_block.operations[len(func.entry_block.operations) - 1]
+            if not isinstance(ret, func_d.ReturnOp):
+                continue
+            for idx, value in enumerate(ret.operands):
+                if not (
+                    BlockArgument.isinstance(value)
+                    and BlockArgument(value).owner == func.entry_block
+                ):
+                    continue
+                if MemRefType.isinstance(value.type) or str(value.type).startswith(
+                    "!allo.stream"
+                ):
+                    continue
+                cast = builtin_d.UnrealizedConversionCastOp(
+                    [value.type], [value], ip=InsertionPoint(ret), loc=ret.location
+                )
+                ret.operation.operands[idx] = cast.result
+    return module
 
 
 def call_ext_libs_in_ptr(module, ext_libs):

@@ -101,6 +101,14 @@ protected:
   /// Emit function signature and return the port list.
   SmallVector<Value, 8> emitFunctionSignature(func::FuncOp func);
 
+  /// Hook consulted by emitFunctionSignature for each array argument: true
+  /// emits it as `const T name[...]`. Vitis keeps every array parameter
+  /// mutable; the SystemC emitter makes a helper's read-only arrays const so
+  /// a `static const` table can be passed to them (A4).
+  virtual bool isConstArrayParam(func::FuncOp func, unsigned argIdx) {
+    return false;
+  }
+
   /// Virtual hook: emit the element type name for a stateful global variable.
   /// Override in backend-specific emitters (e.g. Catapult) to emit
   /// synthesizable float types like ac_ieee_float<binary32> instead of float.

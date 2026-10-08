@@ -57,6 +57,7 @@ from .catapult import (
 from .ip import IPModule
 from .report import parse_xml
 from ..passes import (
+    materialize_returned_arguments,
     _mlir_lower_pipeline,
     decompose_library_function,
     generate_input_output_buffers,
@@ -535,6 +536,7 @@ class HLSModule:
                 ")"
             )
             pm.run(self.module.operation)
+        materialize_returned_arguments(self.module)
         check_pipeline_style_reaches_emitter(self.module, platform)
         buf = io.StringIO()
         success = True

@@ -1,0 +1,411 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+##########################################################################
+Library names, slice widths, helper globals: nine bugs from the U3 tracks
+##########################################################################
+
+:Date: 2026-10-04
+:Host: zhang-21
+:Branch: ``core-fixes-3`` (review branch, based on ``origin/main``
+   ``87420c94``; eight fix commits, one per bug, E4 being E5's instance,
+   and this record)
+:Found by: MiniTPU U3 track A (``dev/records/minitpu/u3_track_a_2026-10-04.rst``
+   on ``u1-pilot``: A2, A3, A4, A5) and track E
+   (``u3_composition_design_2026-10-04.rst`` §7: E1-E5); repros in each
+   record's directory
+:Bindings: the worktree's own ``mlir/build`` (configured like ``main``'s:
+   LLVM/MLIR ``/work/shared/common/llvm-project-main/build-rhel8``,
+   gcc-toolset-13, the ``allo`` env's python and ninja); five of the eight
+   fixes are C++
+
+The bugs
+========
+
+**A3** (core, silent then loud, high). ``decompose_library_function``
+(``allo/passes.py``) matched the library ops by prefix: it erased every
+module-level symbol whose name starts with ``gelu``, ``layernorm`` or
+``tril``, and replaced every call to a function starting with them by the
+library body. A constant ``gelu_tab`` vanished (``'memref.get_global' op
+'gelu_tab' does not reference a valid global memref``); a user function
+``tril_rows`` called at the top of a kernel body was replaced by ``tril``
+(``'linalg.yield' op type of yield operand 1 ('f32') doesn't match``). The
+sfu unit named its ROMs ``rom_gelu`` to dodge it.
+
+**E1** (front end, silent). A region of plain ``@df.kernel`` functions built
+and ran a ``Stream`` no kernel touched, and built a stream only written
+(which blocks once full) and emitted SystemC for it. The ``@df.unit``
+netlist path refused both (``unconnected-stream``).
+
+**E5** (lowering, loud) and **E4**. ``lower_bit_ops`` ended every
+``allo.get_slice`` with ``arith.trunci`` to the result type. The builder
+types a slice whose bounds fold only after ``meta_for`` expansion -- and a
+full-width one -- with the word's own width, so ``lane: int32 =
+w[32*c : 32*(c+1)]`` on a ``UInt(32)`` became ``trunci i32 -> i32`` and the
+simulator refused the module. Not a signedness conversion, as E5 was first
+read: ``lane: UInt(32)`` fails the same way; ``me_sink``'s unsigned lane
+worked because its word was wider. **E4** is this bug: the int8 matrix
+engine at DIM=4 slices ``a: int8 = packed[MAC_IN_BITS*r : ...]`` out of a
+``UInt(32)`` packed row, typed ``i32`` (the bounds name a global), and
+failed at module line 124 with the same message; with the fix it builds and
+matches its reference (``run_u3e``: FINDING -> OK). The LLVM backend (no
+``meta_for`` simulator pipeline) happened to accept the same IR.
+
+**E3** (HLS emitters, loud). The emitters name each result's output pointer
+after the value that defines it, and skip a returned value that is an
+argument (an array returned in place). ``def pack_int32(v: int32) -> int32:
+return v`` was emitted ``void pack_int32(int32_t v0)`` while every call
+passed ``(v, &out)``: g++ "too many arguments" in SystemC csim. Not SystemC
+only, as recorded: the Vitis and Catapult emitters print the same signature
+(shared ``VhlsModuleEmitter::emitFunctionSignature``).
+
+**A2** (SystemC emitter, loud). A baked-in constant array was declared only
+as a ``static const`` local in the thread of each kernel that reads it; a
+helper function (a plain C++ function emitted through the base emitter)
+reading one referred to an undeclared name (``'rom' was not declared in this
+scope``).
+
+**A4** (SystemC emitter, loud). Passing a kernel's constant table to a helper
+made the argument ``const int32_t[]`` and the parameter ``int32_t v1[64]``:
+``invalid conversion from 'const int32_t*' to 'int32_t*'``. SystemC only:
+Vitis declares the global without ``const``.
+
+**A5** (SystemC csim testbench, silent, high). Root cause found: not the
+kernel and not the memory model. With stream outputs, the last stream sink
+``sc_stop()``\ ped the simulation as soon as it had drained its words, and
+memory-port outputs are read after the run; a kernel whose last iteration
+pushes its stream words and then stores to a memory lost every store but
+the first (the reduction tree's one slot of 204,120; the repro's last row
+``[152, 0, 0, 0]``). Stores first, the run outlived them -- which is why the
+track's reorder worked.
+
+**E2** (SystemC and Catapult emitters, loud then silent). Isolated: the
+``ac_int`` slices were sized by the value's type, not the slice's bounds.
+The packing in ``me_feed`` (``packed[MAC_IN_BITS*r : ...] = <i32>`` under
+``meta_for``) became ``_bs.set_slc(48, ac_int<32, false>(v))`` on a 64-bit
+word: 48 + 32 > 64, ac_int's ``Out of bounds set_slc`` assertion
+(``ac_int.h:2912``), and on every lower lane the 16 bits above it
+overwritten (harmless only because the lanes are written in ascending
+order). Past the abort a second instance of the same defect on the read
+side: ``word: UInt(32) = out_word[16*c : 16*(c+1)]`` became ``slc<32>(lo)``,
+reading the next lane into the upper half -- bf16 DIM=4 read 7/32 (the
+seven whose next lane was zero). The two-engine PE rig (no packed lane
+word) never met either. Vitis is unaffected (``v(hi, lo) = x`` truncates).
+
+The fixes
+=========
+
+``[Pass] Replace only the builder's library declarations, not user symbols named like them``
+   A3. A library op is a bodiless ``func.func`` named ``<op>_<digits>``
+   (what ``build_Call`` declares); only calls to those are replaced and only
+   those declarations erased.
+``[Dataflow] Refuse a stream that a plain kernel region leaves without a writer or a reader``
+   E1. ``expand_region_units`` checks a unit-free region too, from every
+   nested kernel's stream uses (inside ``meta_if`` or loops as well), and
+   raises ``NetlistError`` at the ``@df.region()`` naming the stream: one no
+   kernel uses (``no writer and no reader``), or one with a single end that a
+   *blocking* ``put``/``get`` uses (``stream 'orphan' has no reader, and k
+   blocks on orphan.put() once it is full``). A one-ended stream used only
+   through ``try_put``/``try_get``/``full``/``empty`` never blocks and stays
+   legal: the first cut refused it too, and the dataflow suite showed why
+   that is wrong (the non-blocking probes in ``test_stream_ops_*`` and
+   ``test_stream_nb_*``, and the self-FIFO S9/C1 tests, 13 tests). Only this
+   rule: single-producer-single-consumer is not applied to plain regions. An
+   annotation that cannot be evaluated at the definition is not checked. Two
+   tests change with it: ``test_sim_timeout`` built its deadlock from a
+   stream nobody puts to -- now refused at the region, which is the point of
+   E1 -- and deadlocks on a two-kernel token cycle instead (the watchdog it
+   tests is unchanged); ``test_stream_nb_simple`` declared a stream it never
+   used, which is dropped.
+``[Pass] Lower a bit slice that keeps its word's width without a same-width trunci``
+   E5/E4. ``lowerGetSliceOps`` truncates only to a narrower result and
+   zero-extends to a wider one.
+``[Backend] Give a function that returns its scalar argument an output port``
+   E3. Before emission, ``HLSModule`` puts a same-type
+   ``unrealized_conversion_cast`` between a returned scalar argument and the
+   return (``materialize_returned_arguments``, on the emission copy, after
+   the lowering passes); every emitter prints it ``*out = v;``. One place for
+   all the HLS emitters, rather than three signature emitters.
+``[Backend][SystemC] Declare a constant array that a helper function reads at file scope``
+   A2. Each constant global a helper reads is emitted once at file scope
+   before the helpers (``emitStaticConstGlobal``, the code the kernel path
+   already used); a kernel reading the same global uses that copy.
+``[Backend][SystemC] Emit a helper's read-only array parameter const``
+   A4. A helper's array parameter that is only loaded from, or passed to a
+   helper parameter that is itself read-only, is emitted ``const T v[...]``
+   (the new ``isConstArrayParam`` hook of ``emitFunctionSignature``; false
+   for Vitis, so its emission is unchanged).
+``[Backend][SystemC] Stop the csim testbench only after the DUT is done when memories are read out``
+   A5. When a design has memory outputs as well as stream outputs, the last
+   sink waits for the DUT's ``done`` and settles in-flight writes for the
+   same cycles the memory-only path does, then stops. A design that never
+   asserts ``done`` now reports ``TB DEADLOCK`` (the message names the
+   wait) instead of reading half-written memories. Stream-only testbenches
+   are unchanged.
+``[Backend][SystemC][Catapult] Size ac_int bit slices by their bounds, not by the value's type``
+   E2. With constant bounds, ``set_slc`` writes ``ac_int<hi - lo + 1>`` when
+   the value is wider, and a get-slice narrower than its result is taken at
+   its own width and zero-extended (as the LLVM lowering does). Residual,
+   noted: with non-constant bounds both still use the type's width (the
+   builder narrows the value itself there when it can, as in every case
+   seen); a value *narrower* than a constant slice still writes only its own
+   bits (pre-existing; the LLVM lowering zero-extends).
+
+Tests
+=====
+
+.. list-table::
+   :header-rows: 1
+
+   * - file
+     - covers
+     - on ``origin/main``
+   * - ``tests/test_library_names.py`` (3)
+     - constants ``gelu_tab``/``layernorm_tab``/``tril_tab`` on the
+       simulator; user functions ``gelu_addr``/``tril_rows`` on LLVM and in
+       the HLS text; ``allo.gelu`` beside a ``gelu_bias`` constant
+     - 3 fail
+   * - ``tests/dataflow/test_df_region_streams.py`` (6)
+     - untouched, written-only and read-only streams refused with the
+       stream named; a one-ended ``try_put``/``full`` probe, a chain through
+       ``meta_if`` and an array stream, and a self-stream, accepted and run
+     - 3 fail
+   * - ``tests/dataflow/test_df_get_slice_width.py`` (6)
+     - full-width slices into ``int32``/``UInt(32)``, constant and
+       ``meta_for`` bounds, on the simulator; four int8 lanes of a ``UInt(32)``
+       stream word with global-named bounds (E4's shape); LLVM
+     - 5 fail
+   * - ``tests/dataflow/test_df_return_argument.py`` (4 + 1 csim)
+     - Vitis and Catapult signatures, SystemC signatures for one-, two-arg and
+       ``UInt(8)`` identity helpers, simulator, csim
+     - 4 fail
+   * - ``tests/dataflow/test_df_systemc_helper_globals.py`` (5 + 4 csim)
+     - A2: one file-scope declaration before the helper, a kernel and a
+       helper reading the same table, csim; A4: ``const`` on a read-only
+       parameter two helpers deep, not on a written one, Vitis unchanged,
+       csim of both
+     - 6 fail
+   * - ``tests/dataflow/test_df_systemc_tb_mem_drain.py`` (2 + 2 csim)
+     - the sink's wait with memory outputs, a stream-only tb unchanged, csim
+       with the stores last and first
+     - 2 fail (the wait; stores last)
+   * - ``tests/dataflow/test_df_systemc_slice_width.py`` (3 + 1 csim)
+     - SystemC and Catapult slice widths for four 16-bit lanes of a
+       ``UInt(64)`` from ``UInt(32)`` values and back, simulator, csim
+     - 3 fail (csim: the ``set_slc`` abort)
+
+All pass on the branch, the csim ones with the SystemC environment of
+``dev/toolchains.rst`` (Catapult 2024.2's SystemC); the "on main" column is
+each file run against the baseline worktree.
+
+The record repros, on the branch (``u1-pilot`` ``examples/minitpu`` on the
+path through an overlay package, nothing cherry-picked):
+
+* ``repro_gelu_name.py``: ``gelu_tab`` ok (main: FAIL, get_global).
+* ``repro_global.py``: df helper / systemc csim ok (main: g++ ``'rom' was
+  not declared``).
+* ``repro_lastrow_multi.py``: 2-D written last ok (main: row 39 ``[152, 0,
+  0, 0]``).
+* ``h15_frontend_probe.py``: (a) refused at the ``@df.region()``
+  (``NetlistError``, ``untouched.dangling``); main: built and ran.
+* ``sc_probe.py``: pe_two 256/256 + 256/256 (unchanged); mxu tree bf16 d4
+  128/128 (main: ``Out of bounds set_slc``).
+* ``sc_probe2.py``: mxu systolic bf16 d4 64/64 (main: the abort); systolic
+  int8 d16 256/256 (main: g++ "too many arguments", E3).
+* ``run_u3e``: GATE OK on both; the one changed line is "matrix engine
+  systolic at int8, DIM=4 (32-bit packed word)", U3E-FINDING (the ``trunci``)
+  on main, U3E-OK on the branch.
+* Matrix rigs in csim at DIM=4 against the simulator and ``matrix_rows``:
+  tree and systolic bf16, systolic and tree int8, all 32/32 (main: bf16
+  abort; with the set-side fix only, 7/32).
+
+Impact vs main
+==============
+
+Baseline: a detached worktree at ``origin/main`` ``87420c94`` borrowing the
+primary checkout's ``mlir/build`` (same commit); the branch worktree builds
+its own. Same host, same env (Vitis on ``PATH`` as the ``allo`` env sets
+it, the SystemC environment above for every row).
+
+.. list-table::
+   :header-rows: 1
+
+   * - check
+     - origin/main
+     - core-fixes-3
+   * - TinyTPU emitted Vitis (sha256 of ``str(s.build("vhls"))``)
+     - ``6bc774bc...b2ef95``
+     - identical
+   * - TinyTPU emitted Catapult
+     - ``ade1ab5d...88e038``
+     - identical
+   * - TinyTPU emitted SystemC
+     - ``06d36533...8646b7``
+     - identical (TinyTPU has no full-width or meta_for-typed slice, no
+       identity helper, no helper-read constant, and no stream output beside
+       a memory output)
+   * - ``systemc_csim.py 3`` (TinyTPU, SystemC csim)
+     - SYSTEMC CSIM OK, 3 cases wrong=0/16
+     - same three lines (clobbered_outside 4057/4057/4065)
+   * - ``cosim_eva_systemc.py`` (EVA)
+     - PASS (bit-exact)
+     - PASS (bit-exact); ``generated/`` restored after
+   * - ``gen_isa.py --check`` / ``lift_units.py --check``
+     - ISA OK / UNITS OK
+     - ISA OK / UNITS OK
+   * - ``bench_isa.py`` / ``stress_isa.py``
+     - ALL EXACT / STRESS OK 640/640
+     - ALL EXACT / STRESS OK 640/640
+   * - ``act_compile.py --gate``
+     - ACT GATE OK 12/12
+     - ACT GATE OK 12/12
+   * - ``pytest tests/dataflow --ignore=tests/dataflow/aie``
+     - 221 pass, 26 fail, 4 skip, 1 xfail
+     - 255 pass (+34 new), 26 fail, 4 skip, 1 xfail
+   * - ``pytest tests/act``
+     - 193 pass, 2 fail, 4 skip
+     - 195 pass, 0 fail, 4 skip
+   * - ``pytest tests/test_*.py``
+     - 506 pass, 37 fail, 2 skip
+     - 509 pass (+3 new), 37 fail, 2 skip
+
+Per-test outcomes were diffed from the JUnit XML. On the branch as pushed,
+no pre-existing test changes outcome except ``tests/act/test_bindings.py``
+(2) fail -> pass, because the branch worktree has its own ``mlir/build``
+and the baseline borrows the primary checkout's. Two pre-existing tests
+were edited by the E1 commit (above) and pass on both sides.
+
+The first branch run, with E1 refusing every one-ended stream, failed 15
+pre-existing dataflow tests (the non-blocking probes, the self-FIFO tests,
+``test_sim_timeout``'s deliberate starved stream and a dead declaration in
+``test_stream_nb_simple``). That is why E1 refuses a one-ended stream only
+when a blocking op uses it; the dataflow suite was re-run on the final
+commits (the table's numbers). ``tests/test_*.py``, ``tests/act`` and the
+TinyTPU/EVA rows were run with the stricter first cut, which the final rule
+only relaxes, and with every other commit as pushed.
+
+The pre-existing failures are environmental and the same on both sides
+(Vitis HLS csim/csynth project builds, ``GLIBCXX_3.4.32`` for compiled
+wrappers, ``past.verify`` absent, ``tests/act/test_bindings.py`` on the
+borrowed build), as in ``uint_index_2026-10-02.rst``.
+
+Why the published numbers cannot move: TinyTPU's Vitis, Catapult and
+SystemC text is byte-identical, so cosim (175/265/421/482/674) is
+untouched and was not re-run.
+
+On the current ``main``. While this batch was being measured, ``main``
+moved to ``9b33ee03`` (``u1-pilot`` merged, 38 commits). The eight commits
+cherry-pick onto it without conflict; with that tree's own build, the seven
+new test files plus ``test_systemc_unreset``, ``test_compose_memory_ports``,
+``test_df_unit``, ``test_df_systemc_self_fifo``, ``test_sim_timeout``,
+``test_stream_nb_simple`` and ``test_stream_ops_{ir,sim}`` pass (90/90),
+and TinyTPU's three emission hashes are the same as above. The full
+impact table was not re-measured at ``9b33ee03``; the branch stays based on
+``87420c94``, where it was.
+
+Upstream
+========
+
+``cornell-zhang/allo`` ``main`` at ``3f2ea5d4`` (2026-09-30) has A3
+(``allo/passes.py`` lines 424 and 430: the same ``startswith(("gelu",
+"layernorm", "tril"))`` on calls and on every module-level symbol), E5
+(``LowerBitOps.cpp`` line 304: the unconditional ``TruncIOp`` to the result
+type) and E1 (``dataflow.py`` records each kernel's direction per stream and
+never counts a stream's endpoints; upstream has no ``@df.unit``, so its only
+region form is the one that accepts the dangling stream). E3 is upstream
+too: ``EmitVivadoHLS.cpp`` line 2828 skips a returned argument in the
+signature and line 578 emits nothing for ``func.return``. A2, A4, A5 and E2 are in the fork's SystemC emitter and
+its Catapult slice code. No upstream issue or PR matches (searched
+"decompose_library_function", "trunci", "get_slice", "dangling stream",
+"unused stream"; #80 introduced the template functions, #390 moved the bit
+ops to ``LowerBitOps``). Drafts below, not filed.
+
+Draft upstream issue (A3)
+-------------------------
+
+    **[Bug] A user symbol whose name starts with `gelu`, `layernorm` or
+    `tril` is deleted or replaced by the library op**
+
+    `decompose_library_function` (`allo/passes.py`) recognises the library
+    ops by prefix: every module-level op whose `sym_name` starts with
+    `gelu`/`layernorm`/`tril` is erased, and every call to a callee starting
+    with them is replaced by the template body::
+
+        import numpy as np, allo
+        from allo.ir.types import int32
+
+        ROM = np.arange(64, dtype=np.int32)
+
+        def kernel(A: int32[8]) -> int32[8]:
+            gelu_tab: int32[64] = ROM
+            B: int32[8] = 0
+            for i in range(8):
+                B[i] = gelu_tab[A[i]]
+            return B
+
+        allo.customize(kernel).build()
+        # 'memref.get_global' op 'gelu_tab' does not reference a valid global memref
+
+    A user function `tril_rows(A: int32[8]) -> int32[8]` called at the top
+    of a kernel body is replaced by `tril` (`'linalg.yield' op type of
+    yield operand 1 ('f32') doesn't match the element type`).
+
+    Fix: the builder declares a library call as a bodiless private
+    `func.func @<op>_<abs(hash(node))>`; match exactly that (external, name
+    `^(gelu|layernorm|tril)_\d+$`) and replace only calls to those. A patch
+    with tests is on `sunwookim028/allo` branch `core-fixes-3`.
+
+Draft upstream issue (E5)
+-------------------------
+
+    **[Bug] `lower_bit_ops` emits `arith.trunci iN -> iN` for a bit slice
+    whose result has the word's width**
+
+    `lowerGetSliceOps` (`LowerBitOps.cpp`) ends every `allo.get_slice` with
+    `arith.TruncIOp` to the result type. A slice whose result type equals
+    the input width -- a full-width slice, or one whose bounds only become
+    constant after `meta_for` expansion, which the builder types with the
+    word's width -- gives `'arith.trunci' op operand type 'i32' and result
+    type 'i32' are cast incompatible`::
+
+        import numpy as np, allo, allo.dataflow as df
+        from allo.ir.types import int32, UInt
+
+        @df.region()
+        def top(A: UInt(32)[4], B: int32[4]):
+            @df.kernel(mapping=[1], args=[A, B])
+            def k(a: UInt(32)[4], b: int32[4]):
+                for i in range(4):
+                    w: UInt(32) = a[i]
+                    lane: int32 = w[0:32]
+                    b[i] = lane
+
+        df.build(top, target="simulator")   # trunci i32 -> i32
+
+    Fix: truncate only when the result is narrower; zero-extend when wider.
+
+Draft upstream issue (E1)
+-------------------------
+
+    **[Bug] A dataflow region accepts a Stream with no writer or no reader**
+
+    A `Stream` declared in a `@df.region()` that no kernel uses builds and
+    runs; one that a kernel only puts to builds (and blocks once full), and
+    the HLS emitters emit it. Nothing counts a stream's endpoints across the
+    region's kernels (`dataflow.py` records each kernel's direction only)::
+
+        @df.region()
+        def top(A: int32[8], B: int32[8]):
+            orphan: Stream[int32, 4]
+            @df.kernel(mapping=[1], args=[A, B])
+            def k(a: int32[8], b: int32[8]):
+                for i in range(8):
+                    b[i] = a[i] + 1
+                    orphan.put(a[i])
+
+        df.build(top, target="simulator")   # builds; nobody reads `orphan`
+
+    Proposal: at the region, refuse a stream that has no writing or no
+    reading kernel, naming it. The fork's patch (branch `core-fixes-3`) does
+    this from the region's AST, counting `put`/`try_put`/`full` and
+    `get`/`try_get`/`empty` in every nested kernel.

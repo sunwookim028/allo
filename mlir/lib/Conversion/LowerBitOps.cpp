@@ -299,11 +299,21 @@ void lowerGetSliceOps(func::FuncOp &func) {
         rewriter.create<mlir::arith::ShRUIOp>(loc, shift1, lshift_width);
     Value shift3 =
         rewriter.create<mlir::arith::ShRUIOp>(loc, shift2, lo_casted);
+    // The result is typed by the builder, which cannot always fold the
+    // bounds: a slice whose bounds are only constant after meta_for
+    // expansion keeps the input's width (w[32*c : 32*(c+1)] on an i32 is
+    // i32 -> i32). trunci needs a strictly narrower result, so truncate only
+    // then; the bits above the slice are already zero, so a wider result is
+    // a zero extension.
     Type otype = op->getResult(0).getType();
-    Value truncated =
-        rewriter.create<mlir::arith::TruncIOp>(loc, otype, shift3);
+    unsigned owidth = otype.getIntOrFloatBitWidth();
+    Value result = shift3;
+    if (owidth < iwidth)
+      result = rewriter.create<mlir::arith::TruncIOp>(loc, otype, shift3);
+    else if (owidth > iwidth)
+      result = rewriter.create<mlir::arith::ExtUIOp>(loc, otype, shift3);
 
-    op->getResult(0).replaceAllUsesWith(truncated);
+    op->getResult(0).replaceAllUsesWith(result);
   }
 
   // remove the getSliceOps

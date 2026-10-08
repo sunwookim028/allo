@@ -3209,10 +3209,13 @@ allo::hls::VhlsModuleEmitter::emitFunctionSignature(func::FuncOp func) {
         os << addName(arg, false);
         for (auto shape : shapedType.getShape())
           os << "[" << shape << "]";
-      } else if (input_args.size() == 0) {
-        emitArrayDecl(arg, true);
       } else {
-        emitArrayDecl(arg, true, input_args[argIdx]);
+        if (isConstArrayParam(func, argIdx))
+          os << "const ";
+        if (input_args.size() == 0)
+          emitArrayDecl(arg, true);
+        else
+          emitArrayDecl(arg, true, input_args[argIdx]);
       }
     } else {
       if (llvm::isa<StreamType>(arg.getType())) {
