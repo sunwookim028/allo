@@ -169,8 +169,8 @@ class _Tap(R.Sequencer):
         return o, why
 
 
-def decode_slots(word):
-    """The C1 ``decode`` stub: a 128-bit bundle -> its per-slot decoded records
+def decode(word):
+    """C1 ``decode``, STUBBED (track A owns it): a 128-bit bundle -> its per-slot decoded records
     (``ref_ctrl_decode.decode``, REF-MATCH on 25,416 bundles), packed per slot."""
     f = D.decode(word or 0)
     sub = lambda pre, lay: D.pack(lay, {n: f[f"{pre}.{n}"] for n, _ in lay})  # noqa: E731
@@ -192,7 +192,7 @@ def side_columns(cmd, tap=None):
     out = {p: [] for p in SIDE}
     for hv, word, ivs, sb, ss in m.rec[k0:]:
         out["HV"].append(hv)
-        for k, v in decode_slots(word).items():
+        for k, v in decode(word).items():
             out[k].append(v)
         for k, v in enumerate(D.ivs_of(ivs)):
             out[f"IV{k}"].append(v)

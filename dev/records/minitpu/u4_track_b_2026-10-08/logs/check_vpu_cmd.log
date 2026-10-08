@@ -1,0 +1,17 @@
+RTL u4_seq_cmd:shipped: 52236 cycles in 15 traces, 888217 defined slots, RTL vs reference on defined: 888217/888217 (4.6s)
+UNIT-MATCH vpu_cmd:shipped streams simulator 888217/888217 defined (156503 masked: payload, slot not valid (D-23 gate)=154378, reset=900, uninit IRAM=1225; allo==rtl on 153489) cycle=order-only (build 1.5s, run 2.2s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+UNIT-MATCH vpu_cmd:shipped streams systemc 888217/888217 defined (156503 masked: payload, slot not valid (D-23 gate)=154378, reset=900, uninit IRAM=1225; allo==rtl on 153489) cycle=per-iteration, time unchecked (build 1.0s, run 9.9s)
+UNIT-MATCH vpu_cmd:shipped streams_d1 simulator 888217/888217 defined (156503 masked: payload, slot not valid (D-23 gate)=154378, reset=900, uninit IRAM=1225; allo==rtl on 153489) cycle=order-only (build 1.4s, run 3.7s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+UNIT-MATCH vpu_cmd:shipped streams_d1 systemc 888217/888217 defined (156503 masked: payload, slot not valid (D-23 gate)=154378, reset=900, uninit IRAM=1225; allo==rtl on 153489) cycle=per-iteration, time unchecked (build 1.0s, run 10.5s)
+UNIT-MATCH vpu_cmd:shipped streams_d4 simulator 888217/888217 defined (156503 masked: payload, slot not valid (D-23 gate)=154378, reset=900, uninit IRAM=1225; allo==rtl on 153489) cycle=order-only (build 1.5s, run 1.4s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+UNIT-MATCH vpu_cmd:shipped streams_d4 systemc 888217/888217 defined (156503 masked: payload, slot not valid (D-23 gate)=154378, reset=900, uninit IRAM=1225; allo==rtl on 153489) cycle=per-iteration, time unchecked (build 1.0s, run 10.0s)
+real	0m59.418s
