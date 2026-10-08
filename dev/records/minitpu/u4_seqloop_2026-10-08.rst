@@ -1,0 +1,402 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+##############################################################################
+U4 sequencer loop: fetch, loop control, scalar AGU and issue composed
+##############################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-08.** zhang-21, branch ``u4-seqloop``
+   (worktree ``scratch/wt-u4loop``, from ``origin/u1-pilot`` at ``c7abcce4``:
+   README D-23/D-24/D-25), this worktree's own bindings (``mlir/build``:
+   Ninja, LLVM/MLIR ``/work/shared/common/llvm-project-main/build-rhel8``,
+   gcc-toolset-13 13.3.1, ``nice ninja -j16``, 336 steps, 98 s). MiniTPU at
+   ``b3ba0a4d4fb69d39091c55f5f00d1f237082a4f1`` (ISA ``v1``), read only, clean.
+   Verilator 5.052 (conda-forge); SystemC 2.3.3 and Connections of Catapult
+   2024.2 (``harness/env-zhang21.sh``). Task approved by the owner on
+   2026-10-08 (``u4_matrix.rst``, "what the owner decides" item 5).
+   **Nothing under ``allo/`` or ``mlir/`` changed**; the one core defect found
+   is a repro and a proposal (S-2).
+
+Reproduce (``source examples/minitpu/harness/env-zhang21.sh``, ``export
+PYTHONPATH=$PWD``, ``R=dev/records/minitpu/u4_seqloop_2026-10-08``)::
+
+   $ALLO_PYTHON -m examples.minitpu.harness.check sequencer --backend simulator --backend systemc     # ~85 s
+   U4_SEQLOOP_SEEDS=1 $ALLO_PYTHON -m examples.minitpu.harness.check sequencer \
+       --backend simulator --backend systemc                                                          # + the 3 tbs, ~105 s
+   $ALLO_PYTHON $R/scripts/seqloop_rate.py --qd 2        # also --qd 1, --qd 4; ~65 s each
+   $ALLO_PYTHON $R/scripts/wire_probe.py --kind wire     # also comb, wire-x; ~1 min
+   $ALLO_PYTHON -m examples.minitpu.template.calendar --refusals
+   $ALLO_PYTHON -m examples.minitpu.template.control_geometry
+   (cd tests/limits && python new_d12_server_port_order_deadlock.py)   # S-2, ~2 min
+
+Logs in ``u4_seqloop_2026-10-08/logs/``.
+
+1. What was built
+=================
+
+Track B's issue unit (``units/seq_issue.py`` ``locked``) took three of its
+inputs as side columns replayed from Phase 0's references: the fetch head,
+loop control's ``iv_by_level`` and the scalar AGU's descriptor read ports.
+``examples/minitpu/template/sequencer.py`` closes that loop: track A's
+stateful units and track B's issue unit as one ``compose.Architecture``
+(``seqloop``), held to the whole-sequencer Phase 0 oracle.
+
+* ``template/sequencer.py`` -- the composition: nine units, two D-12 memories,
+  21 channels, its runner. Bodies are track A's ``fetch_d12.fq``,
+  ``loop_ctrl_d12.capture``/``ctrl``, ``scalar_agu.s1`` and track B's
+  ``seq_issue.locked`` with the stubs replaced by channel exchanges; geometry
+  from ``control_geometry.SHIPPED`` (D-20); C1 functions (``decode_v/m/x/d/c/l/s``,
+  ``resolve``, ``adapt_v/x/m``) and S1's ``scalar_result`` bound as ``calls``.
+* ``units/sequencer.py`` -- a second instance ``loop`` (now ``DEFAULT``):
+  ``rtl/u4_seq_loop.sv``, a wrapper with no logic = ``u4_seq_cmd.sv`` (D-23
+  slot ports) + ``sreg_o`` (``u_seq.u_scalar_agu.sreg_q`` by hierarchical
+  reference); ``REF("loop")`` = Phase 0's ``ref_ctrl_issue.Sequencer`` at
+  those ports (slot payload masked while its slot is not valid, D-23's gate;
+  the SREGs before the edge); ``VARIANTS = {"loop": ...}``; the three tbs
+  are replayed on ``loop`` with ``U4_SEQLOOP_SEEDS=1`` (271,834 cycles of
+  ``tb_loop_begin_r``). ``characterize sequencer`` now runs both instances.
+* ``scripts/seqloop_rate.py`` (D-23's stall check, track B's ``d23_rate.py``
+  adapted), ``scripts/wire_probe.py`` (the exchanges as Wires),
+  ``tests/limits/new_d12_server_port_order_deadlock.py`` (S-2).
+
+The composition, as text (``->`` a channel, one token per iteration unless
+noted; ``[w]``/``[r]`` a D-12 port; ``==`` a boundary array)::
+
+    WE,WA,WD == loader --[iram.host w]--+
+                                        IRAM 4096 x 128, unreset (D-14)
+    RST_F == fq ------[iram.fetch r, L=1]-+          (+ fq's read register, T-2)
+             fq --f_head{valid,addr}, f_data--> issue
+             fq --f_cap------------------------> lcap
+    RST_C == lcap --[lb.cap w]--+
+                                LB 24 x 128, unreset; replay port declared first (S-2)
+    RST_L == lctl --[lb.replay r, L=0]--+
+             lctl --l_repen, l_rep, l_iv x8--> issue        (registered state)
+             lctl --l_ivs x8-----------------> sagu
+             lcap --c_atcap------------------> lctl         (state)
+    RST_S,KA == sagu == SREG
+             issue --i_sa{selects, S op}-----> sagu         } the one same-cycle
+             sagu --s_b, s_s, s_lb-----------> issue        } round trip
+             issue --i_lc{begin,end,issued,lo,step,hi,skip,body_start}--> lctl
+             issue --i_fq{pop, entry, slot}--> fq
+             lctl --l_fq{taken, target}------> fq
+             lctl --l_cap{reset, cap_en, iss}--> lcap
+    RST_I,START,CHD,DIDLE,ACC,PID == issue == ISS,DONE,CLR,SIDLE,SRUN,XADDR,DV..DSTR,VV,XV,MV
+             issue --cv (V), cx (X), cm (M): D-23, one token per valid command, depth QD--> vrx, xrx, mrx
+
+One iteration of every unit is one clock cycle (D-24). Within an iteration
+each unit puts its registered state first, then gets what this cycle's
+combinational cone needs, in the RTL's cone order (fq/lctl/lcap state ->
+issue decodes -> sagu answers -> issue drives lctl and fq -> lctl drives fq
+and lcap -> every edge); no unit waits on a token that depends on its own
+later put, so the per-iteration graph is acyclic. Exchanges are depth 2,
+``iv_by_level`` depth ``SD`` (8 tokens an iteration), commands ``QD``.
+
+**The flush (D-25).** Not needed, and no count-based drop either: the fetch
+queue is ``fq``'s own state (F1, as ``sequencer_fetch_queue.sv``) and its
+head crosses to ``issue`` as one token per cycle, so a taken branch is the
+queue's own synchronous clear inside ``fq``. A flushable Stream is needed only
+where a Stream *is* the queue (track A's F2/H6); here none is. D-25 stays
+needed for the self-timed form.
+
+2. Verdicts
+===========
+
+Against the RTL (``u4_seq_loop.sv``: ``sequencer.sv`` unchanged), every
+defined slot of the D-23 command sequence (V/X/M valids and payloads), the
+DMA descriptor (valid, store, channel, row, rows, base, stride, cols), the
+issue/FSM outputs (``bundle_issued_o``, ``done``, ``clear_channel_done``,
+state flags, ``x_issue_address``) and the scalar state (four SREGs) per
+cycle (``logs/check_sequencer*.log``):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 14 14 42
+
+   * - trace set
+     - simulator
+     - SystemC csim
+     - defined slots, masks, wall
+   * - Phase 0 programs: 11 asm-scheduled (straight, at slot 3, loops, zero
+       trip, back-edge WAW, DMA ideal/random, 4 random), **both shipped
+       attention images**, unscheduled, matrix-busy (15 traces, 52,236 cycles,
+       5,447 issues)
+     - **UNIT-MATCH**
+     - **UNIT-MATCH**
+     - 940,408/940,408; masked 156,548 (D-23 gate 154,378, reset 945, uninit
+       IRAM 1,225); build 4.9 / 3.6 s, run 13.8 / 50.5 s; 84 s wall
+   * - + ``tb_bundle_loop``, ``tb_bundle_interlocks``, ``tb_loop_begin_r``
+       replayed (18 traces, 70,507 cycles: Phase 0's set)
+     - **UNIT-MATCH**
+     - **UNIT-MATCH**
+     - 1,286,132/1,286,132; masked 194,515 (gate 191,036, reset 1,134,
+       uninit 2,345); run 18.0 / 65.4 s; 105 s wall, 1.05 GB
+
+The reference agrees with the RTL on every defined slot of both sets
+(``RTL vs reference``). Both backends matched on the first run of the full
+set; the only change before it was S-2 (the simulator deadlocked). Phase 0's
+1,049,131 slots counted ``vpu_ctrl_o`` as one slot per cycle; here it is six
+slot ports plus ``sreg_o``, so the counts differ by construction.
+
+No more side columns: ``seq_issue`` (the replayed form) is unchanged beside
+it, as the unit-level check of the issue logic alone.
+
+3. D-23's no-stall check (``seqloop_rate.py``)
+==============================================
+
+The emitted csim ``kernel.cpp`` stamped (track B's technique): the cycle at
+the top of every unit's cycle loop, after every V/X/M ``Push`` in the issue
+loop, after every receiver ``Pop``; values still held to the reference
+(940,408/940,408 in each run). On the 15-trace set (52,236 iterations):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 10 18 22 18 16 16
+
+   * - QD
+     - csim cycles / RTL cycle
+     - intervals (put / no put)
+     - stall cycles
+     - issues at the RTL cycle
+     - put -> pop
+   * - 1
+     - 29, constant
+     - 29 x 1,419 / 29 x 50,815 (start-up 25)
+     - **0**
+     - **5,447/5,447**
+     - 2
+   * - 2
+     - 29, constant
+     - same
+     - **0**
+     - **5,447/5,447**
+     - 2
+   * - 4
+     - 29, constant
+     - same
+     - **0**
+     - **5,447/5,447**
+     - 2
+
+"Issues at the RTL cycle": an RTL issue at cycle t happens in iteration t
+(the value check) at csim time ``T1 + 29 (t - 1)``, with no exception.
+**Result: 0 stall cycles against the RTL on the whole program set; the three
+command Streams cost nothing at depth 1, 2 or 4** (iterations that put a
+command take exactly as long as those that do not), and the iteration is one
+constant csim interval: the composition is cycle-locked. Every unit starts
+iteration t at a fixed offset from ``issue`` (``fq``, ``lcap`` +4, ``lctl``
++2, ``sagu`` 0; ``sagu`` -2 on 45 iterations, absorbed) -- lockstep. The
+loader runs ~127 iterations ahead, held by the IRAM server's lockstep.
+
+What is NOT 1: each RTL cycle costs 29 csim cycles, the price of the
+same-cycle exchanges being Stream hops (S-1). Track B's ``vpu_cmd`` (one
+kernel, the front end as boundary arrays) ran at 1. At depth 1 track B
+measured 488 stall cycles (F-B3); here depth 1 costs none, because a 29-cycle
+iteration always drains a command before the next: F-B3's legality ("depth
+>= 2") is a property of the issue rate, and becomes binding again only when
+the exchanges are Wires.
+
+Before S-4's workaround the same run gave 27 cycles per iteration with **18
+intervals of 29 (36 stall cycles), 265/5,447 issues on time**
+(``logs/seqloop_rate_qd2_ka_conditional.log``): every slow iteration had a
+``loop.begin.r`` at the head (16 of the 19 such heads, plus the two cycles
+after a zero-trip skip), where ``sagu`` read ``kernel_arg_csr[idx]`` under
+``if from_arg``. A 2-D boundary array read at a data-dependent index is a
+request/response memory port in csim, and the conditional access put two
+``wait()``\ s on that path only. With the read made unconditional the
+interval is 29 everywhere: the stall was the emitted thread's, not the
+composition's, and the RTL has no such cycle (S-4).
+
+4. The calendar, unchanged
+==========================
+
+``template/calendar --refusals``: **CALENDAR-MATCH 33/33**, 5/5 wrong
+declarations refused, identical to track B's log (``logs/calendar_check.log``).
+``control_geometry``: 12/12 derived = Phase 0 and MiniTPU's bookings, 7/7
+refused, identical to track A's (``logs/control_geometry.log``). The
+composition reads ``STACK_DEPTH``, ``LB_CAP``, the count/index/stack-pointer
+widths, ``IRAM_ROWS``, ``IRAM_MEM_LATENCY`` and ``S_LAT`` from that record;
+the write-back calendar is downstream of the commands and is not touched.
+
+5. The exchanges as Wires (``wire_probe.py``)
+==============================================
+
+The RTL's exchanges are wires. Three ways to say so in Allo, n = 300:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 78
+
+   * - form
+     - result (``logs/wire_probe_*.log``)
+   * - ``kind="wire"`` on the 14 exchanges, ``region("systemc")``
+     - **refused at build**, but by the D-12 memories, not the exchanges:
+       on a non-simulator target a ported memory lowers to comb pins, and
+       all four owners fail D-13's cone rule: ``iram_host_a`` (loader) reads
+       a memory-port argument; ``iram_fetch_a`` (fq) reads ``next_addr``
+       after the reset branch stored it; ``lb_cap_a`` (lcap), ``lb_replay_a``
+       (lctl) read a temporary written under a condition (S-3)
+   * - ``kind="comb"`` on the exchanges
+     - **refused at build**, one error per kernel (the emitter stops at a
+       kernel's first): ``iram_host_a`` (loader) and five exchange cones,
+       ``f_head`` (fq), ``l_repen`` (lctl), ``i_sa`` (issue): a conditional
+       temporary; ``c_atcap`` (lcap), ``s_b`` (sagu): a read after the
+       iteration's reset store (S-1)
+   * - ``wire-x``: exchanges ``Wire``, memories as the Stream lowering
+     - **builds and runs, wrong**: 4,710/5,187 defined slots, the first
+       difference at cycle 48 (``bundle_issued_o``) -- a Wire has no
+       alignment in csim (limitation 22)
+
+The ``iv_by_level`` vectors cannot be tried as Wires at all (``Channel``
+refuses an array of Wire links; 8 puts an iteration on one Wire is
+meaningless).
+
+6. Findings
+===========
+
+.. list-table::
+   :header-rows: 1
+   :widths: 6 18 46 30
+
+   * - id
+     - class
+     - finding
+     - smallest change / proposal
+   * - S-1
+     - **missing abstraction** (a same-cycle link)
+     - Every one-cycle exchange between two units (fetch head, replay word,
+       ``iv_by_level``, the AGU's read round trip, loop control's inputs and
+       branch, the queue's pop/flush, capture control) must be a Stream: a
+       ``Wire`` unit port is not wired (``stream_ports.rst``), a region-scope
+       Wire is not aligned in csim (``wire-x`` 4,710/5,187), and a ``comb``
+       link is refused in any kernel that also has a Stream port or stores
+       its state before the cone reads it (the reset-first body every
+       cycle-locked unit here has). The Stream form is exact per iteration on
+       both backends and costs 29 csim cycles per RTL cycle.
+     - A declared **same-cycle link** for a cycle-locked composition (D-24):
+       one put and one get per iteration, required in the cone order the
+       composition checks for acyclicity; Stream (depth 1) on the simulator
+       and csim, a wire on Catapult. Until then: the Stream form, which this
+       record shows exact.
+   * - S-2
+     - **bug** (D-12 server lowering; silent hang)
+     - The memory server serves its ports in declaration order each
+       iteration with blocking gets. With the loop buffer declared ``(cap w,
+       replay r)`` it waits for the capture's address before answering the
+       replay read, which loop control needs before issue can decide what
+       the capture writes: the simulator deadlocks with no diagnostic. The
+       RTL's two ports have no order. Repro
+       ``tests/limits/new_d12_server_port_order_deadlock.py`` (REPRODUCES:
+       ``(w, r)`` hangs, ``(r, w)`` returns; ``logs/repro_s2_*``).
+       Workaround: the replay port declared first.
+     - The server answers every read port of an iteration before it waits on
+       any write port (reads see pre-edge state in either order, so nothing
+       changes semantically); or ``compose`` refuses a port order its channels
+       make cyclic, naming the ports.
+   * - S-3
+     - **missing abstraction** (D-12 port, Wire lowering)
+     - On a non-simulator target a ported memory lowers to comb pins whose
+       owner must satisfy D-13's cone rule; all four owners here fail it
+       (conditional address temporaries, reset-first stores, a boundary
+       argument in the cone). So csim ran the Stream lowering
+       (``region("simulator")``), and the Catapult path of the D-12 memories
+       is blocked for these bodies. (T-2 is the same seam from the other
+       side: on Stream links the IRAM's ``L=1`` is ``fq``'s own register.)
+     - If-convert the cone (a conditional temporary feeding an address or an
+       enable is a select), or let the server's request pins be registered
+       Wires (``L >= 1`` ports) rather than comb.
+   * - S-4
+     - **semantic mismatch** (csim time vs the cycle)
+     - A 2-D boundary array read at a data-dependent index under an ``if``
+       (``kernel_arg_csr[idx]`` when ``from_arg``) costs the emitted thread 2
+       csim cycles on exactly those iterations: 36 stall cycles, 265/5,447
+       issues on time, where the RTL has none. Unconditional, it costs
+       nothing extra and the interval is constant.
+     - Workaround kept (unconditional read). The emitter could hoist an
+       addressable boundary read out of a branch when its index is computed
+       unconditionally; or document that a csim stall check must use
+       unconditional boundary reads.
+   * - S-5
+     - **workaround** (D-17)
+     - ``compose`` refuses a slice whose bounds are only parameters, so the
+       bodies slice with literals (``d[41:53]``); ``template/sequencer.py``
+       holds every literal to ``sequencer_pkg``'s layouts at import (29
+       fields, ``channel_sel`` one bit).
+     - D-17's front-end folding of constants into slice bounds.
+   * - S-6
+     - **workaround** (harness)
+     - ``rst_n`` is one wire to every part in the RTL; here each unit owns its
+       own boundary copy (``RST_F``, ``RST_C``, ``RST_L``, ``RST_S``,
+       ``RST_I``) because a boundary array has one owner.
+     - None needed for the check; an input broadcast would be a region port
+       with several readers.
+   * - S-7
+     - **deviation** (D-14, C2)
+     - The fetch queue entries are reset local arrays (the RTL's are unreset);
+       ``Stateful(reset=False)`` is refused in a kernel with Stream ports (C2).
+       Masked as ``uninit`` where it shows; the D-12 IRAM and loop buffer are
+       ``reset=False``.
+     - C2's lowering (owner decision 3 of ``u4_matrix.rst``).
+
+MiniTPU: nothing new.
+
+7. Provisional calls (D-9)
+==========================
+
+* **P-S1.** The exchanges are Streams in the RTL's cone order, one token per
+  iteration; the Wire forms are probes (section 5). *Reason:* the only form
+  exact on both backends today (S-1).
+* **P-S2.** The fetch queue stays ``fq``'s state; no Stream between fetch and
+  issue needs flushing. *Reason:* F1 is the cycle-locked default (P-1 of the
+  plan); D-25 belongs to a self-timed fetch.
+* **P-S3.** ``sequencer``'s ``DEFAULT`` is the ``loop`` instance (the slot
+  wrapper with ``sreg_o``), so the task's command checks the composition;
+  ``shipped`` stays for Phase 0's ``characterize`` (which now runs both).
+* **P-S4.** ``kernel_arg_csr`` is read unconditionally in ``sagu`` (S-4).
+
+8. Proposed matrix row (for the integrator's ``u4_matrix.rst``)
+===============================================================
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 21 21 21 21
+
+   * - unit
+     - RTL oracle
+     - Allo simulator
+     - SystemC csim
+     - Catapult RTL / RTLGen, AMC
+   * - ``sequencer`` (closed loop: F1 + L1 + S1 + I1/A1 + C1, D-23 commands;
+       ``template/sequencer.py``)
+     - match (Phase 0 ``sequencer`` at ``u4_seq_loop.sv``: slots + ``sreg_o``)
+     - **match** 1,286,132/1,286,132 (programs, both images, 3 tbs); **finding**
+       S-2 (server port-order deadlock, bug, repro)
+     - **match** 1,286,132/1,286,132; D-23: **0 stall cycles**, 5,447/5,447
+       issues at the RTL cycle at QD 1/2/4 (29 csim cycles per RTL cycle,
+       S-1); **finding** S-4 (fixed by an unconditional read)
+     - open (track D); blocked for the D-12 memories' Wire lowering (S-3) /
+       n/a
+
+9. Timings and pins
+===================
+
+Bindings 98 s. Verilator build of ``u4_seq_loop`` (once; shared cache in the
+clone's ignored ``.build/``) inside the first run. ``check sequencer``: 84 s
+wall (15 traces) / 105 s (18), 1.05 GB peak. ``seqloop_rate.py``: 65 s per
+depth (csim run 57 s). ``wire_probe.py``: under 1 min each. Repro S-2: about
+2 min (one 90 s timeout). Host shared with Catapult, Vivado and RTLGen agents
+(load 35-50). Pins: MiniTPU ``b3ba0a4d`` (RTL, ``asm.py``, images); Verilator
+5.052 (conda-forge, ``/work/shared/users/phd/sk3463/tools/verilator``); g++
+13.3.1 (gcc-toolset-13); Catapult 2024.2's SystemC 2.3.3 and g++ 10.3.0 for
+csim.
+
+10. Not done
+============
+
+* Catapult RTL (track D): the per-cycle issue check on Catapult RTL needs the
+  exchanges as wires (S-1) and the D-12 memories' Wire lowering (S-3).
+* The self-timed comparison of D-24 at the whole-sequencer level (fetch ->
+  issue over a flushable Stream, D-25): waits for D-25's ``flush()``
+  (branch ``core-fixes-4``).
+* The VPU behind the commands (U5): the receivers here only record tokens.
