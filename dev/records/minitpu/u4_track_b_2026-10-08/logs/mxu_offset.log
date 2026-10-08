@@ -1,0 +1,11 @@
+asm.py: _M_RESULT_LATENCY = 85, _M_ISSUE_INTERVAL = {1: 16, 2: 4, 3: 1}, W_MPOP = 3
+[asm-scheduled] vmatpush issued row [39], vmatpop issued row [124]: asm's distance 85
+   MXU input_push rows [1, 2, 3, 4] (from issue); first output_valid +86; push->valid from the last push 82
+   output_pop +[86]; matrix source at the mux +[86]; asserts 0
+[forced distance d] pop issue -> output_pop -> mux, and against the calendar (pop + W_mpop - 2 = pop + 1)
+   d=82: pop at +82; output_valid +86; output_pop +86; mux +86 (pop + 4); 3 late vs the calendar; sim asserts 0
+   d=83: pop at +83; output_valid +86; output_pop +86; mux +86 (pop + 3); 2 late vs the calendar; sim asserts 0
+   d=84: pop at +84; output_valid +86; output_pop +86; mux +86 (pop + 2); 1 late vs the calendar; sim asserts 0
+   d=85: pop at +85; output_valid +86; output_pop +86; mux +86 (pop + 1); as booked; sim asserts 0
+   d=86: pop at +86; output_valid +86; output_pop +87; mux +87 (pop + 1); as booked; sim asserts 0
+   d=90: pop at +90; output_valid +86; output_pop +91; mux +91 (pop + 1); as booked; sim asserts 0

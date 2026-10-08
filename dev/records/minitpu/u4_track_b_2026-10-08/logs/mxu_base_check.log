@@ -1,0 +1,4 @@
+BASE-CHECK matrix.result_latency.vmatpush derived 85 v1 85 MATCH
+BASE-CHECK matrix.issue_interval.vmatpop derived 1 v1 1 MATCH
+BASE-CHECK rtl_params.WB_W_MPOP_LAST derived 3 v1 3 MATCH
+BASE-CHECK resources.mxu_output_fifo.depth derived 64 v1 64 MATCH
