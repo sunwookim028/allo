@@ -402,6 +402,14 @@ other three (`isa_encoding.py`, `units_isa.py` and the ISA reference page
 included so that the patched tree is complete as applied and `gen_isa.py
 --check` has something to hold it to.
 
+Apply and undo it from the root, as above. Run from `examples/tinytpu`, `git
+apply` patches only the files under the current directory and skips the rest
+without a word, so the patched tree lacks the regenerated
+`tinytpu_isa_spec.rst` (`git diff --shortstat` says 13 files, +166/-19) and
+`gen_isa.py --check` below ends in `ISA FAILED: 1 disagreement(s)`, the page
+reported STALE. From any directory, `git -C "$(git rev-parse --show-toplevel)"
+apply examples/tinytpu/mvoutrelu.patch` applies all 14.
+
 **Step 1: declare it in the ISA** (`isa_spec.json`). One entry: an opcode
 number, the operand fields (the same as `mvout`'s) and its *actions*, the
 per-unit steps that say what the instruction does. Compared with `mvout` it
