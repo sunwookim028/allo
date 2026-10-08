@@ -39,15 +39,94 @@ INPUTS = [("rst_n", 1), ("start", 1), ("instr_write_en", 1), ("iram_addr", 12), 
           ("dma_desc_accept", 1), ("matrix_busy_i", 1)]
 RTL = rtl.RtlUnit(top="sequencer", sources=SOURCES, inputs=INPUTS, outputs=list(R.OUTS),
                   shape="trace", clk="clk", rst_n="rst_n", assertions=True)
-INSTANCES = {"shipped": RTL}
-DEFAULT = "shipped"
+# ``loop`` (U4 sequencer loop, ``template/sequencer.py``): the same sequencer.sv
+# in a wrapper with no logic (``rtl/u4_seq_loop.sv``) that presents vpu_ctrl_t
+# as README D-23's three slot commands (as ``u4_seq_cmd.sv``) and adds the
+# scalar AGU's four committed SREGs (``sreg_o``) by hierarchical reference.
+SLOT_OUTS = [("v_valid_o", 5), ("v_pay_o", 42), ("x_valid_o", 1), ("x_pay_o", 19),
+             ("m_valid_o", 3), ("m_pay_o", 15)]
+LOOP_OUTS = [(p, w) for p, w in R.OUTS if p != "vpu_ctrl_o"] + SLOT_OUTS + [("sreg_o", 128)]
+LOOP_RTL = rtl.RtlUnit(top="u4_seq_loop",
+                       sources=SOURCES + [os.path.join(os.path.dirname(os.path.abspath(__file__)), "rtl",
+                                                       "u4_seq_loop.sv")],
+                       inputs=INPUTS, outputs=LOOP_OUTS, shape="trace", clk="clk", rst_n="rst_n",
+                       assertions=True)
+INSTANCES = {"shipped": RTL, "loop": LOOP_RTL}
+DEFAULT = "loop"
+WIDTH = {"shipped": 16, "loop": 16}
 LATENCY_SOURCE = ("issue: one bundle a cycle warm; delay=N holds N cycles (sequencer.sv:271); "
                   "S_LAT 2; descriptor round trip; loop.begin.r skip 3 (isa_latency.json)")
-VARIANTS = {}
 
 
 def REF(inst, cmd):
+    if inst == "loop":
+        return loop_trace(cmd)
     return R.issue_trace(cmd)
+
+
+class _SregTap(R.Sequencer):
+    """``ref_ctrl_issue.Sequencer`` that also shows the scalar AGU's committed
+    SREGs before the edge (``u4_seq_loop.sreg_o``)."""
+
+    def step(self, r):
+        self.sreg_pre = [0] * 4 if r["rst_n"] == 0 else list(self.sagu.sreg)
+        return super().step(r)
+
+
+GATE = "payload, slot not valid (D-23 gate)"
+
+
+def loop_trace(cmd):
+    """Phase 0's whole-sequencer reference at the ``loop`` wrapper's ports:
+    ``vpu_ctrl_o`` split into D-23's slot ports with the payload masked while
+    its slot is not valid (the composition sends a token only per valid
+    command, D-23's allowed gate), plus ``sreg_o``."""
+    from examples.minitpu.units.seq_issue import slots_of_ctrl
+
+    cols = {p: rtl.unpack(c) for p, c in cmd.items()}
+    n = len(cols["rst_n"])
+    m = _SregTap()
+    names = [p for p, _ in LOOP_OUTS]
+    out = {p: [] for p in names}
+    reason = {p: np.array([""] * n, dtype=object) for p in names}
+    for t in range(n):
+        o, why = m.step({p: cols[p][t] for p in cols})
+        sl = slots_of_ctrl(o["vpu_ctrl_o"])
+        for p, _ in LOOP_OUTS:
+            if p == "sreg_o":
+                out[p].append(sum(v << (32 * k) for k, v in enumerate(m.sreg_pre)))
+                reason[p][t] = "reset" if cols["rst_n"][t] == 0 else ""
+            elif p in sl:
+                out[p].append(sl[p])
+                reason[p][t] = why["vpu_ctrl_o"]
+            else:
+                out[p].append(o[p])
+                reason[p][t] = why[p]
+    for p, pv in (("v_pay_o", "v_valid_o"), ("x_pay_o", "x_valid_o"), ("m_pay_o", "m_valid_o")):
+        for t in range(n):
+            if not reason[p][t] and out[pv][t] == 0:
+                reason[p][t] = GATE
+    ev = dict(m.ev)
+    for k, v in m.loop.ev.items():
+        ev[f"loop: {k}"] = v
+    return {p: rtl.pack(out[p], w) for p, w in LOOP_OUTS}, reason, ev
+
+
+def _make_loop(n, w=16, inst="loop"):
+    """U4 sequencer loop: the five units composed (``template/sequencer.py``)."""
+    assert inst == "loop", "the composition is checked at the loop wrapper's ports (--inst loop)"
+    from examples.minitpu.template import sequencer as T
+
+    return T.make(n, w, inst)
+
+
+def _run_loop(mod, cmd, n, w):
+    from examples.minitpu.template import sequencer as T
+
+    return T.run(mod, cmd, n, w)
+
+
+VARIANTS = {"loop": (_make_loop, _run_loop)}
 
 
 class Run:
@@ -257,6 +336,8 @@ def seeds():
         cmd = {p: rows[p] for p, _ in INPUTS}
         seen = {p: rows[p] for p, _ in R.OUTS}
         out.append((tb, "shipped", cmd, seen, True))
+        if os.environ.get("U4_SEQLOOP_SEEDS") == "1":  # the loop instance too (opt-in: 271,834 cycles)
+            out.append((tb, "loop", cmd, seen, True))
     return out
 
 
