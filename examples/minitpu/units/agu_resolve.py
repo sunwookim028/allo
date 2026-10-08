@@ -17,6 +17,11 @@ Stimulus: every (level, shift, agu_valid) with ivs whose high bits are set
 import os
 import sys
 
+import numpy as np
+
+import allo.dataflow as df
+from allo.ir.types import UInt, int32, uint1
+
 from examples.minitpu.harness import rtl
 from examples.minitpu.harness import ref_ctrl_decode as R
 from examples.minitpu.harness.traces import rng_for
@@ -87,7 +92,57 @@ def probes(inst):
     return [("shift -> x_resolved_addr_o (comb)", 0, rtl.probe_trace(RTL, packed, "x_resolved_addr_o", 8))]
 
 
-VARIANTS = {}
+# ---------------------------------------------------------------------------
+# Allo (U4 track A, plan C1). ``resolve`` is the plain function the issue unit
+# calls (track B); the region holds it alone, one row per iteration. The eight
+# 32-bit ivs are a lane array (P-8): ``iv[t, k]`` is level k.
+# ---------------------------------------------------------------------------
+
+WIDTH = {"base": 12}
+U32, U12, U4, U3 = UInt(32), UInt(12), UInt(4), UInt(3)
+
+
+def resolve(iv: UInt(32)[8], literal: UInt(12), agu_valid: uint1, level: UInt(3),
+            shift: UInt(4)) -> UInt(12):
+    """``sequencer_agu_resolve``: ``literal + (iv[level][11:0] << shift)``, 12 bits."""
+    lv: int32 = level
+    low: UInt(12) = iv[lv]
+    sh: UInt(12) = low << shift
+    off: UInt(12) = 0
+    if agu_valid:
+        off = sh
+    addr: UInt(12) = literal + off
+    return addr
+
+
+def c1(n, w):
+    @df.region()
+    def top(IV: U32[n, 8], LIT: U12[n], AV: uint1[n], LVL: U3[n], SH: U4[n], OUT: U12[n]):
+        @df.kernel(mapping=[1], args=[IV, LIT, AV, LVL, SH, OUT])
+        def agu(iv: U32[n, 8], lit: U12[n], av: uint1[n], lvl: U3[n], sh: U4[n], out: U12[n]):
+            for t in range(n):
+                row: U32[8]
+                for k in range(8):
+                    row[k] = iv[t, k]
+                out[t] = resolve(row, lit[t], av[t], lvl[t], sh[t])
+
+    return top
+
+
+def run_c1(mod, cmd, n, w):
+    iv = np.array([[(v >> (32 * k)) & 0xFFFFFFFF for k in range(8)] for v in cmd["iv_flat_i"][:n]],
+                  dtype=np.uint32).reshape(n, 8)
+    cols = [np.asarray(cmd[p][:n], dtype=np.uint16) for p in ("x_literal_i", "x_agu_valid_i",
+                                                                "x_agu_level_i", "x_agu_shift_i")]
+    cols[1] = cols[1].astype(np.uint8)
+    cols[2] = cols[2].astype(np.uint8)
+    cols[3] = cols[3].astype(np.uint8)
+    out = np.zeros(n, dtype=np.uint16)
+    mod(iv, *cols, out)
+    return {"x_resolved_addr_o": out}
+
+
+VARIANTS = {"c1": (c1, run_c1)}
 
 if __name__ == "__main__":
     sys.exit(0)
