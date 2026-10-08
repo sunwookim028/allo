@@ -84,6 +84,49 @@ def pair_sweep():
     return blocks, fired, merged, rule
 
 
+SEQ_CLASSES = list(CLASSES) + ["mpop"]
+
+
+def seq_bundle(b, cls, vd):
+    return {"load": lambda: {"x": b.vld(vd, 4 * vd)}, "alu": lambda: {"v": b.vadd(vd, 30, 31)},
+            "sfu": lambda: {"v": b.vexp(vd, 30)}, "reduce": lambda: {"v": b.vredsum(vd, 30)},
+            "lane_reduce": lambda: {"v": b.vlanesum(vd, 30)}, "txout": lambda: {"v": b.vtxout(vd, 0)},
+            "mpop": lambda: {"m": b.vmatpop(vd)}}[cls]()
+
+
+def seq_pair_sweep(a):
+    """The sequencer's own sim-only calendar (sequencer.sv:277-432): bundle
+    ``a`` with delay ``d - 1``, then bundle ``b`` (``d = 0``: one bundle where
+    the slots allow), on the whole sequencer; the cases where its write-port
+    checks fire."""
+    from examples.minitpu.units import sequencer as S
+
+    fired, cases = set(), []
+    for ca in SEQ_CLASSES:
+        for cb in SEQ_CLASSES:
+            for d in range(0, 17):
+                b = a.AsmBuilder()
+                sa, sb = seq_bundle(b, ca, 1), seq_bundle(b, cb, 2)
+                if d == 0:
+                    if set(sa) & set(sb):
+                        continue
+                    b.bundle(**sa, **sb)
+                else:
+                    b.bundle(**sa)
+                    b.bundles[-1] = a._set_delay(b.bundles[-1], d - 1)
+                    b.bundle(**sb)
+                for _ in range(20):
+                    b.bundle()
+                b.bundle(b.halt())
+                cmd = S.Run(b.bundles, rng_for("u4-cal-seq"), cycles=80).cmd()
+                rtl.run_trace(S.RTL, {p: rtl.pack(cmd[p], w) for p, w in S.INPUTS})
+                cases.append((ca, cb, d))
+                if any("write-port collision" in m for _, m in rtl.last_asserts):
+                    fired.add((ca, cb, d))
+    rule = {(ca, cb, d) for ca, cb, d in cases if R.W[ca] == d + R.W[cb]}
+    return cases, fired, rule
+
+
 def main():
     a = minitpu_asm.load()
     home = rtl.minitpu_home()
@@ -127,6 +170,15 @@ def main():
         print("   differs:", x)
     print(f"   colliding cases: {sorted(merged)}")
     print(f"   vpu.sv $onehot0 (vpu.sv:370) fired on {len(fired)}; silent: {sorted(merged - fired)}")
+    cases, sfired, srule = seq_pair_sweep(a)
+    sasm = {(ca, cb, d) for ca, cb, d in cases if d and asm_collides(a, ca, cb, d)}
+    sasm |= {(ca, cb, 0) for ca, cb, d in cases if d == 0 and R.W[ca] == R.W[cb]}
+    print(f"{'CALENDAR-MATCH' if sfired == srule else 'CALENDAR-DIFF'} sequencer's sim-only calendar: "
+          f"{len(cases)} (a, b, d) cases incl. vmatpop; its write-port checks fired on {len(sfired)}, "
+          f"the rule gives {len(srule)}, asm refuses {len(sasm)}")
+    print(f"   rule but not fired: {sorted(srule - sfired)}")
+    print(f"   fired but not rule: {sorted(sfired - srule)}")
+    print(f"   asm vs rule: {sorted(sasm ^ srule)}")
     return 0 if ok else 1
 
 
