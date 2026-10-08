@@ -1,0 +1,48 @@
+== vpu_writeback:shipped: u4_vpu_wb (trace) params={} defines=[]
+   ok  singles                      legal      491 cyc  defined 2440/2440 masked 1979  seed-diff 0  asserts 0
+   ok  pairs                        illegal  14087 cyc  defined 70420/70420 masked 56363  seed-diff 0  asserts 20  write-port collisions (asserted)=20, write-port collisions (silent, one source bit)=1
+   ok  random-legal-0               legal     3023 cyc  defined 15100/15100 masked 12107  seed-diff 0  asserts 0
+   ok  random-legal-1               legal     3023 cyc  defined 15100/15100 masked 12107  seed-diff 0  asserts 0
+   ok  random-any-2                 illegal   3022 cyc  defined 15095/15095 masked 12103  seed-diff 0  asserts 279  write-port collisions (asserted)=279, write-port collisions (silent, one source bit)=8
+   ok  matrix-pops                  legal      572 cyc  defined 2845/2845 masked 2303  seed-diff 0  asserts 0
+   undefined-slot census (slots, guess matched, moved with seed):
+      ctrl_w_o           reset                  18  guess       18  seed-moved        0
+      dma_rdata_o        not modelled        24218  guess        0  seed-moved    24218
+      matrix_busy_o      not modelled        24218  guess    24218  seed-moved        0
+      rdata_a_o          not modelled        24218  guess      466  seed-moved    20035
+      unsupported_o      not modelled        24218  guess    24218  seed-moved        0
+      wb_local_addr_o    reset                  18  guess       12  seed-moved        6
+      wb_local_valid_o   reset                  18  guess       12  seed-moved        6
+      wb_src_o           reset                  18  guess       12  seed-moved        6
+      wb_stage_valid_o   reset                  18  guess       12  seed-moved        6
+   events: write-port collisions (asserted)=299, write-port collisions (silent, one source bit)=9
+   assertion x299: %Error: vpu.sv:371: Assertion failed in TOP.u4_vpu_wb.u_vpu: vpu: illegal concurrent VREG writeback schedule
+   LATENCY-OK   load: issue -> wb_source_valid (L): declared 4, step probe 4
+   LATENCY-OK   load: issue -> VREG write enable (W): declared 6, step probe 6
+   LATENCY-OK   load: issue -> port A reads the new value (W+1), vd=5: declared 7, step probe 7
+   LATENCY-OK   load: issue -> port A reads the new value (W+1), vd=17: declared 7, step probe 7
+   LATENCY-OK   alu: issue -> wb_source_valid (L): declared 3, step probe 3
+   LATENCY-OK   alu: issue -> VREG write enable (W): declared 5, step probe 5
+   LATENCY-OK   alu: issue -> port A reads the new value (W+1), vd=5: declared 6, step probe 6
+   LATENCY-OK   alu: issue -> port A reads the new value (W+1), vd=17: declared 6, step probe 6
+   LATENCY-OK   sfu: issue -> wb_source_valid (L): declared 5, step probe 5
+   LATENCY-OK   sfu: issue -> VREG write enable (W): declared 7, step probe 7
+   LATENCY-OK   sfu: issue -> port A reads the new value (W+1), vd=5: declared 8, step probe 8
+   LATENCY-OK   sfu: issue -> port A reads the new value (W+1), vd=17: declared 8, step probe 8
+   LATENCY-OK   reduce: issue -> wb_source_valid (L): declared 13, step probe 13
+   LATENCY-OK   reduce: issue -> VREG write enable (W): declared 15, step probe 15
+   LATENCY-OK   reduce: issue -> port A reads the new value (W+1), vd=5: declared 16, step probe 16
+   LATENCY-OK   reduce: issue -> port A reads the new value (W+1), vd=17: declared 16, step probe 16
+   LATENCY-OK   lane_reduce: issue -> wb_source_valid (L): declared 9, step probe 9
+   LATENCY-OK   lane_reduce: issue -> VREG write enable (W): declared 11, step probe 11
+   LATENCY-OK   lane_reduce: issue -> port A reads the new value (W+1), vd=5: declared 12, step probe 12
+   LATENCY-OK   lane_reduce: issue -> port A reads the new value (W+1), vd=17: declared 12, step probe 12
+   LATENCY-OK   txout: issue -> wb_source_valid (L): declared 1, step probe 1
+   LATENCY-OK   txout: issue -> VREG write enable (W): declared 3, step probe 3
+   LATENCY-OK   txout: issue -> port A reads the new value (W+1), vd=5: declared 4, step probe 4
+   LATENCY-OK   txout: issue -> port A reads the new value (W+1), vd=17: declared 4, step probe 4
+   LATENCY-OK   mpop (result waiting): issue -> wb_source_valid (L): declared 1, step probe 1
+   LATENCY-OK   mpop (result waiting): issue -> VREG write enable (W): declared 3, step probe 3
+   LATENCY-OK   mpop: issue -> port A reads the new value (W+1), vd=9: declared 4, step probe 4
+   LATENCY-OK   mpop: issue -> port A reads the new value (W+1), vd=30: declared 4, step probe 4
+   REF-MATCH vpu_writeback:shipped (27.6s)

@@ -1,0 +1,70 @@
+Verilator 5.052 2026-09-05 rev conda-forge build 
+== tb_vpu_latency_probe
+ vpu architectural latency probe
+ L = cycles from producer ISSUE to the earliest consumer ISSUE
+     that observes the new value.
+===============================================================
+
+  vld   -> V-slot consumer     L = 7   (docs/isa_latency.json: W + 1)
+  vadd  -> V-slot consumer     L = 6   (docs/isa_latency.json: W + 1)
+  vld   -> X-slot vst          L = 7   (docs/isa_latency.json: W + 1)
+  vgelu -> V-slot consumer     L = 8   (docs/isa_latency.json: W + 1)
+  vlanesum -> V-slot consumer  L = 12   (docs/isa_latency.json: W + 1)
+  vtxout   -> V-slot consumer  L = 4   (docs/isa_latency.json: W + 1)
+  vredsum  -> V-slot consumer  L = 16   (docs/isa_latency.json: W + 1)
+
+ A consumer issued at producer_issue + L sees the new value;
+ a direct datapath consumer at + (L-1) sees the stale one.
+ Nothing holds such a bundle: the schedule must space it.
+ Both the V slot's operand registers and the X slot's
+ store-data path sample the VREG file combinationally at issue,
+ so one L covers both consumer kinds.
+===============================================================
+ PROBE COMPLETE
+- tb/tb_vpu_latency_probe.sv:320: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 17us; walltime 0.455 s; speed 36.297 us/s
+- Verilator: cpu 0.306 s on 1 threads; allocated 8 MB
+== tb_bundle_delay
+===============================================================
+ tb_bundle_delay -- bundle `delay` field
+===============================================================
+
+  padded image : 15 bundles, 19 cycles
+  delayed image: 4 bundles, 19 cycles
+
+  PASS delayed result == padded result
+  PASS padded result  == golden
+  PASS delay costs the same cycles as the padding it replaces (19)
+  PASS delayed image is smaller: 15 -> 4 bundles (1920 -> 512 IRAM bits)
+  PASS delay survives D-slot detour (10 cycles)
+  PASS delay inside warm loop body, iteration 0
+  PASS delay inside warm loop body, iteration 1
+  PASS delay inside warm loop body, iteration 2
+  PASS delay inside warm loop body, iteration 3
+  loop with delayed body: 64 cycles for 4 iterations
+===============================================================
+ ALL CHECKS PASSED
+===============================================================
+- tb/tb_bundle_delay.sv:316: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 3us; walltime 0.173 s; speed 17.083 us/s
+- Verilator: cpu 0.106 s on 1 threads; allocated 8 MB
+== tb_bundle_vadd_loop
+PASS tb_bundle_vadd_loop: 4 iterations, every sum checked
+- tb/tb_bundle_vadd_loop.sv:281: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 2us; walltime 0.094 s; speed 22.127 us/s
+- Verilator: cpu 0.088 s on 1 threads; allocated 8 MB
+== tb_bundle_interlocks
+PASS tb_bundle_interlocks: software-scheduled issue distances match the ISA contract
+- tb/tb_bundle_interlocks.sv:205: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 316ns; walltime 0.000 s; speed 3.354 ms/s
+- Verilator: cpu 0.000 s on 1 threads; allocated 2 MB
+== tb_vpu_reduction_writeback
+PASS tb_vpu_reduction_writeback
+- tb/tb_vpu_reduction_writeback.sv:139: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 1us; walltime 0.056 s; speed 18.852 us/s
+- Verilator: cpu 0.053 s on 1 threads; allocated 8 MB

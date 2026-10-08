@@ -1,0 +1,62 @@
+== sequencer:shipped: sequencer (trace) params={} defines=[]
+   ok  straight                     legal     1848 cyc  defined 27581/27581 masked 139  seed-diff 0  asserts 0
+   ok  straight-at-slot-3           legal     1848 cyc  defined 27581/27581 masked 139  seed-diff 0  asserts 0
+   ok  loops                        legal     2340 cyc  defined 34897/34897 masked 203  seed-diff 0  asserts 0  loop: capture overflow=90
+   ok  loops-zero-trip              legal     2340 cyc  defined 34897/34897 masked 203  seed-diff 0  asserts 0  loop: capture overflow=90, loop: skip=1
+   ok  loops-back-edge-waw          illegal   2340 cyc  defined 34897/34897 masked 203  seed-diff 0  asserts 2  assert: WAW on a VREG in flight=2, loop: capture overflow=90
+   ok  dma-ideal                    legal     1151 cyc  defined 17156/17156 masked 109  seed-diff 0  asserts 0
+   ok  dma-random                   legal     1531 cyc  defined 22856/22856 masked 109  seed-diff 0  asserts 0
+   ok  random-0                     legal     5579 cyc  defined 83360/83360 masked 325  seed-diff 0  asserts 0  loop: capture overflow=218
+   ok  random-1                     legal     5579 cyc  defined 83356/83356 masked 329  seed-diff 0  asserts 0  loop: capture overflow=339
+   ok  random-2                     legal     5579 cyc  defined 83364/83364 masked 321  seed-diff 0  asserts 0  loop: capture overflow=97
+   ok  random-3                     legal     5579 cyc  defined 83360/83360 masked 325  seed-diff 0  asserts 0  loop: capture overflow=218
+   ok  image attention_h12_kv12_d64.bin legal     7224 cyc  defined 105869/105869 masked 2491  seed-diff 0  asserts 0
+   ok  image attention_h14_kv2_d64.bin legal     7224 cyc  defined 105869/105869 masked 2491  seed-diff 0  asserts 0
+   ok  unscheduled                  illegal    226 cyc  defined 3295/3295 masked 95  seed-diff 0  asserts 10  assert: RAW on a VREG in flight=6, assert: halt with VREG(s) in flight=1, assert: write-port collision=3
+   ok  matrix-busy-random           illegal   1848 cyc  defined 27581/27581 masked 139  seed-diff 0  asserts 1  assert: M command while its engine is busy=1
+   ok  tb_bundle_loop               legal       69 cyc  defined 954/954 masked 81  seed-diff 0  asserts 0 TB-REPLAY 954/954
+   ok  tb_bundle_interlocks         legal       33 cyc  defined 424/424 masked 71  seed-diff 0  asserts 0 TB-REPLAY 424/424
+   ok  tb_loop_begin_r              legal    18169 cyc  defined 271834/271834 masked 701  seed-diff 0  asserts 0 TB-REPLAY 271834/271834  loop: skip=16
+   undefined-slot census (slots, guess matched, moved with seed):
+      bundle_issued_o    reset                  54  guess       54  seed-moved        0
+      clear_channel_done reset                  54  guess       54  seed-moved       18
+      dma_desc_base      reset                  54  guess       36  seed-moved       18
+      dma_desc_channel   reset                  54  guess       36  seed-moved       18
+      dma_desc_cols      reset                  54  guess       54  seed-moved        0
+      dma_desc_is_store  reset                  54  guess       36  seed-moved       18
+      dma_desc_rows      reset                  54  guess       36  seed-moved       18
+      dma_desc_stride    reset                  54  guess       36  seed-moved       18
+      dma_desc_valid     reset                  54  guess       36  seed-moved        0
+      dma_desc_vmem_row  reset                  54  guess       36  seed-moved       18
+      done               reset                  54  guess       36  seed-moved       18
+      state_is_idle_o    reset                  54  guess       36  seed-moved        0
+      state_is_run_o     reset                  54  guess       54  seed-moved        0
+      vpu_ctrl_o         reset                  54  guess        0  seed-moved       54
+      vpu_ctrl_o         uninit IRAM          3832  guess       74  seed-moved     3644
+      x_issue_address    reset                  54  guess        0  seed-moved       54
+      x_issue_address    uninit IRAM          3832  guess     3752  seed-moved       36
+   events: assert: M command while its engine is busy=1, assert: RAW on a VREG in flight=6, assert: WAW on a VREG in flight=2, assert: halt with VREG(s) in flight=1, assert: write-port collision=3, loop: capture overflow=1142, loop: skip=17
+   assertion x2: %Error: sequencer.sv:412: Assertion failed in TOP.sequencer: schedule: RAW on VREG(s) 00000000000000000000000000000010 still in flight; space the consumer by L=W+1
+   assertion x1: %Error: sequencer.sv:412: Assertion failed in TOP.sequencer: schedule: RAW on VREG(s) 00000000000000000000000000000100 still in flight; space the consumer by L=W+1
+   assertion x1: %Error: sequencer.sv:412: Assertion failed in TOP.sequencer: schedule: RAW on VREG(s) 00000000000000000000000000001000 still in flight; space the consumer by L=W+1
+   assertion x2: %Error: sequencer.sv:412: Assertion failed in TOP.sequencer: schedule: RAW on VREG(s) 00000000000000000000000000100000 still in flight; space the consumer by L=W+1
+   assertion x1: %Error: sequencer.sv:416: Assertion failed in TOP.sequencer: schedule: VREG write-port collision at future cycle(s) 0000000000100000
+   assertion x1: %Error: sequencer.sv:416: Assertion failed in TOP.sequencer: schedule: VREG write-port collision at future cycle(s) 0000000001000000
+   assertion x1: %Error: sequencer.sv:416: Assertion failed in TOP.sequencer: schedule: VREG write-port collision at future cycle(s) 0000100000000000
+   assertion x1: %Error: sequencer.sv:420: Assertion failed in TOP.sequencer: schedule: M command issued while its matrix engine is busy
+   assertion x1: %Error: sequencer.sv:423: Assertion failed in TOP.sequencer: schedule: halt with VREG(s) 00000000000000000000000111101010 still in flight
+   assertion x2: %Error: sequencer.sv:572: Assertion failed in TOP.sequencer: sequencer: VREG WAW remains an illegal static schedule
+   LATENCY-OK   start -> first bundle issued (entry flush + IRAM + queue; fetch probe 3): declared 3, step probe 3
+   LATENCY-OK   straight-line issue interval (warm): declared 1, step probe 1
+   LATENCY-OK   delay=1: issue interval: declared 2, step probe 2
+   LATENCY-OK   delay=5: issue interval: declared 6, step probe 6
+   LATENCY-OK   delay=85: issue interval: declared 86, step probe 86
+   LATENCY-OK   delay=127: issue interval: declared 128, step probe 128
+   LATENCY-OK   halt issue -> done (DMA idle): declared 2, step probe 2
+   LATENCY-OK   descriptor issue -> next issue (accepting DMA; tb_bundle_scalar_agu 2): declared 2, step probe 2
+   LATENCY-OK   loops-back-edge-waw: 'assert: WAW on a VREG in flight' predicted vs fired: declared 2, step probe 2
+   LATENCY-OK   unscheduled: 'assert: RAW on a VREG in flight' predicted vs fired: declared 6, step probe 6
+   LATENCY-OK   unscheduled: 'assert: write-port collision' predicted vs fired: declared 3, step probe 3
+   LATENCY-OK   unscheduled: 'assert: halt with VREG(s) in flight' predicted vs fired: declared 1, step probe 1
+   LATENCY-OK   matrix-busy-random: 'assert: M command while its engine is busy' predicted vs fired: declared 1, step probe 1
+   REF-MATCH sequencer:shipped (20.6s)

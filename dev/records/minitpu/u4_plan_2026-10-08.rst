@@ -1,0 +1,370 @@
+U4 plan: control (the sequencer, the writeback calendar, the DMA)
+==================================================================
+
+2026-10-08, zhang-21. **Prep only**: this plan goes to the owner before any
+Allo expression of a U4 unit is written (README D-9: "how the unit is
+expressed in Allo, before coding"). Inputs: README (Direction; D-1, D-7,
+D-9..D-20; the U4 row: "the ``vpu_ctrl_t`` contract as a declared interface;
+the interlock decision"), ``u1_matrix.rst`` (the minitpu-comp seam: ``W`` =
+unit latency + ``VPU_WB_STAGES``; v1-course counts clock cycles from issue),
+``u2_phase0`` (conflict table), ``d12_memory_ports``, ``u3_plan`` and its
+records (``u3_fifo_composed``, ``u3_track_b``, ``u3_composition_design``),
+``asic_memories_2026-10-04``, the template prototypes, MiniTPU ``b3ba0a4d``.
+
+**Phase 0 is done** (``u4_phase0_2026-10-08.rst``): eleven units have an
+``RtlUnit`` spec, stimulus and a Python reference bit-exact against the RTL on
+every defined slot and at every declared latency; MiniTPU's tbs pass
+unchanged and replay equal. **[V]** verified by a Phase 0 run; **[I]**
+inferred, to test.
+
+1. The units, and what Phase 0 fixed
+------------------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 30 22 30
+
+   * - unit (RTL)
+     - shape, state
+     - declared = measured [V]
+     - oracle (``harness/``)
+   * - ``fetch`` (``sequencer_iram`` + ``_fetch_queue``)
+     - trace; IRAM 4,096 x 128 (unreset, 1-cycle read), 4-deep shift FIFO
+       (unreset entries), flush
+     - request -> valid 2; flush -> target 3; pop -> next 1
+     - ``ref_ctrl_front.fetch_queue_trace``
+   * - ``loop_ctrl`` (+ ``_loop_buffer``)
+     - trace; 8 frames {body, iv, hi, step}; 24 x 128 LUTRAM (unreset)
+     - begin -> iv 1; branch comb; refetch +2/iteration over ``LB_CAP``
+     - ``ref_ctrl_front.LoopCtrl``
+   * - ``seq_decoder``, ``agu_resolve``, ``vpu_adapter``
+     - comb, stateless
+     - 0
+     - ``ref_ctrl_decode.decode``, ``agu_resolve``, ``vpu_adapter``
+   * - ``scalar_agu``
+     - trace; 4 x 32 sregs, ``S_LAT``-deep pipe, no bypass
+     - 2 (= ``S_LAT``; 1, 3 at the parameter)
+     - ``ref_ctrl_decode.ScalarAgu``
+   * - ``dma_desc_adapter``
+     - trace; 1-deep valid/accept
+     - start -> valid 1; accept -> done comb
+     - ``ref_ctrl_decode.DescAdapter``
+   * - ``sequencer`` (whole)
+     - trace; programs loaded through IRAM
+     - start -> issue 3; warm II 1; ``delay=N`` -> N+1; desc round trip 2
+     - ``ref_ctrl_issue.Sequencer`` (the parts + top FSM + sim checker)
+   * - ``vpu_writeback`` (``vpu.sv`` at ``vpu_ctrl_t``)
+     - trace; the six-source OR mux + 2 registers
+     - ``W`` per class, see below
+     - ``ref_ctrl_wb.writeback_trace``
+   * - ``dma_addr_gen``
+     - comb
+     - 0
+     - inline
+   * - ``dma``
+     - trace (open loop, Python bridge); 2 channels, credits, order and
+       landing FIFOs, watchdog
+     - accept comb; -> request 2; last beat -> done 2; VMEM read 2
+     - ``ref_ctrl_dma``
+
+Facts the plan rests on [V]:
+
+* **The calendar is one relation.** For every VREG-writing class the claim
+  cycle is ``W = L + VPU_WB_STAGES`` (L = the unit's latency at the mux):
+  vld 4+2, ALU 3+2, SFU 5+2, reduce 13+2, lane-reduce 9+2, vtxout 1+2,
+  vmatpop 1+2; the first legal consumer is ``W + 1`` by function; the RTL's
+  physical collisions are exactly asm's refusals (586/586 pairs). This is
+  the seam ``minitpu-comp`` agreed, now measured.
+* **``vpu_ctrl_t`` is valid-qualified and single-cycle**: every field is
+  sampled only in its op's valid cycle (payload garbage elsewhere changes
+  nothing: 32/32 VREGs, 260/260 VMEM beats, five seeds), with no
+  backpressure (``matrix_busy_o`` is advisory). Its fields interact only
+  through four shared resources: VREG ports A/B (the V op), port C (store vs
+  matrix stream; the stream wins silently), the write port (the calendar),
+  the VMEM compute port.
+* **There is no interlock at ``b3ba0a4d``.** Issue stalls only on ``delay``,
+  ``S_D_WAIT``, ``S_FLUSH_WAIT``; every hazard rule is sim-only and two of
+  them have holes (F-W1 ``$onehot0`` blind to vredsum + vlanered; F-W2 the
+  sequencer never books vtxout). The schedule is the assembler's alone,
+  plus ``check_back_edges`` for loops (F-W4).
+* **Cycle-locking lives at two seams only**: fetch -> issue -> ``vpu_ctrl_t``
+  (``W`` counts clock cycles from issue; the loop buffer counts on a taken
+  branch costing exactly 2 bubbles), and the store's 2-cycle VMEM read in
+  the DMA. Everything on the DMA's other side is valid/ready.
+* **Unreset storage** [V]: IRAM and its read register, the fetch FIFO, the
+  loop buffer, the DMA landing FIFO payload, ``vpu_vmem_simd``'s request and
+  store-data registers. Control (states, counts, valids, sregs) resets.
+
+2. Allo expression options per unit
+-----------------------------------
+
+Decisions that apply everywhere: **D-10** (backends report latency;
+``latency=L`` only where a contract consumes it), **D-11** (Stateful
+persists), **D-12** (ported memories), **D-13** (comb outputs declared),
+**D-14** (``reset=False`` for unreset storage), **D-16** (model
+``b3ba0a4d``; an interlock is a recorded deviation), **D-17**
+(instantiation), **D-18** (schedules travel), **D-19** (optional modules as
+deltas), **D-20** (derived parameters as properties, relations as
+legality). U4 has no arithmetic engine (D-15 n/a).
+
+**fetch.** Contract: one bundle a cycle once warm; a flush shows its target
+3 edges later; the IRAM returns the old word on a same-cycle write.
+
+* **F1 ``bits``** (default): one kernel; IRAM as a D-12 ``Memory(rows=4096,
+  ports=(Port("host", "w"), Port("fetch", "r", latency=1)))`` with
+  ``reset=False`` (D-14); the FIFO as a ``Stateful`` array (unreset) plus a
+  reset count, transcribed. Cycle-locked by construction.
+* **F2 ``stream``** (probe): the FIFO as a ``Stream[UInt(140), 4]``. A
+  branch must **flush** it, which no Allo stream can do today (H6: missing
+  abstraction, "a flushable stream" or a valid-tagged epoch drop).
+
+**loop_ctrl.** Contract: the frame stack's semantics, ``iv_by_level`` read
+combinationally by both AGUs, the replay/refetch rule at ``LB_CAP``.
+
+* **L1 ``bits``** (default): ``Stateful`` frames (8 x {12, 32, 16, 8} b,
+  reset), branch outputs as ``Wire[..., comb]`` (D-13); the loop buffer a D-12
+  ``Memory(rows=24, ports=(Port("cap", "w"), Port("replay", "r", latency=0)))``
+  with ``reset=False``.
+* ``STACK_DEPTH = 2**LEVEL_SEL_W``, ``LB_CAP``, the 2-bubble branch cost the
+  buffer relies on: D-20 properties and legality (H8).
+
+**decoder, agu_resolve, vpu_adapter.** Pure functions.
+
+* **C1** (default): plain Allo functions inlined into the issue unit
+  (``decode``, ``resolve``, ``adapt``); unit-checked alone as one-kernel
+  ``comb`` regions. The 233-bit decoded view becomes per-slot records, never
+  one wide port (U3 P-8, B6/S7/S8).
+* **C2**: each as its own ``compose.unit`` with ``Wire[..., comb]`` ports
+  (D-13): the composition probe; RTLGen and AMC refuse ``comb`` (D-13).
+
+**scalar_agu.** Contract: a write is visible exactly ``S_LAT`` cycles later,
+no bypass -- the first U4 number an assembler consumes as a latency.
+
+* **S1** (default): ``Stateful`` sregs (reset) + an ``S_LAT``-deep pipe as
+  data (checkpoint 6), SMAC's multiply before the pipe register;
+  ``latency=S_LAT`` pinned (it is a contract: ``asm.py`` ``S_LAT``,
+  ``isa_latency.json`` scalar.latency), and ``S_LAT`` a D-20 booking the
+  generator writes back (``gen_isa_delta``).
+
+**dma_desc_adapter.** A 1-deep valid/accept handshake: the natural boundary
+for a ``Stream`` with ``try_put`` (the sequencer side) feeding ``dma``.
+
+* **A1** (default): a kernel that snapshots base/stride at start and holds
+  the descriptor until accepted; ``Stream[desc, 1]`` to the DMA; the
+  words->beats conversion and ``ROW_BITS == DESC_BEAT_ROWS_W`` as a D-20
+  legality (today: a comment and lint).
+
+**issue (the sequencer's top FSM).** Contract: ``run_accept`` = RUN and a
+bundle and no ``delay``; descriptor detour, ``wait.channel``, halt drain;
+the ``vpu_ctrl_t`` command in the issue cycle.
+
+* **I1 ``locked``** (default): one cycle-locked kernel per sequencer that
+  calls C1's functions and drives F1/L1/S1/A1 over ``Wire`` links (or as one
+  kernel if Wire unit ports stay refused, U3 checkpoint 7); checked per cycle
+  against ``ref_ctrl_issue`` on the Phase 0 program traces. The sim-only
+  checker is **not** expressed (it is a testbench), but its rules move to
+  the calendar (Q2).
+* **I2 ``composed``** (probe): fetch, loop, issue and the AGUs as
+  ``compose.unit``s over Streams. Every Stream hop adds cycles (3 per link in
+  Catapult, ``u3_fifo_composed``), so ``W`` measured from issue moves; the
+  probe asks whether the calendar can be re-derived from the composed units'
+  manifests (D-10/D-20) rather than pinned (H5).
+
+**writeback (the VREG write port).** D-12 already says how: one writeback
+unit owns ``vreg.w``, the producers reach it over channels, the calendar sits
+on that unit's actions.
+
+* **W1** (default): ``writeback`` unit with one input channel per source
+  (load, ALU, SFU, tree root, tree tap, transpose, matrix pop), ``latency``
+  = 2 (``VPU_WB_STAGES``) declared; the "at most one claim per cycle" rule is
+  an **obligation** on the composition (D-12 ``collision="obligation"``,
+  like VMEM's), discharged by the calendar and checked by a stress trace.
+* **W2**: the same unit with an arbiter (an interlock: stall or reject the
+  second claim) as a D-19 ``Option`` -- the interlock question, Q3.
+
+**dma_addr_gen**: a function (C1); ``dma``:
+
+* **D1 ``bits``** (default): ``dma.sv`` transcribed into one kernel per DMA:
+  channel FSMs, issue engine, credit, order FIFO (``Stateful``, reset), the
+  landing FIFO (payload ``reset=False``), watchdog; held per cycle to
+  ``ref_ctrl_dma`` on Phase 0's traces. The bridge stays a boundary (D1's
+  DM req/rsp are region ports).
+* **D2 ``composed``**: issue engine -> ``Stream`` order FIFO -> bridge ->
+  landing ``Stream`` -> drain unit owning the **VMEM DMA port** (D-12
+  ``Port("dma", "rw", latency=2)``, beat gather as data). Judged on the
+  contract (per descriptor: request stream, VMEM write set, completion after
+  the last drain), latencies reported (U3 P-2/P-3's pattern).
+
+3. Composition questions
+------------------------
+
+**Q1. ``vpu_ctrl_t`` as a declared interface (the owner's decision).**
+Phase 0 shows no narrower seam exists *in the RTL*, and that the struct
+behaves as four independent valid-qualified single-cycle commands. Options:
+
+* **(a) one struct**: an 85-bit ``Wire[vpu_ctrl_t, comb]`` port, exactly
+  the RTL. Faithful, and keeps "one unit wearing two file names"
+  (``UNITS.md`` §2.2).
+* **(b) slot commands**: three declared messages -- V (one of
+  alu/sfu/reduce/txin/txout + ``raddr_a/b`` + vd + op), X (vld/vst: vreg,
+  word address), M (load/push/pop + reg) -- each ``valid``-qualified,
+  sampled only in its valid cycle, no backpressure; plus the four shared
+  resources as declared ports (VREG A/B/C, ``vreg.w``, VMEM compute). The
+  measured gating makes (b) exact at the RTL's boundary.
+* **(c) unit commands**: one channel per VPU unit (ALU, SFU, tree,
+  transpose, VMEM, stream engine, pop engine): the template's natural form,
+  since U1-U3 built those units; the decoder fans out.
+
+Provisional default: **(b)**, implemented under I1 as three ``Wire`` command
+ports; (c) is what the template composes *inside* the VPU. Gating the
+payload (zero when not valid) is allowed as a recorded deviation (it lets a
+backend clock-gate). This is a D-n draft for the owner (O1).
+
+**Q2. The calendar, derived (D-20).** ``W_class`` is a property:
+``unit.latency + WB.latency``, from the bound units' declared latencies
+(D-10 bookings), never a constant -- the U3 ``legality.py`` pattern. A
+``Calendar`` record in ``template/`` exposes ``W`` per class, the first
+consumer ``W + 1``, ``vmatpop``'s ``W`` with its precondition (issued >=
+``result_latency`` after its push), and the ``S_LAT`` and descriptor round
+trip; ``check_against_phase0`` holds it to ``calendar.log``; ``gen_isa_delta``
+maps it to ``rtl_params.WB_W_*`` (the agreed seam: manifest latency plus the
+stage count). The program-level rule (two claims never meet) stays the
+assembler's and ACT's; the Actions layer computes the offsets (D-12 text).
+
+**Q3. The interlock (D-16).** None at ``b3ba0a4d``; the Allo MiniTPU
+reproduces that by default (W1: obligation, OR-free single owner). An
+interlocked variant (a RAW/WAW scoreboard that stalls issue, or a write-port
+arbiter) is a D-19 ``Option`` with its own contract and a recorded deviation,
+aligned with v2's interlocks when the pin moves. Phase 0's holes (F-W1, F-W2)
+are an argument for the *checks* (the obligation's stress trace), not for
+hardware.
+
+**Q4. Locked vs self-timed.** U3 judged a Stream-linked MXU on its contract
+(P-2). U4 cannot do that at fetch -> issue -> VPU: ``W`` is counted in clock
+cycles from issue, and every program's delays are computed from it. Either
+the sequencer is cycle-locked (I1) and its ``W`` equal to RTL's, or the
+composition re-derives ``W`` from manifests and the assembler re-schedules
+(I2) -- in which case the Allo machine's ISA timing is a *version delta*
+(D-16's ``versions`` seam), not a match.
+
+**Q5. Memories (D-12).** IRAM (1 host ``w`` + 1 fetch ``r`` lat 1, 4,096 x
+128, unreset), loop buffer (1 ``w`` + 1 async ``r``, 24 x 128, unreset),
+sregs (1 ``w`` + 4 async ``r``: two descriptor reads, the loop bound, the ``rs`` operand; 4 x 32, reset), VMEM's DMA port (``rw`` lat
+2 on the 128 B word, 4-beat gather; compute ``rw`` lat 3; same-word
+collision an obligation, MiniTPU #21). ``asic_memories`` measured that
+Catapult refuses II=1 on a read-or-write RAM port: VMEM's two ``rw`` ports
+are the place it bites (H11).
+
+4. Hypotheses (tool columns)
+----------------------------
+
+Sim = Allo simulator, SC = SystemC csim stand-in, Cat = Catapult RTL (+DC),
+RTLG = RTLGen, AMC. **Y** applies, **opt** optional, **probe** exploratory.
+
+====  ===  ===  =====  =====  =====  ==============================================================
+#     Sim  SC   Cat    RTLG   AMC    hypothesis
+====  ===  ===  =====  =====  =====  ==============================================================
+H1    Y    Y    Y      Y      Y      C1 functions (decode, resolve, adapt, addr gen) match first time; RTLG/AMC refuse a ``comb`` port, take a registered one
+H2    Y    Y    Y      opt    --     S1 matches at ``latency=S_LAT`` on Cat; Sim/SC function only; S_LAT a D-20 booking the generator writes
+H3    Y    Y    Y      --     --     F1 + L1 match the cycle models; IRAM/loop buffer lower as D-12 memories (Cat: ROM/RAM inference; flops at 24 x 128)
+H4    Y    Y    Y      --     --     I1 matches ``ref_ctrl_issue`` per cycle on Cat RTL on every Phase 0 program trace and image
+H5    Y    Y    probe  --     --     I2 (Streams) computes the same issue *order* but not the cycles; ``W`` from issue grows by the hop count (**semantic mismatch**, by design)
+H6    Y    Y    Y      --     --     F2: no Allo stream can be flushed (**missing abstraction**); the workaround (epoch tag + drop) costs a cycle per flush
+H7    Y    Y    Y      --     --     W1: the single-owner writeback refuses two producers on ``vreg.w`` at composition; the claim rule is an obligation the stress trace discharges
+H8    Y    Y    --     --     --     D-20: ``W = L + 2``, ``S_LAT``, ``STACK_DEPTH``, ``ROW_BITS == DESC_BEAT_ROWS_W``, ``LANDING_DEPTH >= OUTSTANDING`` as properties/legality; five wrong declarations refused
+H9    Y    Y    Y      opt    --     D1 matches ``ref_ctrl_dma`` per cycle (four instances); the landing FIFO payload is ``reset=False``
+H10   Y    Y    probe  --     --     D2 (Streams + drain unit) meets the DMA contract; latencies reported, not equal to D1's
+H11   --   --   Y      --     probe  VMEM DMA port (``rw`` lat 2) beside the compute port at II=1: Cat refuses (as ``asic_memories`` s.2.2); AMC is the other place to ask
+H12   Y    Y    --     --     --     Q1(b): three Wire command ports with valid-gated payload compose with U3's VPU units without a 85-bit port (B6/S7 avoided)
+H13   Y    Y    Y      --     --     W2 (interlock Option): a scoreboard stall makes every Phase 0 unscheduled program correct, at a recorded cycle cost
+====  ===  ===  =====  =====  =====  ==============================================================
+
+5. Order of work and agent split
+--------------------------------
+
+Every track branches from ``u4-phase0`` in its own worktree, writes only its
+own ``units/*.py`` variants and record, and holds each variant to the Phase 0
+oracle with ``check.py`` (one ``UNIT-MATCH`` line per unit/variant/backend);
+a ``trace`` unit uses its Phase 0 traces (the program runs for
+``sequencer``). One Verilator build per unit at a time (shared cache). The
+integrator is the only writer of ``u4_matrix.rst`` and of ``u1-pilot``.
+
+**Wave 1 (parallel, after the owner's review):**
+
+* **A -- front and address** (``u4-front``): C1 decode/resolve/adapt, S1, F1,
+  L1 on Sim and SC. H1, H2, H3, H8 (the D-20 records for ``S_LAT``,
+  ``STACK_DEPTH``, ``LB_CAP``).
+* **B -- issue and calendar** (``u4-issue``): A1, I1 (calling A's functions),
+  W1; the ``Calendar`` record (Q2) checked against ``calendar.log`` and
+  emitted through ``gen_isa_delta``. H4, H7, H8, H12.
+* **C -- DMA** (``u4-dma``): D1, then D2 with the VMEM DMA port. H9, H10.
+* **F -- design** (``u4-design``, writing): D-n drafts for Q1 (the
+  interface), Q2/Q3 (calendar and interlock), and the flushable stream (H6),
+  each with a minimal prototype in ``examples/minitpu/template/``.
+
+**Wave 2 (as variants land):**
+
+* **D -- Catapult + DC** (``u4-catapult``): every landed ``bits`` variant
+  at 3.33 ns and 2.0 ns, RTL in Verilator against the oracle per cycle (all
+  of U4's defaults are cycle-locked), ``latency.json`` against the declared
+  value, DC area beside MiniTPU's unit; H11 on the VMEM DMA port; W2 (H13).
+* **E -- open HLS** (``u4-openhls``): RTLGen and AMC on C1, S1, D1 (H1, H2,
+  H9 columns); AMC on the D-12 memories (IRAM, loop buffer).
+
+**Wave 3:** the integrator fills ``u4_matrix.rst``, triages, and drafts the
+D-n entries F produced. Dependencies: B needs A's functions; D waits on a
+variant; F's Q1 draft is the review's first item. Expected cost: A and C a
+day each of agent time, B a day, D a day, E half a day, F half a day.
+
+6. Provisional defaults (to stand unless the owner changes them)
+----------------------------------------------------------------
+
+* **P-1. Expressions.** F1, L1, C1, S1, A1, I1, W1, D1; F2, C2, I2, W2, D2 as
+  probes. *Reason:* the defaults are the cycle-locked forms that can be held
+  to the Phase 0 cycle models; U4's contract is clock-cycle timing (Q4).
+* **P-2. Verdicts.** Per cycle on every output the reference defines, for
+  every default, on Cat RTL; Sim and SC function-only (order of issue, the
+  ``vpu_ctrl_t`` command sequence, DMA traffic). Probes judged on contracts.
+* **P-3. Latency.** Pinned only where a contract consumes the number:
+  ``S_LAT`` 2, writeback 2 (``VPU_WB_STAGES``), the fetch's 3-edge flush (the
+  loop buffer's bubble count), the DMA's 2-cycle VMEM read. Everything else
+  reported (D-10).
+* **P-4. ``vpu_ctrl_t``.** Q1(b), three valid-qualified Wire commands; payload
+  gating allowed and recorded. *Reason:* measured exact at the boundary, and
+  it does not freeze the 85-bit struct into the template.
+* **P-5. The calendar** is derived (D-20), never typed: ``W = L +
+  VPU_WB_STAGES`` from bound latencies, checked against Phase 0 and emitted
+  as the ``WB_W_*`` deltas. *Reason:* the seam agreed with minitpu-comp.
+* **P-6. No interlock** (D-16): W1 with an obligation; W2 only as an Option
+  probe. *Reason:* D-7/D-16 -- an interlock is a deviation the owner decides.
+* **P-7. Unreset storage** (D-14 ``reset=False``) exactly where Phase 0 found
+  it (IRAM, fetch FIFO, loop buffer, landing FIFO payload); control reset.
+* **P-8. Memories** as D-12 declarations (Q5); none hand-built as flops in a
+  body.
+* **P-9. Programs** for every verdict come from MiniTPU's ``asm.py`` via
+  ``harness/minitpu_asm`` (no bytecode, no cache in the clone), plus the
+  shipped images; never a re-implementation of the assembler.
+* **P-10. MiniTPU findings** (F-W1..F-W4, loop overflow, S ops 5-7, channel
+  reuse) recorded, not filed, until the owner says.
+
+7. Open questions for the owner
+-------------------------------
+
+* **O1 (first).** ``vpu_ctrl_t``: accept Q1(b) -- three valid-qualified slot
+  commands plus four declared shared resources -- as the declared interface
+  the U4 row asks for, or keep (a) the RTL's struct, or go to (c) one
+  channel per VPU unit now? And may an Allo instance gate the payload (zero
+  when not valid) as a recorded deviation?
+* **O2.** Must the Allo sequencer match MiniTPU's issue timing per clock
+  (I1, cycle-locked), or may it be self-timed (I2) with the ISA timing
+  published as a version delta through the ``versions`` seam?
+* **O3.** Interlock: confirm none for the ``b3ba0a4d`` instance (P-6), and
+  whether W2 (a scoreboard/arbiter Option) should be built at U4 or wait for
+  v2's interlock contract.
+* **O4.** The four MiniTPU findings (F-W1 ``$onehot0`` blind spot, F-W2
+  ``vtxout`` unbooked, F-W3 lost release, F-W4 back-edge WAW past
+  ``schedule()``) and F1-F3's: file in the MiniTPU repo, or hand to the
+  ``minitpu-comp`` session?
+* **O5.** Scope: should ``iram_loader``, ``command_unit``,
+  ``axi_cdma_ctrl`` and the bridge (second-checked only) get oracles at U4,
+  or stay with M3's host path?

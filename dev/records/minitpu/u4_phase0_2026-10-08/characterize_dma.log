@@ -1,0 +1,193 @@
+== dma_addr_gen: dma_addr_gen (comb), 200700 vectors, rtl 0.3s
+   LATENCY-OK   declared 0 [combinational (one assign, no clock port)]; measured: combinational
+   REF-MATCH 200700/200700
+   IEEE-DIFF 134183/200700, by cause:
+        134183  32-bit wrap (base + row*stride >= 2**32)  e.g. (0000,0002,ffffffff) ieee 1fffffffe rtl fffffffe; (0000,0002,80000000) ieee 100000000 rtl 00000000
+== dma:core: dma (trace) params={'DMA_CHANNEL_COUNT': 2, 'OUTSTANDING': 2, 'TIMEOUT_CYCLES': 1024, 'LANDING_DEPTH': 8, 'M_AXI_DATA_WIDTH': 256} defines=[]
+   ok  load+store contiguous        legal       93 cyc  defined 1874/1874 masked 172  seed-diff 0  asserts 0  channel_done=2, desc=2, dm_req=17, rsp=17, vmem_read=16, vmem_write=16
+   ok  page split, 300 rows         legal      332 cyc  defined 7220/7220 masked 84  seed-diff 0  asserts 0  channel_done=1, desc=1, dm_req=4, rsp=300, vmem_write=300
+   ok  store page split, ready 0.6  legal     1249 cyc  defined 24968/24968 masked 2510  seed-diff 0  asserts 0  channel_done=1, desc=1, dm_req=264, rsp=4, vmem_read=264
+   ok  stride 0 / 7 / 64Ki, wrap    legal       93 cyc  defined 1896/1896 masked 150  seed-diff 0  asserts 0  channel_done=3, desc=3, dm_req=28, rsp=28, vmem_read=8, vmem_write=20
+   ok  two channels round robin     legal       58 cyc  defined 1172/1172 masked 104  seed-diff 0  asserts 0  channel_done=4, desc=4, dm_req=16, rsp=16, vmem_read=4, vmem_write=12
+   ok  vmem_gnt 0.5                 legal      107 cyc  defined 2164/2164 masked 190  seed-diff 0  asserts 0  channel_done=2, desc=2, dm_req=13, rsp=13, vmem_read=36, vmem_write=12
+   ok  SLVERR responses             legal       99 cyc  defined 2016/2016 masked 162  seed-diff 0  asserts 0  channel_done=2, desc=2, dm_req=28, resp_error=6, rsp=28, vmem_read=8, vmem_write=16
+   ok  watchdog timeout             illegal   1088 cyc  defined 21770/21770 masked 2166  seed-diff 0  asserts 0  channel_done=1, desc=2, dm_req=13, rsp=15, timeout=1, vmem_write=15
+   ok  watchdog, then stale beats dropped illegal   2318 cyc  defined 46340/46340 masked 4656  seed-diff 0  asserts 0  desc=1, dm_req=2, rsp_dropped=2, timeout=1
+   ok  channel reuse before clear   illegal     73 cyc  defined 1472/1472 masked 134  seed-diff 0  asserts 1  channel_done=2, desc=2, desc_stall_assert=1, dm_req=16, rsp=16, vmem_write=16
+   ok  reset mid-transfer           legal       36 cyc  defined 716/716 masked 76  seed-diff 0  asserts 0  channel_done=1, desc=3, dm_req=3, rsp=8, vmem_read=3, vmem_write=8
+   ok  random-0                     legal    11263 cyc  defined 228448/228448 masked 19338  seed-diff 0  asserts 0  channel_done=40, desc=40, dm_req=1716, rsp=1604, vmem_read=874, vmem_write=1181
+   ok  random-1                     legal     6605 cyc  defined 133892/133892 masked 11418  seed-diff 0  asserts 0  channel_done=40, desc=40, dm_req=965, rsp=906, vmem_read=733, vmem_write=393
+   ok  random-2                     legal     8475 cyc  defined 172384/172384 masked 14066  seed-diff 0  asserts 0  channel_done=40, desc=40, dm_req=1188, rsp=1452, vmem_read=348, vmem_write=1397
+   ok  random-err                   legal     7829 cyc  defined 159040/159040 masked 13198  seed-diff 0  asserts 0  channel_done=25, desc=25, dm_req=1159, resp_error=93, rsp=986, vmem_read=891, vmem_write=523
+   undefined-slot census (slots, guess matched, moved with seed):
+      beat_count_o       power-up               15  guess        0  seed-moved       15
+      desc_accept        power-up               15  guess       15  seed-moved        0
+      dm_req_addr        power-up               15  guess        0  seed-moved       15
+      dm_req_len         power-up               15  guess       15  seed-moved        0
+      dm_req_valid       power-up               15  guess       15  seed-moved        0
+      dm_req_wdata       power-up               15  guess        0  seed-moved       15
+      dm_req_we          power-up               15  guess       15  seed-moved        0
+      dm_req_wstrb       power-up               15  guess       15  seed-moved        0
+      dm_rsp_ready       power-up               15  guess       15  seed-moved        0
+      dma_channel_done   power-up               15  guess       15  seed-moved       15
+      dma_err            power-up               15  guess        0  seed-moved        0
+      dma_err_cause      power-up               15  guess        0  seed-moved        0
+      dma_err_channel    power-up               15  guess        0  seed-moved       15
+      dma_err_resp       power-up               15  guess        0  seed-moved       15
+      dma_idle           power-up               15  guess        0  seed-moved        0
+      dma_rsp_seen       power-up               15  guess       15  seed-moved       15
+      overlap_stat_o     power-up               15  guess        0  seed-moved       15
+      vmem_rd_en         power-up               15  guess       15  seed-moved        0
+      vmem_rd_ptr        power-up               15  guess        0  seed-moved       15
+      vmem_wr_data       landing empty       34047  guess    30026  seed-moved     4021
+      vmem_wr_data       power-up               15  guess        0  seed-moved       15
+      vmem_wr_en         power-up               15  guess       15  seed-moved        0
+      vmem_wr_ptr        landing empty       34047  guess    30026  seed-moved     4021
+      vmem_wr_ptr        power-up               15  guess        0  seed-moved       15
+   events: channel_done=164, desc=168, desc_stall_assert=1, dm_req=5432, resp_error=99, rsp=5393, rsp_dropped=2, timeout=2, vmem_read=3185, vmem_write=3909
+   assertion x1: %Error: dma.sv:606: Assertion failed in TOP.dma: dma: descriptor stalled on channel 0, which is not IDLE -- a channel must be flushed before it is reused, and this hangs forever rather than faulting
+   LATENCY-OK   desc_valid -> desc_accept (comb): declared 0, step probe 0
+   LATENCY-OK   accept -> first dm_req_valid: declared 2, step probe 2
+   LATENCY-OK   last response beat -> dma_channel_done: declared 2, step probe 2
+   LATENCY-OK   clear_channel_done -> held descriptor accepted: declared 1, step probe 1
+   LATENCY-OK   store: vmem_rd_en -> captured vmem_rd_data (VMEM_DMA_READ_LATENCY): declared 2, step probe 2
+   REF-MATCH dma:core (12.0s)
+== dma:o1: dma (trace) params={'DMA_CHANNEL_COUNT': 2, 'OUTSTANDING': 1, 'TIMEOUT_CYCLES': 1024, 'LANDING_DEPTH': 8, 'M_AXI_DATA_WIDTH': 256} defines=[]
+   ok  load+store contiguous        legal       93 cyc  defined 1874/1874 masked 172  seed-diff 0  asserts 0  channel_done=2, desc=2, dm_req=17, rsp=17, vmem_read=16, vmem_write=16
+   ok  page split, 300 rows         legal      337 cyc  defined 7320/7320 masked 94  seed-diff 0  asserts 0  channel_done=1, desc=1, dm_req=4, rsp=300, vmem_write=300
+   ok  store page split, ready 0.6  legal     1266 cyc  defined 25308/25308 masked 2544  seed-diff 0  asserts 0  channel_done=1, desc=1, dm_req=264, rsp=4, vmem_read=264
+   ok  stride 0 / 7 / 64Ki, wrap    legal      122 cyc  defined 2476/2476 masked 208  seed-diff 0  asserts 0  channel_done=3, desc=3, dm_req=28, rsp=28, vmem_read=8, vmem_write=20
+   ok  two channels round robin     legal       90 cyc  defined 1812/1812 masked 168  seed-diff 0  asserts 0  channel_done=4, desc=4, dm_req=16, rsp=16, vmem_read=4, vmem_write=12
+   ok  vmem_gnt 0.5                 legal      103 cyc  defined 2082/2082 masked 184  seed-diff 0  asserts 0  channel_done=2, desc=2, dm_req=13, rsp=13, vmem_read=28, vmem_write=12
+   ok  SLVERR responses             legal      141 cyc  defined 2856/2856 masked 246  seed-diff 0  asserts 0  channel_done=2, desc=2, dm_req=28, resp_error=7, rsp=28, vmem_read=8, vmem_write=16
+   ok  watchdog timeout             illegal   1056 cyc  defined 21110/21110 masked 2122  seed-diff 0  asserts 0  channel_done=1, desc=2, dm_req=3, rsp=5, timeout=1, vmem_write=5
+   ok  watchdog, then stale beats dropped illegal   2317 cyc  defined 46320/46320 masked 4654  seed-diff 0  asserts 0  desc=1, dm_req=1, rsp_dropped=1, timeout=1
+   ok  channel reuse before clear   illegal    127 cyc  defined 2552/2552 masked 242  seed-diff 0  asserts 1  channel_done=2, desc=2, desc_stall_assert=1, dm_req=16, rsp=16, vmem_write=16
+   ok  reset mid-transfer           legal       36 cyc  defined 716/716 masked 76  seed-diff 0  asserts 0  channel_done=1, desc=3, dm_req=3, rsp=8, vmem_read=3, vmem_write=8
+   ok  random-0                     legal    15235 cyc  defined 307214/307214 masked 27956  seed-diff 0  asserts 0  channel_done=40, desc=40, dm_req=1500, rsp=1267, vmem_read=801, vmem_write=852
+   ok  random-1                     legal    16983 cyc  defined 342404/342404 masked 31222  seed-diff 0  asserts 0  channel_done=40, desc=40, dm_req=1485, rsp=1382, vmem_read=371, vmem_write=1154
+   undefined-slot census (slots, guess matched, moved with seed):
+      beat_count_o       power-up               13  guess        0  seed-moved       13
+      desc_accept        power-up               13  guess       13  seed-moved        0
+      dm_req_addr        power-up               13  guess        0  seed-moved       13
+      dm_req_len         power-up               13  guess       13  seed-moved        0
+      dm_req_valid       power-up               13  guess       13  seed-moved        0
+      dm_req_wdata       power-up               13  guess        0  seed-moved       13
+      dm_req_we          power-up               13  guess       13  seed-moved        0
+      dm_req_wstrb       power-up               13  guess       13  seed-moved        0
+      dm_rsp_ready       power-up               13  guess       13  seed-moved        0
+      dma_channel_done   power-up               13  guess       13  seed-moved       13
+      dma_err            power-up               13  guess        0  seed-moved        0
+      dma_err_cause      power-up               13  guess        0  seed-moved        0
+      dma_err_channel    power-up               13  guess        0  seed-moved       13
+      dma_err_resp       power-up               13  guess        0  seed-moved       13
+      dma_idle           power-up               13  guess        0  seed-moved        0
+      dma_rsp_seen       power-up               13  guess       13  seed-moved       13
+      overlap_stat_o     power-up               13  guess        0  seed-moved       13
+      vmem_rd_en         power-up               13  guess       13  seed-moved        0
+      vmem_rd_ptr        power-up               13  guess        0  seed-moved       13
+      vmem_wr_data       landing empty       34801  guess    29755  seed-moved     5046
+      vmem_wr_data       power-up               13  guess        0  seed-moved       13
+      vmem_wr_en         power-up               13  guess       13  seed-moved        0
+      vmem_wr_ptr        landing empty       34801  guess    29755  seed-moved     5046
+      vmem_wr_ptr        power-up               13  guess        0  seed-moved       13
+   events: channel_done=99, desc=103, desc_stall_assert=1, dm_req=3378, resp_error=7, rsp=3084, rsp_dropped=1, timeout=2, vmem_read=1503, vmem_write=2411
+   assertion x1: %Error: dma.sv:606: Assertion failed in TOP.dma: dma: descriptor stalled on channel 0, which is not IDLE -- a channel must be flushed before it is reused, and this hangs forever rather than faulting
+   LATENCY-OK   desc_valid -> desc_accept (comb): declared 0, step probe 0
+   LATENCY-OK   accept -> first dm_req_valid: declared 2, step probe 2
+   LATENCY-OK   last response beat -> dma_channel_done: declared 2, step probe 2
+   LATENCY-OK   clear_channel_done -> held descriptor accepted: declared 1, step probe 1
+   LATENCY-OK   store: vmem_rd_en -> captured vmem_rd_data (VMEM_DMA_READ_LATENCY): declared 2, step probe 2
+   REF-MATCH dma:o1 (11.5s)
+== dma:o4: dma (trace) params={'DMA_CHANNEL_COUNT': 2, 'OUTSTANDING': 4, 'TIMEOUT_CYCLES': 1024, 'LANDING_DEPTH': 4, 'M_AXI_DATA_WIDTH': 256} defines=[]
+   ok  load+store contiguous        legal       93 cyc  defined 1874/1874 masked 172  seed-diff 0  asserts 0  channel_done=2, desc=2, dm_req=17, rsp=17, vmem_read=16, vmem_write=16
+   ok  page split, 300 rows         legal      327 cyc  defined 7120/7120 masked 74  seed-diff 0  asserts 0  channel_done=1, desc=1, dm_req=4, rsp=300, vmem_write=300
+   ok  store page split, ready 0.6  legal     1244 cyc  defined 24868/24868 masked 2500  seed-diff 0  asserts 0  channel_done=1, desc=1, dm_req=264, rsp=4, vmem_read=264
+   ok  stride 0 / 7 / 64Ki, wrap    legal       76 cyc  defined 1556/1556 masked 116  seed-diff 0  asserts 0  channel_done=3, desc=3, dm_req=28, rsp=28, vmem_read=8, vmem_write=20
+   ok  two channels round robin     legal       51 cyc  defined 1032/1032 masked 90  seed-diff 0  asserts 0  channel_done=4, desc=4, dm_req=16, rsp=16, vmem_read=4, vmem_write=12
+   ok  vmem_gnt 0.5                 legal       93 cyc  defined 1882/1882 masked 164  seed-diff 0  asserts 0  channel_done=2, desc=2, dm_req=13, rsp=13, vmem_read=23, vmem_write=12
+   ok  SLVERR responses             legal       73 cyc  defined 1496/1496 masked 110  seed-diff 0  asserts 0  channel_done=2, desc=2, dm_req=28, resp_error=7, rsp=28, vmem_read=8, vmem_write=14
+   ok  watchdog timeout             illegal   1065 cyc  defined 21310/21310 masked 2120  seed-diff 0  asserts 0  channel_done=1, desc=2, dm_req=13, rsp=15, timeout=1, vmem_write=15
+   ok  watchdog, then stale beats dropped illegal   2322 cyc  defined 46420/46420 masked 4664  seed-diff 0  asserts 0  desc=1, dm_req=4, rsp_dropped=4, timeout=1
+   ok  channel reuse before clear   illegal     60 cyc  defined 1212/1212 masked 108  seed-diff 0  asserts 1  channel_done=2, desc=2, desc_stall_assert=1, dm_req=16, rsp=16, vmem_write=16
+   ok  reset mid-transfer           legal       39 cyc  defined 776/776 masked 82  seed-diff 0  asserts 0  channel_done=1, desc=3, dm_req=3, rsp=8, vmem_read=3, vmem_write=8
+   ok  random-0                     legal     5408 cyc  defined 110440/110440 masked 8536  seed-diff 0  asserts 0  channel_done=40, desc=40, dm_req=1213, rsp=1150, vmem_read=444, vmem_write=865
+   ok  random-1                     legal     4788 cyc  defined 97294/97294 masked 8042  seed-diff 0  asserts 0  channel_done=40, desc=40, dm_req=1000, rsp=777, vmem_read=598, vmem_write=685
+   undefined-slot census (slots, guess matched, moved with seed):
+      beat_count_o       power-up               13  guess        0  seed-moved       13
+      desc_accept        power-up               13  guess       13  seed-moved        0
+      dm_req_addr        power-up               13  guess        0  seed-moved       13
+      dm_req_len         power-up               13  guess       13  seed-moved        0
+      dm_req_valid       power-up               13  guess       13  seed-moved        0
+      dm_req_wdata       power-up               13  guess        0  seed-moved       13
+      dm_req_we          power-up               13  guess       13  seed-moved        0
+      dm_req_wstrb       power-up               13  guess       13  seed-moved        0
+      dm_rsp_ready       power-up               13  guess        0  seed-moved       13
+      dma_channel_done   power-up               13  guess       13  seed-moved       13
+      dma_err            power-up               13  guess        0  seed-moved        0
+      dma_err_cause      power-up               13  guess        0  seed-moved        0
+      dma_err_channel    power-up               13  guess        0  seed-moved       13
+      dma_err_resp       power-up               13  guess        0  seed-moved       13
+      dma_idle           power-up               13  guess        0  seed-moved        0
+      dma_rsp_seen       power-up               13  guess       13  seed-moved       13
+      overlap_stat_o     power-up               13  guess        0  seed-moved       13
+      vmem_rd_en         power-up               13  guess       13  seed-moved        0
+      vmem_rd_ptr        power-up               13  guess        0  seed-moved       13
+      vmem_wr_data       landing empty       13246  guess     9509  seed-moved     3737
+      vmem_wr_data       power-up               13  guess        0  seed-moved       13
+      vmem_wr_en         power-up               13  guess       13  seed-moved        0
+      vmem_wr_ptr        landing empty       13246  guess     9509  seed-moved     3737
+      vmem_wr_ptr        power-up               13  guess        0  seed-moved       13
+   events: channel_done=99, desc=103, desc_stall_assert=1, dm_req=2619, resp_error=7, rsp=2372, rsp_dropped=4, timeout=2, vmem_read=1368, vmem_write=1963
+   assertion x1: %Error: dma.sv:606: Assertion failed in TOP.dma: dma: descriptor stalled on channel 0, which is not IDLE -- a channel must be flushed before it is reused, and this hangs forever rather than faulting
+   LATENCY-OK   desc_valid -> desc_accept (comb): declared 0, step probe 0
+   LATENCY-OK   accept -> first dm_req_valid: declared 2, step probe 2
+   LATENCY-OK   last response beat -> dma_channel_done: declared 2, step probe 2
+   LATENCY-OK   clear_channel_done -> held descriptor accepted: declared 1, step probe 1
+   LATENCY-OK   store: vmem_rd_en -> captured vmem_rd_data (VMEM_DMA_READ_LATENCY): declared 2, step probe 2
+   REF-MATCH dma:o4 (5.7s)
+== dma:bw: dma (trace) params={'DMA_CHANNEL_COUNT': 2, 'OUTSTANDING': 2, 'TIMEOUT_CYCLES': 0, 'LANDING_DEPTH': 8, 'M_AXI_DATA_WIDTH': 256} defines=[]
+   ok  load+store contiguous        legal       93 cyc  defined 1874/1874 masked 172  seed-diff 0  asserts 0  channel_done=2, desc=2, dm_req=17, rsp=17, vmem_read=16, vmem_write=16
+   ok  page split, 300 rows         legal      333 cyc  defined 7240/7240 masked 86  seed-diff 0  asserts 0  channel_done=1, desc=1, dm_req=4, rsp=300, vmem_write=300
+   ok  store page split, ready 0.6  legal     1275 cyc  defined 25488/25488 masked 2562  seed-diff 0  asserts 0  channel_done=1, desc=1, dm_req=264, rsp=4, vmem_read=264
+   ok  stride 0 / 7 / 64Ki, wrap    legal       93 cyc  defined 1896/1896 masked 150  seed-diff 0  asserts 0  channel_done=3, desc=3, dm_req=28, rsp=28, vmem_read=8, vmem_write=20
+   ok  two channels round robin     legal       58 cyc  defined 1172/1172 masked 104  seed-diff 0  asserts 0  channel_done=4, desc=4, dm_req=16, rsp=16, vmem_read=4, vmem_write=12
+   ok  vmem_gnt 0.5                 legal       96 cyc  defined 1956/1956 masked 156  seed-diff 0  asserts 0  channel_done=2, desc=2, dm_req=13, rsp=13, vmem_read=18, vmem_write=12
+   ok  SLVERR responses             legal       96 cyc  defined 1956/1956 masked 156  seed-diff 0  asserts 0  channel_done=2, desc=2, dm_req=28, resp_error=6, rsp=28, vmem_read=8, vmem_write=17
+   ok  channel reuse before clear   illegal     73 cyc  defined 1472/1472 masked 134  seed-diff 0  asserts 1  channel_done=2, desc=2, desc_stall_assert=1, dm_req=16, rsp=16, vmem_write=16
+   ok  reset mid-transfer           legal       35 cyc  defined 696/696 masked 74  seed-diff 0  asserts 0  channel_done=1, desc=3, dm_req=3, rsp=8, vmem_read=3, vmem_write=8
+   ok  random-0                     legal     8663 cyc  defined 176006/176006 masked 14580  seed-diff 0  asserts 0  channel_done=40, desc=40, dm_req=1266, rsp=1383, vmem_read=471, vmem_write=1110
+   ok  tb_dma_bandwidth             legal     8688 cyc  defined 174508/174508 masked 16628  seed-diff 0  asserts 0 TB-REPLAY 174508/174508  channel_done=3, desc=3, dm_req=257, rsp=384, vmem_write=384
+   undefined-slot census (slots, guess matched, moved with seed):
+      beat_count_o       power-up               11  guess        0  seed-moved       11
+      desc_accept        power-up               11  guess       11  seed-moved        0
+      dm_req_addr        power-up               11  guess        0  seed-moved       11
+      dm_req_len         power-up               11  guess       11  seed-moved        0
+      dm_req_valid       power-up               11  guess       11  seed-moved        0
+      dm_req_wdata       power-up               11  guess        0  seed-moved       11
+      dm_req_we          power-up               11  guess       11  seed-moved        0
+      dm_req_wstrb       power-up               11  guess       11  seed-moved        0
+      dm_rsp_ready       power-up               11  guess       11  seed-moved        0
+      dma_channel_done   power-up               11  guess       11  seed-moved       11
+      dma_err            power-up               11  guess        0  seed-moved        0
+      dma_err_cause      power-up               11  guess        0  seed-moved        0
+      dma_err_channel    power-up               11  guess        0  seed-moved       11
+      dma_err_resp       power-up               11  guess        0  seed-moved       11
+      dma_idle           power-up               11  guess        0  seed-moved        0
+      dma_rsp_seen       power-up               11  guess       11  seed-moved       11
+      overlap_stat_o     power-up               11  guess        0  seed-moved       11
+      vmem_rd_en         power-up               11  guess       11  seed-moved        0
+      vmem_rd_ptr        power-up               11  guess        0  seed-moved       11
+      vmem_wr_data       landing empty       17280  guess    15691  seed-moved     1589
+      vmem_wr_data       power-up               11  guess        0  seed-moved       11
+      vmem_wr_en         power-up               11  guess       11  seed-moved        0
+      vmem_wr_ptr        landing empty       17280  guess    15691  seed-moved     1589
+      vmem_wr_ptr        power-up               11  guess        0  seed-moved       11
+   events: channel_done=61, desc=63, desc_stall_assert=1, dm_req=1912, resp_error=6, rsp=2197, vmem_read=792, vmem_write=1895
+   assertion x1: %Error: dma.sv:606: Assertion failed in TOP.dma: dma: descriptor stalled on channel 0, which is not IDLE -- a channel must be flushed before it is reused, and this hangs forever rather than faulting
+   LATENCY-OK   desc_valid -> desc_accept (comb): declared 0, step probe 0
+   LATENCY-OK   accept -> first dm_req_valid: declared 2, step probe 2
+   LATENCY-OK   last response beat -> dma_channel_done: declared 2, step probe 2
+   LATENCY-OK   clear_channel_done -> held descriptor accepted: declared 1, step probe 1
+   LATENCY-OK   store: vmem_rd_en -> captured vmem_rd_data (VMEM_DMA_READ_LATENCY): declared 2, step probe 2
+   REF-MATCH dma:bw (6.6s)

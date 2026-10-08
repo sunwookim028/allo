@@ -1,0 +1,442 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+##############################################################################
+U4 Phase 0: the control units' RTL, references, and the write-port calendar
+##############################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-08.** zhang-21, branch ``u4-phase0``
+   (from ``u1-pilot`` at ``ebbb7b7a``). MiniTPU at
+   ``b3ba0a4d4fb69d39091c55f5f00d1f237082a4f1`` (v1-course, README D-16), read
+   only: its ``board_package/asm.py`` and ``tools/check_back_edges.py`` are
+   imported as data with bytecode and the schedule cache off
+   (``harness/minitpu_asm.py``); the clone stays clean but for its ignored
+   ``.build/``. Verilator 5.052 (conda-forge), g++ 13.3.1 (gcc-toolset-13).
+   RTL side only: no Allo expression of a U4 unit exists; the plan is
+   ``u4_plan_2026-10-08.rst``. Nothing under ``allo/`` or ``mlir/`` changed.
+
+Phase 0 gives each U4 unit an oracle: an ``RtlUnit`` spec (``VARIANTS = {}``),
+stimulus (directed, random, MiniTPU's assembled programs and images, and
+MiniTPU's tbs replayed through their VCD), and a Python reference held
+bit-exact against the Verilator-wrapped ``.sv`` on every defined slot, with
+every declared latency measured by a step probe and MiniTPU's own tbs run
+unchanged as the second check (D-7). Three parallel tracks wrote the parts
+(F1 fetch and loop, F2 decode and address, F3 DMA); the integrator wrote the
+whole sequencer, the VPU's writeback and the calendar comparison.
+
+Reproduce (``source examples/minitpu/harness/env-zhang21.sh`` first)::
+
+   $ALLO_PYTHON -m examples.minitpu.harness.characterize fetch loop_ctrl              # ~30 s warm
+   $ALLO_PYTHON -m examples.minitpu.harness.characterize seq_decoder agu_resolve scalar_agu dma_desc_adapter vpu_adapter
+   $ALLO_PYTHON -m examples.minitpu.units.seq_decoder --asm-check
+   $ALLO_PYTHON -m examples.minitpu.harness.characterize dma_addr_gen dma
+   $ALLO_PYTHON -m examples.minitpu.harness.characterize sequencer vpu_writeback   # vpu build ~2.5 min cold
+   $ALLO_PYTHON -m examples.minitpu.harness.calendar                                 # ~3 min warm
+
+Logs in ``u4_phase0_2026-10-08/``: ``characterize_{front,decode,dma,sequencer,
+vpu_writeback}.log``, ``calendar.log``, ``vpu_ctrl_gating.log``, and the tb
+runs ``tbs_{front,decode,dma,issue}.log`` with their ``run_*_tbs.sh``.
+
+Files
+=====
+
+* Units (``examples/minitpu/units/``): ``fetch``, ``loop_ctrl``,
+  ``seq_decoder``, ``agu_resolve``, ``scalar_agu``, ``dma_desc_adapter``,
+  ``vpu_adapter``, ``dma_addr_gen``, ``dma``, ``sequencer``,
+  ``vpu_writeback``. Wrappers in ``units/rtl/u4_*.sv`` contain no logic:
+  they flatten structs and unpacked arrays into top-level vectors, add a
+  dummy clock to a combinational unit, or read internal signals by
+  hierarchical reference (``u4_vpu_wb.sv``: the writeback mux and registers,
+  VREG port A).
+* References (``examples/minitpu/harness/``): ``ref_ctrl_front.py`` (IRAM +
+  fetch queue, loop control + loop buffer), ``ref_ctrl_decode.py`` (decoder,
+  address resolve, scalar AGU, descriptor adapter, VPU adapter; also
+  ``seed_rows``, which seeds a unit from any scope of a tb, clocked or not),
+  ``ref_ctrl_dma.py`` (``dma.sv`` per cycle, with a Python in-order bridge
+  and VMEM read pipe that generate the open-loop traces), ``ref_ctrl_issue.py``
+  (the whole sequencer, composed from the part models plus the top FSM and
+  the sim-only schedule checker), ``ref_ctrl_wb.py`` (``vpu_ctrl_t``'s layout
+  and the writeback calendar), ``calendar.py`` (the calendar as data).
+* ``harness/rtl.py``, ``characterize.py``, ``vcd_seed.py``: **unchanged**.
+
+Results
+=======
+
+Every instance: **REF-MATCH** on every defined slot, **seed-stable**, every
+probe **LATENCY-OK**, no assertion on any legal trace, every seeded tb
+**TB-REPLAY** equal.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 9 10 13 9 35
+
+   * - unit:instance
+     - traces
+     - cycles
+     - defined slots (all match)
+     - masked
+     - stimulus and notes
+   * - ``fetch:fq_a8`` / ``fq`` / ``iram``
+     - 8 / 7 / 4
+     - 18,142 / 16,138 / 3,804
+     - 126,827 / 112,828 / 24,982
+     - 167 / 138 / 1,646
+     - ``tb_fetch_queue_shift`` 13,999/13,999; masks: unreset queue entries,
+       IRAM words never written
+   * - ``loop_ctrl:shipped`` (+ loop buffer)
+     - 21
+     - 37,729
+     - 527,082
+     - 1,124
+     - programs run closed-loop on the model; ``tb_bundle_loop`` 845,
+       ``tb_loop_begin_r`` 236,083, ``tb_loop_buffer_cap`` 9,679 replayed
+   * - ``seq_decoder``
+     - 4
+     - 25,416 bundles
+     - all
+     - 0
+     - directed, random words (every opcode, undefined ones, IMM conflicts),
+       2,416 image bundles, 2,839 builder bundles; ``tb_bundle_encoding`` 42/42
+   * - ``agu_resolve``
+     - 3
+     - 29,216
+     - all
+     - 0
+     - every level x shift x valid; ``tb_agu_resolve_width`` 9,216/9,216
+   * - ``scalar_agu:lat2`` (+ ``lat1``, ``lat3``)
+     - 7
+     - 40k +
+     - all
+     - row 0
+     - no-bypass rule at +0/+1/+2, SMAC split, SADDI sign, bound saturation;
+       ``tb_bundle_scalar_agu`` parts A and B 130/130
+   * - ``dma_desc_adapter``
+     - 3
+     - 20k random + directed
+     - 180,009
+     - row 0
+     - built with ``SYNTHESIS`` (its sim check reads a sibling by hierarchical
+       reference); ``tb_bundle_scalar_agu:B`` 234/234
+   * - ``vpu_adapter``
+     - 3
+     - 24,866
+     - all
+     - 0
+     - image bundles x issue, random; ``tb_bundle_vpu_adapter`` 34/34
+   * - ``dma_addr_gen`` (``comb``)
+     - --
+     - 200,700 vectors
+     - 200,700
+     - --
+     - 134,183 differ from exact arithmetic, all the 32-bit wrap
+   * - ``dma:core`` / ``o1`` / ``o4`` / ``bw``
+     - 15 / 13 / 13 / 11
+     - 39,718 / 37,906 / 15,639 / 19,503
+     - 805,372 / 764,044 / 317,280 / 394,264
+     - landing-FIFO payload while empty; row 0
+     - OUTSTANDING 2/1/4; strides 0, 1 (fused, 4 KiB split, >256 rows), >1;
+       two channels; backpressure; SLVERR; watchdog; reuse without clear (the
+       one ``dma.sv:606`` assertion, predicted); ``tb_dma_bandwidth``
+       174,508/174,508
+   * - ``sequencer:shipped`` (whole)
+     - 18
+     - 70,507
+     - 1,049,131
+     - 8,474
+     - asm-scheduled programs (straight, loops incl. zero trip and a
+       refetched body, DMA ideal and random, four random loops), the two
+       shipped attention images, an unscheduled program, random
+       ``matrix_busy``; ``tb_bundle_loop`` 954, ``tb_bundle_interlocks`` 424,
+       ``tb_loop_begin_r`` 271,834 replayed; masks: reset rows, payload of an
+       unwritten IRAM word at the fetch head
+   * - ``vpu_writeback:shipped`` (``vpu.sv``)
+     - 6
+     - 24,218
+     - 121,000
+     - 96,962: reset rows; data ports not modelled
+     - every op class alone, a 586-case pair sweep, legal and unfiltered
+       random streams, early and late ``vmatpop``; every payload field random
+       on every cycle
+
+Latency, declared vs measured (step probes)
+-------------------------------------------
+
+.. list-table::
+   :header-rows: 1
+
+   * - unit
+     - path
+     - declared (source)
+     - measured
+   * - ``fetch``
+     - fetch request -> ``bundle_valid``; flush -> target at head; pop -> next head
+     - 2 = ``IRAM_MEM_LATENCY`` 1 (``sequencer_pkg.sv:29``) + 1; 3 ("2 empty
+       cycles", ``sequencer_fetch_queue.sv:25``); 1
+     - 2; 3; 1
+   * - ``loop_ctrl``
+     - begin -> depth/iv; end -> ``branch_taken``; refetch cost of a 25- over a 24-bundle body
+     - 1; 0 (comb); 2 per iteration (``isa_latency.json`` loop_buffer, ``LB_CAP`` 24)
+     - 1; 0; 2
+   * - ``sequencer``
+     - ``start`` -> first issue; warm issue interval; ``delay=N``; halt -> ``done``;
+       descriptor -> next issue (DMA accepting); ``loop.begin.r`` skip
+     - 3 (the flush); 1; N+1 (``sequencer.sv:271``) for N = 1, 5, 85, 127; 2;
+       2 (``tb_bundle_scalar_agu``); 3 (``isa_latency.json`` C row)
+     - 3; 1; 2, 6, 86, 128; 2; 2; 0 + fetch 3
+   * - ``scalar_agu``
+     - S op -> ``sreg``, descriptor base, loop bound
+     - ``S_LAT`` 2 (``sequencer_pkg.sv:233``; ``isa_latency.json`` scalar.latency)
+     - 2 (and 1, 3 at ``S_LAT`` 1, 3)
+   * - ``dma_desc_adapter``
+     - ``start`` -> ``desc_valid``; accept -> ``done``
+     - 1; 0
+     - 1; 0
+   * - ``dma``
+     - ``desc_valid`` -> accept; accept -> first request; last response ->
+       ``channel_done``; clear -> held descriptor accepted; store VMEM read
+     - 0; 2; 2; 1; 2 (``VMEM_DMA_READ_LATENCY``, ``vpu_pkg.sv:52``)
+     - 0; 2; 2; 1; 2
+   * - decoder, ``agu_resolve``, ``vpu_adapter``, ``dma_addr_gen``
+     - all
+     - comb
+     - 0
+
+The write-port calendar, measured (the minitpu-comp seam)
+=========================================================
+
+``vpu.sv`` ORs six writeback sources onto the one VREG write port
+(``:289-305``, ``:352-365``), registers the result twice (``wb_stage_*``, then
+per sublane ``wb_local_*``), and guards it only with ``$onehot0`` under
+``ifndef SYNTHESIS`` (``:370``). The claim cycle ``W`` of each op is what three
+copies book: ``asm.py`` (``W_*`` constants, ``_decode``'s write spans,
+``_Timeline.write_port``), ``docs/isa_latency.json`` (``rtl_params`` and each
+operation's ``w``) and ``sequencer_pkg.sv`` (``WB_W_* = VPU_*_LATENCY +
+VPU_WB_STAGES``, booked by the sim-only checker ``sequencer.sv:277-432``).
+``calendar.py`` measured it on the RTL three ways per class: the cycle the
+source drives the mux (``L``), the cycle the VREG write enable is high
+(``W``), and by function, the first cycle VREG port A returns the new value:
+
+.. list-table::
+   :header-rows: 1
+
+   * - class (op)
+     - L (mux)
+     - W (write enable)
+     - RAW by function
+     - asm ``_decode``
+     - ``isa_latency.json``
+     - ``sequencer_pkg`` L+2
+   * - ``vld``
+     - 4
+     - 6
+     - 7
+     - 6
+     - 6
+     - 6
+   * - ALU (``vadd`` .. ``vmin``, ``vmov``)
+     - 3
+     - 5
+     - 6
+     - 5
+     - 5
+     - 5
+   * - SFU
+     - 5
+     - 7
+     - 8
+     - 7
+     - 7
+     - 7
+   * - ``vredsum``/``vredmax``
+     - 13
+     - 15
+     - 16
+     - 15
+     - 15
+     - 15
+   * - ``vlanered``
+     - 9
+     - 11
+     - 12
+     - 11
+     - 11
+     - 11
+   * - ``vtxout``
+     - 1
+     - 3
+     - 4
+     - 3
+     - 3
+     - 3
+   * - ``vmatpop`` (result waiting)
+     - 1
+     - 3
+     - 4
+     - 3
+     - 3
+     - 3 (``WB_W_MPOP_FIRST`` = ``_LAST``)
+
+**W = unit latency + VPU_WB_STAGES (2) holds for every class, and equals all
+three written copies**: the first measurement of the seam agreed with
+``minitpu-comp`` (``u1_matrix.rst``, 2026-10-08). ``W`` counts clock cycles
+from the issuing bundle (v1-course), and the first legal consumer is
+``W + 1`` by function, which is ``isa_latency.json``'s "L = W + 1". The
+``vmatpop`` row holds only for a pop issued at least 85 cycles after its push
+(``matrix.result_latency``); an earlier pop's beat fires at ``push + 86``, so
+its write lands later than ``W = 3`` booked -- the reference predicts it
+(``ref_ctrl_wb.pop_mux_cycles``) and the ``matrix-pops`` trace matches.
+
+**Pairs.** Every ordered pair of the six fixed-offset classes at every issue
+distance 0..16 (586 cases, each its own trace, ``vpu_writeback``'s fields
+random): two writes merge into one write-enable cycle in exactly the 15
+cases ``W_a = d + W_b``, which are exactly the 15 cases ``asm._Timeline``
+refuses. On the sequencer (806 cases, ``vmatpop`` included, bundles with
+``delay = d - 1``): the rule and ``asm`` give 22; the sequencer's own checker
+fires on 15 (finding F-W2).
+
+``vpu_ctrl_t`` as the interface
+===============================
+
+No narrower seam exists between the sequencer and the VPU: ``vpu_ctrl_t``
+(``vpu_pkg.sv:148-181``, 85 bits, 29 fields counting ``vmem``'s four) is the
+whole contract, and it is **combinational** from the fetch head
+(``sequencer_vpu_adapter``, ``sequencer.sv:467-484``): valid in the issue
+cycle only.
+
+* **Producer** (F2, ``vpu_adapter``): nine valid bits are gated by
+  ``run_accept`` -- ``alu``, ``txin``, ``txout``, ``sfu``, ``reduce``,
+  ``vmem``, ``vmatload``, ``vmatpush``, ``vmatpop``. Every other field is
+  ungated payload that follows the fetch head even on stall cycles (12,423
+  such rows checked): ``raddr_a/b``, the ``*_vd`` and ``*_op`` fields,
+  ``txin/txout_index``, ``reduce_lane``, ``vmem.op/vreg_idx/vmem_address``
+  (the address from ``agu_resolve``), ``vmem_store_read_hint`` (read by
+  nothing), and ``m.reg_idx`` on all three ``vmat*`` fields. ``alu_op`` is
+  cast from 3 to 4 bits: ``vpu_alu``'s AND/OR/XOR are unreachable.
+* **Consumer** (this record): every field is sampled in the cycle its op's
+  valid is high and never again -- the ALU, SFU and tree register their
+  operands then; the tag pipelines carry the ``*_vd`` (they shift every cycle,
+  ungated, and only the valid at the end matters); ``vpu_vmem_simd`` registers
+  the request and port C's store data then (``:40-46``); the matrix engines
+  latch the command and stream port C from ``t + 1``.
+  ``vpu_writeback`` randomises every non-valid field on every cycle and
+  every field of the ops not issued, and the calendar matches; the data-level
+  check (``vpu_ctrl_gating.log``) runs one valid-command stream under two
+  random payloads and ends with **equal VREG files (32/32) and equal stored
+  VMEM (260/260 beats) on five seeds**, while the control (one destination
+  field changed) differs (1/32, 132/260). Matrix commands are not in that
+  check.
+* **What couples the fields** is resources, not timing: ``raddr_a``/``raddr_b``
+  are shared by whichever V op issues (one per bundle); VREG port C is shared
+  by a store and a streaming ``vmatload``/``vmatpush``, and the matrix read
+  wins silently (``vpu.sv:430``); the one write port is the calendar above;
+  ``matrix_busy_o`` is advisory (nothing stalls).
+
+So ``vpu_ctrl_t`` is a set of **valid-qualified, single-cycle, no-backpressure
+commands** on four slots (V, X, M, and nothing else), whose only interactions
+are the four shared resources -- the declared-interface candidate the plan
+puts to the owner (O1).
+
+DMA <-> VMEM port contract (F3)
+===============================
+
+One 32 B beat per access on a 16-bit beat pointer (VMEM uses 14 bits,
+unchecked); four beats a 128 B word. Reads return ``VMEM_DMA_READ_LATENCY`` = 2
+cycles after ``vmem_rd_en``; ``vpu_dma_group`` fetches the word on beat 0 and
+serves beats 1-3 from a register, so a word's beats are read in order from 0.
+A write commits on beat 3 (``flush_i`` tied 0): a partial word is never
+written. ``vmem_gnt`` is tied 1 (``minitpu_core.sv``); inside ``dma.sv`` a
+load drain outranks a store read. A same-word compute/DMA collision is
+undefined and an obligation (MiniTPU issue #21, D-12's ``collision=``). The
+DMA side is one D-12 ``rw`` port of read latency 2 on VMEM, beside the compute
+port's ``rw`` of latency 3 (``VMEM_READ_LATENCY``).
+
+Second check: MiniTPU's tbs, unchanged
+======================================
+
+Built out of the clone into ``scratch/u4p0_tbs/{front,decode,dma,issue}/``,
+run with the clone as working directory: ``tb_fetch_queue_shift``,
+``tb_bundle_loop``, ``tb_loop_begin_r`` (skip 3 cycles),
+``tb_loop_buffer_cap`` (2.00 cycles per refetched iteration),
+``tb_bundle_encoding``, ``tb_agu_resolve_width``, ``tb_bundle_scalar_agu``
+(descriptor round trip 2), ``tb_bundle_vpu_adapter``, ``tb_isa_conformance``,
+``tb_dma_bandwidth``, ``tb_dm_axi_bridge_narrow``, ``tb_iram_loader``,
+``tb_copy_abi_v9``, ``tb_axi_cdma_addr_v9``, ``tb_launch_path_e2e``: all
+**PASS**. ``tb_cdma_fabric_axi_mem`` is not a testbench (the AXI slave model
+of the xsim-only ``tb_cdma_fabric_e2e``). The sequencer + VPU tbs
+(``tb_vpu_latency_probe``, ``tb_bundle_delay``, ``tb_bundle_vadd_loop``,
+``tb_bundle_interlocks``, ``tb_vpu_reduction_writeback``) all **PASS**;
+``tb_vpu_latency_probe``, MiniTPU's own RAW-by-function measurement,
+reports L = 7, 6, 7, 8, 12, 4, 16 (vld, vadd, vld->vst, vgelu, vlanesum,
+vtxout, vredsum): equal to this record's ``W + 1`` column.
+
+Findings
+========
+
+MiniTPU (FYI; not filed while the owner is away, as U3's P-10):
+
+* **F-W1. ``vpu.sv``'s ``$onehot0`` cannot see a ``vredsum`` + ``vlanered``
+  collision.** The tree's two outputs share writeback source bit 3
+  (``vpu.sv:291``), so a ``vredsum`` at ``t`` and a ``vlanered`` at ``t + 4``
+  (both write at ``t + 15``) merge silently: one write to ``vd_a | vd_b`` of
+  OR-ed data, neither destination written, no assertion (8 such cycles in
+  the unfiltered random stream). ``asm.py`` and the sequencer's checker do
+  refuse it.
+* **F-W2. The sequencer's sim-only calendar never books ``vtxout``.**
+  ``candidate_e_writes`` (``sequencer.sv:298``) omits ``txout_valid``, so 7 of
+  the 22 colliding pairs (``vtxout`` against ALU, SFU, both reductions,
+  ``vld``, ``vmatpop``) pass its write-port check; ``vpu.sv``'s assertion
+  catches six of them (different sources). ``sequencer_pkg.sv:7`` documents
+  the RAW/WAW exclusion, not this one.
+* **F-W3. A lost release.** The checker's release pipeline holds one address
+  per slot (``sequencer.sv:357-388``); two writes landing in one cycle
+  overwrite each other's slot, and the loser's VREG stays pending, so a legal
+  read many cycles later asserts RAW. Only after an illegal collision; the
+  reference models it register for register and predicts all six RAW
+  assertions of the ``unscheduled`` trace.
+* **F-W4. ``schedule()`` accepts a back-edge WAW that the sequencer asserts.**
+  A ``loop.begin.r`` body that loads one VREG per pass, scheduled by
+  ``asm.schedule()``, fires two "WAW remains" assertions; MiniTPU's
+  ``tools/check_back_edges.py`` flags the same bundle twice. Documented
+  (``isa_latency.json`` scheduler.not_modelled), and the reason
+  ``check_back_edges`` is a separate gate.
+* Loop-stack overflow (a ninth nested loop) and underflow are silent in
+  hardware (flags left open, ``sequencer.sv:163``; no assertion); a ninth
+  ``loop.begin`` still resets the loop buffer (F1).
+* S ops 5-7 decode as valid, claim the IMM and write 0 after ``S_LAT``;
+  ``asm.py``'s ``_S_IMM_OPS`` disagrees on them; a descriptor channel bit
+  above ``DMA_CHANNEL_SEL_W`` is dropped (F2). Neither occurs in assembled
+  code: on 5,255 real bundles ``asm.py``'s decode agrees with the RTL's on
+  every field it reads; on random words its reads are a superset (safe).
+* A channel reused without a clear hangs (sim-only assertion only); a DMA
+  word address above 2^29 is truncated and a stride-0 store is accepted; a
+  bridge that skips a burst attributes later data to the wrong rows until the
+  watchdog fires (F3).
+
+Harness:
+
+* **H1. Verilator's ``--x-initial unique`` gives every entry of an unpacked
+  array the same random value** (all 32 VREGs read equal at power-up, per
+  seed). A read of the wrong register is then invisible; the VPU probes
+  preload distinct contents through the DMA port first. U2's masks are
+  unaffected (uninitialised slots were masked, and differ across seeds).
+* **H2. Assertion time stamps are not cycles** for sources with
+  ``timescale 1ns/1ps`` (``rtl.py`` sets ``ctx->time(t + 1)`` in the
+  precision unit; ``$error`` prints ``[0]``). The pair sweeps therefore run
+  one case per trace. Fix: scale the time by the timescale.
+* A trace starting with ``rst_n`` low leaves an async-reset unit undefined in
+  row 0 (no edge yet): masked as reset. ``vcd_seed.extract`` reads one scope
+  and needs ``PASS <tb>``; ``seed_rows`` (F2) and two local extractors (F1,
+  F3) work around both without changing the harness.
+
+Not done in Phase 0
+===================
+
+* No Allo expression (the plan's tracks).
+* ``iram_loader``, ``command_unit``, ``axi_cdma_ctrl``, ``dm_axi_bridge``:
+  second check only (their tbs pass); no unit spec. They are M3's host path.
+* The VPU's datapath through the sequencer (sequencer + VPU as one unit) is
+  U5; here the VPU is characterised at its ``vpu_ctrl_t`` boundary.
+* Matrix commands in the payload-gating check; a ``vmatpop`` pair sweep on
+  ``vpu.sv`` (the sequencer sweep covers its booking).

@@ -1,0 +1,34 @@
+Verilator 5.052 2026-09-05 rev conda-forge build 
+b3ba0a4d4fb69d39091c55f5f00d1f237082a4f1
+== tb_fetch_queue_shift
+PASS tb_fetch_queue_shift
+- tb/tb_fetch_queue_shift.sv:120: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 8us; walltime 0.004 s; speed 2.052 ms/s
+- Verilator: cpu 0.004 s on 1 threads; allocated 2 MB
+== tb_bundle_loop
+[655000] lend fired: sp_q=1 tos_iv=6 branch_taken=0 branch_target=4 lb_warm_q=0 body_len=2
+PASS-CANDIDATE: program halted at 675000
+  x_count=6 (expected 6), dma_count=6 (expected 6)
+PASS tb_bundle_loop
+- tb/tb_bundle_loop.sv:243: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 675ns; walltime 0.000 s; speed 3.408 ms/s
+- Verilator: cpu 0.000 s on 1 threads; allocated 2 MB
+== tb_loop_begin_r
+bound 0 from arg0: skip takes 3 cycles
+bound 0 from sreg1: skip takes 3 cycles
+PASS tb_loop_begin_r
+- tb/tb_loop_begin_r.sv:297: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 182us; walltime 0.024 s; speed 7.668 ms/s
+- Verilator: cpu 0.024 s on 1 threads; allocated 2 MB
+== tb_loop_buffer_cap
+  body 24 (held):     56 cycles at 2 trips, 248 at 10 -> 24.00 cycles an iteration
+  body 25 (overruns): 58 cycles at 2 trips, 274 at 10 -> 27.00 cycles an iteration
+  the cap costs 2.00 cycles an iteration, over the one the extra bundle costs
+PASS tb_loop_buffer_cap
+- tb/tb_loop_buffer_cap.sv:202: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 8us; walltime 0.001 s; speed 7.226 ms/s
+- Verilator: cpu 0.001 s on 1 threads; allocated 2 MB

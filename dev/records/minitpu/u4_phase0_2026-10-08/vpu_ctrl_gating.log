@@ -1,0 +1,6 @@
+control (1, 132, (32, 260))
+seed 0 vreg rows equal, vmem beats equal, (of) (32, 260, (32, 260))
+seed 1 vreg rows equal, vmem beats equal, (of) (32, 260, (32, 260))
+seed 2 vreg rows equal, vmem beats equal, (of) (32, 260, (32, 260))
+seed 3 vreg rows equal, vmem beats equal, (of) (32, 260, (32, 260))
+seed 4 vreg rows equal, vmem beats equal, (of) (32, 260, (32, 260))

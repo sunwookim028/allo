@@ -1,0 +1,60 @@
+Verilator 5.052 2026-09-05 rev conda-forge build 
+== tb_dma_bandwidth
+OUTSTANDING=2  LANDING_DEPTH=8  RTT=64  rows=128
+  pattern        cycles    beats  beats/cyc  note
+  contiguous        196      128     0.6531  one fused burst per 4 KiB
+  stride 2         4228      128     0.0303  len=0, one burst per row
+  stride 4KiB      4228      128     0.0303  len=0, one burst per row
+PASS
+- tb/tb_dma_bandwidth.sv:258: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 87us; walltime 0.009 s; speed 9.969 ms/s
+- Verilator: cpu 0.009 s on 1 threads; allocated 2 MB
+   rc=0 wall=13s
+== tb_dm_axi_bridge_narrow
+PASS tb_dm_axi_bridge_narrow
+- tb/tb_dm_axi_bridge_narrow.sv:128: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 26ns; walltime 0.000 s; speed 326.243 us/s
+- Verilator: cpu 0.000 s on 1 threads; allocated 2 MB
+   rc=0 wall=10s
+== tb_iram_loader
+PASS tb_iram_loader: 18 bundles over 9 beats in 1 request(s), in order
+- tb/tb_iram_loader.sv:160: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 366ns; walltime 0.000 s; speed 3.414 ms/s
+- Verilator: cpu 0.000 s on 1 threads; allocated 2 MB
+   rc=0 wall=11s
+== tb_copy_abi_v9
+PASS tb_copy_abi_v9
+- tb/tb_copy_abi_v9.sv:74: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 36ns; walltime 0.000 s; speed 451.026 us/s
+- Verilator: cpu 0.000 s on 1 threads; allocated 2 MB
+   rc=0 wall=10s
+== tb_axi_cdma_addr_v9
+PASS tb_axi_cdma_addr_v9
+- tb/tb_axi_cdma_addr_v9.sv:65: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 626ns; walltime 0.000 s; speed 4.646 ms/s
+- Verilator: cpu 0.000 s on 1 threads; allocated 2 MB
+   rc=0 wall=12s
+== tb_cdma_fabric_axi_mem
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: end at 0s; walltime 0.000 s; speed 0.000 s/s
+- Verilator: cpu 0.000 s on 1 threads; allocated 2 MB
+   rc=0 wall=14s
+== tb_launch_path_e2e
+=========================================================
+SUMMARY
+TEST 0 (in-range kbin_addr):  timed_out=0 instr_ready=1 launch_status=0x00000000 dma_err=0x00000060
+TEST 1 (out-of-range kbin_addr): timed_out=0 instr_ready=1 launch_status=0x00000001 dma_err=0x00000060
+=========================================================
+PASS: in-range LAUNCH retired cleanly, no dma_err fault, no launch_error.
+PASS: out-of-range LAUNCH (DECERR) aborted cleanly with launch_error set, dma_err=0x00000060
+PASS tb_launch_path_e2e: both scenarios behaved as expected
+- tb/tb_launch_path_e2e.sv:538: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.052 2026-09-05
+- Verilator: $finish at 525ns; walltime 0.153 s; speed 3.431 us/s
+- Verilator: cpu 0.142 s on 1 threads; allocated 18 MB
+   rc=0 wall=279s

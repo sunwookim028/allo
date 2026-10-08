@@ -1,0 +1,187 @@
+# U4 Phase 0 track F2 (decode and address), 2026-10-08, MiniTPU b3ba0a4d4fb69d39091c55f5f00d1f237082a4f1
+== seq_decoder:base: u4_seq_decoder (trace) params={} defines=[]
+   ok  directed                     legal      161 cyc  defined 161/161 masked 0  seed-diff 0  asserts 0  c-op-undefined=32, imm-claim-conflict=24, mem-kind-3=32, v-op-undefined=16
+   ok  random                       legal    20000 cyc  defined 20000/20000 masked 0  seed-diff 0  asserts 0  c-op-undefined=4415, imm-claim-conflict=3526, mem-kind-3=3390, v-op-undefined=8853
+   ok  images                       legal     2416 cyc  defined 2416/2416 masked 0  seed-diff 0  asserts 0
+   ok  asm-builder                  legal     2839 cyc  defined 2839/2839 masked 0  seed-diff 0  asserts 0
+   ok  tb_bundle_encoding           legal       42 cyc  defined 42/42 masked 0  seed-diff 0  asserts 0 TB-REPLAY 42/42  c-op-undefined=2
+   undefined-slot census (slots, guess matched, moved with seed):
+   events: c-op-undefined=4449, imm-claim-conflict=3550, mem-kind-3=3422, v-op-undefined=8869
+   LATENCY-OK   bundle_i -> fields_o (comb): declared 0, step probe 0
+   REF-MATCH seq_decoder:base (1.9s)
+== agu_resolve:base: u4_agu_resolve (trace) params={} defines=[]
+   ok  exhaustive-level-shift       legal     9216 cyc  defined 9216/9216 masked 0  seed-diff 0  asserts 0  iv-high-bits-dropped=2688
+   ok  random                       legal    20000 cyc  defined 20000/20000 masked 0  seed-diff 0  asserts 0  iv-high-bits-dropped=10024
+   ok  tb_agu_resolve_width         legal     9216 cyc  defined 9216/9216 masked 0  seed-diff 0  asserts 0 TB-REPLAY 9216/9216  iv-high-bits-dropped=2688
+   undefined-slot census (slots, guess matched, moved with seed):
+   events: iv-high-bits-dropped=15400
+   LATENCY-OK   shift -> x_resolved_addr_o (comb): declared 0, step probe 0
+   REF-MATCH agu_resolve:base (1.6s)
+== scalar_agu:lat2: u4_scalar_agu (trace) params={'S_LAT': 2} defines=[]
+   ok  no-bypass                    legal       15 cyc  defined 70/70 masked 5  seed-diff 0  asserts 0
+   ok  every-op                     legal       17 cyc  defined 80/80 masked 5  seed-diff 0  asserts 0
+   ok  loop-bound-saturation        legal       15 cyc  defined 70/70 masked 5  seed-diff 0  asserts 0
+   ok  inflight-and-undefined       illegal     23 cyc  defined 110/110 masked 5  seed-diff 0  asserts 0  s-op-undefined=3
+   ok  reset-in-flight              legal       10 cyc  defined 45/45 masked 5  seed-diff 0  asserts 0
+   ok  random-0                     legal    20042 cyc  defined 100205/100205 masked 5  seed-diff 0  asserts 0
+   ok  random-1                     legal    20038 cyc  defined 100185/100185 masked 5  seed-diff 0  asserts 0
+   ok  tb_bundle_scalar_agu:A       legal       27 cyc  defined 130/130 masked 5  seed-diff 0  asserts 0 TB-REPLAY 130/130
+   ok  tb_bundle_scalar_agu:B       legal       27 cyc  defined 130/130 masked 5  seed-diff 0  asserts 0 TB-REPLAY 130/130
+   undefined-slot census (slots, guess matched, moved with seed):
+      rd_data_d_base_o   before reset            9  guess        0  seed-moved        9
+      rd_data_d_stride_o before reset            9  guess        0  seed-moved        9
+      rd_data_loop_bound_o before reset            9  guess        0  seed-moved        0
+      sreg_o             before reset            9  guess        0  seed-moved        9
+      sreg_written_o     before reset            9  guess        0  seed-moved        9
+   events: s-op-undefined=3
+   LATENCY-OK   S-op issue -> sreg_o: declared 2, step probe 2
+   LATENCY-OK   S-op issue -> rd_data_d_base_o: declared 2, step probe 2
+   LATENCY-OK   S-op issue -> rd_data_loop_bound_o: declared 2, step probe 2
+   REF-MATCH scalar_agu:lat2 (5.5s)
+== scalar_agu:lat1: u4_scalar_agu (trace) params={'S_LAT': 1} defines=[]
+   ok  no-bypass                    legal       15 cyc  defined 70/70 masked 5  seed-diff 0  asserts 0
+   ok  every-op                     legal       17 cyc  defined 80/80 masked 5  seed-diff 0  asserts 0
+   ok  loop-bound-saturation        legal       15 cyc  defined 70/70 masked 5  seed-diff 0  asserts 0
+   ok  inflight-and-undefined       illegal     23 cyc  defined 110/110 masked 5  seed-diff 0  asserts 0  s-op-undefined=3
+   ok  reset-in-flight              legal       10 cyc  defined 45/45 masked 5  seed-diff 0  asserts 0
+   ok  random-0                     legal    20049 cyc  defined 100240/100240 masked 5  seed-diff 0  asserts 0
+   ok  random-1                     legal    20049 cyc  defined 100240/100240 masked 5  seed-diff 0  asserts 0
+   undefined-slot census (slots, guess matched, moved with seed):
+      rd_data_d_base_o   before reset            7  guess        0  seed-moved        7
+      rd_data_d_stride_o before reset            7  guess        0  seed-moved        7
+      rd_data_loop_bound_o before reset            7  guess        0  seed-moved        0
+      sreg_o             before reset            7  guess        0  seed-moved        7
+      sreg_written_o     before reset            7  guess        0  seed-moved        7
+   events: s-op-undefined=3
+   LATENCY-OK   S-op issue -> sreg_o: declared 1, step probe 1
+   LATENCY-OK   S-op issue -> rd_data_d_base_o: declared 1, step probe 1
+   LATENCY-OK   S-op issue -> rd_data_loop_bound_o: declared 1, step probe 1
+   REF-MATCH scalar_agu:lat1 (5.3s)
+== scalar_agu:lat3: u4_scalar_agu (trace) params={'S_LAT': 3} defines=[]
+   ok  no-bypass                    legal       15 cyc  defined 70/70 masked 5  seed-diff 0  asserts 0
+   ok  every-op                     legal       17 cyc  defined 80/80 masked 5  seed-diff 0  asserts 0
+   ok  loop-bound-saturation        legal       15 cyc  defined 70/70 masked 5  seed-diff 0  asserts 0
+   ok  inflight-and-undefined       illegal     23 cyc  defined 110/110 masked 5  seed-diff 0  asserts 0  s-op-undefined=3
+   ok  reset-in-flight              legal       10 cyc  defined 45/45 masked 5  seed-diff 0  asserts 0
+   ok  random-0                     legal    20032 cyc  defined 100155/100155 masked 5  seed-diff 0  asserts 0
+   ok  random-1                     legal    20040 cyc  defined 100195/100195 masked 5  seed-diff 0  asserts 0
+   undefined-slot census (slots, guess matched, moved with seed):
+      rd_data_d_base_o   before reset            7  guess        0  seed-moved        7
+      rd_data_d_stride_o before reset            7  guess        0  seed-moved        7
+      rd_data_loop_bound_o before reset            7  guess        0  seed-moved        0
+      sreg_o             before reset            7  guess        0  seed-moved        7
+      sreg_written_o     before reset            7  guess        0  seed-moved        7
+   events: s-op-undefined=3
+   LATENCY-OK   S-op issue -> sreg_o: declared 3, step probe 3
+   LATENCY-OK   S-op issue -> rd_data_d_base_o: declared 3, step probe 3
+   LATENCY-OK   S-op issue -> rd_data_loop_bound_o: declared 3, step probe 3
+   REF-MATCH scalar_agu:lat3 (5.6s)
+== dma_desc_adapter:base: u4_dma_desc_adapter (trace) params={} defines=['SYNTHESIS']
+   ok  directed                     legal       27 cyc  defined 234/234 masked 9  seed-diff 0  asserts 0  channel-bit-dropped=5, start-while-issuing (ignored)=1
+   ok  random                       legal    20002 cyc  defined 180009/180009 masked 9  seed-diff 0  asserts 0  channel-bit-dropped=1813, start-while-issuing (ignored)=2163
+   ok  tb_bundle_scalar_agu:B       legal       27 cyc  defined 234/234 masked 9  seed-diff 0  asserts 0 TB-REPLAY 234/234
+   undefined-slot census (slots, guess matched, moved with seed):
+      desc_base_o        before reset            3  guess        0  seed-moved        3
+      desc_channel_o     before reset            3  guess        3  seed-moved        0
+      desc_cols_o        before reset            3  guess        3  seed-moved        0
+      desc_is_store_o    before reset            3  guess        0  seed-moved        3
+      desc_rows_o        before reset            3  guess        0  seed-moved        3
+      desc_stride_o      before reset            3  guess        0  seed-moved        3
+      desc_valid_o       before reset            3  guess        0  seed-moved        3
+      desc_vmem_row_o    before reset            3  guess        0  seed-moved        3
+      done_o             before reset            3  guess        2  seed-moved        1
+   events: channel-bit-dropped=1818, start-while-issuing (ignored)=2164
+   LATENCY-OK   start_i -> desc_valid_o: declared 1, step probe 1
+   LATENCY-OK   desc_accept_i -> done_o (comb): declared 0, step probe 0
+   REF-MATCH dma_desc_adapter:base (1.9s)
+== vpu_adapter:base: u4_vpu_adapter (trace) params={} defines=[]
+   ok  images                       legal     4832 cyc  defined 4832/4832 masked 0  seed-diff 0  asserts 0  ungated-payload-while-not-issued=2326
+   ok  random                       legal    20000 cyc  defined 20000/20000 masked 0  seed-diff 0  asserts 0  ungated-payload-while-not-issued=10096
+   ok  tb_bundle_vpu_adapter        legal       34 cyc  defined 34/34 masked 0  seed-diff 0  asserts 0 TB-REPLAY 34/34  ungated-payload-while-not-issued=1
+   undefined-slot census (slots, guess matched, moved with seed):
+   events: ungated-payload-while-not-issued=12423
+   LATENCY-OK   issue_i -> vpu_ctrl_o.alu_valid (comb): declared 0, step probe 0
+   REF-MATCH vpu_adapter:base (1.6s)
+
+real	0m31.747s
+user	0m20.770s
+sys	0m2.013s
+exit 0
+
+# asm.py cross-check
+== asm.py vs reference decode: directed (161 bundles)
+   AGREE    _decode delay                                 129/129
+   DISAGREE _decode reads == RTL reads                    112/129  e.g. ['0x7fff000000000000000000000000000', '0x87fff000000000000000000000000000', '0x8ffff000000000000000000000000000']
+   AGREE    _decode reads >= RTL reads (conservative)     129/129
+   AGREE    _decode writes (vreg, W)                      129/129
+   AGREE    _imm_owners                                   129/129
+   AGREE    control_op                                    129/129
+   AGREE    control_op refuses undefined C op (RTL: nop)  32/32
+   AGREE    descriptor_of                                 129/129
+   AGREE    loop_begin_of                                 129/129
+   AGREE    unpack_ldst                                   24/24
+   AGREE    unpack_s_slot                                 49/49
+== asm.py vs reference decode: random (20000 bundles)
+   AGREE    _decode delay                                 15585/15585
+   DISAGREE _decode reads == RTL reads                    6706/15585  e.g. ['0xadc6fb97d1d01e5cb56442c73be20000', '0xa6f6365ad75c89525ba2d519e98a0000', '0x625b0a492a4742e726af6c26b230cc6']
+   AGREE    _decode reads >= RTL reads (conservative)     15585/15585
+   AGREE    _decode writes (vreg, W)                      15585/15585
+   DISAGREE _imm_owners                                   12595/15585  e.g. ['0x2965fc84e7deb9db5d4c569f2770cff4', '0xfde69cf4a288c1fc351620e6a5a3ac5', '0x44e7c16ee7c6c3536c6d4eb99f3f0000']
+   AGREE    control_op                                    15585/15585
+   AGREE    control_op refuses undefined C op (RTL: nop)  4415/4415
+   AGREE    descriptor_of                                 15585/15585
+   AGREE    loop_begin_of                                 15585/15585
+   AGREE    unpack_ldst                                   5045/5045
+   AGREE    unpack_s_slot                                 15585/15585
+== asm.py vs reference decode: images (2416 bundles)
+   AGREE    _decode delay                                 2416/2416
+   AGREE    _decode reads == RTL reads                    2416/2416
+   AGREE    _decode reads >= RTL reads (conservative)     2416/2416
+   AGREE    _decode writes (vreg, W)                      2416/2416
+   AGREE    _imm_owners                                   2416/2416
+   AGREE    control_op                                    2416/2416
+   AGREE    descriptor_of                                 2416/2416
+   AGREE    loop_begin_of                                 2416/2416
+   AGREE    unpack_ldst                                   930/930
+   AGREE    unpack_s_slot                                 10/10
+== asm.py vs reference decode: asm-builder (2839 bundles)
+   AGREE    _decode delay                                 2839/2839
+   AGREE    _decode reads == RTL reads                    2839/2839
+   AGREE    _decode reads >= RTL reads (conservative)     2839/2839
+   AGREE    _decode writes (vreg, W)                      2839/2839
+   AGREE    _imm_owners                                   2839/2839
+   AGREE    control_op                                    2839/2839
+   AGREE    descriptor_of                                 2839/2839
+   AGREE    loop_begin_of                                 2839/2839
+   AGREE    unpack_ldst                                   845/845
+   AGREE    unpack_s_slot                                 895/895
+
+# vpu_ctrl_t producer table
+raddr_a                  5  ungated  v.raddr_a
+raddr_b                  5  ungated  v.raddr_b
+alu_valid                1  issue &  v.alu_valid
+txin_valid               1  issue &  v.txin_valid
+txin_index               2  ungated  v.txin_index
+txout_valid              1  issue &  v.txout_valid
+txout_index              2  ungated  v.txout_index
+txout_vd                 5  ungated  v.txout_vd
+alu_op                   4  ungated  v.alu_op (3b -> 4b cast)
+alu_vd                   5  ungated  v.alu_vd
+sfu_valid                1  issue &  v.sfu_valid
+sfu_op                   2  ungated  v.sfu_op
+sfu_vd                   5  ungated  v.sfu_vd
+reduce_valid             1  issue &  v.reduce_valid
+reduce_op                1  ungated  v.reduce_op
+reduce_lane              1  ungated  v.reduce_lane
+reduce_vd                5  ungated  v.reduce_vd
+vmem.valid               1  issue &  x.valid
+vmem.op                  1  ungated  x.op
+vmem.vreg_idx            5  ungated  x.vreg_idx
+vmem.vmem_address       12  ungated  x_resolved_row_i (agu_resolve)
+vmem_store_read_hint     1  ungated  x.valid & x.op
+vmatload_valid           1  issue &  m.subop == VMATLOAD
+vmatload_base            5  ungated  m.reg_idx
+vmatpush_valid           1  issue &  m.subop == VMATPUSH
+vmatpush_vs              5  ungated  m.reg_idx
+vmatpop_valid            1  issue &  m.subop == VMATPOP
+vmatpop_vd               5  ungated  m.reg_idx
