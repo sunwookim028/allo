@@ -30,6 +30,11 @@ Instances: ``shipped`` only (no geometry parameter: ``STACK_DEPTH`` and
 
 import os
 
+import numpy as np
+
+import allo.dataflow as df
+from allo.ir.types import UInt, int32, uint1
+
 from examples.minitpu.harness import ref_ctrl_front, rtl
 from examples.minitpu.harness.traces import Trace, rng_for, word
 
@@ -354,4 +359,197 @@ def seeds():
     return [(tb, "shipped", *_extract(tb), True) for tb in SEED_TBS]
 
 
-VARIANTS = {}
+# ---------------------------------------------------------------------------
+# Allo (U4 track A, plan L1 ``bits``). One kernel, one iteration per cycle:
+# the combinational outputs (branch, target, iv per level, buffer controls,
+# the replayed word) from the registers and this cycle's inputs, then the
+# edge. ``sequencer_loop_ctrl.sv`` and ``sequencer_loop_buffer.sv`` are
+# transcribed register for register: the frame stack (``STACK_DEPTH`` frames
+# of {body_start, iv, hi, step}, reset), the capture/replay state, and the
+# ``LB_CAP`` x 128 buffer (unreset; written only when not reset, as the RTL's
+# ``if (rst_n && ...)``). The geometry is the D-20 record's
+# (``template/control_geometry.py``), not literals.
+# ---------------------------------------------------------------------------
+
+WIDTH = {"shipped": 128}
+U32 = UInt(32)
+
+
+def l1(n, w, inst):
+    from examples.minitpu.template.control_geometry import SHIPPED as G
+
+    SD, CAP = G.STACK_DEPTH, G.LB_CAP
+    A = UInt(G.INSTR_ADDR_W)
+    SPW = UInt(G.SP_W)  # $clog2(STACK_DEPTH + 1)
+    CW = UInt(G.LB_COUNT_W)  # $clog2(LB_CAP + 1): capture count, body length, write pointer
+    IW = UInt(G.LB_IDX_W)  # $clog2(LB_CAP): replay index
+
+    @df.region()
+    def top(RST: uint1[n], BV: uint1[n], BS: A[n], LO: UInt(8)[n], HI: UInt(16)[n], STEP: UInt(8)[n],
+            MS: uint1[n], SKIP: A[n], EV: uint1[n], ISS: uint1[n], CAPD: U32[n, 4],
+            IVL: U32[n, 8], RD: U32[n, 4], TAKEN: uint1[n], TARGET: A[n], IVT: U32[n], LVT: UInt(3)[n],
+            LBR: uint1[n], CAPEN: uint1[n], REPEN: uint1[n], RIDX: IW[n], CAPOVF: uint1[n], DEPTH: SPW[n],
+            OVF: uint1[n], UNF: uint1[n]):
+        @df.kernel(mapping=[1], args=[RST, BV, BS, LO, HI, STEP, MS, SKIP, EV, ISS, CAPD,
+                                      IVL, RD, TAKEN, TARGET, IVT, LVT, LBR, CAPEN, REPEN, RIDX, CAPOVF,
+                                      DEPTH, OVF, UNF])
+        def loop(rst: uint1[n], bv_i: uint1[n], bs_i: A[n], lo_i: UInt(8)[n], hi_i: UInt(16)[n],
+                 step_i: UInt(8)[n], ms_i: uint1[n], skip_i: A[n], ev_i: uint1[n], iss_i: uint1[n],
+                 capd: U32[n, 4],
+                 ivl_o: U32[n, 8], rd_o: U32[n, 4], taken_o: uint1[n], target_o: A[n], ivt_o: U32[n],
+                 lvt_o: UInt(3)[n], lbr_o: uint1[n], capen_o: uint1[n], repen_o: uint1[n], ridx_o: IW[n],
+                 capovf_o: uint1[n], depth_o: SPW[n], ovf_o: uint1[n], unf_o: uint1[n]):
+            fr_bs: A[SD] = 0
+            fr_iv: U32[SD] = 0
+            fr_hi: UInt(16)[SD] = 0
+            fr_step: UInt(8)[SD] = 0
+            sp: SPW = 0
+            warm: uint1 = 0
+            cap_count: CW = 0
+            body_len: CW = 0
+            ridx: IW = 0
+            invalid: uint1 = 0
+            lbmem: U32[CAP, 4] = 0  # sequencer_loop_buffer.mem (unreset LUTRAM)
+            wr_ptr: CW = 0
+            for t in range(n):
+                if rst[t] == 0:
+                    for k in range(SD):
+                        fr_bs[k] = 0
+                        fr_iv[k] = 0
+                        fr_hi[k] = 0
+                        fr_step[k] = 0
+                    sp = 0
+                    warm = 0
+                    cap_count = 0
+                    body_len = 0
+                    ridx = 0
+                    invalid = 0
+                    wr_ptr = 0
+                bv: uint1 = bv_i[t]
+                endv: uint1 = ev_i[t]
+                iss: uint1 = iss_i[t]
+                # ---- combinational: sequencer_loop_ctrl ----
+                tos: SPW = 0
+                if sp != 0:
+                    tos = sp - 1
+                it: int32 = tos
+                step32: U32 = fr_step[it]
+                iv_next: U32 = fr_iv[it] + step32
+                hi32: U32 = fr_hi[it]
+                live: uint1 = endv & (sp != 0)
+                cont: uint1 = 0
+                if live and iv_next < hi32:
+                    cont = 1
+                exit_: uint1 = live & (1 - cont)
+                lo16: UInt(16) = lo_i[t]
+                skip: uint1 = 0
+                if bv and ms_i[t] and hi_i[t] <= lo16:
+                    skip = 1
+                push: uint1 = bv & (1 - skip)
+                lb_reset: uint1 = push | exit_ | skip
+                cap_en: uint1 = 0
+                if sp != 0 and warm == 0 and invalid == 0:
+                    cap_en = 1
+                rep_en: uint1 = 0
+                if sp != 0 and warm == 1:
+                    rep_en = 1
+                # sequencer_loop_buffer: capture_overflow_o, replay_data_o
+                cap_ovf: uint1 = 0
+                if cap_en and iss and wr_ptr == CAP:
+                    cap_ovf = 1
+                completes: uint1 = cap_en & endv & (1 - cap_ovf)
+                cold_cont: uint1 = cont & (1 - warm)
+                warm_exit: uint1 = exit_ & warm
+                target: A = fr_bs[it] + body_len + 1
+                if skip:
+                    target = bs_i[t] + skip_i[t]
+                elif cold_cont:
+                    target = fr_bs[it]
+                for k in range(SD):
+                    ivl_o[t, k] = fr_iv[k]  # A5: the 2-D outputs stored first
+                ir: int32 = ridx
+                for k in range(4):
+                    word: U32 = 0
+                    if ir < CAP:  # an index at or above LB_CAP reads nothing defined
+                        word = lbmem[ir, k]
+                    rd_o[t, k] = word
+                taken_o[t] = cold_cont | warm_exit | skip
+                target_o[t] = target
+                ivt_o[t] = fr_iv[it]
+                lvt_o[t] = tos
+                lbr_o[t] = lb_reset
+                capen_o[t] = cap_en
+                repen_o[t] = rep_en
+                ridx_o[t] = ridx
+                capovf_o[t] = cap_ovf
+                depth_o[t] = sp
+                ovf_o[t] = push & (sp == SD)
+                unf_o[t] = endv & (sp == 0)
+                # ---- rising edge ----
+                if rst[t]:
+                    isp: int32 = sp
+                    if push and sp != SD:
+                        fr_bs[isp] = bs_i[t]
+                        fr_iv[isp] = lo_i[t]
+                        fr_hi[isp] = hi_i[t]
+                        fr_step[isp] = step_i[t]
+                        sp = sp + 1
+                    elif endv and sp != 0:
+                        if cont:
+                            fr_iv[it] = iv_next
+                        else:
+                            sp = sp - 1
+                    if push:
+                        warm = 0
+                        cap_count = 0
+                        ridx = 0
+                        invalid = 0
+                    elif exit_ or skip:
+                        warm = 0
+                        cap_count = 0
+                        ridx = 0
+                        invalid = 1
+                    else:
+                        old_count: CW = cap_count
+                        if cap_en and iss:
+                            cap_count = cap_count + 1
+                        if completes:
+                            body_len = old_count
+                            warm = 1
+                        if rep_en and iss:
+                            if endv:
+                                ridx = 0
+                            else:
+                                ridx = ridx + 1
+                    # the loop buffer
+                    if lb_reset:
+                        wr_ptr = 0
+                    elif cap_en and iss and wr_ptr < CAP:
+                        iw: int32 = wr_ptr
+                        for k in range(4):
+                            lbmem[iw, k] = capd[t, k]
+                        wr_ptr = wr_ptr + 1
+
+    return top
+
+
+L_IN = [("rst_n", np.uint8), ("loop_begin_valid", np.uint8), ("body_start", np.uint16), ("lo", np.uint8),
+        ("hi", np.uint16), ("step", np.uint8), ("may_skip", np.uint8), ("skip", np.uint16),
+        ("loop_end_valid", np.uint8), ("bundle_issued", np.uint8)]
+L_OUT = [("branch_taken", np.uint8), ("branch_target", np.uint16), ("iv_tos", np.uint32),
+         ("level_tos", np.uint8), ("lb_reset", np.uint8), ("lb_capture_en", np.uint8),
+         ("lb_replay_en", np.uint8), ("lb_replay_idx", np.uint8), ("lb_capture_overflow", np.uint8),
+         ("depth", np.uint8), ("overflow", np.uint8), ("underflow", np.uint8)]
+
+
+def run_l1(mod, cmd, n, w):
+    from examples.minitpu.units.ctrl_lanes import col, join, split
+
+    ivl, rd = np.zeros((n, 8), dtype=np.uint32), np.zeros((n, 4), dtype=np.uint32)
+    outs = {p: np.zeros(n, dtype=d) for p, d in L_OUT}
+    mod(*[col(cmd, p, n, d) for p, d in L_IN], split(cmd["capture_data"][:n], 4), ivl, rd,
+        *[outs[p] for p, _ in L_OUT])
+    return {"iv_by_level": join(ivl), "replay_data": join(rd), **outs}
+
+
+VARIANTS = {"l1": (l1, run_l1)}
