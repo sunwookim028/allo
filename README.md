@@ -459,6 +459,23 @@ from Allo, mostly as RTL IP; and Allo's MXU integrated into MiniTPU.**
 - Neither replaces the ladder (U4, U5) nor moves the pin (D-16).
 - Evidence as it lands: `dev/records/minitpu/minitpu_rtl_*.rst`.
 
+**D-22 (2026-10-08). TinyTPU is the toy instance for communication; MiniTPU
+is the design driver.**
+- TinyTPU-isa (`examples/tinytpu/`, frozen, D-4) exists to communicate the
+  Allo co-design programming model and the compiler -- docs, demos, the
+  tutorial -- and as the regression reference for the toolchain. It need not
+  be a real implementation instance of the MiniTPU family.
+- MiniTPU is the practical design driver: the unit ladder (U1-U5), the
+  template, the ISA seam with its compiler, and the physical-design numbers
+  are MiniTPU's. A "TinyTPU as an instance" of the template is a probe of the
+  template's mechanisms (an int8 engine, an accumulator option), informative
+  when it reproduces TinyTPU-isa's gates and cycles and not required to.
+  D-4's retirement of the frozen copy is therefore optional, not a milestone.
+- Naming: "TinyTPU-isa" is the shipped design; "TinyTPU" bare is the family
+  name of that toy; both stay. `mvoutrelu.patch` is a demonstration variant
+  of the shipped design; the parity baselines are its measurement
+  configurations.
+
 ## Milestones
 
 Each milestone passes on **one acceptance check** and names the tools it uses

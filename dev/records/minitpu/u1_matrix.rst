@@ -495,6 +495,17 @@ merging it is the owner's review. An audit of the 30 open fork issues
 against this month's fixes and decisions is in progress (no posting).
 Also started: U4 Phase 0 (prep only) and the TinyTPU-as-instance track.
 
+**Checkpoint 20, 2026-10-08:** README D-22 (TinyTPU = the toy instance for
+communication; MiniTPU = the design driver; the instance track is a probe,
+not a requirement). Issue audit recorded
+(``dev/records/fork_issue_audit_2026-10-08.md``); the owner approved closing
+6 issues and PR #14 and posting 12 update comments (delegated). Running:
+``u1-pilot-sync3`` (integration), ``tinytpu-example`` (README cleanup),
+``u4-phase0``, ``tinytpu-instance``, PR #48 probe, whole-core shim plan,
+``minitpu-rtl-mxu`` probe. Next session: merge what landed, regress, ff
+``main``, prune the 13 merged branches, add the README naming paragraph
+(after the cleanup lands).
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
