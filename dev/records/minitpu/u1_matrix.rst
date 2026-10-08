@@ -510,6 +510,13 @@ not a requirement). Issue audit recorded
 ``main``, prune the 13 merged branches, add the README naming paragraph
 (after the cleanup lands).
 
+**Standing order (owner, 2026-10-08): the main checkout is frozen.** No
+command, build, test or fast-forward in ``/work/shared/users/phd/sk3463/allo``
+and no merge to ``main`` until the owner explicitly authorizes each merge.
+Everything integrates into ``u1-pilot``; regressions run in a throwaway
+baseline worktree; the owner's demo work is in ``scratch/ace-demo`` (branch
+``ace-demo``). ``main`` stays at ``870265c2`` until then.
+
 **Checkpoint 29 (2026-10-08, U4 track E landed).** ``u4-openhls``
 (``71546a54``): RTLGen matches every combinational U4 unit (II=1 inlined;
 lane-array ports cost II=2..9, called functions become sequenced
