@@ -1,0 +1,6 @@
+{"dim": 2, "push_to_valid": 39, "pop_to_next_valid": 28,
+ "ref": {"push_to_valid": 11, "pop_to_next_valid": 0, "rtl": "mxu.sv b3ba0a4d, same tb copy, DIM 2 (logs/tb/mxu_sv_dim2.txt)"},
+ "pop_beats": 1, "switch_span": null, "output_fifo_depth": 64,
+ "tokens_per_cycle": 1.0, "token_lag": 27, "acc_lag": 2,
+ "tb": "tb_mxu_single_port_lat (record copy of b3ba0a4d's tb_mxu_single_port)",
+ "rtl": "mxu_wide_dim2 Vitis HLS 2023.2 5 ns, per-link depths (v2c)"}

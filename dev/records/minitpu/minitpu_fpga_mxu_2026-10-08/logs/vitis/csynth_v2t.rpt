@@ -1,0 +1,294 @@
+
+
+================================================================
+== Synthesis Summary Report of 'mxu_wide_dim2'
+================================================================
++ General Information: 
+    * Date:           Thu Oct  8 06:28:32 2026
+    * Version:        2023.2 (Build 4023990 on Oct 11 2023)
+    * Project:        out.prj
+    * Solution:       solution1 (Vivado IP Flow Target)
+    * Product family: zynquplus
+    * Target device:  xczu7ev-ffvc1156-2-e
+    
+
++ Performance & Resource Estimates: 
+    
+    PS: '+' for module; 'o' for loop; '*' for dataflow
+    +------------------+--------+-------+---------+-----------+----------+---------+---------+----------+------+----+------------+------------+-----+
+    |      Modules     |  Issue |       | Latency |  Latency  | Iteration|         |   Trip  |          |      |    |            |            |     |
+    |      & Loops     |  Type  | Slack | (cycles)|    (ns)   |  Latency | Interval|  Count  | Pipelined| BRAM | DSP|     FF     |     LUT    | URAM|
+    +------------------+--------+-------+---------+-----------+----------+---------+---------+----------+------+----+------------+------------+-----+
+    |+ mxu_wide_dim2*  |  Timing|  -1.55|  1048604|  5.451e+06|         -|  1048587|        -|  dataflow|     -|   -|   6639 (1%)|  16548 (7%)|    -|
+    | + mxu_front_w_0  |  Timing|  -0.10|  1048578|  5.243e+06|         -|  1048578|        -|        no|     -|   -|   234 (~0%)|   793 (~0%)|    -|
+    |  o l_S_t_0_t     |       -|   3.65|  1048576|  5.243e+06|         2|        1|  1048576|  yes(flp)|     -|   -|           -|           -|    -|
+    | + pe_unit_0_0    |  Timing|  -0.35|  1048584|  5.243e+06|         -|  1048584|        -|        no|     -|   -|   672 (~0%)|  1992 (~0%)|    -|
+    |  o l_S_t_0_t1    |       -|   3.65|  1048582|  5.243e+06|         7|        1|  1048576|  yes(flp)|     -|   -|           -|           -|    -|
+    | + pe_unit_0_1    |  Timing|  -0.35|  1048584|  5.243e+06|         -|  1048584|        -|        no|     -|   -|   565 (~0%)|  1954 (~0%)|    -|
+    |  o l_S_t_0_t2    |       -|   3.65|  1048582|  5.243e+06|         7|        1|  1048576|  yes(flp)|     -|   -|           -|           -|    -|
+    | + pe_unit_1_0    |  Timing|  -0.35|  1048586|  5.243e+06|         -|  1048586|        -|        no|     -|   -|   726 (~0%)|   2645 (1%)|    -|
+    |  o l_S_t_0_t3    |       -|   3.65|  1048584|  5.243e+06|         9|        1|  1048576|  yes(flp)|     -|   -|           -|           -|    -|
+    | + pe_unit_1_1    |  Timing|  -0.35|  1048586|  5.243e+06|         -|  1048586|        -|        no|     -|   -|   574 (~0%)|   2587 (1%)|    -|
+    |  o l_S_t_0_t4    |       -|   3.65|  1048584|  5.243e+06|         9|        1|  1048576|  yes(flp)|     -|   -|           -|           -|    -|
+    | + mxu_back_w_0   |  Timing|  -1.55|  1048581|  5.451e+06|         -|  1048581|        -|        no|     -|   -|  2581 (~0%)|   5699 (2%)|    -|
+    |  o l_S_t_0_t5    |       -|   3.65|  1048579|  5.451e+06|         4|        1|  1048576|  yes(flp)|     -|   -|           -|           -|    -|
+    +------------------+--------+-------+---------+-----------+----------+---------+---------+----------+------+----+------------+------------+-----+
+
+
+================================================================
+== HW Interfaces
+================================================================
+* AP_FIFO
++-----------+-----------+------------+
+| Interface | Direction | Data Width |
++-----------+-----------+------------+
+| v2970     | out       | 1          |
+| v2971     | out       | 1          |
+| v2972     | out       | 1          |
+| v2973     | out       | 32         |
+| v2974     | out       | 1          |
+| v2975     | out       | 1          |
+| v2976     | out       | 1          |
+| v2977     | out       | 1          |
+| v2978     | out       | 1          |
+| v2979     | out       | 128        |
++-----------+-----------+------------+
+
+* TOP LEVEL CONTROL
++-----------+--------------+--------+
+| Interface | Type         | Ports  |
++-----------+--------------+--------+
+| ap_clk    | clock        | ap_clk |
+| ap_rst    | reset        | ap_rst |
+| ap_ctrl   | ap_ctrl_none |        |
++-----------+--------------+--------+
+
+
+================================================================
+== SW I/O Information
+================================================================
+* Top Function Arguments
++----------+-----------+---------------+
+| Argument | Direction | Datatype      |
++----------+-----------+---------------+
+| v2970    | in        | bool*         |
+| v2971    | in        | bool*         |
+| v2972    | in        | bool*         |
+| v2973    | in        | unsigned int* |
+| v2974    | in        | bool*         |
+| v2975    | in        | bool*         |
+| v2976    | out       | bool*         |
+| v2977    | out       | bool*         |
+| v2978    | out       | bool*         |
+| v2979    | out       | ap_uint<128>* |
++----------+-----------+---------------+
+
+* SW-to-HW Mapping
++----------+--------------+-----------+
+| Argument | HW Interface | HW Type   |
++----------+--------------+-----------+
+| v2970    | v2970        | interface |
+| v2971    | v2971        | interface |
+| v2972    | v2972        | interface |
+| v2973    | v2973        | interface |
+| v2974    | v2974        | interface |
+| v2975    | v2975        | interface |
+| v2976    | v2976        | interface |
+| v2977    | v2977        | interface |
+| v2978    | v2978        | interface |
+| v2979    | v2979        | interface |
++----------+--------------+-----------+
+
+
+================================================================
+== Bind Op Report
+================================================================
++---------------------------+-----+--------+------------+-----+--------+---------+
+| Name                      | DSP | Pragma | Variable   | Op  | Impl   | Latency |
++---------------------------+-----+--------+------------+-----+--------+---------+
+| + mxu_wide_dim2           | 0   |        |            |     |        |         |
+|  + mxu_front_w_0          | 0   |        |            |     |        |         |
+|    add_ln61_fu_458_p2     |     |        | add_ln61   | add | fabric | 0       |
+|  + pe_unit_0_0            | 0   |        |            |     |        |         |
+|    t1_2_fu_496_p2         |     |        | t1_2       | add | fabric | 0       |
+|    v281_fu_2296_p2        |     |        | v281       | add | fabric | 0       |
+|    v285_fu_2302_p2        |     |        | v285       | add | fabric | 0       |
+|    add_ln944_fu_1892_p2   |     |        | add_ln944  | add | fabric | 0       |
+|    v436_fu_2029_p2        |     |        | v436       | add | fabric | 0       |
+|    v445_fu_2042_p2        |     |        | v445       | sub | fabric | 0       |
+|    mul_8ns_8ns_16_1_1_U13 |     |        | v661       | mul | auto   | 0       |
+|    add_ln1482_fu_637_p2   |     |        | add_ln1482 | add | fabric | 0       |
+|    v666_fu_643_p2         |     |        | v666       | add | fabric | 0       |
+|    v670_fu_1265_p2        |     |        | v670       | add | fabric | 0       |
+|    v674_fu_1270_p2        |     |        | v674       | add | fabric | 0       |
+|  + pe_unit_0_1            | 0   |        |            |     |        |         |
+|    t2_2_fu_454_p2         |     |        | t2_2       | add | fabric | 0       |
+|    v902_fu_2229_p2        |     |        | v902       | add | fabric | 0       |
+|    v906_fu_2235_p2        |     |        | v906       | add | fabric | 0       |
+|    add_ln2285_fu_1842_p2  |     |        | add_ln2285 | add | fabric | 0       |
+|    v1057_fu_1979_p2       |     |        | v1057      | add | fabric | 0       |
+|    v1066_fu_1992_p2       |     |        | v1066      | sub | fabric | 0       |
+|    mul_8ns_8ns_16_1_1_U20 |     |        | v1282      | mul | auto   | 0       |
+|    add_ln2823_fu_592_p2   |     |        | add_ln2823 | add | fabric | 0       |
+|    v1287_fu_598_p2        |     |        | v1287      | add | fabric | 0       |
+|    v1291_fu_1215_p2       |     |        | v1291      | add | fabric | 0       |
+|    v1295_fu_1220_p2       |     |        | v1295      | add | fabric | 0       |
+|  + pe_unit_1_0            | 0   |        |            |     |        |         |
+|    t3_2_fu_521_p2         |     |        | t3_2       | add | fabric | 0       |
+|    v1532_fu_2671_p2       |     |        | v1532      | add | fabric | 0       |
+|    v1536_fu_2677_p2       |     |        | v1536      | add | fabric | 0       |
+|    add_ln3645_fu_2279_p2  |     |        | add_ln3645 | add | fabric | 0       |
+|    v1687_fu_2416_p2       |     |        | v1687      | add | fabric | 0       |
+|    v1696_fu_2429_p2       |     |        | v1696      | sub | fabric | 0       |
+|    v1786_fu_1079_p2       |     |        | v1786      | sub | fabric | 0       |
+|    v1804_fu_1441_p2       |     |        | v1804      | add | fabric | 0       |
+|    v1830_fu_1744_p2       |     |        | v1830      | add | fabric | 0       |
+|    v1831_fu_1750_p2       |     |        | v1831      | sub | fabric | 0       |
+|    mul_8ns_8ns_16_1_1_U25 |     |        | v1912      | mul | auto   | 0       |
+|    add_ln4183_fu_661_p2   |     |        | add_ln4183 | add | fabric | 0       |
+|    v1917_fu_667_p2        |     |        | v1917      | add | fabric | 0       |
+|    v1921_fu_1257_p2       |     |        | v1921      | add | fabric | 0       |
+|    v1925_fu_1262_p2       |     |        | v1925      | add | fabric | 0       |
+|  + pe_unit_1_1            | 0   |        |            |     |        |         |
+|    t4_2_fu_468_p2         |     |        | t4_2       | add | fabric | 0       |
+|    v2145_fu_2593_p2       |     |        | v2145      | add | fabric | 0       |
+|    v2149_fu_2599_p2       |     |        | v2149      | add | fabric | 0       |
+|    add_ln4969_fu_2218_p2  |     |        | add_ln4969 | add | fabric | 0       |
+|    v2300_fu_2355_p2       |     |        | v2300      | add | fabric | 0       |
+|    v2309_fu_2368_p2       |     |        | v2309      | sub | fabric | 0       |
+|    v2399_fu_1018_p2       |     |        | v2399      | sub | fabric | 0       |
+|    v2417_fu_1380_p2       |     |        | v2417      | add | fabric | 0       |
+|    v2443_fu_1683_p2       |     |        | v2443      | add | fabric | 0       |
+|    v2444_fu_1689_p2       |     |        | v2444      | sub | fabric | 0       |
+|    mul_8ns_8ns_16_1_1_U31 |     |        | v2525      | mul | auto   | 0       |
+|    add_ln5507_fu_605_p2   |     |        | add_ln5507 | add | fabric | 0       |
+|    v2530_fu_611_p2        |     |        | v2530      | add | fabric | 0       |
+|    v2534_fu_1196_p2       |     |        | v2534      | add | fabric | 0       |
+|    v2538_fu_1201_p2       |     |        | v2538      | add | fabric | 0       |
+|  + mxu_back_w_0           | 0   |        |            |     |        |         |
+|    add_ln5862_fu_7386_p2  |     |        | add_ln5862 | add | fabric | 0       |
+|    v2770_fu_7429_p2       |     |        | v2770      | add | fabric | 0       |
+|    v2829_fu_7679_p2       |     |        | v2829      | add | fabric | 0       |
+|    v2842_fu_9502_p2       |     |        | v2842      | add | fabric | 0       |
+|    v2852_fu_9526_p2       |     |        | v2852      | add | fabric | 0       |
+|    add_ln6185_fu_7704_p2  |     |        | add_ln6185 | add | fabric | 0       |
+|    v2862_fu_7714_p2       |     |        | v2862      | add | fabric | 0       |
+|    v2875_fu_7473_p2       |     |        | v2875      | add | fabric | 0       |
+|    v2934_fu_7885_p2       |     |        | v2934      | add | fabric | 0       |
+|    v2949_fu_9573_p2       |     |        | v2949      | add | fabric | 0       |
+|    v2959_fu_9597_p2       |     |        | v2959      | add | fabric | 0       |
+|    add_ln6384_fu_7910_p2  |     |        | add_ln6384 | add | fabric | 0       |
+|    v2969_fu_7920_p2       |     |        | v2969      | add | fabric | 0       |
++---------------------------+-----+--------+------------+-----+--------+---------+
+
+
+================================================================
+== Storage Report
+================================================================
++-----------------+--------------+--------+------+------+--------+----------+------+---------+------------------+
+| Name            | Usage        | Type   | BRAM | URAM | Pragma | Variable | Impl | Latency | Bitwidth, Depth, |
+|                 |              |        |      |      |        |          |      |         | Banks            |
++-----------------+--------------+--------+------+------+--------+----------+------+---------+------------------+
+| + mxu_wide_dim2 |              |        | 0    | 0    |        |          |      |         |                  |
+|   v2998_U       | fifo channel | stream |      |      |        | v2998    | srl  | 0       | 32, 25, 1        |
+|   v2980_U       | fifo channel | stream |      |      |        | v2980    | srl  | 0       | 32, 3, 1         |
+|   v2983_U       | fifo channel | stream |      |      |        | v2983    | srl  | 0       | 32, 9, 1         |
+|   v2986_U       | fifo channel | stream |      |      |        | v2986    | srl  | 0       | 64, 3, 1         |
+|   v2987_U       | fifo channel | stream |      |      |        | v2987    | srl  | 0       | 64, 9, 1         |
+|   v2981_U       | fifo channel | stream |      |      |        | v2981    | srl  | 0       | 32, 3, 1         |
+|   v2988_U       | fifo channel | stream |      |      |        | v2988    | srl  | 0       | 64, 3, 1         |
+|   v2994_U       | fifo channel | stream |      |      |        | v2994    | srl  | 0       | 32, 3, 1         |
+|   v2989_U       | fifo channel | stream |      |      |        | v2989    | srl  | 0       | 64, 5, 1         |
+|   v2995_U       | fifo channel | stream |      |      |        | v2995    | srl  | 0       | 32, 5, 1         |
+|   v2984_U       | fifo channel | stream |      |      |        | v2984    | srl  | 0       | 32, 3, 1         |
+|   v2996_U       | fifo channel | stream |      |      |        | v2996    | srl  | 0       | 32, 11, 1        |
+|   v2997_U       | fifo channel | stream |      |      |        | v2997    | srl  | 0       | 32, 3, 1         |
++-----------------+--------------+--------+------+------+--------+----------+------+---------+------------------+
+
+
+================================================================
+== Pragma Report
+================================================================
+* Pragmas with Warnings
++----------+---------+----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Type     | Options | Location                         | Messages                                                                                                                                                                           |
++----------+---------+----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| dataflow |         | kernel.cpp:6403 in mxu_wide_dim2 | Since the only kind of statements allowed in a canonical dataflow region are variable declarations and function calls, the compiler may not be able to correctly handle the region |
+|          |         |                                  | There are a total of 24 such instances of non-canonical statements in the dataflow region                                                                                          |
++----------+---------+----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+* Valid Pragma Syntax
++-----------------+-------------------------------+-----------------------------------------+
+| Type            | Options                       | Location                                |
++-----------------+-------------------------------+-----------------------------------------+
+| pipeline        | II=1                          | kernel.cpp:62 in mxu_front_w_0          |
+| unroll          |                               | kernel.cpp:275 in mxu_front_w_0         |
+| unroll          |                               | kernel.cpp:343 in mxu_front_w_0         |
+| unroll          |                               | kernel.cpp:358 in mxu_front_w_0         |
+| unroll          |                               | kernel.cpp:380 in mxu_front_w_0         |
+| pipeline        | II=1                          | kernel.cpp:468 in pe_unit_0_0           |
+| unroll          |                               | kernel.cpp:921 in pe_unit_0_0           |
+| pipeline        | II=1                          | kernel.cpp:1844 in pe_unit_0_1          |
+| unroll          |                               | kernel.cpp:2262 in pe_unit_0_1          |
+| pipeline        | II=1                          | kernel.cpp:3186 in pe_unit_1_0          |
+| unroll          |                               | kernel.cpp:3622 in pe_unit_1_0          |
+| pipeline        | II=1                          | kernel.cpp:4545 in pe_unit_1_1          |
+| unroll          |                               | kernel.cpp:4946 in pe_unit_1_1          |
+| pipeline        | II=1                          | kernel.cpp:5863 in mxu_back_w_0         |
+| stream          | variable=v2980 depth=2        | kernel.cpp:6405 in mxu_wide_dim2, v2980 |
+| stream          | variable=v2981 depth=2        | kernel.cpp:6407 in mxu_wide_dim2, v2981 |
+| stream          | variable=v2982 depth=2        | kernel.cpp:6409 in mxu_wide_dim2, v2982 |
+| stream          | variable=v2983 depth=2        | kernel.cpp:6411 in mxu_wide_dim2, v2983 |
+| stream          | variable=v2984 depth=2        | kernel.cpp:6413 in mxu_wide_dim2, v2984 |
+| stream          | variable=v2985 depth=2        | kernel.cpp:6415 in mxu_wide_dim2, v2985 |
+| stream          | variable=v2986 depth=2        | kernel.cpp:6417 in mxu_wide_dim2, v2986 |
+| stream          | variable=v2987 depth=2        | kernel.cpp:6419 in mxu_wide_dim2, v2987 |
+| stream          | variable=v2988 depth=2        | kernel.cpp:6421 in mxu_wide_dim2, v2988 |
+| stream          | variable=v2989 depth=2        | kernel.cpp:6423 in mxu_wide_dim2, v2989 |
+| stream          | variable=v2990 depth=2        | kernel.cpp:6425 in mxu_wide_dim2, v2990 |
+| stream          | variable=v2991 depth=2        | kernel.cpp:6427 in mxu_wide_dim2, v2991 |
+| stream          | variable=v2992 depth=2        | kernel.cpp:6429 in mxu_wide_dim2, v2992 |
+| stream          | variable=v2993 depth=2        | kernel.cpp:6431 in mxu_wide_dim2, v2993 |
+| stream          | variable=v2994 depth=2        | kernel.cpp:6433 in mxu_wide_dim2, v2994 |
+| stream          | variable=v2995 depth=2        | kernel.cpp:6435 in mxu_wide_dim2, v2995 |
+| stream          | variable=v2996 depth=2        | kernel.cpp:6437 in mxu_wide_dim2, v2996 |
+| stream          | variable=v2997 depth=2        | kernel.cpp:6439 in mxu_wide_dim2, v2997 |
+| stream          | variable=v2998 depth=16       | kernel.cpp:6441 in mxu_wide_dim2, v2998 |
+| array_partition | complete dim=0 variable=cnt   | run.tcl:29 in mxu_back_w_0, cnt         |
+| array_partition | complete dim=0 variable=gidx  | run.tcl:25 in mxu_back_w_0, gidx        |
+| array_partition | complete dim=0 variable=gq    | run.tcl:26 in mxu_back_w_0, gq          |
+| array_partition | complete dim=0 variable=mem   | run.tcl:19 in mxu_back_w_0, mem         |
+| array_partition | complete dim=0 variable=rd    | run.tcl:27 in mxu_back_w_0, rd          |
+| array_partition | complete dim=0 variable=wr    | run.tcl:28 in mxu_back_w_0, wr          |
+| array_partition | complete dim=0 variable=cbs   | run.tcl:22 in mxu_front_w_0, cbs        |
+| array_partition | complete dim=0 variable=hdata | run.tcl:24 in mxu_front_w_0, hdata      |
+| array_partition | complete dim=0 variable=skd   | run.tcl:20 in mxu_front_w_0, skd        |
+| array_partition | complete dim=0 variable=skv   | run.tcl:21 in mxu_front_w_0, skv        |
+| array_partition | complete dim=0 variable=wss   | run.tcl:23 in mxu_front_w_0, wss        |
+| interface       | ap_ctrl_none port=return      | run.tcl:8 in mxu_wide_dim2, return      |
+| interface       | ap_fifo port=v2970            | run.tcl:9 in mxu_wide_dim2, v2970       |
+| interface       | ap_fifo port=v2971            | run.tcl:10 in mxu_wide_dim2, v2971      |
+| interface       | ap_fifo port=v2972            | run.tcl:11 in mxu_wide_dim2, v2972      |
+| interface       | ap_fifo port=v2973            | run.tcl:12 in mxu_wide_dim2, v2973      |
+| interface       | ap_fifo port=v2974            | run.tcl:13 in mxu_wide_dim2, v2974      |
+| interface       | ap_fifo port=v2975            | run.tcl:14 in mxu_wide_dim2, v2975      |
+| interface       | ap_fifo port=v2976            | run.tcl:15 in mxu_wide_dim2, v2976      |
+| interface       | ap_fifo port=v2977            | run.tcl:16 in mxu_wide_dim2, v2977      |
+| interface       | ap_fifo port=v2978            | run.tcl:17 in mxu_wide_dim2, v2978      |
+| interface       | ap_fifo port=v2979            | run.tcl:18 in mxu_wide_dim2, v2979      |
+| stream          | depth=3 variable=v2980        | run.tcl:30 in mxu_wide_dim2, v2980      |
+| stream          | depth=3 variable=v2981        | run.tcl:31 in mxu_wide_dim2, v2981      |
+| stream          | depth=9 variable=v2983        | run.tcl:32 in mxu_wide_dim2, v2983      |
+| stream          | depth=3 variable=v2984        | run.tcl:33 in mxu_wide_dim2, v2984      |
+| stream          | depth=3 variable=v2986        | run.tcl:34 in mxu_wide_dim2, v2986      |
+| stream          | depth=9 variable=v2987        | run.tcl:35 in mxu_wide_dim2, v2987      |
+| stream          | depth=3 variable=v2988        | run.tcl:36 in mxu_wide_dim2, v2988      |
+| stream          | depth=5 variable=v2989        | run.tcl:37 in mxu_wide_dim2, v2989      |
+| stream          | depth=3 variable=v2994        | run.tcl:38 in mxu_wide_dim2, v2994      |
+| stream          | depth=5 variable=v2995        | run.tcl:39 in mxu_wide_dim2, v2995      |
+| stream          | depth=11 variable=v2996       | run.tcl:40 in mxu_wide_dim2, v2996      |
+| stream          | depth=3 variable=v2997        | run.tcl:41 in mxu_wide_dim2, v2997      |
+| stream          | depth=25 variable=v2998       | run.tcl:42 in mxu_wide_dim2, v2998      |
++-----------------+-------------------------------+-----------------------------------------+
+
+

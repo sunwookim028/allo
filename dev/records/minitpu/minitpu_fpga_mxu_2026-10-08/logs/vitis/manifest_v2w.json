@@ -1,0 +1,45 @@
+{
+ "tool": "vitis_hls 2023.2",
+ "part": "xczu7ev-ffvc1156-2-e",
+ "clock_period_ns": 5.0,
+ "estimated_clock_ns": 3.998,
+ "top": "mxu_widev_dim2",
+ "units": {
+  "mxu_back_w_0": {
+   "loop": "l_S_t_0_t5",
+   "ii": 1,
+   "iteration_latency": 3,
+   "trip_count": "1048576"
+  },
+  "mxu_front_w_0": {
+   "loop": "l_S_t_0_t",
+   "ii": 1,
+   "iteration_latency": 2,
+   "trip_count": "1048576"
+  },
+  "pe_unit_0_0": {
+   "loop": "l_S_t_0_t1",
+   "ii": 1,
+   "iteration_latency": 7,
+   "trip_count": "1048576"
+  },
+  "pe_unit_0_1": {
+   "loop": "l_S_t_0_t2",
+   "ii": 1,
+   "iteration_latency": 7,
+   "trip_count": "1048576"
+  },
+  "pe_unit_1_0": {
+   "loop": "l_S_t_0_t3",
+   "ii": 1,
+   "iteration_latency": 9,
+   "trip_count": "1048576"
+  },
+  "pe_unit_1_1": {
+   "loop": "l_S_t_0_t4",
+   "ii": 1,
+   "iteration_latency": 9,
+   "trip_count": "1048576"
+  }
+ }
+}

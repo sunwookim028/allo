@@ -114,6 +114,28 @@ estimate is pessimistic), 7,864 LUT / 5,311 FF / 0 DSP in all; per PE
 **411-419 LUT** in row 0 (no psum input, ``ROW0_PSUM_ZERO``) and **677-684
 LUT** in row 1, ~645 FF, 0 DSP; the back 5,032 LUT; the front 124.
 
+**The form variant ``forms/mxu_wide_v.py``.** ``mxu_wide.py``'s back reads
+``mem[lane * ENTRIES + rd[lane]]`` with an ``int32`` pointer; Vitis cannot
+bound that index, so with ``mem`` partitioned complete each lane's head read
+is a ``D * ENTRIES``:1 mux of 64-bit words (``sparsemux_65_5_64`` at DIM 2,
+256:1 at DIM 16, where the back alone had not finished scheduling after more
+than an hour). The variant types the rings for the mux the RTL means --
+``mem: UInt(64)[D, ENTRIES]``, ``rd``/``wr: UInt(4)[D]``, ``cnt: UInt(5)[D]``
+-- and is otherwise ``mxu_wide.py`` verbatim (same function: the pointers
+wrap at ``ENTRIES - 1`` as before). At DIM 2 (``v2w``): every kernel II 1,
+the back's iteration latency 3 (was 4); Vivado OOC: the back **1,497 LUT**
+(was 5,032), PEs unchanged (413-422 / 688-689), WNS +2.401 ns. It passes
+both tbs with one token per cycle (section 2). The DIM 16 builds use it.
+
+**Area levers tried at DIM 2** (tcl only, ``logs/vitis/run_v2a*.tcl``,
+Vivado OOC per PE, row 0 / row 1): ``config_op mul -impl dsp`` 355-359 /
+606-613 LUT and 1 DSP; plus ``config_compile -pipeline_style stp``: no
+change; ``config_op add -impl dsp`` (every adder) 349-350 / 574-580 LUT and
+10-12 DSP. MiniTPU's own PE (``mxu_pe.sv``) is 392 LUT and 2 DSP
+(``use_dsp`` on the 8 x 8 mantissa product and the 20-bit magnitude add;
+section 3's baseline). The Vitis PE costs 1.55-1.75 x the LUTs whatever
+these levers do.
+
 The DIM 16 build is in section 3.
 
 2. The token rate on Vitis RTL: link depths from the schedule
@@ -174,6 +196,12 @@ uniform depth is the wrong lever:
      - **28**
      - **27**, 27, 27, 27, 27 (``acc_lag`` **2**)
      - PASS, **one token per cycle**, stationary
+   * - the variant ``mxu_wide_v`` (``v2w``), per-link
+     - **38**
+     - **27**
+     - **26**, 26, 26, 26, 26 (``acc_lag`` **2**)
+     - PASS, **one token per cycle**, stationary (the back is one state
+       shorter); ``tb_mxu_single_port`` PASS
    * - ``mxu.sv`` (MiniTPU's own, same tb copy)
      - 11
      - 0

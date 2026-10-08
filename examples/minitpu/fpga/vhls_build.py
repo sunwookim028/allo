@@ -32,6 +32,10 @@ ap.add_argument("--n", type=int, default=1 << 20)
 ap.add_argument("--clock", type=float, default=5.0)
 ap.add_argument("--depth", default=None)
 ap.add_argument("--partition", action="append", default=[])
+ap.add_argument("--tcl-partition", action="store_true",
+                help="apply --partition as Vitis set_directive_array_partition -type complete (the arrays are locals of "
+                     "the kernel functions in kernel.cpp, names kept) instead of Allo's s.partition, whose whole-module "
+                     "use-def walk per call does not scale to DIM 16 (record, finding 6)")
 ap.add_argument("--no-unroll-inner", action="store_true")
 ap.add_argument("--no-pipeline", action="store_true")
 ap.add_argument("--iface", default="ap_fifo", choices=["ap_fifo", "axis", "none"])
@@ -54,7 +58,9 @@ spec.loader.exec_module(form)
 kw = {"inst": a.inst} if "inst" in inspect.signature(form.make).parameters else {}
 t0 = time.time()
 top = form.make(a.n, **kw)
+print(f"PHASE make {time.time() - t0:.0f}s", flush=True)
 s = df.customize(top)
+print(f"PHASE customize {time.time() - t0:.0f}s", flush=True)
 
 
 def kernel_loops():
@@ -89,16 +95,21 @@ if not a.no_pipeline:
     pipes = [f"{fn}:{names[0]}" for fn, (band, names) in mains.items()]
 for lp in unrolls:
     s.unroll(lp)
+print(f"PHASE unroll x{len(unrolls)} {time.time() - t0:.0f}s", flush=True)
 for lp in pipes:
     s.pipeline(lp)
-for tg in a.partition:
-    s.partition(tg)
+print(f"PHASE pipeline x{len(pipes)} {time.time() - t0:.0f}s", flush=True)
+if not a.tcl_partition:
+    for tg in a.partition:
+        s.partition(tg)
+        print(f"PHASE partition {tg} {time.time() - t0:.0f}s", flush=True)
 t_sched = time.time() - t0
 if os.path.isdir(a.prj):
     shutil.rmtree(a.prj)
 mod = s.build(target="vhls", mode="csyn", project=a.prj,
               configs={"device": "zcu104", "frequency": round(1000 / a.clock)})
 t_emit = time.time() - t0
+print(f"PHASE build(vhls) {t_emit:.0f}s", flush=True)
 code = open(os.path.join(a.prj, "kernel.cpp")).read()
 # the top: the function marked by Allo as top (the region), and its array arguments in order
 top_name = s.top_func_name
@@ -112,6 +123,10 @@ if a.ctrl != "none":
 if a.iface != "none":
     for nm in arg_names:
         dirs.append(f'set_directive_interface -mode {a.iface} "{top_name}" {nm}')
+if a.tcl_partition:
+    for tg in a.partition:
+        fn, arr = tg.split(":")
+        dirs.append(f"set_directive_array_partition -type complete -dim 0 {fn} {arr}")
 dirs += a.tcl
 if a.tcl_file:
     dirs += [ln for ln in open(a.tcl_file).read().splitlines() if ln.strip() and not ln.startswith("#")]
@@ -130,7 +145,7 @@ exit
 open(os.path.join(a.prj, "run.tcl.allo"), "w").write(open(os.path.join(a.prj, "run.tcl")).read())
 open(os.path.join(a.prj, "run.tcl"), "w").write(tcl)
 tag = (f"{os.path.basename(a.form)} inst={a.inst} n={a.n} depth={a.depth} clock={a.clock} iface={a.iface} "
-       f"ctrl={a.ctrl} unroll={len(unrolls)} pipeline={pipes} partition={a.partition} tcl={a.tcl} tcl_file={a.tcl_file}")
+       f"ctrl={a.ctrl} unroll={len(unrolls)} pipeline={pipes} partition={a.partition}{" (tcl)" if a.tcl_partition else ""} tcl={a.tcl} tcl_file={a.tcl_file}")
 print(f"EMITTED {tag} top={top_name} args={arg_names} ({t_emit:.0f}s, schedule {t_sched:.0f}s)", flush=True)
 if a.no_run:
     sys.exit(0)
