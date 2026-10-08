@@ -493,9 +493,10 @@ from Allo, mostly as RTL IP; and Allo's MXU integrated into MiniTPU.**
   cycle-level mixed RTL/Allo co-simulation seam is what a later swap needs.
 - Status: M-R1 and M-R2 passed on 2026-10-08
   (`minitpu_rtl_m1_2026-10-08.rst`): all 52 oracle launches bit-identical
-  to MiniTPU's testbench digests inside the Allo region; cycles differ only
-  through the shim's memory model (one request in flight, no bridge), to be
-  closed by putting MiniTPU's own bridge in the shim.
+  to MiniTPU's testbench digests inside the Allo region; with MiniTPU's own
+  DDR bridge inside the shim (`minitpu_rtl_m2b_2026-10-08.rst`) the cycle
+  counts equal the testbench's on all 52 as well. The baseline lives at
+  `examples/minitpu/rtl/` (one design tree with the Allo-modelled core).
 
 **D-22 (2026-10-08). TinyTPU is the toy instance for communication; MiniTPU
 is the design driver.**
