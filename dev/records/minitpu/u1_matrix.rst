@@ -510,6 +510,26 @@ not a requirement). Issue audit recorded
 ``main``, prune the 13 merged branches, add the README naming paragraph
 (after the cleanup lands).
 
+**Checkpoint 25 (2026-10-08, the pin is ``v1``; U4 B and C landed).**
+minitpu-comp confirmed track B's measurement: ``b3ba0a4d`` is ISA ``v1``,
+not ``v1-course`` (v1-course = Lab 2's tree / minitpu ``613190d`` timing;
+``05e1bdf`` one-beat vmatpop + result latency 85, ``49d895d``, ``3bcf0b7``
+are all in the pin). D-16 re-keyed in the README; the deltas
+(``allo-selftimed``, ``allo-mxu``, later ``allo-mxu-vitis``) are relative to
+base ``v1``. Open: the ladder's MXU push->valid 82 is at the MXU port, the
+ISA's ``result_latency.vmatpush`` 85 counts from the issue edge -- the offset
+is being measured on the pinned RTL before any delta maps one onto the
+other; the landing PR (``isa/latency.json`` versions + regenerated outputs)
+waits for the owner's approval. Merged into ``u1-pilot``: U4 track C
+(``4446f019``: DMA units match; findings C1 ``done`` name clash, C2 unreset
+state refused in Stream kernels, C7 local arrays on the SystemC thread
+stack) and track B (``f4e13af3``: issue/command/write-back match; D-23 holds
+at command-stream depth >= 2, fails at 1; D-24: cycle-locked reproduces W
+with no delta, self-timed cannot run the scheduled programs unchanged;
+F-B4 simulator hang on an unfinished producer). ``main`` = ``33b7cbf6``
+(the TinyTPU demo with cosim working here). Fork issue #51 (harness
+``calendar.py`` shadows the stdlib).
+
 **Checkpoint 24 (2026-10-08, D-21 re-scoped; the FPGA route started).**
 Owner: the RTL-wrapped baseline is worth doing only if meaningful. Provisional
 re-scope (README D-21 to be amended when M-R1 lands): the whole-core wrap is

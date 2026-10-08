@@ -324,11 +324,17 @@ accumulate order is a different function.**
 - Evidence: `dev/records/minitpu/u3_composition_design_2026-10-04.rst` §1,
   prototype `examples/minitpu/template/`.
 
-**D-16 (2026-10-04). The ladder models MiniTPU `b3ba0a4d` (ISA v1-course)
-through U5, then re-pins.**
+**D-16 (2026-10-04; re-keyed 2026-10-08). The ladder models MiniTPU
+`b3ba0a4d` (ISA `v1`) through U5, then re-pins.**
 - MiniTPU now has three ISA versions (`minitpu-comp`, master `a9757be`):
-  `v1-course` = the frozen course ISA (our pin, MXU push->valid 82),
-  `v1` = master (85), `v2` = `docs/ISA_V2.md` (branches, one zero-overhead
+  `v1-course` = the frozen course ISA (Lab 2's released tree, timing of
+  minitpu `613190d`: result latency 82, four-beat vmatpop), `v1` = master
+  **and our pin** (minitpu-comp, 2026-10-08: `05e1bdf`'s one-beat vmatpop and
+  85-cycle result latency, `49d895d`'s 8-deep loop stack and `3bcf0b7`'s
+  4-bit agu_shift are all ancestors of `b3ba0a4d`; U4 track B measured all
+  eight `WB_W_*` equal to the `v1` base). The "82" the ladder measures is
+  push->valid at the MXU port (2 + 5*DIM); `v1`'s 85 counts from the issue
+  edge, the offset is being measured. `v2` = `docs/ISA_V2.md` (branches, one zero-overhead
   loop, post-increment addressing, semaphores, a fault register, and
   interlocks). E03 (freeze-on-stall; new `en_i` ports and a VMEM landing
   ring) is in flight on branch `e03`.
@@ -515,7 +521,7 @@ valid-qualified slot commands plus four declared resources.**
   VPU command): the write-back claim `W` is derived from the bound units'
   declared latencies plus the write-back stages (D-20) and checked against
   Phase 0's measurement (`W = L + VPU_WB_STAGES` for all seven classes);
-  v1-course programs run unchanged. This is for speed: it reuses MiniTPU's
+  `v1` programs run unchanged. This is for speed: it reuses MiniTPU's
   assembler, images and testbenches as they are.
 - A self-timed composition (dataflow issue, `W` re-derived from the
   manifests, the timing published as a `versions.list.<name>` delta) is
