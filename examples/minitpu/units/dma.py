@@ -510,4 +510,584 @@ def seeds():
     return [(SEED_TB, "bw", cmd, seen, True)]
 
 
-VARIANTS = {}
+# ---------------------------------------------------------------------------
+# Allo variants (U4 track C, ``dev/records/minitpu/u4_track_c_2026-10-08.rst``)
+# ---------------------------------------------------------------------------
+#
+# Every variant is driven by the SAME per-cycle command trace as the RTL (the
+# open-loop traces above) and returns every output port per cycle. Region
+# ports are four lane arrays (U3 P-8; a 256-bit port has no numpy dtype, B6,
+# and a 64-bit lane is lost in csim at >= 2**63, S8):
+#
+#   CIN  UInt(32)[n, 15]  the scalar inputs, CIN_NAMES order
+#   DIN  UInt(32)[n, 16]  dm_rsp_data lanes 0..7, vmem_rd_data lanes 0..7
+#   COUT UInt(32)[n, 20]  the scalar outputs, COUT_NAMES order
+#   DOUT UInt(32)[n, 16]  dm_req_wdata lanes 0..7, vmem_wr_data lanes 0..7
+#
+# "Cycle t" is iteration t: reset (asynchronous, so a row with rst_n low is
+# sampled in reset), then the outputs from the state the cycle starts in and
+# its inputs (rtl.py's "pre" sampling), then the edge. The edge is dma.sv's
+# one always_ff transcribed in its order with non-blocking semantics: every
+# register written goes to an ``n_*`` copy, reads see the old value, the
+# last write wins, and the copies commit at the end of the iteration.
+
+import numpy as np  # noqa: E402
+
+import allo.dataflow as df  # noqa: E402
+from allo.ir.types import Stateful, UInt, int32  # noqa: E402
+
+from examples.minitpu.units.dma_addr_gen import addr  # noqa: E402,F401 (the body calls it)
+from examples.minitpu.units.dma_params import GEOMETRIES  # noqa: E402
+
+CIN_NAMES = ["rst_n", "desc_valid", "desc_is_store", "desc_channel", "desc_vmem_row", "desc_rows",
+             "desc_cols", "desc_base", "desc_stride", "clear_channel_done", "dm_req_ready",
+             "dm_rsp_valid", "dm_rsp_last", "dm_rsp_resp", "vmem_gnt"]
+DIN_NAMES = ["dm_rsp_data", "vmem_rd_data"]
+COUT_NAMES = ["desc_accept", "dma_channel_done", "dma_idle", "dm_req_valid", "dm_req_we",
+              "dm_req_addr", "dm_req_len", "dm_req_wstrb", "dm_rsp_ready", "vmem_wr_en",
+              "vmem_wr_ptr", "vmem_rd_en", "vmem_rd_ptr", "dma_err", "dma_err_channel",
+              "dma_err_cause", "dma_err_resp", "dma_rsp_seen", "beat_count_o", "overlap_stat_o"]
+DOUT_NAMES = ["dm_req_wdata", "vmem_wr_data"]
+assert sorted(CIN_NAMES + DIN_NAMES) == sorted(p for p, _ in INPUTS)
+assert sorted(COUT_NAMES + DOUT_NAMES) == sorted(p for p, _ in OUTPUTS)
+WIDTH = {k: 256 for k in PARAMS}
+
+
+def bits(n, w=256, inst="core", payload="unreset"):
+    """Plan D1: ``dma.sv`` transcribed into one cycle-locked kernel.
+
+    ``payload``: the landing FIFO's payload RAM (``lnd_mem``, never reset in
+    the RTL). ``"unreset"`` declares it ``@ Stateful(reset=False)`` (P-7,
+    D-14: the planned D1); ``"reset"`` declares it ``@ Stateful`` -- reset
+    storage, a recorded deviation from the RTL (D-13's note), invisible on
+    the defined slots because the RTL's payload is masked while the FIFO is
+    empty."""
+    PAYLOAD = Stateful(reset=False) if payload == "unreset" else Stateful
+    g = GEOMETRIES[inst].legality()
+    assert g.CHANNELS == 2, "the trace ports are sized for two channels (ref_ctrl_dma)"
+    CH = g.CHANNELS
+    OUT = g.OUTSTANDING
+    LND = g.LANDING_DEPTH
+    TO = g.TIMEOUT_CYCLES
+    L = g.LANES
+    NC = len(CIN_NAMES)
+    NO = len(COUT_NAMES)
+    CRED_M = (1 << g.CRED_W) - 1
+    OUTC_M = (1 << g.CRED_W) - 1  # OUT_CNT_W == CRED_W
+    LNDC_M = (1 << g.LND_CNT_W) - 1
+    TO_M = (1 << g.TO_W) - 1
+    TO_LAST = (TO - 1) & TO_M
+    PW_M1 = g.PAGE_WORDS - 1
+    ROW_M = (1 << g.ROW_BITS) - 1
+    RDL_M1 = g.VMEM_DMA_READ_LATENCY - 1
+    LND_LAST = LND - 1
+    OUT_LAST = OUT - 1
+    ADDR_M = (1 << g.DRAM_BEAT_ADDR_W) - 1
+
+    @df.region()
+    def top(CI: UInt(32)[n, NC], DI: UInt(32)[n, 2 * L], CO: UInt(32)[n, NO], DO: UInt(32)[n, 2 * L]):
+        @df.kernel(mapping=[1], args=[CI, DI, CO, DO])
+        def dma(cin: UInt(32)[n, NC], din: UInt(32)[n, 2 * L], cout: UInt(32)[n, NO],
+                dout: UInt(32)[n, 2 * L]):
+            # ---- per-channel descriptor state (reset) ----
+            st: int32[CH] = 0
+            cstore: int32[CH] = 0
+            cvmem: int32[CH] = 0
+            clast: int32[CH] = 0
+            cbase: UInt(32)[CH] = 0
+            cstride: UInt(32)[CH] = 0
+            cnext: int32[CH] = 0
+            call: int32[CH] = 0
+            cbif: int32[CH] = 0
+            n_st: int32[CH] = 0
+            n_cstore: int32[CH] = 0
+            n_cvmem: int32[CH] = 0
+            n_clast: int32[CH] = 0
+            n_cbase: UInt(32)[CH] = 0
+            n_cstride: UInt(32)[CH] = 0
+            n_cnext: int32[CH] = 0
+            n_call: int32[CH] = 0
+            n_cbif: int32[CH] = 0
+            cdone: int32 = 0  # not `done`: C1 (the SystemC process has a `done` port)
+            # ---- issue engine ----
+            eng: int32 = 0
+            iss: int32 = 0
+            rr: int32 = 0
+            st_beat: int32 = 0
+            rd_lat: int32 = 0
+            st_data: UInt(32)[L] = 0
+            credit: int32 = OUT
+            # ---- order FIFO (reset) ----
+            ord_ch: int32[OUT] = 0
+            ord_vmem: int32[OUT] = 0
+            ord_store: int32[OUT] = 0
+            ord_head: int32 = 0
+            ord_tail: int32 = 0
+            ord_count: int32 = 0
+            # ---- landing FIFO: payload never reset (P-7, D-14); control reset ----
+            lnd_ch: int32[LND] @ PAYLOAD
+            lnd_store: int32[LND] @ PAYLOAD
+            lnd_dest: int32[LND] @ PAYLOAD
+            lnd_data: UInt(32)[LND, L] @ PAYLOAD
+            lnd_r: int32[LND] @ PAYLOAD
+            lnd_last: int32[LND] @ PAYLOAD
+            lnd_head: int32 = 0
+            lnd_tail: int32 = 0
+            lnd_count: int32 = 0
+            rsp_beat: int32 = 0
+            to_cnt: int32 = 0
+            err: int32 = 0
+            err_ch: int32 = 0
+            err_cause: int32 = 0
+            err_resp: int32 = 0
+            rsp_seen: int32 = 0
+            beats: UInt(32) = 0
+            ovl_max: int32 = 0
+            ovl_cyc: int32 = 0
+            for t in range(n):
+                # S6: every port element read once, unconditionally
+                rst: int32 = cin[t, 0]
+                dv: int32 = cin[t, 1]
+                dis: int32 = cin[t, 2]
+                dch: int32 = cin[t, 3]
+                dvr: int32 = cin[t, 4]
+                drows: int32 = cin[t, 5]
+                dcols: int32 = cin[t, 6]  # carried, unused (dma.sv:37)
+                dbase: UInt(32) = cin[t, 7]
+                dstride: UInt(32) = cin[t, 8]
+                clr: int32 = cin[t, 9]
+                rdy: int32 = cin[t, 10]
+                rv: int32 = cin[t, 11]
+                rlast: int32 = cin[t, 12]
+                rresp: int32 = cin[t, 13]
+                gnt: int32 = cin[t, 14]
+                rdata: UInt(32)[L] = 0
+                vdata: UInt(32)[L] = 0
+                for k in range(L):
+                    rdata[k] = din[t, k]
+                    vdata[k] = din[t, L + k]
+                if rst == 0:  # asynchronous reset: everything but the landing payload
+                    for c in range(CH):
+                        st[c] = 0
+                        cstore[c] = 0
+                        cvmem[c] = 0
+                        clast[c] = 0
+                        cbase[c] = 0
+                        cstride[c] = 0
+                        cnext[c] = 0
+                        call[c] = 0
+                        cbif[c] = 0
+                    cdone = 0
+                    eng = 0
+                    iss = 0
+                    rr = 0
+                    st_beat = 0
+                    rd_lat = 0
+                    for k in range(L):
+                        st_data[k] = 0
+                    credit = OUT
+                    for j in range(OUT):
+                        ord_ch[j] = 0
+                        ord_vmem[j] = 0
+                        ord_store[j] = 0
+                    ord_head = 0
+                    ord_tail = 0
+                    ord_count = 0
+                    lnd_head = 0
+                    lnd_tail = 0
+                    lnd_count = 0
+                    rsp_beat = 0
+                    to_cnt = 0
+                    err = 0
+                    err_ch = 0
+                    err_cause = 0
+                    err_resp = 0
+                    rsp_seen = 0
+                    beats = 0
+                    ovl_max = 0
+                    ovl_cyc = 0
+                # ---- combinational issue view (dma.sv:195-218) ----
+                cur: int32 = cnext[iss]
+                cur14: UInt(14) = cur
+                agu: UInt(32) = addr(cbase[iss], cur14, cstride[iss])
+                logical: int32 = agu & ADDR_M
+                contiguous: int32 = 0
+                if cstride[iss] == 1:
+                    contiguous = 1
+                left_m1: int32 = (clast[iss] - cur) & ROW_M
+                to_bound_m1: int32 = PW_M1 - (logical & PW_M1)
+                left_sat: int32 = left_m1 & 255
+                if (left_m1 >> 8) != 0:
+                    left_sat = 255
+                blen: int32 = 0
+                if contiguous == 1:
+                    blen = left_sat
+                    if to_bound_m1 < left_sat:
+                        blen = to_bound_m1
+                last: int32 = 0
+                if blen == left_m1:
+                    last = 1
+                vbase: int32 = (cvmem[iss] + cur) & 0xFFFF
+                # ---- landing head ----
+                hch: int32 = lnd_ch[lnd_head]
+                hstore: int32 = lnd_store[lnd_head]
+                hdest: int32 = lnd_dest[lnd_head]
+                hr: int32 = lnd_r[lnd_head]
+                hlast: int32 = lnd_last[lnd_head]
+                # ---- outputs ----
+                req_valid: int32 = 0
+                if eng == 1:
+                    if credit != 0:
+                        req_valid = 1
+                elif eng == 4:
+                    if st_beat != 0 or credit != 0:
+                        req_valid = 1
+                we: int32 = 0
+                if eng == 4:
+                    we = 1
+                rsp_ready: int32 = 1
+                if ord_count != 0:
+                    if lnd_count >= LND:
+                        rsp_ready = 0
+                lnd_ne: int32 = 0
+                if lnd_count != 0:
+                    lnd_ne = 1
+                wr_en: int32 = 0
+                if lnd_ne == 1 and hstore == 0 and hr == 0:
+                    wr_en = 1
+                rd_en: int32 = 0
+                if eng == 2 and wr_en == 0:
+                    rd_en = 1
+                accept: int32 = 0
+                if dv == 1 and st[dch] == 0:
+                    accept = 1
+                idle: int32 = 0
+                if ord_count == 0 and lnd_count == 0:
+                    idle = 1
+                for c in range(CH):
+                    if st[c] == 1 or st[c] == 2:
+                        idle = 0
+                ovl: UInt(32) = ovl_cyc
+                ovl = (ovl << 8) | ovl_max
+                cout[t, 0] = accept
+                cout[t, 1] = cdone
+                cout[t, 2] = idle
+                cout[t, 3] = req_valid
+                cout[t, 4] = we
+                cout[t, 5] = logical
+                cout[t, 6] = blen
+                cout[t, 7] = 0xFFFFFFFF
+                cout[t, 8] = rsp_ready
+                cout[t, 9] = wr_en
+                cout[t, 10] = hdest
+                cout[t, 11] = rd_en
+                cout[t, 12] = (cvmem[iss] + cur + st_beat) & 0xFFFF
+                cout[t, 13] = err
+                cout[t, 14] = err_ch
+                cout[t, 15] = err_cause
+                cout[t, 16] = err_resp
+                cout[t, 17] = rsp_seen
+                cout[t, 18] = beats
+                cout[t, 19] = ovl
+                for k in range(L):
+                    dout[t, k] = st_data[k]
+                    dout[t, L + k] = lnd_data[lnd_head, k]
+                # ---- the edge (dma.sv:300-560) ----
+                if rst == 1:
+                    req_fire: int32 = 0
+                    if req_valid == 1 and rdy == 1:
+                        req_fire = 1
+                    rsp_fire: int32 = 0
+                    if rv == 1 and rsp_ready == 1:
+                        rsp_fire = 1
+                    real_rsp: int32 = 0
+                    if rsp_fire == 1 and ord_count != 0:
+                        real_rsp = 1
+                    lnd_pop: int32 = 0
+                    if lnd_ne == 1:
+                        if hstore == 1 or hr != 0 or gnt == 1:
+                            lnd_pop = 1
+                    issue_push: int32 = 0
+                    ord_pop: int32 = 0
+                    lnd_push: int32 = 0
+                    drain_last: int32 = lnd_pop & hlast
+                    timeout: int32 = 0
+                    oh_ch: int32 = ord_ch[ord_head]
+                    oh_vmem: int32 = ord_vmem[ord_head]
+                    oh_store: int32 = ord_store[ord_head]
+                    for c in range(CH):
+                        n_st[c] = st[c]
+                        n_cstore[c] = cstore[c]
+                        n_cvmem[c] = cvmem[c]
+                        n_clast[c] = clast[c]
+                        n_cbase[c] = cbase[c]
+                        n_cstride[c] = cstride[c]
+                        n_cnext[c] = cnext[c]
+                        n_call[c] = call[c]
+                        n_cbif[c] = cbif[c]
+                    n_done: int32 = cdone
+                    n_eng: int32 = eng
+                    n_iss: int32 = iss
+                    n_rr: int32 = rr
+                    n_st_beat: int32 = st_beat
+                    n_rd_lat: int32 = rd_lat
+                    cap: int32 = 0
+                    n_ord_head: int32 = ord_head
+                    n_ord_tail: int32 = ord_tail
+                    n_lnd_head: int32 = lnd_head
+                    n_lnd_tail: int32 = lnd_tail
+                    n_rsp_beat: int32 = rsp_beat
+                    n_to_cnt: int32 = to_cnt
+                    n_err: int32 = err
+                    n_err_ch: int32 = err_ch
+                    n_err_cause: int32 = err_cause
+                    n_err_resp: int32 = err_resp
+                    n_rsp_seen: int32 = rsp_seen
+                    n_ovl_max: int32 = ovl_max
+                    n_ovl_cyc: int32 = ovl_cyc
+                    # 1) descriptor accept
+                    if accept == 1:
+                        n_st[dch] = 1
+                        n_cstore[dch] = dis
+                        n_cvmem[dch] = dvr
+                        n_clast[dch] = drows
+                        n_cbase[dch] = dbase
+                        n_cstride[dch] = dstride
+                        n_cnext[dch] = 0
+                        n_call[dch] = 0
+                    # 2) W1C clear
+                    for c in range(CH):
+                        if ((clr >> c) & 1) == 1:
+                            n_done = n_done & (3 - (1 << c))
+                            if st[c] == 3:
+                                n_st[c] = 0
+                    # 3) issue engine
+                    if eng == 0:
+                        pick: int32 = 0
+                        any_p: int32 = 0
+                        for k in range(CH):
+                            idx: int32 = (rr + (CH - 1 - k)) % CH
+                            if st[idx] == 1:
+                                any_p = 1
+                                pick = idx
+                        if any_p == 1:
+                            n_iss = pick
+                            n_st[pick] = 2
+                            n_rr = (pick + 1) % CH
+                            n_st_beat = 0
+                            if cstore[pick] == 1:
+                                n_eng = 2
+                            else:
+                                n_eng = 1
+                    elif eng == 1:
+                        if req_fire == 1:
+                            issue_push = 1
+                            if last == 1:
+                                n_call[iss] = 1
+                                n_eng = 0
+                            else:
+                                n_cnext[iss] = (cur + blen + 1) & ROW_M
+                    elif eng == 2:
+                        if rd_en == 1 and gnt == 1:
+                            n_rd_lat = 0
+                            n_eng = 3
+                    elif eng == 3:
+                        if rd_lat == RDL_M1:
+                            cap = 1
+                            n_eng = 4
+                        else:
+                            n_rd_lat = (rd_lat + 1) & 3
+                    elif eng == 4:
+                        if req_fire == 1:
+                            if st_beat == 0:
+                                issue_push = 1
+                            if st_beat == blen:
+                                if last == 1:
+                                    n_call[iss] = 1
+                                    n_eng = 0
+                                else:
+                                    n_cnext[iss] = (cur + blen + 1) & ROW_M
+                                    n_st_beat = 0
+                                    n_eng = 2
+                            else:
+                                n_st_beat = (st_beat + 1) & 255
+                                n_eng = 2
+                    # 4) response accept
+                    if rv == 1:
+                        n_rsp_seen = 1
+                    if real_rsp == 1:
+                        if lnd_tail == LND_LAST:
+                            n_lnd_tail = 0
+                        else:
+                            n_lnd_tail = lnd_tail + 1
+                        lnd_push = 1
+                        if rlast == 1:
+                            ord_pop = 1
+                            if ord_head == OUT_LAST:
+                                n_ord_head = 0
+                            else:
+                                n_ord_head = ord_head + 1
+                            n_rsp_beat = 0
+                        else:
+                            n_rsp_beat = (rsp_beat + 1) & 255
+                    # 5) order FIFO push
+                    if issue_push == 1:
+                        ord_ch[ord_tail] = iss
+                        ord_vmem[ord_tail] = vbase
+                        ord_store[ord_tail] = cstore[iss]
+                        if ord_tail == OUT_LAST:
+                            n_ord_tail = 0
+                        else:
+                            n_ord_tail = ord_tail + 1
+                    n_ord_count: int32 = (ord_count + issue_push - ord_pop) & OUTC_M
+                    # 6) landing FIFO pop
+                    if lnd_pop == 1:
+                        if lnd_head == LND_LAST:
+                            n_lnd_head = 0
+                        else:
+                            n_lnd_head = lnd_head + 1
+                        if hr != 0:
+                            n_err = 1
+                            if err == 0:
+                                n_err_ch = hch
+                                n_err_cause = 1
+                                n_err_resp = hr
+                    n_lnd_count: int32 = (lnd_count + lnd_push - lnd_pop) & LNDC_M
+                    bc: int32 = 0
+                    if lnd_pop == 1 and hstore == 0 and hr == 0:
+                        bc = 1
+                    if req_fire == 1 and we == 1:
+                        bc = bc + 1
+                    n_beats: UInt(32) = beats + bc
+                    # 6c) overlap
+                    nonidle: int32 = 0
+                    for c in range(CH):
+                        if st[c] == 1 or st[c] == 2:
+                            nonidle = nonidle + 1
+                    if nonidle > ovl_max:
+                        n_ovl_max = nonidle & 255
+                    if nonidle >= 2 and ovl_cyc != 0xFFFFFF:
+                        n_ovl_cyc = ovl_cyc + 1
+                    # 7) credit
+                    n_credit: int32 = (credit - issue_push + ord_pop) & CRED_M
+                    # 8) per-channel in flight + completion
+                    for c in range(CH):
+                        inc: int32 = 0
+                        if issue_push == 1 and iss == c:
+                            inc = 1
+                        dec: int32 = 0
+                        if drain_last == 1 and hch == c:
+                            dec = 1
+                        n_cbif[c] = (cbif[c] + inc - dec) & OUTC_M
+                        if dec == 1 and inc == 0 and cbif[c] == 1 and call[c] == 1:
+                            n_done = n_done | (1 << c)
+                            n_st[c] = 3
+                    # 9) watchdog
+                    if ord_count == 0 or rv == 1 or req_fire == 1:
+                        n_to_cnt = 0
+                    elif TO != 0 and to_cnt == TO_LAST:
+                        timeout = 1
+                    else:
+                        n_to_cnt = (to_cnt + 1) & TO_M
+                    # 10) watchdog flush
+                    if timeout == 1:
+                        n_err = 1
+                        if err == 0:
+                            n_err_ch = oh_ch
+                            n_err_cause = 2
+                            n_err_resp = 0
+                        for c in range(CH):
+                            n_cbif[c] = 0
+                            if st[c] == 1 or st[c] == 2:
+                                n_done = n_done | (1 << c)
+                                n_st[c] = 3
+                        n_credit = OUT
+                        n_ord_head = 0
+                        n_ord_tail = 0
+                        n_ord_count = 0
+                        n_lnd_head = 0
+                        n_lnd_tail = 0
+                        n_lnd_count = 0
+                        n_rsp_beat = 0
+                        n_st_beat = 0
+                        n_eng = 0
+                        n_to_cnt = 0
+                    # the landing payload write (its own always_ff: rst_n && real_rsp)
+                    if real_rsp == 1:
+                        lnd_ch[lnd_tail] = oh_ch
+                        lnd_store[lnd_tail] = oh_store
+                        lnd_dest[lnd_tail] = (oh_vmem + rsp_beat) & 0xFFFF
+                        lnd_r[lnd_tail] = rresp
+                        lnd_last[lnd_tail] = rlast
+                        for k in range(L):
+                            lnd_data[lnd_tail, k] = rdata[k]
+                    if cap == 1:
+                        for k in range(L):
+                            st_data[k] = vdata[k]
+                    # commit
+                    for c in range(CH):
+                        st[c] = n_st[c]
+                        cstore[c] = n_cstore[c]
+                        cvmem[c] = n_cvmem[c]
+                        clast[c] = n_clast[c]
+                        cbase[c] = n_cbase[c]
+                        cstride[c] = n_cstride[c]
+                        cnext[c] = n_cnext[c]
+                        call[c] = n_call[c]
+                        cbif[c] = n_cbif[c]
+                    cdone = n_done & 3
+                    eng = n_eng
+                    iss = n_iss
+                    rr = n_rr
+                    st_beat = n_st_beat
+                    rd_lat = n_rd_lat
+                    credit = n_credit
+                    ord_head = n_ord_head
+                    ord_tail = n_ord_tail
+                    ord_count = n_ord_count
+                    lnd_head = n_lnd_head
+                    lnd_tail = n_lnd_tail
+                    lnd_count = n_lnd_count
+                    rsp_beat = n_rsp_beat
+                    to_cnt = n_to_cnt
+                    err = n_err
+                    err_ch = n_err_ch
+                    err_cause = n_err_cause
+                    err_resp = n_err_resp
+                    rsp_seen = n_rsp_seen
+                    beats = n_beats
+                    ovl_max = n_ovl_max
+                    ovl_cyc = n_ovl_cyc
+
+    return top
+
+
+def _lanes(vals, nl, lb=32):
+    m = (1 << lb) - 1
+    return np.array([[(int(v) >> (lb * k)) & m for k in range(nl)] for v in vals], dtype=np.uint32)
+
+
+def _join(arr, lb=32):
+    return [sum(int(x) << (lb * k) for k, x in enumerate(row)) for row in arr]
+
+
+def run_bits(mod, cmd, n, w=256):
+    L = 8
+    ci = np.zeros((n, len(CIN_NAMES)), dtype=np.uint32)
+    for j, p in enumerate(CIN_NAMES):
+        ci[:, j] = np.asarray([int(x) for x in cmd[p][:n]], dtype=np.uint32)
+    di = np.concatenate([_lanes(cmd["dm_rsp_data"][:n], L), _lanes(cmd["vmem_rd_data"][:n], L)], axis=1)
+    co = np.zeros((n, len(COUT_NAMES)), dtype=np.uint32)
+    do = np.zeros((n, 2 * L), dtype=np.uint32)
+    mod(ci, np.ascontiguousarray(di), co, do)
+    out = {p: [int(x) for x in co[:, j]] for j, p in enumerate(COUT_NAMES)}
+    out["dm_req_wdata"] = _join(do[:, :L])
+    out["vmem_wr_data"] = _join(do[:, L:])
+    return out
+
+
+def bits_reset(n, w=256, inst="core"):
+    return bits(n, w, inst, payload="reset")
+
+
+VARIANTS = {"bits": (bits, run_bits), "bits_reset": (bits_reset, run_bits)}
