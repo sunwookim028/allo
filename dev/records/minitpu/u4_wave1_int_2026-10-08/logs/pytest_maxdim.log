@@ -1,0 +1,9 @@
+$ python -m pytest tests/dataflow/test_stream_ports_tinytpu.py tests/act/test_tutorial.py tests/act -q   # fixed file, one session
+........................................................................ [ 35%]
+.............................................ssss....................... [ 70%]
+.............................................................            [100%]
+201 passed, 4 skipped in 183.44s (0:03:03)
+
+real	3m5.130s
+user	3m19.777s
+sys	0m13.457s

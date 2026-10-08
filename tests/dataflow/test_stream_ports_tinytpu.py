@@ -17,22 +17,43 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-os.environ.setdefault("TPU_MAXDIM", "16")
 
 import allo.dataflow as df  # noqa: E402
 from allo.netlist import netlist_of  # noqa: E402
-from examples.tinytpu.microarch_isa import (  # noqa: E402
-    tinytpu_isa,
-    gemm_program_flat,
-    assemble,
-    MAXDIM,
-    IMEM_SIZE,
-    T,
-)
-from examples.tinytpu.isa_dsl import Program, gemm_program  # noqa: E402
-from examples.tinytpu.units_isa import (  # noqa: E402
-    tinytpu_ports,
-)
+
+# The design reads `TPU_MAXDIM` once, at import, into module constants. This
+# file builds it at MAXDIM=16 (unless the caller set it), so the setting must
+# stay local: set it only around these imports, then restore the environment
+# and put back whatever `examples.tinytpu` modules were loaded before, so a
+# later test in the same session imports the design at its own setting (the
+# leak made `tests/act/test_tutorial.py` fail in the full suite only).
+_TINYTPU = "examples.tinytpu"
+_saved_env = os.environ.get("TPU_MAXDIM")
+_saved_mods = {k: m for k, m in sys.modules.items() if k == _TINYTPU or k.startswith(_TINYTPU + ".")}
+for _k in _saved_mods:
+    del sys.modules[_k]
+os.environ.setdefault("TPU_MAXDIM", "16")
+try:
+    from examples.tinytpu.microarch_isa import (  # noqa: E402
+        tinytpu_isa,
+        gemm_program_flat,
+        assemble,
+        MAXDIM,
+        IMEM_SIZE,
+        T,
+    )
+    from examples.tinytpu.isa_dsl import Program, gemm_program  # noqa: E402
+    from examples.tinytpu.units_isa import (  # noqa: E402
+        tinytpu_ports,
+    )
+finally:
+    if _saved_env is None:
+        os.environ.pop("TPU_MAXDIM", None)
+    else:
+        os.environ["TPU_MAXDIM"] = _saved_env
+    for _k in [k for k in sys.modules if k == _TINYTPU or k.startswith(_TINYTPU + ".")]:
+        del sys.modules[_k]
+    sys.modules.update(_saved_mods)
 
 SHAPES = [(4, 4, 4), (8, 8, 8), (16, 16, 16)]
 

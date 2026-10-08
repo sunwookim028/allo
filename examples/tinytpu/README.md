@@ -743,7 +743,11 @@ REPRODUCED (functional only)
 `TPU_MAXDIM=16` (where the published numbers were taken), one `csynth` and
 then one cosim per published shape, each checked bit-exact against `isa_ref`,
 and it exits nonzero if any count differs from the published
-`175 / 265 / 421 / 482 / 674`. About 11 min on this host, 8 of them Vitis:
+`175 / 265 / 421 / 482 / 674`. `cosim.py` run directly, without
+`TPU_MAXDIM=16`, builds at `microarch_isa.py`'s default MAXDIM=64 and prints
+other counts (`222 / 361 / 567 / 676 / 868`,
+`dev/records/minitpu/pr48_merge_2026-10-08.rst`) -- a different build, not a
+regression. About 11 min on this host, 8 of them Vitis:
 
 ```bash
 ./reproduce.sh

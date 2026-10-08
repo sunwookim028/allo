@@ -1,0 +1,7 @@
+$ python -m pytest <HEAD~ copy of tests/dataflow/test_stream_ports_tinytpu.py> tests/act/test_tutorial.py -q   # control: the leaking file (tail)
+  REFUSED fc2: 8x32x16 does not fit this build's MAXDIM=16
+
+The ISA has no instruction for the refused nodes, so the model does not compile.
+=========================== short test summary info ============================
+FAILED tests/act/test_tutorial.py::test_the_walk_through_compiles_and_matches_pytorch
+1 failed, 8 passed in 21.18s
