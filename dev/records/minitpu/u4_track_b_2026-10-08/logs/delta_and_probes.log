@@ -1,0 +1,10 @@
+DELTA-MATCH allo-locked vs v1: 8/8 rtl_params.WB_W_* equal to the pinned JSON
+DELTA-MATCH versions.list.allo-locked: 8 entries re-derived equal
+DELTA-DIFF allo-locked vs v1-course: WB_W_MPOP_LAST derived 3 pinned 6 (7/8 equal)
+DELTA-MATCH allo-locked vs v1: 8/8 rtl_params.WB_W_* equal to the pinned JSON
+H7 refused: vpu_wb_units: port 'vreg.w' is bound by both wb and alu_direct; each port has exactly one owner (README D-12). A port several units share in hardware is owned by one unit fed over channels
+D23-RESOURCE D-23 boundary: four resources, one owner each :: composed
+D23-RESOURCE port A: the X unit also reads vreg.ra beside the V unit :: refused: vpu_cmd_resources: port 'vreg.ra' is bound by both r_vop and p_xop_reads_a; each port has exactly one owner (README D-12). A port several units share in hardware is owned by one unit fed over channels
+D23-RESOURCE port C: the store reads vreg.rc itself beside the arbiter :: refused: vpu_cmd_resources: port 'vreg.rc' is bound by both p_store_reads_c and r_portc; each port has exactly one owner (README D-12). A port several units share in hardware is owned by one unit fed over channels
+D23-RESOURCE write port: the load unit writes vreg.w beside W1 :: refused: vpu_cmd_resources: port 'vreg.w' is bound by both p_load_writes and r_wb; each port has exactly one owner (README D-12). A port several units share in hardware is owned by one unit fed over channels
+D23-RESOURCE port C left without its owner (the arbiter dropped; the netlist rule on its channel fires first) :: refused: vpu_cmd_resources: nothing reads 'cxs'

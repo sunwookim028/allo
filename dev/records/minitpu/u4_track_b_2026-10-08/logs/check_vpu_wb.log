@@ -1,0 +1,24 @@
+RTL u4_vpu_wb:shipped: 24218 cycles in 6 traces, 121075 defined slots, RTL vs reference on defined: 121075/121075 (2.7s)
+UNIT-MATCH vpu_wb:shipped locked simulator 121075/121075 defined (96887 masked: not modelled=96872, reset=15; allo==rtl on 49024) cycle=order-only (build 2.1s, run 0.3s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+UNIT-MATCH vpu_wb:shipped locked systemc 121075/121075 defined (96887 masked: not modelled=96872, reset=15; allo==rtl on 49024) cycle=per-iteration, time unchecked (build 1.8s, run 6.7s)
+UNIT-MATCH vpu_wb:shipped units simulator 121075/121075 defined (96887 masked: not modelled=96872, reset=15; allo==rtl on 49024) cycle=order-only (build 2.1s, run 1.0s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+UNIT-MATCH vpu_wb:shipped units systemc 121075/121075 defined (96887 masked: not modelled=96872, reset=15; allo==rtl on 49024) cycle=per-iteration, time unchecked (build 1.8s, run 6.6s)
+real	0m30.600s
+RTL u4_vpu_wb:shipped: 24218 cycles in 6 traces, 121075 defined slots, RTL vs reference on defined: 121075/121075 (2.8s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+UNIT-DIFF  vpu_wb:shipped selftimed systemc 94493/121075 defined (96887 masked: not modelled=96872, reset=15; allo==rtl on 49024) cycle=per-iteration, time unchecked (build 1.0s, run 6.6s)
+    differing defined slots by trace: singles=158, pairs=7501, random-legal-0=6323, random-legal-1=5971, random-any-2=6593, matrix-pops=36
+    e.g. singles cycle 10 wb_src_o: allo 0 rtl 1
+    e.g. singles cycle 11 wb_src_o: allo 1 rtl 0
+    e.g. singles cycle 29 wb_src_o: allo 0 rtl 2
+    e.g. singles cycle 31 wb_src_o: allo 2 rtl 0
+real	0m15.609s
+UNIT-FAIL  vpu_wb:shipped selftimed simulator: no verdict, killed at the 300 s timeout (exit 124): the polling merge finishes its fixed trip count while the class units are still blocked on full claim streams; the simulator waits for every kernel (F-B4, tests/limits/new_sim_unfinished_producer_hang.py)

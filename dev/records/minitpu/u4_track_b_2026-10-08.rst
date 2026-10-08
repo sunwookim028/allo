@@ -1,0 +1,573 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+##############################################################################
+U4 track B: issue, the write-back calendar, and the VPU command boundary
+##############################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-08.** zhang-21, branch ``u4-issue``
+   (worktree ``scratch/wt-u4b``, from ``u1-pilot`` at ``d1116048``, which
+   carries D-23/D-24), this worktree's own bindings (``mlir/build``: Ninja,
+   LLVM/MLIR ``/work/shared/common/llvm-project-main/build-rhel8``,
+   gcc-toolset-13 g++ 13.3.1, the ``allo`` env's python). MiniTPU at
+   ``b3ba0a4d4fb69d39091c55f5f00d1f237082a4f1`` read only (Verilator 5.052,
+   conda-forge; the harness's shared build cache in the clone's ignored
+   ``.build/``). MiniTPU master's ``isa/latency.json`` pinned at
+   ``9622f754`` (>= ``f1e978e``), ``pins/``. SystemC csim through Catapult
+   2024.2's SystemC 2.3.3 and Connections (``env-zhang21.sh``). Track B of
+   ``u4_plan_2026-10-08.rst`` §5 (A1, I1, W1, the ``Calendar`` record, H4,
+   H7, H8, H12) implementing D-23 and D-24. **Nothing under ``allo/`` or
+   ``mlir/`` changed**; gaps are proposals below. Not the matrix
+   (``u4_matrix.rst`` is the integrator's): proposed rows are in §8.
+
+Reproduce (``source examples/minitpu/harness/env-zhang21.sh``,
+``export PYTHONPATH=$PWD``, ``R=dev/records/minitpu/u4_track_b_2026-10-08``)::
+
+   $ALLO_PYTHON -m examples.minitpu.harness.check seq_issue --backend simulator --backend systemc   # ~25 s
+   $ALLO_PYTHON -m examples.minitpu.harness.check vpu_cmd   --backend simulator --backend systemc   # ~60 s
+   $ALLO_PYTHON -m examples.minitpu.harness.check vpu_wb --variant locked --variant units \
+       --backend simulator --backend systemc                                                    # ~30 s warm; VPU RTL build 2 min cold
+   $ALLO_PYTHON -m examples.minitpu.harness.check vpu_wb --variant selftimed --backend systemc     # UNIT-DIFF by design (D-24)
+   $ALLO_PYTHON -m examples.minitpu.template.calendar --refusals                                  # ~6 s
+   $ALLO_PYTHON -m examples.minitpu.template.gen_isa_delta --base $R/pins/minitpu_9622f754_isa_latency.json \
+       --name allo-locked --check $R/logs/versions_allo-locked.json --check-base                  # DELTA-MATCH
+   $ALLO_PYTHON $R/scripts/d23_rate.py --variant streams      # also streams_d1, streams_d4; ~30 s each
+   $ALLO_PYTHON $R/scripts/d24_compare.py                     # ~30 s
+   python tests/limits/new_sim_unfinished_producer_hang.py    # REPRODUCES after its 60 s timeout
+
+Logs in ``u4_track_b_2026-10-08/logs/``: ``check_{seq_issue,vpu_cmd,vpu_wb}.log``
+(verdict lines), ``calendar_check.log``, ``delta_and_probes.log``,
+``d23_rate_csim.log``, ``d24_compare.log``, ``versions_allo-{locked,selftimed}.json``.
+
+.. contents::
+   :local:
+   :depth: 1
+
+1. Files
+========
+
+* ``examples/minitpu/units/seq_issue.py`` -- **I1 + A1**: the sequencer's
+  issue FSM (``sequencer.sv:254-550``), the descriptor adapter
+  (``dma_desc_adapter.sv``), ``resolve`` and ``adapt`` as one cycle-locked
+  kernel; ``units/rtl/u4_seq_cmd.sv``, a wrapper with no logic that presents
+  ``vpu_ctrl_t`` as the three D-23 slot commands (a valid vector and a
+  payload vector each) beside the sequencer's other outputs.
+* ``examples/minitpu/units/vpu_cmd.py`` -- **D-23**: the same issue kernel
+  (its text derived mechanically from ``seq_issue``'s: only the three payload
+  outputs became ``put``\ s) sending V/X/M as tokens on three ``Stream``\ s,
+  three VPU-side receivers; ``resources()``, the four shared resources as
+  D-12 ports in a ``compose.Architecture``, with refusal probes.
+* ``examples/minitpu/units/vpu_wb.py`` -- **W1** and the calendar on the VPU
+  side, held to Phase 0's ``vpu_writeback`` (``vpu.sv`` behind
+  ``vpu_ctrl_t``): ``locked`` (one kernel), ``units`` (W1 as the one owner of
+  ``vreg.w`` in a ``compose.Architecture``), ``selftimed`` (D-24).
+* ``examples/minitpu/template/calendar.py`` -- the ``Calendar`` record (Q2).
+* ``examples/minitpu/template/gen_isa_delta.py`` -- the calendar half of the
+  seam generator (imports the MXU prototype's ``get`` from
+  ``minitpu_rtl_mxu_2026-10-08/scripts/gen_isa_delta.py``).
+* ``scripts/d23_rate.py``, ``scripts/d24_compare.py`` (this record).
+* ``tests/limits/new_sim_unfinished_producer_hang.py`` (F-B4).
+
+**Stubbed (track A's units; the integrator swaps them).** The issue kernel
+takes, per cycle, what a composed front end hands it, as side columns of the
+trace produced by Phase 0's bit-exact part references while the reference
+runs the same program (``seq_issue._Tap``, one model stepped across the
+joined traces):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 40 42
+
+   * - stubbed (plan name)
+     - side columns
+     - source
+   * - F1 fetch head
+     - ``HV`` and the head word
+     - ``ref_ctrl_issue.Fetch`` / loop-buffer replay
+   * - C1 ``decode``
+     - ``VS MS XS DS CS DLY`` (per-slot packed records, P-8)
+     - ``seq_issue.decode`` = ``ref_ctrl_decode.decode`` (REF-MATCH on 25,416 bundles)
+   * - L1 ``iv_by_level``
+     - ``IV0`` .. ``IV7``
+     - ``ref_ctrl_front.LoopCtrl``
+   * - S1 read ports
+     - ``SB`` / ``SS`` (``rd_data_d_base_o``, ``rd_data_d_stride_o``)
+     - ``ref_ctrl_decode.ScalarAgu``
+
+C1 ``resolve`` is an Allo function in ``seq_issue.py``; ``adapt`` is inline
+in the kernel (an Allo function returns one value; the three slot words would
+be ``adapt_v``/``adapt_x``/``adapt_m`` when track A's lands). The side
+columns are an open-loop replay of a closed loop -- what the front end did
+given the RTL's issue decisions -- so an issue unit that decided differently
+diverges at its first wrong cycle: the check stays sound.
+
+2. Verdicts
+===========
+
+Every line is ``check.py``'s, against the RTL (``logs/check_*.log``).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 12 12 54
+
+   * - unit:variant
+     - simulator
+     - SystemC csim
+     - defined slots, masks, run time
+   * - ``seq_issue:locked`` (I1+A1)
+     - **UNIT-MATCH**
+     - **UNIT-MATCH**
+     - 1,042,595/1,042,595 on 52,236 cycles, 15 program traces (5,447
+       issues); masked: reset 900, uninit IRAM 1,225; run 0.6 s / 9.0 s
+   * - ``vpu_cmd:streams`` (D-23, depth 2)
+     - **UNIT-MATCH**
+     - **UNIT-MATCH**
+     - 888,217/888,217; masked: **payload, slot not valid (D-23 gate)
+       154,378**, reset 900, uninit 1,225 (the RTL's ungated value differed
+       from the gate's 0 on 3,014 of all masked slots); 2.2 s / 9.9 s
+   * - ``vpu_cmd:streams_d1``, ``streams_d4``
+     - **UNIT-MATCH**
+     - **UNIT-MATCH**
+     - as ``streams`` (function only; the timing is §4)
+   * - ``vpu_wb:locked`` (W1)
+     - **UNIT-MATCH**
+     - **UNIT-MATCH**
+     - 121,075/121,075 on 24,218 cycles: every class alone, the 586-case pair
+       sweep, legal and unfiltered random, early/late ``vmatpop``; 0.3 s / 6.7 s
+   * - ``vpu_wb:units`` (W1 owns ``vreg.w``)
+     - **UNIT-MATCH**
+     - **UNIT-MATCH**
+     - 121,075/121,075; 1.0 s / 6.6 s
+   * - ``vpu_wb:selftimed`` (D-24)
+     - no verdict (hang, F-B4)
+     - **UNIT-DIFF** by design
+     - 94,493/121,075: every claim lands at issue + 5 (§5); the simulator
+       run was killed at its 300 s timeout
+   * - ``Calendar`` (template)
+     - --
+     - --
+     - **CALENDAR-MATCH** 33/33 against ``calendar.log``; 5/5 wrong
+       declarations refused (``logs/calendar_check.log``)
+   * - ``gen_isa_delta`` (locked)
+     - --
+     - --
+     - **DELTA-MATCH** 8/8 ``rtl_params.WB_W_*`` vs the pinned JSON's ``v1``;
+       re-derived block DELTA-MATCH; **DELTA-DIFF** vs ``v1-course`` on
+       ``WB_W_MPOP_LAST`` 3 vs 6 (F-B1)
+
+The cycle columns mean what ``check.py`` says: the simulator checks order,
+csim per iteration; per-cycle timing on csim is §4's stamped run, on
+Catapult RTL track D's.
+
+3. The ``Calendar`` record and the seam (Q2, H8)
+================================================
+
+``template/calendar.Calendar`` binds each writeback source to the unit whose
+declared latency it books and reads that latency from the unit's own
+declaration: ``units/alu.py`` ``RTL.latency`` 3, ``units/sfu.py`` 5,
+``template/legality.TreeGeometry`` root 13 / tap 9 (``LEAF + ADDER x
+LEVELS``), VMEM's compute port in the D-12 prototype (``vpu_word_array_d12``
+port ``c``, latency 3) plus the request register, the transpose's and the pop
+engine's register 1; ``WB_STAGES`` 2 is the writeback unit's declared
+latency. ``L``, ``W = L + WB_STAGES``, the first consumer ``W + 1``, the
+collision set ``W_a = d + W_b``, ``W_MPOP_LAST = W_mpop + POP_BEATS - 1`` and
+``vmatpop``'s precondition (``MxuGeometry().result_latency`` 85) are
+properties; ``calendar_legality`` holds the relations.
+
+* ``check_against_phase0`` parses ``u4_phase0_2026-10-08/calendar.log``:
+  L, W and RAW-by-function for all seven classes, W against asm, json and
+  ``sequencer_pkg``, the 15-case collision set on ``vpu.sv`` (same set), the
+  22 cases of the sequencer sweep, the precondition: **33/33 equal**.
+* Refused: a calendar typed beside an ALU whose latency changed, ``W_sfu``
+  typed as the unit latency, a combinational write port, ``WB_W_MPOP_LAST``
+  kept at 6 with a one-beat pop, the tap latency copied from the root.
+* ``gen_isa_delta`` emits ``versions.list.<name>.deltas`` as the seam's list of
+  ``{what, set: {rtl_params.WB_W_*: W}, source}`` (overrides only, through the
+  prototype's ``get``), ``unresolved`` outside the list;
+  ``--check-base`` compares the derived values with the pinned JSON at a
+  version. The locked instance is **``v1`` on the write port, 8/8**.
+
+``S_LAT`` and the descriptor round trip are carried as the S1 booking the
+calendar consumes (``Calendar.S_LAT`` 2); ``STACK_DEPTH``/``LB_CAP`` are
+track A's (H8's other half).
+
+4. D-23: the command boundary, and the deadlock/issue-rate check
+================================================================
+
+**The interface.** ``vpu_ctrl_t`` is three slot commands, each a ``Stream``
+carrying one token per valid command in its issue cycle: V (5 valids + 42
+payload bits), X (``vmem.valid`` + 19: op, register, resolved word, the
+store hint), M (3 valids + 15). Gating is structural: no token, no payload --
+D-23's allowed deviation, masked in the check (§2).
+
+**The four resources** (``vpu_cmd.resources()``, ``logs/delta_and_probes.log``):
+``vreg`` with ports ``ra``/``rb`` (r, latency 0) owned by the V unit, ``rc``
+(r, 0) owned by an arbiter fed by the store's request and the matrix
+stream's (the RTL's "the matrix read wins silently", ``vpu.sv:430``, as the
+owner's declared priority), ``w`` owned by W1; ``vmem.c`` (rw, latency 3)
+owned by the X unit. It **composes**, and builds and runs on the simulator
+and csim. **Refused at composition, naming the port**: the X unit also
+reading ``vreg.ra``; the store reading ``vreg.rc`` itself beside the arbiter;
+the load unit writing ``vreg.w`` beside W1 (and H7's second writer in
+``vpu_wb``). Dropping the arbiter is refused first by the netlist rule on its
+dangling channel.
+
+**Deadlock.** The netlist is acyclic (issue -> three Streams -> receivers;
+the resources composition likewise), so no ``deadlock_free_because`` is
+owed; each command channel has one writer and one reader (the netlist
+rules). What remains is the rate.
+
+**Issue rate, measured in csim** (``scripts/d23_rate.py``,
+``logs/d23_rate_csim.log``). The emitted ``kernel.cpp`` is stamped (the
+``u1_pipe`` technique: a patch to a generated file, values still held to the
+reference): the cycle at the top of each issue-loop iteration, after each
+command ``Push``, after each receiver ``Pop``. Loop iteration ``t`` is RTL
+cycle ``t``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 10 20 22 28 20
+
+   * - depth
+     - intervals of 1
+     - stall cycles
+     - issues at the RTL cycle
+     - put -> pop
+   * - 1
+     - 51,747 / 52,235
+     - **488** (all on command puts)
+     - 19 / 5,447 (up to 488 late)
+     - 2 or 3
+   * - 2
+     - 52,235 / 52,235
+     - 0
+     - **5,447 / 5,447**
+     - 2 (all)
+   * - 4
+     - 52,235 / 52,235
+     - 0
+     - **5,447 / 5,447**
+     - 2 (all)
+
+**Result: in csim the three Streams cost neither a deadlock nor an issue
+cycle at depth >= 2; the sequencer issues cycle for cycle as the RTL does on
+every Phase 0 program.** At depth 1 a stall the RTL does not have appears
+(488 cycles on back-to-back commands): a finding (F-B3), and the obligation's
+"sized" is a legality, depth >= 2, not a free choice.
+
+**On Catapult RTL: not measured here; left for track D**, with two reasons to
+expect the depth to matter more there: ``u3_fifo_composed`` measured a
+producer stall (238 cycles, 0.6 %) on Catapult RTL through a 4-deep
+Connections FIFO where csim showed none, and ``minitpu_rtl_mxu`` measured a
+depth-2 link between two II-1 kernels sustaining 2 tokens per 3 cycles. A
+csyn of ``vpu_cmd:streams`` was started at 3.33 ns (§7). Track D's check:
+``d23_rate.py``'s three numbers on the Catapult RTL in Verilator, at depths 2
+and 4. The **non-blocking fallback**, if needed, is the ``empty()``-guarded
+form, not ``try_get``/``try_put``: the emitter lowers ``empty()`` to the
+FIFO's ``empty_o`` and a guarded ``Pop`` with one ``wait()`` an iteration
+(seen in ``vpu_wb:selftimed``'s ``kernel.cpp``), whereas limitation 18 (issue
+#23, open) turns ``try_*`` into blocking calls.
+
+5. D-24: cycle-locked against self-timed, on the same programs
+==============================================================
+
+``vpu_wb:selftimed``: the trace's commands as D-23 tokens, three class
+units that turn a command into a claim token with no notion of a cycle (a
+self-timed unit's latency is its backend's, D-10), and the write port's
+owner merging the three claim streams by polling ``empty()``, one write a
+cycle (a merge onto one port is an arbiter), then the same two registers.
+``scripts/d24_compare.py`` (``logs/d24_compare.log``):
+
+**A. Claim latency, issue -> write-port mux, in csim** on ``vpu_writeback``'s
+traces (W = L + 2):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 14 14 56
+
+   * - class
+     - RTL L
+     - locked L
+     - self-timed L (median, range, claims)
+   * - vld
+     - 4
+     - 4
+     - 7 (5..56; behind the merge), 1,540
+   * - ALU
+     - 3
+     - 3
+     - 5 (5..5), 708
+   * - SFU
+     - 5
+     - 5
+     - 5, 808
+   * - vredsum
+     - 13
+     - 13
+     - 5, 886
+   * - vlanered
+     - 9
+     - 9
+     - 5, 845
+   * - vtxout
+     - 1
+     - 1
+     - 5, 681
+   * - vmatpop
+     - 1 (+ wait for the result)
+     - = RTL
+     - 5, 4 (no MXU in the composition)
+
+csim cannot see a unit's latency (``u1_pipe``: every one-kernel unit reads 2
+whatever its arithmetic), so the self-timed claim is two hops and a poll for
+every class. The hardware number has to come from the manifests:
+``W' = L_manifest + 2 links x 3 + 2`` (Catapult 3.33 ns: ALU 2, SFU 1,
+transpose 1 from ``u1_catapult_units``/``u3_track_c``; VMEM's port, the N=64
+tree and the MXU pop have no scheduled manifest and keep their declared L).
+
+**B. What Phase 0's sequencer programs see** (their RTL issue trace replayed
+against each calendar: RAW reads of a register still in flight / WAW pairs
+landing out of issue order / cycles with two claims at the port):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 24 24 24
+
+   * - programs
+     - locked (RTL)
+     - self-timed csim
+     - self-timed Catapult
+   * - 11 legal asm-scheduled
+     - **0 / 0 / 0**
+     - 77 / 0 / 53
+     - 165 / 0 / 81
+   * - ``unscheduled``
+     - 7 / 0 / 3
+     - 8 / 0 / 2
+     - 8 / 0 / 2
+
+The legal programs (scheduled by ``asm.schedule()`` for v1's calendar) are
+clean under the locked calendar and wrong under either self-timed one: a
+self-timed instance cannot run MiniTPU's images unchanged; its calendar is a
+version the scheduler must consume.
+
+**C. The deltas.** ``allo-locked``: 8 entries, all equal to ``v1``
+(DELTA-MATCH). ``allo-selftimed`` (Catapult manifests + links): 3 deltas
+(``WB_W_ALU`` 10, ``WB_W_SFU`` 9, ``WB_W_TXOUT`` 9) and 5 **unresolved**
+(``WB_W_VLD`` would be 12, ``REDUCE`` 21, ``LANE_REDUCE`` 17, ``MPOP_*`` 9),
+each with the missing manifest named.
+
+**Comparison.**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 40 40
+
+   * -
+     - cycle-locked (I1 + W1)
+     - self-timed (Streams, merge)
+   * - issue cycles
+     - the RTL's, cycle for cycle (csim; Cat RTL open)
+     - the same (the issue side does not stall at depth >= 2)
+   * - write-port claim W
+     - ``L + 2`` = the RTL's for all 7 classes; derived, DELTA-MATCH ``v1``
+     - ``L_backend + hops x link + 2``: 7 for every class in csim, 9-21 from
+       Catapult manifests; 5 of 8 unresolved for want of a manifest
+   * - collisions
+     - kept as the RTL's (OR-merge, visible); an obligation on the schedule
+     - impossible by construction (an arbiter); a second claim waits (a load's
+       L from 5 to 56 behind the V claims), so W is not a constant
+   * - MiniTPU's programs
+     - run unchanged (0 hazards)
+     - 77-165 RAW hazards on 11 legal programs: need a re-schedule
+   * - backends
+     - simulator and csim match
+     - csim only: the simulator hangs (F-B4); Catapult lowers the merge's
+       ``empty()`` correctly but ``try_*`` blocking (lim. 18)
+   * - area
+     - not measured (track D)
+     - not measured (track D)
+   * - what it exposes
+     - nothing new about the tools; the stubs' seam with track A
+     - that W is a property of a build, not of the units (D-10/D-20 hold:
+       the calendar re-derives); a merge needs a non-blocking form
+
+6. Findings
+===========
+
+.. list-table::
+   :header-rows: 1
+   :widths: 7 16 47 30
+
+   * - #
+     - class
+     - finding
+     - smallest change / proposal
+   * - F-B1
+     - semantic mismatch (seam)
+     - The pin ``b3ba0a4d`` is labelled ``v1-course`` (D-16), but master's
+       ``versions.list.v1-course`` sets ``WB_W_MPOP_LAST`` 6,
+       ``result_latency.vmatpush`` 82, ``issue_interval.vmatpop`` 4, a 4-deep
+       loop stack; ``b3ba0a4d`` measures 3, 85, 1 and 8 (Phase 0,
+       ``sequencer_pkg``). On every quantity the calendar touches, the pin is
+       master's ``v1`` base: DELTA-MATCH ``v1`` 8/8, DELTA-DIFF ``v1-course``.
+     - Owner/minitpu-comp: which ``versions`` name ``b3ba0a4d`` is; the
+       generator takes ``--version``, default ``v1``.
+   * - F-B2
+     - missing abstraction (workaround)
+     - ``compose.FRONTEND_NAMES`` has ``UInt``, ``int8/16/32``, ``uint1`` but
+       not ``uint8/16/32/64``: a unit body using them is refused ("uses
+       [...] without declaring them"). Bodies spell ``UInt(k)``.
+     - Add the four aliases to ``FRONTEND_NAMES`` (``allo/compose.py:36``),
+       one line.
+   * - F-B3
+     - finding (sizing; D-23's obligation)
+     - A depth-1 command Stream stalls issue in csim: 488 cycles on
+       back-to-back commands, issue up to 488 cycles behind the RTL. Depth 2
+       is the least stall-free depth in csim; Catapult's may be larger.
+     - Declare the command channels' depth as a legality (``>= 2`` in csim;
+       track D sets the Catapult bound), not a default.
+   * - F-B4
+     - bug (simulator) / semantic mismatch (sim vs csim)
+     - A consumer that finishes while its producer is blocked on a full
+       stream hangs the simulator with no diagnostic (the region call never
+       returns); csim terminates at the last output, the hung producer
+       invisible. Hit by the self-timed merge; repro
+       ``tests/limits/new_sim_unfinished_producer_hang.py`` (REPRODUCES).
+     - The simulator reports "finished with kernel X blocked on stream S"
+       instead of waiting (all non-finished kernels blocked = deadlock).
+   * - F-B5
+     - bug (repro rot)
+     - ``tests/limits/item18_catapult_try_ops_blocking.py`` no longer reaches
+       the backend: the netlist rules refuse it (``unconnected-stream
+       top.O``). Issue #23 is still open.
+     - Give the repro a reader of ``O``.
+   * - F-B6
+     - missing abstraction
+     - W1's "at most one claim per cycle" is an obligation on several
+       *channels* converging on the port's owner; ``Architecture.obligations``
+       accepts only a memory with more than one write-capable port, so the
+       rule cannot be declared where it lives (the D-12 ``vreg`` has one write
+       port). Stated in the docstring; discharged by the stress traces
+       (pair sweep, unfiltered random: the OR-merge reproduces the RTL's
+       collisions exactly).
+     - ``obligations={"vreg.w": "..."}`` naming a port whose owner merges
+       channels, or ``Unit(obligation=...)``.
+   * - F-B7
+     - semantic mismatch (by design, D-24)
+     - Self-timed W is a property of the build: csim shows 7 for every class
+       (it cannot see a unit's latency); the hardware number needs a
+       scheduled manifest per unit, which exists for 3 of 8 quantities.
+     - Track D: manifests for the N=64 tree, VMEM's compute port, the MXU pop.
+   * - F-B8
+     - harness (pitfall)
+     - The stubbed front end must be one model stepped across the joined
+       traces: the IRAM is unreset and a trace sees words an earlier one
+       wrote (``straight-at-slot-3`` reads slot 0's program). Per-trace side
+       columns gave 239 false differences on ``x_issue_address``.
+     - Noted in ``seq_issue``; track A's integration keeps the rule.
+   * - F-B9
+     - finding (front end, minor)
+     - Every build of these kernels warns "Cannot infer the bitwidth of the
+       slice, use UInt(32) as default" (``allo/ir/infer.py:644``) for a
+       slice whose bounds are not literal; the result is right here (no such
+       slice is wider than 32), but a wider one would be truncated silently.
+       The slice was not isolated.
+     - Fold module constants before the width check, or refuse (D-1).
+
+.. list-table::
+   :header-rows: 0
+   :widths: 7 16 47 30
+
+   * - F-B10
+     - finding (Catapult, budget)
+     - The csyn of ``vpu_cmd:streams`` with ``--unroll-inner`` ran away in
+       ``architect`` (86 GB, 13 min) and was stopped (§7).
+     - Track D: build without the harness pad loop, or rolled; cap memory.
+
+MiniTPU (FYI, not filed, P-10): the reference that mirrors the sequencer's
+sim-only checker counts no port-A read for ``vtxin`` (only ALU, SFU and
+reduce add one); ``vtxin`` reads port A in ``vpu.sv``. [I] -- from
+``ref_ctrl_issue._calendar``; ``sequencer.sv`` not re-read for it.
+
+7. Catapult
+===========
+
+**Not built to RTL here.** One csyn of ``vpu_cmd:streams`` (n 64, 3.33 ns,
+every iteration loop pipelined, inner loops unrolled -- which unrolls the
+64-iteration end-of-trace pad loop with its three conditional puts; track C's
+``u3c_build.py`` unchanged) passed ``go analyze``/``compile`` and spent 13 min
+in ``architect``, reaching **86 GB** of memory, and was stopped by hand on a
+shared host (no result, no manifest). Likely cause, untested: the unrolled
+pad loop (64 x 3 conditional ``Push``\ es) -- a harness artifact, not the
+issue logic; a Catapult build should drop the pad loop (the receivers' trip
+count is a harness need) or keep it rolled. The cycle-for-cycle issue check
+on Catapult RTL and every area number are **track D's** (D-23's condition on
+Catapult RTL is open). F-B10 in §6.
+
+8. Hypotheses and proposed matrix rows
+======================================
+
+* **H4** (I1 matches the sequencer per cycle): **confirmed** on the
+  simulator (order) and csim (per iteration, and per cycle by the stamped run
+  of §4); Catapult RTL open (track D).
+* **H7** (single-owner writeback refuses a second producer; the claim rule an
+  obligation): **confirmed** for the refusal; the obligation cannot be
+  declared on channels (F-B6), it is discharged by the traces.
+* **H8** (calendar relations as properties/legality, wrong declarations
+  refused): **confirmed** for the calendar (5/5 refused).
+* **H12** (Q1(b) composes without an 85-bit port): **confirmed** in the
+  D-23 form (three Streams + four ports), simulator and csim.
+
+Proposed rows for ``u4_matrix.rst`` (the integrator's file):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 21 21 21 21
+
+   * - unit
+     - RTL oracle
+     - Allo simulator
+     - SystemC csim
+     - Catapult RTL / RTLGen, AMC
+   * - issue (I1 + A1, ``seq_issue``)
+     - match (Phase 0 ``sequencer``)
+     - **match** 1,042,595 (stubs: F1/C1/L1/S1 side columns)
+     - **match** 1,042,595; issue cycle-for-cycle (§4)
+     - open (D) / n/a
+   * - VPU command (D-23, ``vpu_cmd``)
+     - match (Phase 0 ``sequencer`` + gating log)
+     - **match** 888,217 gated; four resources compose, three wrong owners
+       **refused**
+     - **match**; rate: depth >= 2 stall-free, depth 1 **finding** F-B3
+     - open (D): csyn stopped at 86 GB (F-B10)
+   * - write-back W1 (``vpu_wb``)
+     - match (Phase 0 ``vpu_writeback``)
+     - **match** 121,075 (``locked``, ``units``); H7 **refused**
+     - **match** 121,075
+     - open (D) / n/a
+   * - calendar (``template/calendar`` + ``gen_isa_delta``)
+     - match (``calendar.log``)
+     - **match** 33/33; 5/5 refused; DELTA-MATCH ``v1``; **finding** F-B1
+     - --
+     - --
+   * - self-timed W1 (D-24, ``vpu_wb:selftimed``)
+     - --
+     - **finding** F-B4 (hang)
+     - **semantic mismatch** by design: W' 7 all classes; 77 RAW on legal
+       programs
+     - open (D): manifests, F-B7
+
+9. Timings and pins
+===================
+
+Bindings build 1 min 20 s (``nice ninja -j16``, 336 steps, against the shared LLVM build). Verilator: the
+``u4_seq_cmd`` wrapper build ~15 s, the VPU (``u4_vpu_wb``) 2 min cold. Per
+check: §2. ``d23_rate.py`` ~30 s per depth, ``d24_compare.py`` ~30 s,
+calendar 6 s. Pins: MiniTPU ``b3ba0a4d`` (RTL, asm.py, images); MiniTPU
+master ``9622f754`` ``isa/latency.json`` sha256 ``7eb2bdeb...e11e85e``
+(``pins/SHA256SUMS.txt``, ``pins/ORIGIN.txt``); Verilator 5.052
+(conda-forge); g++ 13.3.1 (gcc-toolset-13); Catapult 2024.2
+(``/opt/siemens/catapult/2024.2``), its SystemC 2.3.3 and g++ 10.3.0 for csim.

@@ -1,0 +1,7 @@
+RTL u4_seq_cmd:shipped: 52236 cycles in 15 traces, 1042595 defined slots, RTL vs reference on defined: 1042595/1042595 (4.7s)
+UNIT-MATCH seq_issue:shipped locked simulator 1042595/1042595 defined (2125 masked: reset=900, uninit IRAM=1225; allo==rtl on 1927) cycle=order-only (build 0.8s, run 0.6s)
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+UNIT-MATCH seq_issue:shipped locked systemc 1042595/1042595 defined (2125 masked: reset=900, uninit IRAM=1225; allo==rtl on 1927) cycle=per-iteration, time unchecked (build 0.4s, run 9.0s)
+real	0m25.162s

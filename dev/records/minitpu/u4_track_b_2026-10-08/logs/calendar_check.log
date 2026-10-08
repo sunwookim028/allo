@@ -1,0 +1,46 @@
+binding:
+   load         L=  4  vmem.c (D-12 port) + request register  [units/vpu_word_array_d12.py vmem port c latency + 1 (vpu_pkg VPU_VLD_LATENCY)]
+   alu          L=  3  vpu_alu  [units/alu.py RTL.latency]
+   sfu          L=  5  sfu  [units/sfu.py RTL.latency]
+   reduce       L= 13  xlu_reduction_tree (root)  [template/legality.py TreeGeometry.latency = LEAF + ADDER*LEVELS]
+   lane_reduce  L=  9  xlu_reduction_tree (tap)  [template/legality.py TreeGeometry.tap_latency = LEAF + ADDER*LANE_LEVELS]
+   txout        L=  1  xlu_transpose  [units/xlu_transpose.py read register (probe 1)]
+   mpop         L=  1  mxu_pop_engine  [mxu_pop_engine registers the command (VPU_MPOP_LATENCY)]
+CALENDAR-MATCH load: L (issue -> mux): derived 4 phase0 4
+CALENDAR-MATCH load: W (issue -> write enable): derived 6 phase0 6
+CALENDAR-MATCH load: first consumer W+1 (RAW by function): derived 7 phase0 7
+CALENDAR-MATCH load: W vs asm/json/pkg: derived 6 phase0 (6, 6, 6)
+CALENDAR-MATCH alu: L (issue -> mux): derived 3 phase0 3
+CALENDAR-MATCH alu: W (issue -> write enable): derived 5 phase0 5
+CALENDAR-MATCH alu: first consumer W+1 (RAW by function): derived 6 phase0 6
+CALENDAR-MATCH alu: W vs asm/json/pkg: derived 5 phase0 (5, 5, 5)
+CALENDAR-MATCH sfu: L (issue -> mux): derived 5 phase0 5
+CALENDAR-MATCH sfu: W (issue -> write enable): derived 7 phase0 7
+CALENDAR-MATCH sfu: first consumer W+1 (RAW by function): derived 8 phase0 8
+CALENDAR-MATCH sfu: W vs asm/json/pkg: derived 7 phase0 (7, 7, 7)
+CALENDAR-MATCH reduce: L (issue -> mux): derived 13 phase0 13
+CALENDAR-MATCH reduce: W (issue -> write enable): derived 15 phase0 15
+CALENDAR-MATCH reduce: first consumer W+1 (RAW by function): derived 16 phase0 16
+CALENDAR-MATCH reduce: W vs asm/json/pkg: derived 15 phase0 (15, 15, 15)
+CALENDAR-MATCH lane_reduce: L (issue -> mux): derived 9 phase0 9
+CALENDAR-MATCH lane_reduce: W (issue -> write enable): derived 11 phase0 11
+CALENDAR-MATCH lane_reduce: first consumer W+1 (RAW by function): derived 12 phase0 12
+CALENDAR-MATCH lane_reduce: W vs asm/json/pkg: derived 11 phase0 (11, 11, 11)
+CALENDAR-MATCH txout: L (issue -> mux): derived 1 phase0 1
+CALENDAR-MATCH txout: W (issue -> write enable): derived 3 phase0 3
+CALENDAR-MATCH txout: first consumer W+1 (RAW by function): derived 4 phase0 4
+CALENDAR-MATCH txout: W vs asm/json/pkg: derived 3 phase0 (3, 3, 3)
+CALENDAR-MATCH mpop: L (issue -> mux): derived 1 phase0 1
+CALENDAR-MATCH mpop: W (issue -> write enable): derived 3 phase0 3
+CALENDAR-MATCH mpop: first consumer W+1 (RAW by function): derived 4 phase0 4
+CALENDAR-MATCH mpop: W vs asm/json/pkg: derived 3 phase0 (3, 3, 3)
+CALENDAR-MATCH pair sweep: colliding (a, b, d) on vpu.sv: derived 15 phase0 15
+CALENDAR-MATCH pair sweep: same set: derived [] phase0 []
+CALENDAR-MATCH sequencer sweep: rule gives (vmatpop incl.): derived 22 phase0 22
+CALENDAR-MATCH vmatpop precondition (result latency): derived 85 phase0 85
+CALENDAR-MATCH locked: rtl_params {'WB_W_VLD': 6, 'WB_W_ALU': 5, 'WB_W_SFU': 7, 'WB_W_REDUCE': 15, 'WB_W_LANE_REDUCE': 11, 'WB_W_TXOUT': 3, 'WB_W_MPOP_FIRST': 3, 'WB_W_MPOP_LAST': 3}
+   W typed beside an ALU whose latency changed to 4: refused: L_alu=3 must be the bound unit's declared latency 4 (+ hop 0): a calendar typed beside the unit outl
+   W_sfu typed as the unit latency (the WB stages forgotten): refused: W_sfu=5 must be L_sfu + WB_STAGES = 7 (the seam: W = unit latency + VPU_WB_STAGES)
+   a combinational write port (WB_STAGES 0): refused: WB_STAGES=0: the OR-mux is registered at least once (vpu.sv wb_stage_*); a combinational write port 
+   WB_W_MPOP_LAST kept at v1-course's 6 with a one-beat pop: refused: W_MPOP_LAST=6 must be W_mpop + POP_BEATS - 1 = 3 (sequencer_pkg.sv:573)
+   tree tap latency copied from the root: refused: L_lane_reduce=13 must be the bound unit's declared latency 9 (+ hop 0): a calendar typed beside the 

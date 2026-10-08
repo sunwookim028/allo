@@ -1,0 +1,34 @@
+/work/shared/users/phd/sk3463/scratch/wt-u4b/allo/ir/infer.py:644: UserWarning: Cannot infer the bitwidth of the slice, use UInt(32) as default
+A. claim timing in csim on vpu_writeback's traces (issue -> write-port mux, L; W = L + 2)
+   class               rtl L     locked L        selftimed L (median, min..max, n)
+   load             4 (4..4)     4 (4..4)                        7 (5..56), n=1540
+   alu              3 (3..3)     3 (3..3)                          5 (5..5), n=708
+   sfu              5 (5..5)     5 (5..5)                          5 (5..5), n=808
+   reduce        13 (13..13)  13 (13..13)                          5 (5..5), n=886
+   lane_reduce      9 (9..9)     9 (9..9)                          5 (5..5), n=845
+   txout            1 (1..1)     1 (1..1)                          5 (5..5), n=681
+   mpop            6 (1..41)    6 (1..41)                            5 (5..5), n=4
+   calendars W (claim cycle from issue):
+   locked (= RTL)             load 6, alu 5, sfu 7, reduce 15, lane_reduce 11, txout 3, mpop 3
+   selftimed csim             load 9, alu 7, sfu 7, reduce 7, lane_reduce 7, txout 7, mpop 7
+   selftimed Catapult 3.33    load 12, alu 10, sfu 9, reduce 21, lane_reduce 17, txout 9, mpop 9
+B. Phase 0's sequencer programs under each calendar: RAW in flight / WAW landing out of issue order / cycles with two claims at the write port
+   straight                     legal   w   21 r   30  locked 0/0/0  selfti-csim 10/0/0  selfti-Cata 14/0/0
+   straight-at-slot-3           legal   w   21 r   30  locked 0/0/0  selfti-csim 10/0/0  selfti-Cata 14/0/0
+   loops                        legal   w   18 r  179  locked 0/0/0  selfti-csim 12/0/0  selfti-Cata 21/0/0
+   loops-zero-trip              legal   w   18 r  174  locked 0/0/0  selfti-csim 12/0/0  selfti-Cata 21/0/0
+   loops-back-edge-waw          ILLEGAL w   26 r  171  locked 0/0/0  selfti-csim 12/0/0  selfti-Cata 21/0/0
+   dma-ideal                    legal   w    0 r    0  locked 0/0/0  selfti-csim 0/0/0  selfti-Cata 0/0/0
+   dma-random                   legal   w    0 r    0  locked 0/0/0  selfti-csim 0/0/0  selfti-Cata 0/0/0
+   random-0                     legal   w  204 r  218  locked 0/0/0  selfti-csim 6/0/12  selfti-Cata 25/0/22
+   random-1                     legal   w  327 r  345  locked 0/0/0  selfti-csim 18/0/21  selfti-Cata 38/0/33
+   random-2                     legal   w  111 r  126  locked 0/0/0  selfti-csim 5/0/8  selfti-Cata 14/0/12
+   random-3                     legal   w  194 r  240  locked 0/0/0  selfti-csim 4/0/12  selfti-Cata 18/0/14
+   image attention_h12_kv12_d64 legal   w    0 r    0  locked 0/0/0  selfti-csim 0/0/0  selfti-Cata 0/0/0
+   image attention_h14_kv2_d64. legal   w    0 r    0  locked 0/0/0  selfti-csim 0/0/0  selfti-Cata 0/0/0
+   unscheduled                  ILLEGAL w    8 r    8  locked 7/0/3  selfti-csim 8/0/2  selfti-Cata 8/0/2
+   matrix-busy-random           ILLEGAL w   21 r   30  locked 0/0/0  selfti-csim 10/0/0  selfti-Cata 14/0/0
+   legal programs, total RAW/WAW/meet: locked (= RTL): 0/0/0; selftimed csim: 77/0/53; selftimed Catapult 3.33: 165/0/81
+C. the deltas (template/gen_isa_delta, base: the pinned isa/latency.json, version v1)
+   allo-locked: 8 deltas, 0 unresolved -> dev/records/minitpu/u4_track_b_2026-10-08/logs/versions_allo-locked.json; DELTA-MATCH v1 (no change)
+   allo-selftimed: 3 deltas, 5 unresolved -> dev/records/minitpu/u4_track_b_2026-10-08/logs/versions_allo-selftimed.json; differs from v1 on WB_W_VLD 6->12, WB_W_ALU 5->10, WB_W_SFU 7->9, WB_W_REDUCE 15->21, WB_W_LANE_REDUCE 11->17, WB_W_TXOUT 3->9, WB_W_MPOP_FIRST 3->9, WB_W_MPOP_LAST 3->9
