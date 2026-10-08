@@ -42,6 +42,7 @@ the page, not to a new `.md` file. The fork-only pages:
 | Catapult: host setup, licences, directives, `ppa` mode | `docs/source/backends/catapult.rst` |
 | SystemC emitter, `Wire`/`Channel` links, EVA | `docs/source/backends/systemc.rst` |
 | Non-blocking streams | `docs/source/backends/nonblocking_streams.rst` |
+| `RTLModule` (Verilog as IP, Verilator sim / Vitis black box), `hls::stream` IPs, the stream shim; Verilator 5 notes and limits | `docs/source/backends/rtl_module.rst` |
 | TinyTPU-isa, Gemmini comparison, history | `docs/source/designs/` |
 | TinyTPU as a unit library (`ip/`), what the front end refuses | `docs/source/designs/tinytpu_library.rst` |
 | IP-library gap register vs LPU/Jalapeño, the adder tree (`ip/units/reduction_tree.py`) | `docs/source/designs/ip_gaps.rst` |

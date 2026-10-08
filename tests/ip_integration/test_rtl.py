@@ -19,7 +19,7 @@ EXAMPLE = Path(__file__).resolve().parents[2] / "examples/ip_integration"
 N = 8
 
 
-def accumulator(name=None):
+def accumulator(name=None, **kwargs):
     return RTLModule(
         "accumulator",
         EXAMPLE / "rtl_accumulator.v",
@@ -39,6 +39,7 @@ def accumulator(name=None):
         done="ap_done",
         persistent=True,
         hls=HLSBlackBox(str(EXAMPLE / "rtl_accumulator.cpp"), latency=3),
+        **kwargs,
     )
 
 
@@ -155,9 +156,43 @@ def test_signedness_mismatch(capsys):
         def compute():
             ip(a, c)
 
+        # Both streams need their other end: a region whose stream has one
+        # blocking end only is refused before the IP call is checked
+        # (allo/ir/units.py::_check_kernel_streams).
+        @df.kernel(mapping=[1])
+        def feed():
+            a.put(1)
+
+        @df.kernel(mapping=[1])
+        def drain():
+            v: int32 = c.get()
+
     with pytest.raises(SystemExit):
         df.customize(top)
     assert "requires int32_t" in capsys.readouterr().out
+
+
+def test_one_ended_ip_stream_refused():
+    # The netlist check counts an IP call as the reader of the streams the IP
+    # reads (input_idx) and the writer of those it writes (output_idx).
+    from allo.netlist import NetlistError
+
+    ip = accumulator()
+
+    with pytest.raises(NetlistError) as err:
+
+        @df.region()
+        def top():
+            a: Stream[int32, 2]
+            c: Stream[int32, 2]
+
+            @df.kernel(mapping=[1])
+            def compute():
+                ip(a, c)
+
+        df.customize(top)
+    assert "no writer, and compute blocks on a.get()" in str(err.value)
+    assert "no reader, and compute blocks on c.put()" in str(err.value)
 
 
 def test_rtl_pin_validation(verilator):
@@ -166,6 +201,41 @@ def test_rtl_pin_validation(verilator):
     ip.ports[0].data = "missing"
     with pytest.raises(ValueError, match="RTL pin missing"):
         ip.validate_rtl()
+
+
+def test_verilator_args_and_max_stall():
+    from allo.backend.rtl import _emit
+
+    ip = accumulator(verilator_args="-Wno-fatal --build-jobs 2", max_stall=1234)
+    assert ip.verilator_args == ["-Wno-fatal", "--build-jobs", "2"]
+    assert accumulator(verilator_args=["-Wno-fatal"]).verilator_args == ["-Wno-fatal"]
+    assert accumulator().max_stall == 500000
+    src = _emit(
+        ip.rtl_top,
+        ip.ports,
+        ip.clock,
+        ip.reset,
+        ip.reset_active_high,
+        ip.start,
+        ip.done,
+        ip.persistent,
+        max_stall=ip.max_stall,
+    )
+    assert "const long MAX_STALL = 1234;" in src
+    for bad in (0, -1, 1.5, True):
+        with pytest.raises(ValueError, match="max_stall"):
+            accumulator(max_stall=bad)
+
+
+def test_verilator_args_reach_verilator(verilator):
+    # An option Verilator does not know must fail validation: proof that the
+    # pass-through reaches the --json-only run.
+    ip = accumulator(verilator_args=["--no-such-allo-option"])
+    with pytest.raises(RuntimeError, match="no-such-allo-option"):
+        ip.validate_rtl()
+    assert "input" in {
+        d for d, _ in accumulator(verilator_args=["-Wno-fatal"]).validate_rtl().values()
+    }
 
 
 def test_stream_backpressure_and_repeated_calls(verilator):
@@ -285,6 +355,17 @@ def test_multiple_static_calls_rejected(capsys):
         def compute():
             ip(a, c)
             ip(a, c)
+
+        # Both streams need their other end: a region whose stream has one
+        # blocking end only is refused before the IP call is checked
+        # (allo/ir/units.py::_check_kernel_streams).
+        @df.kernel(mapping=[1])
+        def feed():
+            a.put(1)
+
+        @df.kernel(mapping=[1])
+        def drain():
+            v: int32 = c.get()
 
     with pytest.raises(SystemExit):
         df.customize(top)

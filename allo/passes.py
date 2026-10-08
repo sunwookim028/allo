@@ -557,7 +557,7 @@ def call_ext_libs_in_ptr(module, ext_libs, allow_stream_ip=False):
     # `allow_stream_ip=True` is passed by the dataflow simulator only: there,
     # stream IPs are left untouched here and lowered later by
     # `backend/simulator.py`, which knows the ring buffer each stream became and
-    # calls the IP through the stream shim (see docs/IP_STREAM_SIM_SHIM.md).
+    # calls the IP through the stream shim (see docs/source/backends/rtl_module.rst).
     #
     # The plain LLVM target keeps raising: it executes the kernels sequentially,
     # one call after another, so an IP that blocks waiting on a FIFO another

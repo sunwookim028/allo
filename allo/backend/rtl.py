@@ -11,10 +11,10 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
-import xml.etree.ElementTree as ET
 
 from .ip import IPModule, STREAM, IP_SIM_INCLUDE_DIR, parse_cpp_function
 
@@ -139,6 +139,7 @@ def _emit(
     persistent,
     control=None,
     function_name=None,
+    max_stall=500000,
 ):
     """One transactor emitter for every port combination.
 
@@ -164,7 +165,7 @@ def _emit(
     A("#include <thread>")
     A(f'#include "V{top}.h"\n')
     A("namespace {")
-    A("const long MAX_STALL = 500000;   // cycles with NO progress")
+    A(f"const long MAX_STALL = {int(max_stall)};   // cycles with NO progress")
     A(
         f"void tick(V{top} *m) {{ m->eval(); m->{clk} = 1; m->eval(); m->{clk} = 0; m->eval(); }}"
     )
@@ -362,6 +363,16 @@ class RTLModule(IPModule):
     independent instance a distinct C symbol; ``top`` always names the RTL.
     For synthesis pass HLSBlackBox and describe either a supplied FIFO wrapper
     or ready/valid core pins with an explicit ReadyValidAdapter contract.
+
+    Verilator (simulation and ``validate_rtl`` only): the binary is
+    ``verilator=`` if given, else ``$VERILATOR``, else ``verilator`` on
+    ``PATH``; ``dev/toolchains.rst`` pins the one this fork is tested with
+    (5.052). ``verilator_args`` (a list, or one shell-quoted string) is
+    appended to both Verilator invocations -- the ``--json-only`` validation
+    and the ``--cc --build`` model build -- e.g. ``["-Wno-fatal",
+    "--build-jobs", "16"]``. ``max_stall`` is the number of consecutive
+    cycles without handshake progress after which the simulation transactor
+    reports ``STALLED`` and aborts (default 500000).
     """
 
     def __init__(
@@ -389,6 +400,8 @@ class RTLModule(IPModule):
         parameters=None,
         defines=None,
         verilator=None,
+        verilator_args=(),
+        max_stall=500000,
     ):
         # pylint: disable=super-init-not-called
         # IPModule's C parser is intentionally bypassed: the signature is typed
@@ -447,6 +460,16 @@ class RTLModule(IPModule):
             if not isinstance(value, int) or isinstance(value, bool):
                 raise ValueError("RTL parameter overrides must be integers")
         self.verilator = verilator
+        if isinstance(verilator_args, (str, os.PathLike)):
+            verilator_args = shlex.split(str(verilator_args))
+        self.verilator_args = [str(a) for a in verilator_args]
+        if (
+            not isinstance(max_stall, int)
+            or isinstance(max_stall, bool)
+            or max_stall <= 0
+        ):
+            raise ValueError("max_stall must be a positive integer (cycles)")
+        self.max_stall = max_stall
         self.mlir_include = mlir_include
         self._validate_description()
         self.args = []
@@ -702,6 +725,8 @@ class RTLModule(IPModule):
             persistent=True,
             hls=replace(self.hls, adapter=None, c_model=str(model_path)),
             verilator=self.verilator,
+            verilator_args=self.verilator_args,
+            max_stall=self.max_stall,
             mlir_include=self.mlir_include,
         )
         # The compiler has already recorded this object's JIT entry name.
@@ -743,39 +768,80 @@ class RTLModule(IPModule):
         )
 
     def validate_rtl(self):
-        """Elaborate with Verilator and validate top-level names/directions/widths."""
+        """Elaborate with Verilator and validate top-level names/directions/widths.
+
+        Reads Verilator's ``--json-only`` tree (Verilator 5.x; the ``--xml-only``
+        front end this was first written against is gone in the pinned 5.052).
+        A pin whose type is not a plain ``BASICDTYPE`` -- a packed/unpacked
+        array, struct or enum -- is refused.
+        """
         _, env = self._tool()
-        xml = self.build_path / "ports.xml"
+        tree_path = self.build_path / "ports.tree.json"
+        meta_path = self.build_path / "ports.meta.json"
         _run(
             self._rtl_command()
             + [
-                "--xml-only",
+                "--json-only",
                 "-Wno-fatal",
-                "--xml-output",
-                str(xml),
+                "--json-only-output",
+                str(tree_path),
+                "--json-only-meta-output",
+                str(meta_path),
                 "--Mdir",
-                str(self.build_path / "xml"),
-            ],
+                str(self.build_path / "json"),
+            ]
+            + self.verilator_args,
             env,
         )
-        tree = ET.parse(xml)
+        tree = json.loads(tree_path.read_text(encoding="utf-8"))
+        nodes = {}
+
+        def collect(node):
+            if isinstance(node, dict):
+                if "addr" in node:
+                    nodes[node["addr"]] = node
+                for value in node.values():
+                    collect(value)
+            elif isinstance(node, list):
+                for value in node:
+                    collect(value)
+
+        collect(tree)
+        # The elaborated top is the one MODULE at level 1 (the XML front end's
+        # topModule="1"); a parameterised submodule may share its origName.
         module = next(
-            (m for m in tree.findall(".//module") if m.get("topModule") == "1"), None
+            (
+                m
+                for m in tree.get("modulesp", [])
+                if m.get("type") == "MODULE"
+                and m.get("level") == 1
+                and m.get("origName") == self.rtl_top
+            ),
+            None,
         )
         if module is None:
             raise ValueError("Cannot locate elaborated RTL top module")
-        dtypes = {d.get("id"): d for d in tree.findall(".//typetable/*")}
         actual = {}
-        for var in module.findall("var"):
-            if var.get("dir") not in ("input", "output", "inout"):
+        for var in module.get("stmtsp", []):
+            if var.get("type") != "VAR":
                 continue
-            dtype = dtypes[var.get("dtype_id")]
-            if dtype.tag != "basicdtype":
+            direction = {"INPUT": "input", "OUTPUT": "output", "INOUT": "inout"}.get(
+                var.get("direction")
+            )
+            if direction is None:
+                continue
+            dtype = nodes[var["dtypep"]]
+            if dtype.get("type") != "BASICDTYPE":
                 raise ValueError(
                     f"Packed/unpacked aggregate pin unsupported: {var.get('name')}"
                 )
-            width = abs(int(dtype.get("left", "0")) - int(dtype.get("right", "0"))) + 1
-            actual[var.get("name")] = (var.get("dir"), width)
+            rng = dtype.get("range")
+            if rng:
+                left, right = (int(x) for x in rng.split(":"))
+                width = abs(left - right) + 1
+            else:
+                width = 1
+            actual[var["name"]] = (direction, width)
         expected = {name: (direction, width) for name, direction, width in self._pins()}
         for name, spec in expected.items():
             if actual.get(name) != spec:
@@ -808,7 +874,8 @@ class RTLModule(IPModule):
                 str(vgen),
                 "-CFLAGS",
                 "-fPIC -fvisibility=hidden",
-            ],
+            ]
+            + self.verilator_args,
             env,
         )
         root = Path(_run([binary, "--getenv", "VERILATOR_ROOT"], env).strip())
@@ -829,6 +896,7 @@ class RTLModule(IPModule):
                 self.persistent,
                 self.hls,
                 self.top,
+                self.max_stall,
             ),
             encoding="utf-8",
         )

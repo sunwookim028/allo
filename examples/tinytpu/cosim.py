@@ -216,11 +216,14 @@ def patch_axi_depths(prj):
     depths = [IMEM_SIZE, MAXDIM * MAXDIM, MAXDIM * MAXDIM, MAXDIM * MAXDIM]
     path = os.path.join(prj, "kernel.cpp")
     src = open(path).read()
+    # Allo's vitis.py emits `depth=<static element count>` itself since PR #48;
+    # replace it rather than append a second `depth=` (same values here).
     def sub(m):
         i = int(m.group(2))
         return f"{m.group(1)} depth={depths[i]}" if i < len(depths) else m.group(0)
     out, n = re.subn(
-        r"(#pragma HLS interface m_axi port=\w+ offset=slave bundle=gmem(\d+))",
+        r"(#pragma HLS interface m_axi port=\w+ offset=slave bundle=gmem(\d+))"
+        r"(?: depth=\d+)?",
         sub, src)
     assert n == len(depths), f"patched {n} m_axi pragmas, expected {len(depths)}"
     open(path, "w").write(out)

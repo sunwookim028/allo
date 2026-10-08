@@ -1706,7 +1706,7 @@ def _check_no_unlowered_stream_ip_calls(module: Module, stream_ips: dict):
                 f"Stream IP '{callee_name}' is called from a place the dataflow "
                 "simulator cannot wire up. Call it inside a @df.kernel, passing "
                 "streams declared at @df.region scope. See "
-                "docs/IP_STREAM_SIM_SHIM.md."
+                "docs/source/backends/rtl_module.rst."
             )
 
 
@@ -1743,7 +1743,7 @@ def build_dataflow_simulator(module: Module, top_func_name: str, ext_libs=None):
         # Hand-written HLS IPs whose interface uses hls::stream ports run on the
         # CPU through the stream shim: their MLIR declaration is swapped for the
         # generated wrapper's, and their calls are rewritten once the ring
-        # buffers exist. See docs/IP_STREAM_SIM_SHIM.md.
+        # buffers exist. See docs/source/backends/rtl_module.rst.
         ext_libs = [] if ext_libs is None else ext_libs
         stream_ips = {
             lib.top: lib for lib in ext_libs if getattr(lib, "has_stream_args", False)

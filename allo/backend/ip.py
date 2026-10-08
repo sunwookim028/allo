@@ -26,7 +26,7 @@ _STREAM_TOKEN = rf"(?:\w+::)*stream\s*<{_TEMPLATE_ARGS}>"
 # Directory holding the CPU-simulation shim headers (`hls_stream.h`,
 # `allo_fifo.h`). It is put FIRST on the include path of the simulator wrapper
 # so that the IP's `#include <hls_stream.h>` resolves to Allo's shim instead of
-# Vitis's header. See `docs/IP_STREAM_SIM_SHIM.md`.
+# Vitis's header. See `docs/source/backends/rtl_module.rst`.
 IP_SIM_INCLUDE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ip_sim")
 
 # The only symbol a generated wrapper .so may export. Everything else -- above

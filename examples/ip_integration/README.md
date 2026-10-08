@@ -52,16 +52,16 @@ deadlocks rather than merely running slowly.
 
 ## Further reading
 
-- [`docs/IP_STREAM_INTEGRATION.md`](../../docs/IP_STREAM_INTEGRATION.md) — how
-  stream IPs are integrated for the `vitis_hls` / `vivado_hls` targets.
-- [`docs/IP_STREAM_SIM_SHIM.md`](../../docs/IP_STREAM_SIM_SHIM.md) — how they
-  run under the CPU dataflow simulator, including the FIFO protocol and the ABI.
+- [`docs/source/backends/rtl_module.rst`](../../docs/source/backends/rtl_module.rst)
+  — how stream IPs are integrated for the `vitis_hls` / `vivado_hls` targets, and
+  how they run under the CPU dataflow simulator, including the FIFO protocol and
+  the ABI.
 - [`tests/ip_integration/`](../../tests/ip_integration/) — smaller, more focused
   cases, including IPs with plain array interfaces.
 
 ## RTL IP integration
 
-See [RTLModule documentation](../../docs/RTL_MODULE.md) and
+See [RTLModule documentation](../../docs/source/backends/rtl_module.rst) and
 [`rtl_accumulator.py`](rtl_accumulator.py) for Verilator simulation and Vitis
 black-box project generation with a supplied RTL wrapper.
 

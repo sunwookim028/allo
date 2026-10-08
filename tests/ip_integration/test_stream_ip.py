@@ -7,7 +7,7 @@ The IP under test is ``vadd_stream.cpp``: it reads one element from each of two
 input streams, adds them, and writes the sum to an output stream. Around it we
 build a dataflow region with feeder kernels (that put into the input streams), a
 thin wrapper kernel that calls the IP, and a drain kernel (that gets from the
-output stream). See ``docs/IP_STREAM_INTEGRATION.md`` for the design rationale.
+output stream). See ``docs/source/backends/rtl_module.rst`` for the design rationale.
 """
 
 import tempfile
@@ -105,7 +105,7 @@ def test_stream_ip_sequential_cpu_paths_rejected():
 
     The dataflow *simulator* does support stream IPs now (each kernel is its own
     thread, so a blocking read can be satisfied -- see
-    ``test_stream_ip_sim.py`` and ``docs/IP_STREAM_SIM_SHIM.md``). The paths that
+    ``test_stream_ip_sim.py`` and ``docs/source/backends/rtl_module.rst``). The paths that
     call the IP once, sequentially, cannot: the plain ``llvm`` target
     (``call_ext_libs_in_ptr`` / ``generate_mlir_c_wrapper``) and vitis_hls
     ``csim`` (``generate_nanobind_wrapper``).

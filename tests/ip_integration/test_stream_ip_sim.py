@@ -8,7 +8,7 @@ in shared memory and every kernel into an OpenMP thread. These tests check that 
 hand-written HLS IP joins that scheme through Allo's ``hls::stream`` shim: the
 IP's own ``read()`` / ``write()`` calls drive Allo's ring buffers directly.
 
-See ``docs/IP_STREAM_SIM_SHIM.md`` for the design; ``test_stream_ip.py`` covers
+See ``docs/source/backends/rtl_module.rst`` for the design; ``test_stream_ip.py`` covers
 the FPGA path.
 
 Run with ``OMP_NUM_THREADS`` at least as large as the number of kernels in the

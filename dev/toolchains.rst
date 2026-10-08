@@ -225,6 +225,18 @@ smoke test builds and runs with g++ 13.3.1. MiniTPU, cloned at
    PASS tb_copy_abi_v9 ... PASS tb_isa_conformance
    == unit suite complete: 14 testbenches          # 14/14 PASS, 80 s wall
 
+**RTLModule** (``allo/backend/rtl.py``, from fork PR #48) is pinned to this same
+Verilator **5.052** and needs it or a later 5.x: ``validate_rtl`` reads
+``--json-only``, which replaced the ``--xml-only`` the PR was written against
+(gone in 5.052). The binary is ``RTLModule(verilator=...)``, else
+``$VERILATOR``, else ``verilator`` on ``PATH``; the prefix above is not on
+``PATH``, so export
+``VERILATOR=/work/shared/users/phd/sk3463/tools/verilator/bin/verilator`` (or
+*append* its ``bin`` to ``PATH``: prepending shadows the ``allo`` env's
+``python``), and put ``gcc-toolset-13`` first on ``PATH`` with ``CXX`` pointing at
+its ``g++`` (the generated model and the transactor are C++17).
+``docs/source/backends/rtl_module.rst`` ("On this fork").
+
 **torch 2.14.0 CPU**, in a new env cloned from ``allo`` rather than in ``allo``
 itself: every session on this host shares ``allo``, and Allo's PyTorch
 frontend imports torch, so swapping its torch under them was not worth the

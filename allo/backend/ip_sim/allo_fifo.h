@@ -20,7 +20,7 @@
 // Every step below mirrors one operation emitted by simulator.py. The cited
 // line numbers refer to that file at the time this was written; the ordering
 // they encode is what actually matters and is explained in
-// `docs/IP_STREAM_SIM_SHIM.md`.
+// `docs/source/backends/rtl_module.rst`.
 //
 // MEMORY MODEL
 // ------------

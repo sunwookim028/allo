@@ -19,8 +19,8 @@ Run it with::
 
     OMP_NUM_THREADS=8 python3 vadd_sequencer_ip.py
 
-See ``docs/IP_STREAM_SIM_SHIM.md`` for how the stream ports are wired up on the
-CPU, and ``docs/IP_STREAM_INTEGRATION.md`` for the FPGA path.
+See ``docs/source/backends/rtl_module.rst`` for how the stream ports are wired up on the
+CPU, and ``docs/source/backends/rtl_module.rst`` for the FPGA path.
 """
 
 from pathlib import Path

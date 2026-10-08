@@ -174,6 +174,33 @@ def _as_kernel(spec, name, bindings, mapping):
     return tree
 
 
+def _ip_stream_uses(call, global_vars):
+    """``[(stream name, direction)]`` for a call to a stream IP.
+
+    An ``IPModule``/``RTLModule`` with ``hls::stream`` ports is called as
+    ``ip(a, c)``: the stream is an argument, not the receiver of a
+    ``put``/``get``, so the method-call scan does not see it. The IP's own
+    ``input_idx``/``output_idx`` say which arguments it reads and writes, and
+    the calling kernel is that stream's reader or writer. Any other call, or a
+    name that does not resolve here, uses no stream.
+    """
+    if not isinstance(call.func, ast.Name):
+        return []
+    ip = global_vars.get(call.func.id)
+    if not getattr(ip, "has_stream_args", False):
+        return []
+    found = []
+    for index, arg in enumerate(call.args):
+        name, _ = _root_name(arg)
+        if name is None:
+            continue
+        if index in (ip.input_idx or ()):
+            found.append((name, IN))  # the IP reads it: the kernel is a reader
+        if index in (ip.output_idx or ()):
+            found.append((name, OUT))  # the IP writes it: the kernel is a writer
+    return found
+
+
 def _check_kernel_streams(node, global_vars):
     """Refuse a stream that the nested kernels of a unit-free region leave
     unconnected (E1).
@@ -200,9 +227,20 @@ def _check_kernel_streams(node, global_vars):
             if not (isinstance(inner, ast.FunctionDef) and _decorator(inner, "kernel")):
                 continue
             for call in ast.walk(inner):
+                if not isinstance(call, ast.Call):
+                    continue
+                for name, direction in _ip_stream_uses(call, global_vars):
+                    if name not in channels:
+                        continue
+                    who = users.setdefault(name, {}).setdefault(direction, [])
+                    if inner.name not in who:
+                        who.append(inner.name)
+                    # An IP call blocks on its streams like put/get do.
+                    blocking.setdefault(name, []).append(
+                        (inner.name, "put" if direction == OUT else "get")
+                    )
                 if not (
-                    isinstance(call, ast.Call)
-                    and isinstance(call.func, ast.Attribute)
+                    isinstance(call.func, ast.Attribute)
                     and call.func.attr in READS + WRITES
                 ):
                     continue

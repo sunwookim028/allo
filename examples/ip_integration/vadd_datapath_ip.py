@@ -18,7 +18,7 @@ the dataflow region as a peer of the Allo kernels: under
 ``target="simulator"`` it runs in its own thread and its ``read()``/``write()``
 calls drive Allo's FIFOs directly, and under ``target="vitis_hls"`` it is
 stitched in through Vitis's own ``hls::stream``. The same source works for both.
-See ``docs/IP_STREAM_SIM_SHIM.md`` and ``docs/IP_STREAM_INTEGRATION.md``.
+See ``docs/source/backends/rtl_module.rst``.
 
 Run it with::
 
