@@ -318,6 +318,10 @@ over the banks that answers as ``axi4_mem_model`` does at round trip 0. That
 is RTL-only (no tool change) and is proposed for M-R2; it would also make the
 ``+ROUND_TRIP_CYCLES`` knob reproducible.
 
+**Done (M-R2b, ``minitpu_rtl_m2b_2026-10-08.rst``):** with ``uncore_io_tile``
+and a transcription of the TB's memory model in the shim, cycles equal the
+testbench's on 52/52, digests still 52/52.
+
 6. Findings
 ===========
 

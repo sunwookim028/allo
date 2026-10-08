@@ -129,6 +129,11 @@ established about the descriptors:
   for the MiniTPU core at ``--build-jobs 16``.
 - An ``RTLModule`` composes in ``compose.Architecture`` only as a *parameter*
   (``calls=`` takes functions), unchecked against its ports.
+- One boundary array may be passed to two ``MemPort``\ s of one call (a write
+  port and a read port): the transactor commits memory ports in list order, so
+  listing the write port first gives a write-first dual-ported RAM. M-R2b
+  (``minitpu_rtl_m2b_2026-10-08.rst``) relies on it; it is not a documented
+  contract of ``MemPort``.
 
 Effects on projects without an RTLModule
 ----------------------------------------
