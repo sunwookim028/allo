@@ -107,6 +107,29 @@ RTL shim around the core today:
   the generated ready/valid adapter needs an active-high clock enable on the core;
   Vitis 2023.2 only, ``mode="csyn"`` only.
 
+Whole-core use (MiniTPU M-R1)
+-----------------------------
+
+``examples/minitpu-rtl/`` wraps MiniTPU's whole ``minitpu_core`` as one
+``RTLModule`` (``dev/records/minitpu/minitpu_rtl_m1_2026-10-08.rst``): all 52
+oracle launches drain bit-identical to MiniTPU's own testbench. What it
+established about the descriptors:
+
+- **A ``MemPort`` and stream ``Port``\ s on one IP work under
+  ``target="simulator"``**, including eight ``MemPort``\ s of 2**20 words bound
+  to region boundary arrays.
+- A 256-bit memory word is served as eight interleaved 32-bit ``MemPort``\ s
+  (one access per bank per cycle); there is no wide or laned ``MemPort``.
+- A non-persistent input stream needs a fixed ``size``, so a variable-length
+  program is padded to a fixed length.
+- ``$readmem`` paths in the RTL resolve against the *Python process's* working
+  directory, and a missing file is only a warning: the caller must ``chdir``
+  and check the model's output (there is no run-directory or plusarg option).
+- The model is rebuilt per ``RTLModule`` object (no cache): ~70 s per process
+  for the MiniTPU core at ``--build-jobs 16``.
+- An ``RTLModule`` composes in ``compose.Architecture`` only as a *parameter*
+  (``calls=`` takes functions), unchecked against its ports.
+
 Effects on projects without an RTLModule
 ----------------------------------------
 
