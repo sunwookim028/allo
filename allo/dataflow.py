@@ -1000,6 +1000,11 @@ def build(
             unroll=False,
             typing_rule_set="cpp-style",
         )
+        from .backend.rtl import RTLModule
+
+        for lib in s.ext_libs:
+            if isinstance(lib, RTLModule):
+                lib.validate_target(target)
         stream_info, stream_types_dict, extra_stream_info = move_stream_to_interface(
             s, with_stream_type=True, with_extra_info=True, unroll=False
         )
@@ -1046,7 +1051,7 @@ def build(
                     '(target="systemc"); the simulator has no wire/channel '
                     "semantics. Use Stream links on the simulator."
                 )
-        return LLVMOMPModule(s.module, s.top_func_name)
+        return LLVMOMPModule(s.module, s.top_func_name, s.ext_libs)
     # FPGA backend (vitis_hls, vivado_hls, tapa, ihls)
     s = customize(func, enable_tensor=enable_tensor)
     # Before the backend runs: the architecture this build is about to compile,

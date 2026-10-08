@@ -7,6 +7,7 @@ from .customize import customize, Partition
 from .backend.llvm import invoke_mlir_parser, LLVMModule
 from .backend.hls import HLSModule
 from .backend.ip import IPModule
+from .backend.rtl import RTLModule, Port, MemPort, HLSBlackBox, ReadyValidAdapter
 from .dsl import *
 from .template import *
 from .verify import verify

@@ -533,8 +533,48 @@ def materialize_returned_arguments(module):
     return module
 
 
-def call_ext_libs_in_ptr(module, ext_libs):
-    lib_map = {lib.top: lib for lib in ext_libs}
+def _nested_ops(op):
+    """Yield every operation under `op`, at any depth.
+
+    `entry_block.operations` only sees the top level of a function body, so an
+    IP call inside a loop used to be left un-rewritten -- while this pass had
+    already erased the declaration it referred to, leaving a dangling callee
+    that failed to lower. A fixed-width IP tiled over a larger problem is the
+    ordinary way to use one, so that call is very often inside a loop.
+    """
+    for region in op.regions:
+        for block in region.blocks:
+            for child in block.operations:
+                yield child
+                yield from _nested_ops(child)
+
+
+def call_ext_libs_in_ptr(module, ext_libs, allow_stream_ip=False):
+    # This rewrite turns each IP call into a call through unranked-memref
+    # pointers -- an `hls::stream<T>` port has no such representation, so a
+    # stream IP cannot go through it.
+    #
+    # `allow_stream_ip=True` is passed by the dataflow simulator only: there,
+    # stream IPs are left untouched here and lowered later by
+    # `backend/simulator.py`, which knows the ring buffer each stream became and
+    # calls the IP through the stream shim (see docs/source/backends/rtl_module.rst).
+    #
+    # The plain LLVM target keeps raising: it executes the kernels sequentially,
+    # one call after another, so an IP that blocks waiting on a FIFO another
+    # kernel has not filled yet would simply hang. Only the simulator gives each
+    # kernel its own thread.
+    stream_ips = [lib for lib in ext_libs if getattr(lib, "has_stream_args", False)]
+    if stream_ips and not allow_stream_ip:
+        raise NotImplementedError(
+            f"IP '{stream_ips[0].top}' has hls::stream<T> arguments, which are "
+            "supported for the vitis_hls/vivado_hls targets and for the dataflow "
+            "simulator (df.build(..., target='simulator')), but not for the "
+            "'llvm' target: it runs the kernels sequentially, so a blocking "
+            "stream read could never be satisfied."
+        )
+    lib_map = {
+        lib.top: lib for lib in ext_libs if not getattr(lib, "has_stream_args", False)
+    }
     with module.context, Location.unknown():
         op_to_remove = []
         for op in module.body.operations:
@@ -559,8 +599,13 @@ def call_ext_libs_in_ptr(module, ext_libs):
                 )
                 func_op.attributes["sym_visibility"] = StringAttr.get("private")
                 op_to_remove.append(op)
-            elif isinstance(op, func_d.FuncOp):
-                for body_op in op.entry_block.operations:
+            elif isinstance(op, func_d.FuncOp) and not op.is_external:
+                # `not op.is_external`: a declaration has no entry block to walk.
+                # Reachable now that a stream IP's declaration is deliberately
+                # left in place here (it is lowered by backend/simulator.py).
+                # Walk nested blocks too, and materialise the list first: the
+                # rewrite below inserts memref.cast ops into blocks being walked.
+                for body_op in list(_nested_ops(op)):
                     # update call function
                     if (
                         isinstance(body_op, func_d.CallOp)

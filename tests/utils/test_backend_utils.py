@@ -88,6 +88,18 @@ def test_postprocess_preserves_modulo_operator():
     assert "x % 4" in result
 
 
+def test_postprocess_axi_depths():
+    code = "void top(\n  int A[8],\n  int scale,\n  int B[2][3]\n) {\n}\n"
+    result = postprocess_hls_code(code, top="top")
+    assert "m_axi port=A offset=slave bundle=gmem0 depth=8" in result
+    assert "m_axi port=B offset=slave bundle=gmem1 depth=6" in result
+    assert "m_axi port=scale" not in result
+    assert "int *A," in result and "int *B" in result
+    assert "#pragma HLS interface" not in postprocess_hls_code(
+        code, top="top", pragma=False
+    )
+
+
 def test_postprocess_realistic_mlir_snippet():
     """Realistic MLIR-emitted snippet: %alloc stripped, C++ modulo preserved."""
     # Reproduces the exact pattern that caused g++ to fail in test_three_level_systolic_csim
