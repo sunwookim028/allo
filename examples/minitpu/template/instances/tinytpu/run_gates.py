@@ -160,12 +160,13 @@ def cosim(script):
     """``cosim.py``'s ``main()`` with its ``-B`` pointed at ``linker_dir()``:
     the script formats ``LDFLAGS`` into ``TCL_COSIM`` at import, so it is
     loaded as a module and the one string patched before ``main`` runs."""
-    g = runpy.run_path(script, run_name="ttinst_cosim")
+    main_fn = runpy.run_path(script, run_name="ttinst_cosim")["main"]
+    g = main_fn.__globals__      # run_path returns a COPY; patch the live namespace
     where = linker_dir()
     print(f"  cosim linker: -B{where}", flush=True)
     g["TCL_COSIM"] = g["TCL_COSIM"].replace('-ldflags "-B/usr/bin', f'-ldflags "-B{where}')
     assert f"-B{where}" in g["TCL_COSIM"]
-    return int(g["main"]() or 0)
+    return int(main_fn() or 0)
 
 
 if __name__ == "__main__":
