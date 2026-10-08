@@ -1,0 +1,11 @@
+RTL sequencer_fetch_queue:fq_a8: 18142 cycles in 8 traces, 126871 defined slots, RTL vs reference on defined: 126871/126871 (0.3s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[17:25:57] Compiling with g++ ...
+[17:26:02] Running simulation ...
+UNIT-MATCH fetch:fq_a8 f1 systemc 126871/126871 defined (123 masked: reset=119, uninit=4; allo==rtl on 112) cycle=per-iteration, time unchecked (build 0.7s, run 6.7s)

@@ -1,0 +1,11 @@
+RTL u4_fetch:iram: 3804 cycles in 4 traces, 25026 defined slots, RTL vs reference on defined: 25026/25026 (0.1s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[16:03:44] Compiling with g++ ...
+[16:03:49] Running simulation ...
+UNIT-MATCH fetch:iram f1 systemc 25026/25026 defined (1602 masked: reset=56, uninit=1546; allo==rtl on 48) cycle=per-iteration, time unchecked (build 0.9s, run 5.8s)

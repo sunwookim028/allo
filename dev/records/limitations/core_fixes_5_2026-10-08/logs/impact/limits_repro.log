@@ -1,0 +1,2 @@
+{'llvm literal': [8, 8], 'llvm typed': [8, 8], 'simulator literal': [8, 8]} want [8, 8]
+[item new-wide-literal-shift] FIXED: {'llvm literal': [8, 8], 'llvm typed': [8, 8], 'simulator literal': [8, 8]}

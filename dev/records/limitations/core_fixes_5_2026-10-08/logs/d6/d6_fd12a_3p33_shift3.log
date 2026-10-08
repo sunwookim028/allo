@@ -1,0 +1,11 @@
+RTL u4_fetch:iram: 3804 cycles in 4 traces, 25026 defined slots, RTL vs reference on defined: 25026/25026 (0.1s)
+VERILATOR built /work/shared/users/phd/sk3463/scratch/fix5/hcache/cat-fetch_d12_amended-b0dd2e64e40557d9/Vfetch_d12_amended in 8s
+UNIT-MATCH fetch:iram form:fetch_d12_packed catapult-rtl[fd12a_3p33] 25008/25008 defined (1599 masked: reset=56, uninit=1543; catapult==rtl on 48) cycle=per-cycle: 1.0000 cyc/row (3805 cycles in all), stall cycles 0, row->token offset [1]; CYCLE-FOR-CYCLE yes (run 8.6s)
+    L (accept edge -> token edge) over every row-aligned output: {0: 26628}; first row accepted at cycle 1; rows at interval 1: 3803/3803
+    L {0: 3804}: v260, v261, v262, v263, v264, v265, v266
+    LATENCY-UNRELIABLE fq_amended_0+iram_mem_0+loader_0+sink_0+src_0: kernel latencies [1, 1, 1, None, None] (sum 3), ii [1, 1, 1, 1, 1] (rate max 1), measured 0 at 1 cyc/vector; unreliable: ['sink_0', 'src_0']
+      fq_amended_0: latency 1 ii 1 (scheduled)
+      iram_mem_0: latency 1 ii 1 (scheduled)
+      loader_0: latency 1 ii 1 (scheduled)
+      sink_0: latency None ii 1 (unreliable: no Pop or no Push in the I/O loop)
+      src_0: latency None ii 1 (unreliable: no Pop or no Push in the I/O loop)

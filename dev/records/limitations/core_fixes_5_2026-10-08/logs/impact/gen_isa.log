@@ -1,0 +1,30 @@
+TinyTPU-isa ISA conformance, against examples/tinytpu/isa_spec.json
+
+  examples/tinytpu/isa_encoding.py: up to date (31945 bytes, byte-identical)
+  docs/source/designs/tinytpu_isa_spec.rst: up to date (42912 bytes, byte-identical)
+  design constants: 25 held to the spec by value
+  design layout: 15 names in ip/isa.py held to the field table by value
+  design parameters: 8 in range, read from their environment variables, constraints hold
+  parameter agreement: the design and the generated module land on the same 20 values under 6 configurations, defaults included
+  hardware bit slices: 9 distinct slices of the 13 64-bit words ip/units declares (accu_copy, agu_word, array_counts_word, control_word, count_word, dram_imem, fused_copy, header, program, resolved, span_word, spm_copy, word), all defined by the spec
+  encoder: 2700 words identical between microarch_isa.enc/enc_agu and the spec's
+  control flow and AGU: the design's `expand` and the spec's agree on all 73 programs
+  imem header: microarch_isa.assemble's 8 words equal the spec's on all 73 programs
+  numerics: operand and accumulator lane widths and the mvout saturation bounds match the int8 configuration
+  reference model: takes its opcodes, field layout, control flow and numerics from the generated module, not from the design
+  action model: 45 actions over 7 units compose 9 instructions; the rule accepts and leaves 56 obligation(s)
+    status: 45 description (description is what an undecorated action is worth, and checked must name its checker; nothing here is guaranteed)
+  dispatch rewrites: the actions imply 3, and ip/units/sequencer.py performs exactly those -- mm/spm -> 5, vadd/accu -> 6, vaddrelu/accu -> 6
+  sequencer dispatch: 7 opcodes feed exactly the queues their actions name, read out of ip/units/sequencer.py
+  unit ISA namespaces: 5 units decode exactly the opcodes they have actions for
+  ports against the composed region: 20 of the spec's ports ARE ip/tinytpu.py's own channels and memories and 4 more stand for them; 3 are arithmetic no composition carries and 1 carries nothing at all; 23 composed ports are not modelled, each with a reason; and 1 unit(s) are several composed units: array = wld + pe
+  write-before-read surface: 10 read actions name a memory the assembler must have seen written; the contract is carried as an obligation, not as a property of any one instruction
+  allo.encoding.TINYTPU_ISA: 2 budget(s) held to the spec by value
+  derived properties: 5 recomputed from the spec and confirmed against the design --
+      every operand field is an AGU target, `acc` included (resolved acc [0, 1]);
+      terms are additively monotone, so `acc` at base 0 stride 1 is drivable for 2 trips and rejected at 3;
+      the shipped accumulating mm already spends 3/3 terms, so a term on `acc` needs 4 and the budget refuses it first
+      the encoding's MAXDIM ceilings, computed at T=4: addressing 88, cubic_header 76 (binding 76); the design 4 accepts, 72 accepts, 76 accepts, 80 refuses in assemble, 88 refuses in assemble, 92 refuses at import -- each ceiling confirmed by the stage it fires at
+      the program limits predict exactly which of 30 GEMM shapes the design assembles
+
+  ISA OK: the spec, its 2 generated artefacts and all 9 consumers agree

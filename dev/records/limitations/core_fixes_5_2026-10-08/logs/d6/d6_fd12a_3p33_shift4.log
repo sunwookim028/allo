@@ -1,0 +1,15 @@
+RTL u4_fetch:iram: 3804 cycles in 4 traces, 25026 defined slots, RTL vs reference on defined: 25026/25026 (0.1s)
+UNIT-DIFF  fetch:iram form:fetch_d12_packed catapult-rtl[fd12a_3p33] 15910/25002 defined (1598 masked: reset=56, uninit=1542; catapult==rtl on 48) cycle=per-cycle: 1.0000 cyc/row (3805 cycles in all), stall cycles 0, row->token offset [1]; CYCLE-FOR-CYCLE no (run 0.1s)
+    differing defined slots by trace: program-0=2217, program-1=2274, program-2=2294, program-3=2307
+    e.g. program-0 cycle 2 rd_addr: catapult 1 rtl 0
+    e.g. program-0 cycle 3 rd_addr: catapult 2 rtl 1
+    e.g. program-0 cycle 4 rd_addr: catapult 3 rtl 2
+    e.g. program-0 cycle 5 rd_addr: catapult 4 rtl 3
+    L (accept edge -> token edge) over every row-aligned output: {0: 26628}; first row accepted at cycle 1; rows at interval 1: 3803/3803
+    L {0: 3804}: v260, v261, v262, v263, v264, v265, v266
+    LATENCY-UNRELIABLE fq_amended_0+iram_mem_0+loader_0+sink_0+src_0: kernel latencies [1, 1, 1, None, None] (sum 3), ii [1, 1, 1, 1, 1] (rate max 1), measured 0 at 1 cyc/vector; unreliable: ['sink_0', 'src_0']
+      fq_amended_0: latency 1 ii 1 (scheduled)
+      iram_mem_0: latency 1 ii 1 (scheduled)
+      loader_0: latency 1 ii 1 (scheduled)
+      sink_0: latency None ii 1 (unreliable: no Pop or no Push in the I/O loop)
+      src_0: latency None ii 1 (unreliable: no Pop or no Push in the I/O loop)

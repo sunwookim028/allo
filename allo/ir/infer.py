@@ -55,6 +55,147 @@ from .units import bind_ports, expand_region_units, is_region, is_unit_instance
 
 
 # pylint: disable=too-many-public-methods
+# U4 track E, E-F1 (core-fixes-5): untyped integer literals.
+#
+# An untyped integer literal is `int32`, so a literal expression is computed at
+# 32 bits: `x | (1 << 35)` on a `UInt(64)` left bit 35 clear, `x + 0x80000000`
+# sign-extended the mask, and `y: UInt(64) = 1 << k` lost every bit above 31 --
+# all silently. The rules, chosen so that every literal whose value is a 32-bit
+# pattern keeps today's typing (narrow code and its emitted text unchanged):
+#
+# 1. A literal expression -- int literals and global ints (not shadowed by a
+#    local) under + - * << >> | & ^ and unary - + ~ -- is evaluated in Python.
+#    If its value is not a 32-bit pattern (outside [-2**31, 2**32)) it is
+#    folded to one constant of its own minimal width: UInt(n) for n bits of a
+#    non-negative value, Int(n + 1) for a negative one.
+# 2. Next to a typed operand wider than 32 bits (| & ^ + - * and comparisons),
+#    or as the value of a target wider than 32 bits, a literal in
+#    [2**31, 2**32) and the literal on the left of a shift by a non-constant
+#    amount take that operand's (target's) type -- also inside an expression
+#    of literals under | & ^ + - * (`x & ((1 << k) - 1)`).
+# 3. A folded literal assigned to an integer target it does not fit is refused,
+#    naming the expression.
+_LIT_BINOPS = {
+    ast.Add: lambda a, b: a + b,
+    ast.Sub: lambda a, b: a - b,
+    ast.Mult: lambda a, b: a * b,
+    ast.LShift: lambda a, b: a << b,
+    ast.RShift: lambda a, b: a >> b,
+    ast.BitOr: lambda a, b: a | b,
+    ast.BitAnd: lambda a, b: a & b,
+    ast.BitXor: lambda a, b: a ^ b,
+}
+_LIT_UNOPS = {ast.USub: lambda a: -a, ast.UAdd: lambda a: a, ast.Invert: lambda a: ~a}
+_CONTEXT_BINOPS = (ast.BitOr, ast.BitAnd, ast.BitXor, ast.Add, ast.Sub, ast.Mult)
+
+
+def _int32_pattern(v):
+    """A value today's int32 literal already carries bit for bit."""
+    return -(1 << 31) <= v < (1 << 32)
+
+
+def _literal_type(v):
+    """The minimal integer type holding ``v``."""
+    return UInt(max(1, v.bit_length())) if v >= 0 else Int(v.bit_length() + 1)
+
+
+def _fits(v, dtype):
+    """``v`` is representable in ``dtype``'s bits (as either signedness)."""
+    return -(1 << (dtype.bits - 1)) <= v < (1 << dtype.bits)
+
+
+def _wide_int(dtype):
+    return isinstance(dtype, (Int, UInt)) and dtype.bits > 32
+
+
+def _set_literal(node, v):
+    """Mark ``node`` a literal expression of value ``v``; fold it (rule 1)
+    when ``v`` is not a 32-bit pattern."""
+    node.lit_value = v
+    if not _int32_pattern(v):
+        node.dtype = _literal_type(v)
+        node.lit_folded = True
+
+
+def _literal_in_context(ctx, node, dtype):
+    """Rule 2: type the literal ``node`` (or the literal on the left of a
+    shift ``node``) as ``dtype``, a typed operand's or target's type wider
+    than 32 bits. Returns True when ``node``'s type changed."""
+    if not _wide_int(dtype) or getattr(node, "shape", None) not in ((), None):
+        return False
+    v = getattr(node, "lit_value", None)
+    if v is not None:
+        if getattr(node, "lit_folded", False) or v < (1 << 31):
+            return False  # rule 1 already typed it, or int32 is exact
+        if not _fits(v, dtype):
+            raise RuntimeError(
+                f"integer literal `{ast.unparse(node)}` = {v} does not fit {dtype} "
+                "(README E-F1: an untyped literal takes its context's type)"
+            )
+        node.dtype, node.lit_folded = dtype, True
+        return True
+    if (
+        isinstance(node, ast.BinOp)
+        and isinstance(node.op, ast.LShift)
+        and getattr(node.left, "lit_value", None) is not None
+        and getattr(node.right, "lit_value", None) is None
+        and not getattr(node.left, "lit_folded", False)
+        and node.dtype == int32
+    ):
+        if not _fits(node.left.lit_value, dtype):
+            raise RuntimeError(
+                f"integer literal `{ast.unparse(node.left)}` in `{ast.unparse(node)}` "
+                f"does not fit {dtype}"
+            )
+        node.left.dtype, node.left.lit_folded = dtype, True
+        node.dtype = dtype  # shift_rule: the left operand's type
+        return True
+    if (
+        isinstance(node, ast.BinOp)
+        and isinstance(node.op, _CONTEXT_BINOPS)
+        and _literal_rooted(node.left)
+        and _literal_rooted(node.right)
+    ):
+        # e.g. `x & ((1 << k) - 1)`: the shift under the `-` takes the type too
+        changed = _literal_in_context(ctx, node.left, dtype)
+        changed = _literal_in_context(ctx, node.right, dtype) or changed
+        if changed:
+            rule = get_typing_rule(type(node.op), ctx.typing_rule_set)
+            node.dtype = rule(node.left.dtype, node.right.dtype)
+        return changed
+    return False
+
+
+def _literal_rooted(node):
+    """A literal, or an expression of literals and literal-left shifts."""
+    if getattr(node, "lit_value", None) is not None:
+        return True
+    if not isinstance(node, ast.BinOp):
+        return False
+    if isinstance(node.op, ast.LShift):
+        return getattr(node.left, "lit_value", None) is not None
+    return (
+        isinstance(node.op, _CONTEXT_BINOPS)
+        and _literal_rooted(node.left)
+        and _literal_rooted(node.right)
+    )
+
+
+def _refuse_unfit_literal(node, dtype, what):
+    """Rule 3: a folded literal stored into an integer ``what`` it does not fit."""
+    v = getattr(node, "lit_value", None)
+    if (
+        v is not None
+        and getattr(node, "lit_folded", False)
+        and isinstance(dtype, (Int, UInt))
+        and not _fits(v, dtype)
+    ):
+        raise RuntimeError(
+            f"integer literal `{ast.unparse(node)}` = {v} does not fit {what} of type "
+            f"{dtype} (README E-F1: a wide literal is never truncated silently)"
+        )
+
+
 class TypeInferer(ASTVisitor):
     def print_verbose(self, ctx: ASTContext, node: ast.AST):
         if isinstance(node, ast.Name):
@@ -236,6 +377,8 @@ class TypeInferer(ASTVisitor):
             if isinstance(var, int):
                 node.dtype = int32
                 node.shape = tuple()
+                if not isinstance(var, bool):
+                    _set_literal(node, var)  # E-F1
             elif isinstance(var, float):
                 node.dtype = float32
                 node.shape = tuple()
@@ -252,6 +395,8 @@ class TypeInferer(ASTVisitor):
         node.shape = tuple()
         if isinstance(node.value, int):
             node.dtype = int32
+            if not isinstance(node.value, bool):
+                _set_literal(node, node.value)  # E-F1
         elif isinstance(node.value, float):
             node.dtype = float32
         elif isinstance(node.value, str):
@@ -426,13 +571,29 @@ class TypeInferer(ASTVisitor):
             node.dtype = Int(operand.dtype.bits)
         else:
             node.dtype = operand.dtype
+        v = getattr(operand, "lit_value", None)
+        if v is not None and type(node.op) in _LIT_UNOPS:
+            _set_literal(node, _LIT_UNOPS[type(node.op)](v))  # E-F1
         return node
 
     @staticmethod
     def visit_BinOp(ctx: ASTContext, node: ast.BinOp):
         lhs = visit_stmt(ctx, node.left)
         rhs = visit_stmt(ctx, node.right)
-        return TypeInferer.visit_general_binop(ctx, node, lhs, rhs)
+        # E-F1 rule 2: a literal next to a typed operand wider than 32 bits
+        if isinstance(node.op, _CONTEXT_BINOPS):
+            _literal_in_context(ctx, lhs, rhs.dtype)
+            _literal_in_context(ctx, rhs, lhs.dtype)
+        TypeInferer.visit_general_binop(ctx, node, lhs, rhs)
+        a, b = getattr(lhs, "lit_value", None), getattr(rhs, "lit_value", None)
+        if a is not None and b is not None and type(node.op) in _LIT_BINOPS:
+            try:
+                v = _LIT_BINOPS[type(node.op)](a, b)
+            except (ValueError, OverflowError):  # a negative shift amount
+                v = None
+            if v is not None:
+                _set_literal(node, v)  # E-F1 rule 1
+        return node
 
     @staticmethod
     def visit_Assign(ctx: ASTContext, node: ast.Assign):
@@ -474,6 +635,9 @@ class TypeInferer(ASTVisitor):
                     rhs = TypeInferer.visit_assignment_val(
                         ctx, values[idx], target_shape, target_dtype
                     )
+                    if target_dtype is not None:  # E-F1 rules 2 and 3
+                        _literal_in_context(ctx, rhs, target_dtype)
+                        _refuse_unfit_literal(rhs, target_dtype, f"`{target.id}`")
                     rhs_shape, rhs_dtype = rhs.shape, rhs.dtype
                 else:
                     rhs_shape, rhs_dtype = rhs_shapes[idx], rhs_dtypes[idx]
@@ -500,6 +664,9 @@ class TypeInferer(ASTVisitor):
                 else:
                     rhs_shape = rhs_shapes[idx]
                 lhs = visit_stmt(ctx, target)
+                if not rhs_visited and rhs is not None:  # E-F1 rules 2 and 3
+                    _literal_in_context(ctx, rhs, lhs.dtype)
+                    _refuse_unfit_literal(rhs, lhs.dtype, f"`{ast.unparse(target)}`")
                 final_shape, lhs_dims, rhs_dims = TypeInferer.visit_broadcast(
                     ctx, lhs.shape, rhs_shape=rhs_shape, match_lhs=True
                 )
@@ -545,6 +712,8 @@ class TypeInferer(ASTVisitor):
             node.target.dtype, node.target.shape = lhs.dtype, lhs.shape
         else:
             raise RuntimeError("Unsupported AugAssign")
+        if isinstance(node.op, _CONTEXT_BINOPS):
+            _literal_in_context(ctx, rhs, lhs.dtype)  # E-F1 rule 2
         # augment LHS
         return TypeInferer.visit_general_binop(ctx, node, lhs, rhs)
 
@@ -784,6 +953,9 @@ class TypeInferer(ASTVisitor):
             rhs = TypeInferer.visit_assignment_val(
                 ctx, node.value, target_shape, target_dtype
             )
+            if rhs is not None:  # E-F1 rules 2 and 3
+                _literal_in_context(ctx, rhs, target_dtype)
+                _refuse_unfit_literal(rhs, target_dtype, f"`{node.target.id}`")
 
         if target_ is None and not getattr(target_dtype, "constexpr", False):
             # new def - but NOT for ConstExpr, which should only be in global_vars
@@ -1033,6 +1205,8 @@ class TypeInferer(ASTVisitor):
         lhs = visit_stmt(ctx, node.left)
         assert len(node.comparators) == 1, "Only support one comparator for now"
         rhs = visit_stmt(ctx, node.comparators[0])
+        _literal_in_context(ctx, lhs, rhs.dtype)  # E-F1 rule 2
+        _literal_in_context(ctx, rhs, lhs.dtype)
         typing_rule = get_typing_rule(type(node.ops[0]), ctx.typing_rule_set)
         # Both operands are cast to this common type before comparing; the
         # builder picks the predicate's signedness from it.

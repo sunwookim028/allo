@@ -218,3 +218,211 @@ with limitation 22, ``Wire`` semantics).
    iteration's Wire outputs together, from shadows, after the iteration's
    last handshake: the loop is 1 c-step and a 25,008-slot trace matches the
    reference RTL cycle for cycle.
+
+2. E-F1: an untyped integer literal was always ``int32``
+========================================================
+
+**Before.** ``TypeInferer.visit_Constant`` typed every int literal ``int32``,
+and a global int too (``visit_Name``). ``shift_rule(Int32, Int32)`` is
+``Int32``, so a literal expression was computed at 32 bits, and the builder
+materialised every untyped constant as ``i32``. Measured on the bindings of
+this branch, at commit 1, with HEAD's Python (``logs/ef1/pretest_results.txt``:
+``tests/test_wide_literal.py`` run one test per process against that tree):
+
+* every wide case gave a wrong value, silently: ``x | (1 << 35)`` was ``x``;
+  ``x + (1 << 40)``, ``x + 1099511627776`` and ``x | BIG`` (a global
+  ``1 << 40``) all dropped the 2**40;
+* ``x + 0x80000000`` and ``x & 0xFFFFFFFF`` on a ``UInt(64)`` sign-extended
+  the 32-bit pattern;
+* ``y: UInt(64) = 1 << k`` with ``k = 35`` was 0;
+* ``x >= (1 << 35)`` **segfaulted** the ``llvm`` build, and
+  ``(x & (1 << k)) == (1 << k)`` did not finish in 120 s;
+* ``Int(64)`` gave the same wrong values;
+* the limits repro printed ``REPRODUCES``.
+
+**Change** (``allo/ir/infer.py``, the ``E-F1`` block and its calls in
+``visit_Constant``, ``visit_Name``, ``visit_UnaryOp``, ``visit_BinOp``,
+``visit_Compare``, ``visit_AugAssign``, ``visit_Assign``,
+``visit_AnnAssign``; ``allo/ir/builder.py``, ``build_folded_literal`` called
+from ``build_Constant``, ``build_Name``, ``build_UnaryOp``, ``build_BinOp``).
+Rules 1-3 below are chosen so that **a literal whose value is a 32-bit
+pattern keeps today's typing next to operands of at most 32 bits**:
+
+1. **Fold.** A literal expression is int literals and global ints (not
+   shadowed by a local) under ``+ - * << >> | & ^`` and unary ``- + ~``
+   (``/``, ``//``, ``%``, ``**`` excluded: their Allo semantics differ from
+   Python's). It is evaluated in Python. If its value lies outside
+   ``[-2**31, 2**32)`` it becomes one ``arith.constant`` of its minimal
+   width: ``UInt(n)`` for a non-negative value, ``Int(n + 1)`` for a negative
+   one.
+2. **Context.** Next to an integer operand wider than 32 bits (``| & ^ + -
+   *``, the comparisons, augmented assignment), or as the value of such a
+   target, two kinds of literal take that operand's type: a literal in
+   ``[2**31, 2**32)``, and the literal on the left of a shift by a
+   non-constant amount. This reaches inside an expression of literals, so in
+   ``x & ((1 << k) - 1)`` the shift under the ``-`` takes the type too (the
+   pattern in ``template/sequencer.py``).
+3. **Refuse.** A folded literal stored into an integer variable, array
+   element or target that it does not fit is refused, naming the expression
+   (``integer literal `1 << 70` = … does not fit `y` of type ui64``). This
+   includes ``y: uint32 = 1 << 35``, which was silently 0 or poison before.
+   ``customize`` reports it and exits, as it does every front-end error
+   (limitations item C).
+
+**The one narrow-source change, judged intended.** Allo types ``int32 ±
+int32`` as ``Int(33)``. Next to that, ``0xFFFFFFFF`` now takes rule 2: it is
+the number 4,294,967,295 (``arith.constant 4294967295 : i33``), not ``-1``
+sign-extended. The int32 result is unchanged bit for bit (a truncation
+follows). A result kept wider than 32 bits is the masked value, which is what
+the source says; before, it was E-F1's sign-extension
+(``test_pattern_literal_next_to_int33``).
+
+**Narrow code unchanged** (``logs/ef1/narrow_ir/``): ten kernels, the same
+IR text before and after the change. They cover:
+
+* shifts, ``|`` ``^``, masks ``0xFFFFFFFF`` / ``0x80000000`` / ``1 << 31`` on
+  ``uint32``, and ``== 0xFFFFFFFF`` on ``int32``;
+* ``uint8 + 300``, ``int8 & -2``, global ints, index arithmetic, ``1 << k``
+  on ``int32``, and ``|=`` / ``+=`` on ``uint16``;
+* small literals next to a ``UInt(64)``.
+
+``test_narrow_ir_unchanged`` holds one such kernel's arith lines against the
+pre-change text. TinyTPU's emission hashes are unchanged (section 3).
+
+**Tests** ``tests/test_wide_literal.py`` (30). The limits repro now prints
+``FIXED`` and stays a repro; its two cases (``llvm``, simulator) are also a
+test.
+
+.. list-table:: ``tests/test_wide_literal.py``, before (HEAD's Python) -> after
+   :header-rows: 1
+
+   * - group
+     - before
+     - after
+   * - 18 wide cases (``UInt(64)``/``Int(64)``: shift, or, and, add, compare,
+       target, variable shift, mask, global, ``|=``, array store, ``~``)
+     - 16 wrong values, 1 segfault (``cmp_shift``), 1 timeout
+       (``cmp_eq_var_shift``)
+     - **18 pass**
+   * - 6 narrow value cases + narrow IR golden
+     - 7 pass
+     - **7 pass** (unchanged)
+   * - ``int32 - int32`` masked by ``0xFFFFFFFF`` into ``Int(64)``
+     - fail (sign-extended)
+     - **pass**
+   * - 3 refusals (``1 << 70`` into ``UInt(64)``, ``1 << 35`` into ``uint32``,
+       ``1 << 64`` into a ``UInt(64)`` array)
+     - fail (accepted silently)
+     - **pass** (refused, naming the expression)
+   * - the limits repro (``llvm`` and simulator)
+     - fail
+     - **pass**
+
+**Broad suites, before -> after** (``logs/ef1/broad/``,
+``scripts/broad.sh``). Every top-level ``tests/*.py`` and ``tests/dataflow``
+(AIE excluded: it needs the AIE toolchain), csim included, local ``TMPDIR``.
+Run on HEAD's Python and on the change, with the same bindings. Before: 867
+passed, 61 failed, 15 skipped (31 min). After: 897 passed, 61 failed, 15
+skipped (31 min). **No test changed outcome** (``jdiff.txt``); the 30 extra
+passes are ``tests/test_wide_literal.py``. The 61 failures are identical on
+both trees (``failed_pre.txt`` == ``failed_post.txt``): Vitis, ``test_verify``
+and dataflow HLS-flow tests that fail on this host before any change.
+
+3. Impact check (working tree = commit 2's code, on ``3e4394c5``; ``logs/impact/``)
+===================================================================================
+
+Run by ``scripts/impact.sh`` under ``env-zhang21.sh``, with the conda python
+by path, ``PYTHONPATH`` = the worktree, ``OMP_NUM_THREADS=8`` and a local
+``TMPDIR``.
+
+.. list-table::
+   :header-rows: 1
+
+   * - gate
+     - result
+   * - TinyTPU emission hashes
+     - **unchanged**: ``vhls`` ``6bc774bc9d97f0e7…`` (166,563 B), ``catapult``
+       ``ade1ab5dfd20d72a…`` (170,812 B), ``systemc`` ``06d365336c307ffc…``
+       (267,151 B). No literal widened: TinyTPU's literals are 32-bit patterns
+       next to int8/int32 operands, and it has no ``Wire``
+   * - ``tests/dataflow/test_df_unit.py``
+     - pass
+   * - ``pytest`` ``test_region_stateful``, ``test_systemc_*``,
+       ``tests/test_compose_*``, ``tests/dataflow/test_compose_*`` (with
+       ``port_latency``, ``registers_write_first``), ``test_stream_ports*``,
+       ``test_stream_flush``, ``tests/test_wide_literal.py``
+     - **232 passed, 1 skipped** (the opt-in Catapult case; 7 min 30 s; csim
+       included)
+   * - ``tests/limits/new_wide_literal_shift.py``
+     - **FIXED** (was REPRODUCES)
+   * - ``examples/tinytpu/gen_isa.py --check``
+     - ISA OK
+   * - ``TPU_MAXDIM=16 stress_isa.py``
+     - STRESS OK 492/492
+   * - ``python -m examples.minitpu.template.run_u3e``
+     - **U3E-GATE OK** (50 s)
+   * - ``check fetch`` ``f1`` on ``iram`` / ``fq`` / ``fq_a8``, ``f1_d12``;
+       ``check loop_ctrl`` ``l1_d12``; simulator and SystemC csim
+     - UNIT-MATCH 25,026 / 112,864 / 126,871 / 25,026; 527,446; both backends
+       (as before)
+   * - ``examples/minitpu/rtl/reproduce.sh --all`` (Verilator 5.052)
+     - **52/52 drains bit-identical** to ``tb_kernel_image``, **cycles equal
+       to the TB on 52/52** (149 s)
+   * - track D's ``fetch:iram`` amended form on Catapult RTL (section 1)
+     - UNIT-MATCH 25,008/25,008, cycle for cycle (was 24,971/25,002)
+   * - the new test's Catapult case (section 1)
+     - 52/52 read-first (before the fix: 51/51 write-first)
+
+**For the integrator.** Track D's record and ``u4_matrix.rst`` still list D-6
+as a server bug. It is closed here as a ``Wire``-timing gap in the SystemC
+emitter, and the fix changes the alignment of every Wire-linked composite fed
+by a kernel that is not Wire-only. Track D's ``--shift 4`` for this form is
+now ``--shift 3``. Any other track-D Wire composite whose stimulus kernel
+split across c-steps (``latency.json`` ``io`` with more than one c-step) will
+shift the same way when rebuilt. The landed ``fd12l`` body was not rebuilt:
+its 2,010 slots are T-2 (one register late), unrelated to D-6.
+
+4. Draft upstream issue text (E-F1; not filed)
+==============================================
+
+D-6's draft is in section 1 (fork-only: the SystemC emitter is the fork's).
+E-F1 is upstream-relevant: the same text compiles the same way in upstream
+Allo's front end (and in AMC's vendored Allo, track E's E-A4).
+
+   *Title:* Untyped integer literals are always ``int32``:
+   ``x | (1 << 35)`` on a 64-bit value silently loses the bit
+
+   ``TypeInferer.visit_Constant`` types every integer literal ``int32``, and
+   ``shift_rule(int32, int32)`` is ``int32``. So a literal expression is
+   computed at 32 bits, whatever it is combined with:
+
+   .. code-block:: python
+
+      def k(A: uint32[2], O: uint32[2]):
+          for i in range(2):
+              x: UInt(64) = A[i]
+              y: UInt(64) = x | (1 << 35)   # bit 35 stays clear
+              O[i] = y[32:64]               # [0, 0], want [8, 8]
+
+   The same happens to ``x + (1 << 40)``, to a lone ``1099511627776``, to a
+   global ``BIG = 1 << 40``, to ``y: UInt(64) = 1 << k`` with ``k >= 32``,
+   and to ``x + 0x80000000`` (sign-extended). There is no warning. One form,
+   ``x >= (1 << 35)``, segfaults the LLVM build. Proposal (implemented on
+   the fork, ``sunwookim028/allo`` branch ``core-fixes-5``):
+
+   1. fold a literal expression (literals and global ints under ``+ - * <<
+      >> | & ^``, unary ``- + ~``) whose value is not a 32-bit pattern to one
+      constant of its minimal width;
+   2. next to an operand or target wider than 32 bits, type a literal in
+      ``[2**31, 2**32)`` and the literal left of a shift by a variable
+      amount as that operand;
+   3. refuse a folded literal stored into an integer it does not fit, naming
+      the expression.
+
+   Literals that are 32-bit patterns next to operands of at most 32 bits keep
+   today's typing, so existing narrow code builds identical IR. One
+   deliberate exception: ``0xFFFFFFFF`` next to the 33-bit sum of two
+   ``int32`` is 4294967295, no longer ``-1``; the int32 result is the same.
+   Evidence: 18 wide cases wrong or crashing before and right after, the
+   narrow IR identical on ten kernels, and 928 other tests with unchanged
+   outcomes.

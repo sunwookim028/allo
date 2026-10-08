@@ -405,6 +405,19 @@ checked-in snapshot.
        (U4 sequencer loop, S-2)
      - none yet (closed on ``core-fixes-4``)
 
+   * - :ref:`O <limitation-o>`
+     - A kernel that is not Wire-only wrote one iteration's ``Wire`` outputs on
+       different edges; a D-12 memory's two owners then looked write-first
+       (U4 track D, D-6)
+     - none yet (closed on ``core-fixes-5``; draft issue text in
+       ``dev/records/limitations/core_fixes_5_2026-10-08.rst``)
+
+   * - :ref:`P <limitation-p>`
+     - An untyped integer literal was ``int32``: ``x | (1 << 35)`` on a
+       ``UInt(64)`` lost bit 35, silently (U4 track E, E-F1)
+     - none yet (closed on ``core-fixes-5``; draft upstream issue text in the
+       record)
+
 :ref:`Item 13 <limitation-13>` is **not** in this table: it was largely
 retracted, but a real convenience gap (no ``allo.dma`` intrinsic) remains
 under the same item number, so its status is not unambiguous enough to close
@@ -771,3 +784,45 @@ declaration order (and, since the D-12 latency fix, puts every latency-``L >=
 ``tests/limits/new_d12_server_port_order_deadlock.py`` (now FIXED); test
 ``tests/dataflow/test_compose_server_port_order.py``; record
 ``dev/records/limitations/core_fixes_4_2026-10-08.rst``.
+
+.. _limitation-o:
+
+O. One iteration's ``Wire`` outputs reached their readers on different edges -- closed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Found by U4 track D (D-6). It was filed as a write-first read in the D-12
+``registers`` server on Catapult RTL. On the RTL the server is read-first. The
+skew came from the composition's stimulus kernel. That kernel pops array ports
+and puts each value to a ``Wire``, and Catapult scheduled it in two c-steps,
+each ``sc_out`` write going with the pop before it. So the memory's writer saw
+row ``t`` one edge before its reader. Closed: a kernel that is not Wire-only
+publishes each iteration's ``Wire`` outputs together, after its last handshake
+(:doc:`/backends/systemc`, after the link table). Test
+``tests/dataflow/test_compose_registers_write_first.py`` (its Catapult RTL
+case is opt-in, ``ALLO_TEST_CATAPULT=1``); record
+``dev/records/limitations/core_fixes_5_2026-10-08.rst``.
+
+.. _limitation-p:
+
+P. An untyped integer literal was always ``int32`` -- closed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Found by U4 track E (E-F1). ``x | (1 << 35)`` on a ``UInt(64)`` left bit 35
+clear, ``x + 0x80000000`` sign-extended the mask, ``x >= (1 << 35)`` crashed
+the ``llvm`` build, and a global ``1 << 40`` truncated to 0. All of this
+happened silently, on ``llvm`` and on the dataflow simulator alike. Closed
+with three front-end rules (``allo/ir/infer.py``, the ``E-F1`` block):
+
+* a literal expression whose value is not a 32-bit pattern is folded to its
+  own minimal width;
+* next to an operand (or target) wider than 32 bits, a literal in
+  ``[2**31, 2**32)`` and the literal left of a shift by a variable amount take
+  that operand's type;
+* a folded literal stored into an integer it does not fit is refused, naming
+  the expression.
+
+A literal that is a 32-bit pattern next to operands of at most 32 bits builds
+the IR it always did, and TinyTPU's emission is unchanged. Repro
+``tests/limits/new_wide_literal_shift.py`` (now FIXED); test
+``tests/test_wide_literal.py``; record
+``dev/records/limitations/core_fixes_5_2026-10-08.rst``.

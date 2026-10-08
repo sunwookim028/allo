@@ -144,6 +144,18 @@ class ASTTransformer(ASTBuilder):
         return op.result
 
     @staticmethod
+    def build_folded_literal(ctx: ASTContext, node):
+        """A literal expression the type inferer folded (README E-F1): one
+        ``arith.constant`` of ``node.dtype`` holding ``node.lit_value``."""
+        bits = node.dtype.bits
+        v = node.lit_value & ((1 << bits) - 1)
+        if v >= 1 << (bits - 1):
+            v -= 1 << bits  # the signless attribute, two's complement
+        attr = Attribute.parse(f"{v} : i{bits}")
+        # pylint: disable=too-many-function-args
+        return arith_d.ConstantOp(node.dtype.build(), attr, ip=ctx.get_ip())
+
+    @staticmethod
     def build_assign_value(ctx: ASTContext, node: ast.Name, buffer, val):
         target = (
             buffer.op.result
@@ -205,6 +217,8 @@ class ASTTransformer(ASTBuilder):
 
     @staticmethod
     def build_Name(ctx: ASTContext, node: ast.Name, val=None):
+        if val is None and getattr(node, "lit_folded", False):
+            return ASTTransformer.build_folded_literal(ctx, node)  # E-F1
         if val is not None and isinstance(node.ctx, ast.Store):
             if hasattr(ctx, "stateful_var_map") and node.id in ctx.stateful_var_map:
                 buffer = ASTTransformer.get_or_create_stateful_get_global(ctx, node.id)
@@ -241,6 +255,8 @@ class ASTTransformer(ASTBuilder):
 
     @staticmethod
     def build_Constant(ctx: ASTContext, node: ast.Constant):
+        if getattr(node, "lit_folded", False):
+            return ASTTransformer.build_folded_literal(ctx, node)  # E-F1
         return MockConstant(node.value, ctx)
 
     @staticmethod
@@ -946,6 +962,8 @@ class ASTTransformer(ASTBuilder):
 
     @staticmethod
     def build_UnaryOp(ctx: ASTContext, node: ast.UnaryOp):
+        if getattr(node, "lit_folded", False):
+            return ASTTransformer.build_folded_literal(ctx, node)  # E-F1
         value = build_stmt(ctx, node.operand)
         value_result = ASTTransformer.get_mlir_op_result(ctx, value)
         if isinstance(node.op, ast.USub):
@@ -982,6 +1000,8 @@ class ASTTransformer(ASTBuilder):
 
     @staticmethod
     def build_BinOp(ctx: ASTContext, node: ast.BinOp):
+        if getattr(node, "lit_folded", False):
+            return ASTTransformer.build_folded_literal(ctx, node)  # E-F1
         lhs = build_stmt(ctx, node.left)
         rhs = build_stmt(ctx, node.right)
         # Cast lhs and rhs to the same type

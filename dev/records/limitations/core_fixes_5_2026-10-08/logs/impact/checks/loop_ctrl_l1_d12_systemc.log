@@ -1,0 +1,11 @@
+RTL u4_loop_ctrl:shipped: 37729 cycles in 21 traces, 527446 defined slots, RTL vs reference on defined: 527446/527446 (1.0s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[17:26:22] Compiling with g++ ...
+[17:26:31] Running simulation ...
+UNIT-MATCH loop_ctrl:shipped l1_d12 systemc 527446/527446 defined (760 masked: reset=756, uninit=4; allo==rtl on 750) cycle=per-iteration, time unchecked (build 1.2s, run 26.6s)
