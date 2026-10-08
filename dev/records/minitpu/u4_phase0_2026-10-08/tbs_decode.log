@@ -1,0 +1,15 @@
+Verilator 5.052 2026-09-05 rev conda-forge build 
+b3ba0a4d4fb69d39091c55f5f00d1f237082a4f1
+== tb_bundle_encoding
+PASS tb_bundle_encoding
+== tb_agu_resolve_width
+tb_agu_resolve_width: 9216 cases, 12 induction variables x 8 levels x 16 shifts, every one matching a full 32-bit reference
+PASS tb_agu_resolve_width
+== tb_bundle_scalar_agu
+PART A done at 125000, errors so far = 0
+PASS [PART B] the descriptor round trip took exactly 2 cycles
+PASS tb_bundle_scalar_agu (0 errors)
+== tb_bundle_vpu_adapter
+PASS tb_bundle_vpu_adapter (0 errors)
+== tb_isa_conformance
+PASS tb_isa_conformance
