@@ -93,7 +93,12 @@ def add_int32(p: int32, q: int32) -> int32:
 
 
 def pack_int32(v: int32) -> int32:
-    return v
+    # Not `return v`: a function that returns its own parameter makes
+    # `passes.analyze_use_def` read the attributes of a block argument's
+    # owner (a Block) and crash under any `s.partition` in the region
+    # (tinytpu_instance record, F3). The copy costs nothing.
+    r: int32 = v
+    return r
 
 
 def _ref_mul_int8(a, w):

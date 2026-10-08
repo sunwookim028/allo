@@ -343,6 +343,18 @@ the instance's ISA derived from its composition, for an assembler or
 of real units, U1's ``bits`` ALU and track A's ``bits`` SFU
 (``examples/minitpu/template/vpu_lane.py``, ``tests/test_compose_options.py``).
 
+A base an option COMPLETES is not a legal machine on its own: TinyTPU's
+sequencer dispatches to the accumulator's queues whatever is composed, so
+the base without the accumulator fails the rules naming ``c_acc``, and the
+rules are judged on the composed result. ``Architecture(draft=True)``
+declares such a base: it binds its geometry and defers the netlist check to
+``with_options``, and ``source``/``region``/``build``/``directives`` of a
+draft are refused naming it. The first use is TinyTPU-isa as an instance of
+the template, base + ``accumulator`` option
+(``examples/minitpu/template/instances/tinytpu/``,
+``dev/records/minitpu/tinytpu_instance_2026-10-08.rst``), where the record
+also lists what an option cannot yet bring: the sequencer's dispatch arms.
+
 A unit's own helper functions are declared ``calls=("add_bits", ...)``:
 resolved from the body's module, never bound by the architecture, never
 renamed by an instance. A function an architecture chooses is an engine
