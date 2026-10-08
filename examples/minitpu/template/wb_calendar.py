@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """The VREG write-port calendar as a derived record (U4 plan Q2; README D-20, D-24).
 
-    $ALLO_PYTHON -m examples.minitpu.template.calendar            # check against Phase 0
-    $ALLO_PYTHON -m examples.minitpu.template.calendar --refusals
+    $ALLO_PYTHON -m examples.minitpu.template.wb_calendar            # check against Phase 0
+    $ALLO_PYTHON -m examples.minitpu.template.wb_calendar --refusals
 
 MiniTPU writes the calendar three times by hand (``asm.py``'s ``W_*``,
 ``isa_latency.json``'s ``rtl_params.WB_W_*``, ``sequencer_pkg.sv``'s
