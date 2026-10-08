@@ -491,6 +491,41 @@ is the design driver.**
   of the shipped design; the parity baselines are its measurement
   configurations.
 
+**D-23 (2026-10-08). The sequencer's command to the VPU is three
+valid-qualified slot commands plus four declared resources.**
+- MiniTPU's `vpu_ctrl_t` (an 85-bit combinational struct, valid in the issue
+  cycle only, nine valid bits, payload ignored outside each op's valid
+  cycle; U4 Phase 0) is declared in Allo as three slot commands -- V
+  (vector), X (matrix), M (memory) -- each a `Stream`, and four shared
+  resources declared as D-12 ports: VREG read ports A/B, port C (a store
+  loses to the matrix stream), the write port under the calendar, the VMEM
+  compute port. The collisions the RTL resolves by convention become
+  declared ownership the composition checks.
+- An instance may gate the payload (zero when not valid): a recorded
+  deviation from the RTL, not a semantic change.
+- Owner's condition: streams must not cost a deadlock or an issue-rate loss.
+  With blocking streams every command channel is sized and single-owned
+  (`stream_ports.rst`'s obligation), and the pass check is Phase 0's
+  sequencer programs issuing cycle for cycle as the RTL does (D-24) in csim
+  and on Catapult RTL; a stall the RTL does not have is a finding, and a
+  non-blocking form is the fallback.
+
+**D-24 (2026-10-08). U4 timing: cycle-locked first, self-timed compared.**
+- The Allo sequencer is first transcribed cycle for cycle (fetch -> issue ->
+  VPU command): the write-back claim `W` is derived from the bound units'
+  declared latencies plus the write-back stages (D-20) and checked against
+  Phase 0's measurement (`W = L + VPU_WB_STAGES` for all seven classes);
+  v1-course programs run unchanged. This is for speed: it reuses MiniTPU's
+  assembler, images and testbenches as they are.
+- A self-timed composition (dataflow issue, `W` re-derived from the
+  manifests, the timing published as a `versions.list.<name>` delta) is
+  built beside it on the same programs, and the record compares the two --
+  cycles, area, what each exposes -- before the template keeps one.
+- No interlock at `b3ba0a4d` (D-16); an interlocked sequencer is a D-19
+  option aligned with v2 when the pin moves. The host path (`iram_loader`,
+  `command_unit`, the bridge) stays with M3: the baseline wraps the core seam
+  (D-21).
+
 ## Milestones
 
 Each milestone passes on **one acceptance check** and names the tools it uses
