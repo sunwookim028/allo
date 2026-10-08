@@ -1,0 +1,232 @@
+# u1-pilot sync 6 raw results (2026-10-08, zhang-21). Branch 669a6daf, baseline 870265c2.
+
+## builds
+==> build_branch.log <==
+[336/336] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlir.cpython-312-x86_64-linux-gnu.so
+
+==> build_base.log <==
+[336/336] Linking CXX shared module tools/allo/_mlir/_mlir_libs/_mlir.cpython-312-x86_64-linux-gnu.so
+
+## emission hashes
+base HASH vhls 6bc774bc9d97f0e7b9d97a25941296e463c73aa733c082f37eec1ff894b2ef95 166563
+base HASH catapult ade1ab5dfd20d72af7d879f17819b6de513733cbfcdb885ca90a5fe8df88e038 170812
+base HASH systemc 06d365336c307ffc16df3946dd52bcfc0e9fa8b604518cf0f7b6bb8ed78646b7 267151
+branch HASH vhls 6bc774bc9d97f0e7b9d97a25941296e463c73aa733c082f37eec1ff894b2ef95 166563
+branch HASH catapult ade1ab5dfd20d72af7d879f17819b6de513733cbfcdb885ca90a5fe8df88e038 170812
+branch HASH systemc 06d365336c307ffc16df3946dd52bcfc0e9fa8b604518cf0f7b6bb8ed78646b7 267151
+
+## gate summaries
+### base
+HEAD 870265c2778191d3a3e49cf8bec30cada06b08d7 start 2026-10-08T11:38:42-04:00
+allo_where EXIT 0 6s
+hashes EXIT 0 79s
+gen_isa EXIT 0 58s
+lift_units EXIT 0 4s
+bench_isa EXIT 0 13s
+stress_isa EXIT 0 234s
+stress_isa_md16 EXIT 0 31s
+act_gate EXIT 0 6s
+mutate_none EXIT 0 248s
+systemc_csim EXIT 0 54s
+df_unit EXIT 0 7s
+region_stateful EXIT 0 9s
+eva EXIT 0 17s
+minitpu_quick EXIT 0 163s
+u3e EXIT 0 55s
+m_check_bf16_add EXIT 1 16s
+m_check_vpu_regfile EXIT 1 391s
+m_check_sfu EXIT 0 20s
+m_check_mxu_pe EXIT 0 63s
+m_check_dma_core EXIT 0 27s
+m_check_dma_o1 EXIT 0 26s
+m_check_dma_o4 EXIT 0 21s
+m_check_dma_bw EXIT 0 21s
+m_check_seq_issue EXIT 0 22s
+DONE 2026-10-08T12:05:21-04:00
+ip_integration EXIT 0 174s
+### branch
+HEAD 669a6daf5ee64fbfc72b671194407258a6c785c8 start 2026-10-08T11:38:42-04:00
+allo_where EXIT 0 6s
+hashes EXIT 0 79s
+gen_isa EXIT 0 58s
+lift_units EXIT 0 5s
+bench_isa EXIT 0 13s
+stress_isa EXIT 0 238s
+stress_isa_md16 EXIT 0 33s
+act_gate EXIT 0 5s
+mutate_none EXIT 0 250s
+systemc_csim EXIT 0 54s
+df_unit EXIT 0 5s
+region_stateful EXIT 0 10s
+eva EXIT 0 18s
+minitpu_quick EXIT 0 153s
+u3e EXIT 0 57s
+u3e_path EXIT 0 57s
+m_check_bf16_add EXIT 1 17s
+m_check_vpu_regfile EXIT 1 397s
+m_check_sfu EXIT 0 20s
+m_check_mxu_pe EXIT 0 61s
+m_check_dma_core EXIT 0 29s
+m_check_dma_o1 EXIT 0 26s
+m_check_dma_o4 EXIT 0 22s
+m_check_dma_bw EXIT 0 22s
+m_check_seq_issue EXIT 0 22s
+DONE 2026-10-08T12:06:23-04:00
+c_sequencer EXIT 0 94s
+c_seq_issue EXIT 0 25s
+c_fetch_iram EXIT 0 32s
+c_dma_core EXIT 0 44s
+c_dma_o1 EXIT 0 45s
+c_dma_o4 EXIT 0 30s
+c_dma_bw EXIT 0 29s
+c_dmavmem_core EXIT 0 37s
+c_dmavmem_o1 EXIT 0 38s
+c_dmavmem_o4 EXIT 0 34s
+CHECKS DONE 2026-10-08T12:13:54-04:00
+ip_integration EXIT 0 170s
+rtl_reproduce_all EXIT 0 159s
+CHAIN1 DONE
+tinytpu_reproduce_nocosim EXIT 0 174s
+mlp_cosim EXIT 0 221s
+CHAIN2 DONE
+
+## gate result lines
+base gen_isa: ISA OK: the spec, its 2 generated artefacts and all 9 consumers agree|
+branch gen_isa: ISA OK: the spec, its 2 generated artefacts and all 9 consumers agree|
+base lift_units: UNITS OK: units_isa.py is byte-identical to what ip/ composes to|
+branch lift_units: UNITS OK: units_isa.py is byte-identical to what ip/ composes to|
+base bench_isa: ALL EXACT|
+branch bench_isa: ALL EXACT|
+base stress_isa: STRESS OK: 640/640 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 96 shapes, vector and random programs)|
+branch stress_isa: STRESS OK: 640/640 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 96 shapes, vector and random programs)|
+base stress_isa_md16: STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)|
+branch stress_isa_md16: STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)|
+base act_gate: ACT GATE OK: 12/12 problems, every encodable mapping verified|
+branch act_gate: ACT GATE OK: 12/12 problems, every encodable mapping verified|
+base mutate_none: MUTATE OK: all 0 mutants run were caught|
+branch mutate_none: MUTATE OK: all 0 mutants run were caught|
+base systemc_csim: SYSTEMC CSIM OK|
+branch systemc_csim: SYSTEMC CSIM OK|
+base df_unit: Dataflow Simulator Passed!|Dataflow Simulator Passed!|Dataflow Simulator (Arithmetic) Passed!|
+branch df_unit: Dataflow Simulator Passed!|Dataflow Simulator Passed!|Dataflow Simulator (Arithmetic) Passed!|
+base region_stateful: 16 passed in 8.21s|
+branch region_stateful: 16 passed in 8.41s|
+base eva: COSIM RESULT   : PASS (bit-exact)|
+branch eva: COSIM RESULT   : PASS (bit-exact)|
+base minitpu_quick: PASS|
+branch minitpu_quick: PASS|
+base u3e: U3E-GATE OK  (51 s)|
+branch u3e: U3E-GATE OK  (53 s)|
+branch u3e_path: U3E-GATE OK  (53 s)|
+branch tinytpu_reproduce_nocosim: STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)|ACT GATE OK: 12/12 problems, every encodable mapping verified|REPRODUCED (functional only)|
+branch mlp_cosim: mlp_small_l0          1186    1636   -27.5%   TB mlp_small_l0 mismatches = 0 / 4096|mlp_small_l1           682    1145   -40.4%   TB mlp_small_l1 mismatches = 0 / 4096|mlp_small on RTL: 2781 cycles over 2 layers, summed with no fusion and no residency|
+
+## check verdict lines, base and branch (sorted, timings stripped): equal
+RTL dma:bw: 19503 cycles in 11 traces, 394464 defined slots, RTL vs reference on defined: 394464/394464 
+RTL dma:core: 39718 cycles in 15 traces, 805652 defined slots, RTL vs reference on defined: 805652/805652 
+RTL dma:o1: 37906 cycles in 13 traces, 764284 defined slots, RTL vs reference on defined: 764284/764284 
+RTL dma:o4: 15639 cycles in 13 traces, 317520 defined slots, RTL vs reference on defined: 317520/317520 
+RTL mxu_pe:pe: 60090 cycles in 7 traces, 360202 defined slots, RTL vs reference on defined: 360202/360202 
+RTL sfu: 462144 vectors, latency [5] (declared 5), 0.2s
+RTL u4_seq_cmd:shipped: 52236 cycles in 15 traces, 1042595 defined slots, RTL vs reference on defined: 1042595/1042595 
+RTL vpu_bf16_add: 251936 vectors, latency [0] (declared 0), 0.1s
+RTL vpu_regfile:w16: 60261 cycles in 9 traces, 180780 defined slots, RTL vs reference on defined: 180780/180780 
+UNIT-DIFF  bf16_add native systemc 249907/251936 latency=unchecked (rtl 0) 
+UNIT-DIFF  vpu_regfile:w16 comb systemc 23010/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked 
+UNIT-DIFF  vpu_regfile:w16 comb_unreset systemc 23010/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked 
+UNIT-DIFF  vpu_regfile:w16 d12_replica_wire systemc 23010/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked 
+UNIT-DIFF  vpu_regfile:w16 d12_server_wire systemc 23010/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked 
+UNIT-DIFF  vpu_regfile:w16 wire systemc 21217/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked 
+UNIT-DIFF  vpu_regfile:w16 wire_stateful systemc 21217/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked 
+UNIT-FAIL  vpu_regfile shared systemc: RuntimeError: Stateful `mem` (`__stateful_top_mem_1`) is used by 4 kernels: port_a_0, port_b_0, port_c_0, port_w_0. One Stateful has one kernel (README D-11): the kernels of a region run concurrently and nothing orders their accesses, and no HLS backend can express the sharing. Give each kernel its own `@ Stateful`, or pass the state between them over a Stream. If streams already order every access, state that premise: `@df.region(shared_stateful={"mem": "<why>"})` -- the simulator then honours it; the HLS backends still refuse.
+UNIT-FAIL  vpu_regfile shared_sync systemc: RuntimeError: Stateful `mem` (`__stateful_top_mem_1`) is used by 4 kernels: port_a_0, port_b_0, port_c_0, port_w_0. One Stateful has one kernel (README D-11): the kernels of a region run concurrently and nothing orders their accesses, and no HLS backend can express the sharing. Give each kernel its own `@ Stateful`, or pass the state between them over a Stream. If streams already order every access, state that premise: `@df.region(shared_stateful={"mem": "<why>"})` -- the simulator then honours it; the HLS backends still refuse.
+UNIT-MATCH bf16_add bits systemc 251936/251936 latency=unchecked (rtl 0) 
+UNIT-MATCH dma:bw bits simulator 394464/394464 defined (34602 masked: landing empty=34580, power-up=22; allo==rtl on 34576) cycle=order-only 
+UNIT-MATCH dma:bw bits_reset simulator 394464/394464 defined (34602 masked: landing empty=34580, power-up=22; allo==rtl on 34576) cycle=order-only 
+UNIT-MATCH dma:bw streams simulator 394464/394464 defined (34602 masked: landing empty=34580, power-up=22; allo==rtl on 34576) cycle=order-only 
+UNIT-MATCH dma:bw streams_reset simulator 394464/394464 defined (34602 masked: landing empty=34580, power-up=22; allo==rtl on 34576) cycle=order-only 
+UNIT-MATCH dma:core bits simulator 805652/805652 defined (68144 masked: landing empty=68122, power-up=22; allo==rtl on 68118) cycle=order-only 
+UNIT-MATCH dma:core bits_reset simulator 805652/805652 defined (68144 masked: landing empty=68122, power-up=22; allo==rtl on 68118) cycle=order-only 
+UNIT-MATCH dma:core streams simulator 805652/805652 defined (68144 masked: landing empty=68122, power-up=22; allo==rtl on 68118) cycle=order-only 
+UNIT-MATCH dma:core streams_reset simulator 805652/805652 defined (68144 masked: landing empty=68122, power-up=22; allo==rtl on 68118) cycle=order-only 
+UNIT-MATCH dma:o1 bits simulator 764284/764284 defined (69648 masked: landing empty=69626, power-up=22; allo==rtl on 69622) cycle=order-only 
+UNIT-MATCH dma:o1 bits_reset simulator 764284/764284 defined (69648 masked: landing empty=69626, power-up=22; allo==rtl on 69622) cycle=order-only 
+UNIT-MATCH dma:o1 streams simulator 764284/764284 defined (69648 masked: landing empty=69626, power-up=22; allo==rtl on 69622) cycle=order-only 
+UNIT-MATCH dma:o1 streams_reset simulator 764284/764284 defined (69648 masked: landing empty=69626, power-up=22; allo==rtl on 69622) cycle=order-only 
+UNIT-MATCH dma:o4 bits simulator 317520/317520 defined (26538 masked: landing empty=26516, power-up=22; allo==rtl on 26511) cycle=order-only 
+UNIT-MATCH dma:o4 bits_reset simulator 317520/317520 defined (26538 masked: landing empty=26516, power-up=22; allo==rtl on 26511) cycle=order-only 
+UNIT-MATCH dma:o4 streams simulator 317520/317520 defined (26538 masked: landing empty=26516, power-up=22; allo==rtl on 26511) cycle=order-only 
+UNIT-MATCH dma:o4 streams_reset simulator 317520/317520 defined (26538 masked: landing empty=26516, power-up=22; allo==rtl on 26511) cycle=order-only 
+UNIT-MATCH mxu_pe:pe bits systemc 360202/360202 defined (338 masked: reset fill=338; allo==rtl on 337) cycle=per-iteration, time unchecked 
+UNIT-MATCH mxu_pe:pe unit systemc 360196/360196 defined (338 masked: reset fill=338; allo==rtl on 337) cycle=per-iteration, time unchecked 
+UNIT-MATCH seq_issue:shipped locked simulator 1042595/1042595 defined (2125 masked: reset=900, uninit IRAM=1225; allo==rtl on 1927) cycle=order-only 
+UNIT-MATCH sfu bits systemc 462144/462144 latency=unchecked (rtl 5) 
+UNIT-MATCH sfu staged systemc 462144/462144 latency=unchecked (rtl 5) 
+UNIT-MATCH vpu_regfile:w16 annotated systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked 
+UNIT-MATCH vpu_regfile:w16 d12_replica systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked 
+UNIT-MATCH vpu_regfile:w16 d12_server systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked 
+UNIT-MATCH vpu_regfile:w16 ported systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked 
+UNIT-MATCH vpu_regfile:w16 stateful systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked 
+UNIT-MATCH vpu_regfile:w16 trace systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked 
+UNIT-MATCH vpu_regfile:w16 trace_raw systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked 
+
+## branch-only check verdict lines (each occurs verbatim in a committed record: core_fixes_4, u4_track_c, u4_wave1_int)
+UNIT-MATCH dma:bw bits simulator 394464/394464 defined (34602 masked: landing empty=34580, power-up=22; allo==rtl on 34576) cycle=order-only
+UNIT-MATCH dma:bw bits systemc 394464/394464 defined (34602 masked: landing empty=34580, power-up=22; allo==rtl on 34576) cycle=per-iteration, time unchecked
+UNIT-MATCH dma:bw bits_reset simulator 394464/394464 defined (34602 masked: landing empty=34580, power-up=22; allo==rtl on 34576) cycle=order-only
+UNIT-MATCH dma:bw bits_reset systemc 394464/394464 defined (34602 masked: landing empty=34580, power-up=22; allo==rtl on 34576) cycle=per-iteration, time unchecked
+UNIT-MATCH dma:core bits simulator 805652/805652 defined (68144 masked: landing empty=68122, power-up=22; allo==rtl on 68118) cycle=order-only
+UNIT-MATCH dma:core bits systemc 805652/805652 defined (68144 masked: landing empty=68122, power-up=22; allo==rtl on 68118) cycle=per-iteration, time unchecked
+UNIT-MATCH dma:core bits_reset simulator 805652/805652 defined (68144 masked: landing empty=68122, power-up=22; allo==rtl on 68118) cycle=order-only
+UNIT-MATCH dma:core bits_reset systemc 805652/805652 defined (68144 masked: landing empty=68122, power-up=22; allo==rtl on 68118) cycle=per-iteration, time unchecked
+UNIT-MATCH dma:o1 bits simulator 764284/764284 defined (69648 masked: landing empty=69626, power-up=22; allo==rtl on 69622) cycle=order-only
+UNIT-MATCH dma:o1 bits systemc 764284/764284 defined (69648 masked: landing empty=69626, power-up=22; allo==rtl on 69622) cycle=per-iteration, time unchecked
+UNIT-MATCH dma:o1 bits_reset simulator 764284/764284 defined (69648 masked: landing empty=69626, power-up=22; allo==rtl on 69622) cycle=order-only
+UNIT-MATCH dma:o1 bits_reset systemc 764284/764284 defined (69648 masked: landing empty=69626, power-up=22; allo==rtl on 69622) cycle=per-iteration, time unchecked
+UNIT-MATCH dma:o4 bits simulator 317520/317520 defined (26538 masked: landing empty=26516, power-up=22; allo==rtl on 26511) cycle=order-only
+UNIT-MATCH dma:o4 bits systemc 317520/317520 defined (26538 masked: landing empty=26516, power-up=22; allo==rtl on 26511) cycle=per-iteration, time unchecked
+UNIT-MATCH dma:o4 bits_reset simulator 317520/317520 defined (26538 masked: landing empty=26516, power-up=22; allo==rtl on 26511) cycle=order-only
+UNIT-MATCH dma:o4 bits_reset systemc 317520/317520 defined (26538 masked: landing empty=26516, power-up=22; allo==rtl on 26511) cycle=per-iteration, time unchecked
+UNIT-MATCH dma_vmem:core d12_reset_r256 simulator 138855/138855 defined (11559 masked: landing empty=11306, power-up=22, vmem uninit=231; allo==rtl on 11295) cycle=order-only
+UNIT-MATCH dma_vmem:core d12_reset_r256 systemc 138855/138855 defined (11559 masked: landing empty=11306, power-up=22, vmem uninit=231; allo==rtl on 11295) cycle=per-iteration, time unchecked
+UNIT-MATCH dma_vmem:o1 d12_reset_r256 simulator 128260/128260 defined (12650 masked: landing empty=11048, power-up=22, vmem uninit=1580; allo==rtl on 11033) cycle=order-only
+UNIT-MATCH dma_vmem:o1 d12_reset_r256 systemc 128260/128260 defined (12650 masked: landing empty=11048, power-up=22, vmem uninit=1580; allo==rtl on 11033) cycle=per-iteration, time unchecked
+UNIT-MATCH dma_vmem:o4 d12_reset_r256 simulator 88216/88216 defined (7330 masked: landing empty=6724, power-up=22, vmem uninit=584; allo==rtl on 6711) cycle=order-only
+UNIT-MATCH dma_vmem:o4 d12_reset_r256 systemc 88216/88216 defined (7330 masked: landing empty=6724, power-up=22, vmem uninit=584; allo==rtl on 6711) cycle=per-iteration, time unchecked
+UNIT-MATCH fetch:iram f1 simulator 25026/25026 defined (1602 masked: reset=56, uninit=1546; allo==rtl on 48) cycle=order-only
+UNIT-MATCH fetch:iram f1 systemc 25026/25026 defined (1602 masked: reset=56, uninit=1546; allo==rtl on 48) cycle=per-iteration, time unchecked
+UNIT-MATCH fetch:iram f1_d12 simulator 25026/25026 defined (1602 masked: reset=56, uninit=1546; allo==rtl on 48) cycle=order-only
+UNIT-MATCH fetch:iram f1_d12 systemc 25026/25026 defined (1602 masked: reset=56, uninit=1546; allo==rtl on 48) cycle=per-iteration, time unchecked
+UNIT-MATCH seq_issue:shipped locked simulator 1042595/1042595 defined (2125 masked: reset=900, uninit IRAM=1225; allo==rtl on 1927) cycle=order-only
+UNIT-MATCH seq_issue:shipped locked systemc 1042595/1042595 defined (2125 masked: reset=900, uninit IRAM=1225; allo==rtl on 1927) cycle=per-iteration, time unchecked
+UNIT-MATCH sequencer:loop loop simulator 940408/940408 defined (156548 masked: payload, slot not valid (D-23 gate)=154378, reset=945, uninit IRAM=1225; allo==rtl on 153487) cycle=order-only
+UNIT-MATCH sequencer:loop loop systemc 940408/940408 defined (156548 masked: payload, slot not valid (D-23 gate)=154378, reset=945, uninit IRAM=1225; allo==rtl on 153487) cycle=per-iteration, time unchecked
+
+## M-R1 rtl/reproduce.sh --all
+52/52 drains bit-identical to tb_kernel_image; build 68 s; memory=bridge; cycles equal to the TB on 52/52; pins: MiniTPU b3ba0a4d, oracle round_trip_cycles=0
+
+## ip_integration (own invocation, plain env, VERILATOR set)
+base: 63 passed, 1 skipped, 2 deselected in 172.95s (0:02:52)
+branch: 63 passed, 1 skipped, 2 deselected in 168.69s (0:02:48)
+base Counter({'pass': 63, 'skip': 1}) branch Counter({'pass': 63, 'skip': 1})
+new-and-passing on branch: 0
+
+## full pytest
+base: 67 failed, 1052 passed, 12 skipped, 1 xfailed, 96 warnings in 2006.30s (0:33:26) PYTEST_EXIT 1 WALL 2008s 
+branch: 67 failed, 1073 passed, 12 skipped, 1 xfailed, 100 warnings in 2107.59s (0:35:07) PYTEST_EXIT 1 WALL 2110s 
+base Counter({'pass': 1052, 'fail': 67, 'skip': 13}) branch Counter({'pass': 1073, 'fail': 67, 'skip': 13})
+  pass -> absent tests.dataflow.test_systemc_unreset::test_unreset_refusals[_regfile_stream-only when every port is a Wire]
+new-and-passing on branch: 22
+
+## mvoutrelu.patch
+patch sha256 a313ddfd5d46750ebe68eef0f4520fc1265430e326373a09ac6567dc9379b3c6
+14 files +230/-21
+apply --check OK
+apply OK
+14 tracked files modified after apply
+TinyTPU-isa ISA conformance, against examples/tinytpu/isa_spec.json
+  ISA OK: the spec, its 2 generated artefacts and all 9 consumers agree
+gen_isa(patched) EXIT 0 55s
+apply -R OK
+all 14 files byte-identical after -R
+git status after -R: only the pytest run's three output directories (test_stateful_array_systemc/, test_stateful_scalar_systemc/, test_stream_nb_scalar_2/)

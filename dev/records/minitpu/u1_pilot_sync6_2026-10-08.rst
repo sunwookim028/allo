@@ -1,0 +1,309 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+##############################################################################
+u1-pilot sync 6: can ``u1-pilot`` (669a6daf) fast-forward ``main`` (870265c2)?
+##############################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-08.** zhang-21, 64 cores, load 12-19
+   from other sessions (a Catapult track and a Vivado job among them), so wall
+   times are upper bounds. Branch: ``origin/u1-pilot`` at
+   ``669a6daf5ee64fbfc72b671194407258a6c785c8`` in a throwaway detached
+   worktree (``scratch/wt-reg6``). Baseline: ``origin/main`` at
+   ``870265c2778191d3a3e49cf8bec30cada06b08d7`` in a second throwaway detached
+   worktree (``scratch/wt-reg6base``) -- **not** the main checkout, which is
+   frozen and was not touched. Each worktree has its **own** ``mlir/build``
+   (the batch adds an op to ``mlir/``): Ninja, gcc-toolset-13,
+   ``LLVM_DIR``/``MLIR_DIR`` under
+   ``/work/shared/common/llvm-project-main/build-rhel8``, ``nice ninja -j16``,
+   336 steps, branch 74 s, baseline 72 s. ``origin/main`` is an ancestor of the
+   branch: the merge is a fast-forward. ``TMPDIR`` on local disk for every
+   run. Scripts: ``u1_pilot_sync6_2026-10-08/scripts/`` (sync 5's, with the
+   changes in s.5); raw summaries, verdict lines and the pytest diff:
+   ``u1_pilot_sync6_2026-10-08/results.txt``.
+
+REGRESS_RESULT: READY -- ``u1-pilot`` 669a6daf may fast-forward ``main`` 870265c2 (and so may 27fe1a22, which differs from 669a6daf only under ``dev/records/``, s.5). Emissions byte-identical; every gate and every ``check`` verdict line equal to the baseline; the 30 branch-only verdicts (sequencer, seq_issue, fetch, dma bits/bits_reset, dma_vmem d12_reset_r256; simulator and SystemC csim) equal to the committed records line for line; M-R1 52/52 bits and cycles; ``ip_integration`` 63 passed 1 skipped on both sides; ``mvoutrelu.patch`` applies from the root and reverses byte-for-byte; mlp_small cosim 1636+1145=2781, 0 mismatches. pytest: no test goes pass -> fail; the same 67 failures on both sides; 22 new tests, all pass; one parametrised case removed by design (D-14).
+
+What this batch adds over ``main``: core fixes 4 (``allo/``, ``mlir/``: the
+D-12 memory-server latency rule and read-before-write port order in
+``compose.py``, D-14 unreset lowering in kernels with Stream/array ports,
+D-25 flushable streams -- ``allo.stream_flush``, front end, simulator, the
+fork's ``AlloFifoClr`` in SystemC, refusals in the other HLS backends), U4
+track E records, the sequencer-loop composition, ``template/calendar.py``
+renamed ``wb_calendar.py``, the U4 matrix, README D-25 and the D-12/D-14
+amendments, docs pages. 15 files under ``allo/`` and ``mlir/``, 182 in all
+(+11,468/-196).
+
+1. Emission hashes
+==================
+
+``customize(tinytpu_isa); schedule(s); str(s.build(target=T))``, sha256 of
+the text (``scripts/gates.sh``). The SystemC text is unchanged because
+``AlloFifoClr`` is appended only to designs that flush a stream, and TinyTPU
+flushes none (core_fixes_4 s.3).
+
+.. list-table::
+   :header-rows: 1
+
+   * - Target
+     - Baseline 870265c2
+     - Branch 669a6daf
+     - Bytes
+   * - ``vhls``
+     - ``6bc774bc9d97f0e7…``
+     - identical
+     - 166,563
+   * - ``catapult``
+     - ``ade1ab5dfd20d72a…``
+     - identical
+     - 170,812
+   * - ``systemc``
+     - ``06d365336c307ffc…``
+     - identical
+     - 267,151
+
+2. Gates
+========
+
+Both sides ran concurrently (11:38-12:06), branch-only runs after. Plain
+``allo`` env, the conda python by path, ``PYTHONPATH`` = the worktree;
+``systemc_csim``, eva and ``check`` under ``env-zhang21.sh`` with the conda
+python by path. Wall times are baseline / branch, in seconds.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Gate
+     - Baseline
+     - Branch
+     - Wall (s)
+   * - ``reproduce.sh --no-cosim``
+     - not run (sync 5's form)
+     - ``REPRODUCED (functional only)``; ISA OK, UNITS OK, ALL EXACT, stress 492/492, ACT 12/12
+     - -- / 174
+   * - ``gen_isa.py --check``
+     - ISA OK (9 consumers)
+     - same
+     - 58 / 58
+   * - ``lift_units.py --check``
+     - UNITS OK
+     - same
+     - 4 / 5
+   * - ``bench_isa.py``
+     - ALL EXACT
+     - same
+     - 13 / 13
+   * - ``stress_isa.py`` (default MAXDIM)
+     - STRESS OK 640/640
+     - same
+     - 234 / 238
+   * - ``TPU_MAXDIM=16 stress_isa.py`` (as ``reproduce.sh``)
+     - STRESS OK 492/492
+     - same
+     - 31 / 33
+   * - ``act_compile.py --gate``
+     - ACT GATE OK 12/12
+     - same
+     - 6 / 5
+   * - ``mutate.py none``
+     - MUTATE OK (control passes)
+     - same
+     - 248 / 250
+   * - ``systemc_csim.py 3``
+     - SYSTEMC CSIM OK
+     - same
+     - 54 / 54
+   * - ``tests/dataflow/test_df_unit.py``
+     - Passed
+     - same
+     - 7 / 5
+   * - ``pytest tests/dataflow/test_region_stateful.py``
+     - 16 passed
+     - same
+     - 9 / 10
+   * - ``examples/eva/cosim_eva_systemc.py``
+     - PASS (bit-exact)
+     - same
+     - 17 / 18
+   * - ``examples/minitpu/run.py --quick``
+     - PASS
+     - same
+     - 163 / 153
+   * - ``python -m examples.minitpu.template.run_u3e``
+     - U3E-GATE OK, 27 U3E-OK
+     - same
+     - 55 / 57
+   * - ``python examples/minitpu/template/run_u3e.py`` (by path)
+     - not run (``calendar.py`` shadows the stdlib)
+     - U3E-GATE OK, 27 U3E-OK: the rename removes the shadowing
+     - -- / 57
+   * - ``check bf16_add``
+     - native DIFF 249907/251936, bits MATCH
+     - same
+     - 16 / 17
+   * - ``check vpu_regfile``
+     - 7 MATCH, 6 DIFF, 2 FAIL (D-11 shared)
+     - same
+     - 391 / 397
+   * - ``check sfu``
+     - MATCH
+     - same
+     - 20 / 20
+   * - ``check mxu_pe``
+     - MATCH
+     - same
+     - 63 / 61
+   * - ``check dma --inst core/o1/o4/bw`` (simulator, every variant)
+     - 4 x 4 UNIT-MATCH
+     - same
+     - 27, 26, 21, 21 / 29, 26, 22, 22
+   * - ``check seq_issue`` (simulator)
+     - UNIT-MATCH 1042595/1042595
+     - same
+     - 22 / 22
+   * - ``pytest tests/ip_integration tests/utils/test_backend_utils.py -k "not csynth and not lib_gemm"``
+       (own invocation, plain env, ``VERILATOR`` set, gcc-toolset-13)
+     - 63 passed, 1 skipped
+     - same; per-test outcomes identical
+     - 174 / 170
+   * - ``examples/minitpu/rtl/reproduce.sh --all``
+     - --
+     - 52/52 drains bit-identical, cycles equal to the TB on 52/52 (build 68 s)
+     - -- / 159
+   * - ``make mlp-cosim MODEL=mlp_small`` (Vitis cosim)
+     - --
+     - l0 1636 + l1 1145 = 2781 cycles, mismatches 0/4096 each
+     - -- / 221
+
+``check`` verdict lines (sorted, timings and build times stripped; 47 lines
+each side) are line-for-line equal between baseline and branch.
+
+**Branch-only checks** (``scripts/branch_checks.sh``; ``--backend simulator
+--backend systemc``). All 30 verdict lines are UNIT-MATCH, and each occurs
+verbatim (timings stripped) in a committed record:
+``core_fixes_4_2026-10-08/logs`` (c2, t2, s2), ``u4_track_c`` (``bits_reset``)
+and ``u4_wave1_int`` (``seq_issue``).
+
+.. list-table::
+   :header-rows: 1
+
+   * - unit:instance variant
+     - simulator / SystemC csim
+     - Wall (s)
+   * - ``sequencer:loop`` ``loop``
+     - UNIT-MATCH 940,408/940,408 / same (156,548 masked)
+     - 94
+   * - ``seq_issue:shipped`` ``locked``
+     - UNIT-MATCH 1,042,595/1,042,595 / same
+     - 25
+   * - ``fetch:iram`` ``f1``, ``f1_d12``
+     - UNIT-MATCH 25,026/25,026 / same, both variants
+     - 32
+   * - ``dma:core`` ``bits``, ``bits_reset``
+     - UNIT-MATCH 805,652 / same, both variants
+     - 44
+   * - ``dma:o1`` ``bits``, ``bits_reset``
+     - UNIT-MATCH 764,284 / same
+     - 45
+   * - ``dma:o4`` ``bits``, ``bits_reset``
+     - UNIT-MATCH 317,520 / same
+     - 30
+   * - ``dma:bw`` ``bits``, ``bits_reset``
+     - UNIT-MATCH 394,464 / same
+     - 29
+   * - ``dma_vmem:core`` ``d12_reset_r256``
+     - UNIT-MATCH 138,855 / same
+     - 37
+   * - ``dma_vmem:o1`` ``d12_reset_r256``
+     - UNIT-MATCH 128,260 / same
+     - 38
+   * - ``dma_vmem:o4`` ``d12_reset_r256``
+     - UNIT-MATCH 88,216 / same
+     - 34
+
+3. pytest
+=========
+
+``pytest -p no:cacheprovider -q tests/dataflow --ignore=tests/dataflow/aie
+tests/act tests/test_*.py tests/utils/test_backend_utils.py tests/ip_integration
+--ignore=tests/ip_integration/test_rtl.py
+--ignore=tests/ip_integration/test_rtl_adapter.py --junitxml`` under
+``env-zhang21.sh`` (``scripts/pytest.sh``), serial, both sides concurrently.
+This is sync 5's run-2 selection, now used on **both** sides because
+``main`` has ``tests/ip_integration`` too: the two Verilator files abort the
+interpreter in that env (sync 5 s.3) and are covered by the dedicated
+invocation in s.2.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Side
+     - Passed
+     - Failed
+     - Skipped
+     - Wall
+   * - Baseline 870265c2
+     - 1052
+     - 67
+     - 12 + 1 xfail
+     - 2008 s
+   * - Branch 669a6daf
+     - 1073
+     - 67
+     - 12 + 1 xfail
+     - 2110 s
+
+Per-test diff (``jdiff.py``): **no test goes pass -> fail**, and the 67
+failures are the same set on both sides (sync 5's: Vitis builds,
+``test_verify``, ``test_systolic_array``, ..., ``ip_integration/test_external``'s
+pybind tests, ``test_lib_gemm``). New on the branch, all passing: 22 --
+``test_stream_flush`` 9, ``test_compose_port_latency`` 8,
+``test_systemc_unreset`` 3 (``test_unreset_stream_kernel_{emit,comb_refused,csim}``),
+``test_compose_server_port_order`` 2. One case is gone:
+``test_systemc_unreset::test_unreset_refusals[_regfile_stream-only when every
+port is a Wire]`` -- removed on purpose by D-14's extended lowering
+(core_fixes_4 s.1: that kernel is now lowered, so its refusal case left the
+parametrisation and the three new tests cover it).
+
+4. ``mvoutrelu.patch``
+======================
+
+In the branch worktree, from the repository root: ``git apply --check`` OK;
+``git apply`` touches 14 files (+230/-21); with the patch applied
+``gen_isa.py --check`` gives **ISA OK** (9 consumers, 55 s); ``git apply -R``
+restores all 14 byte-for-byte (sha256 of each before and after). Patch sha256
+``a313ddfd5d46750e…`` (unchanged since sync 4). ``git status`` afterwards
+shows only the pytest run's three output directories.
+
+5. Notes
+========
+
+* **``origin/u1-pilot`` moved during the run**: 669a6daf -> 27fe1a22
+  (``bd51bf03`` merging ``u4-catapult``, U4 track D, and checkpoint 31,
+  pushed 11:34-11:37, just after this run's fetch). ``git diff 669a6daf
+  27fe1a22`` touches only ``dev/records/minitpu/`` (516 files: the
+  ``u4_track_d_2026-10-08`` record and its evidence, ``u1_matrix.rst``,
+  ``u4_matrix.rst``); every file outside ``dev/records/`` is identical, so
+  no gate, test or emission can differ and the verdict extends to 27fe1a22.
+  This record's branch ``u1-pilot-sync6`` is cut from 669a6daf.
+* **A second ninja pass in the branch worktree.** ``reproduce.sh`` runs
+  ``ninja`` itself; it re-ran 77 steps (44 compiles, relinks) while the
+  branch pytest was running in that worktree. Cause: ninja's tblgen mtime
+  non-convergence on a fresh build (``AlloEnums.h.inc`` newer than objects
+  compiled from it in the same pass) -- the baseline tree shows the same 77
+  steps under ``ninja -n -d explain``. Same sources, compiler and flags, so
+  the relinked modules are equivalent; the pytest outcome diff shows no
+  effect. Next sync: run ``ninja`` twice in ``build.sh`` (or run
+  ``reproduce.sh`` before the pytest) so the tree is converged first.
+* Changes to sync 5's scripts: ``build.sh`` takes the worktree (both sides
+  build); ``gates.sh`` runs ``systemc_csim`` and eva under ``env-zhang21.sh``
+  directly (sync 5 needed ``rerun_sc.sh`` for that) and runs ``run_u3e`` by
+  path as well where ``template/calendar.py`` is gone; ``pytest.sh`` is sync
+  5's run-2 form on both sides; ``ipint.sh`` is the dedicated
+  ``ip_integration`` invocation (both sides); ``branch_checks.sh`` adds the
+  core_fixes_4 / U4 verdicts on both backends.
+* Load: ``ninja -j16`` twice (one build per side, sequential), pytest serial,
+  one Verilator build at a time (the baseline ``ip_integration``, the branch
+  ``ip_integration``, then ``rtl/reproduce.sh``).
