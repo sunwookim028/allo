@@ -41,9 +41,9 @@ pass crashes under ``s.partition``, F3. And the headline on expressiveness:
 swapping the MAC engine in the PE is NOT swapping the machine's arithmetic.
 Every reused unit is int8/int32 through literals (``wld``'s ``[0:8]``,
 ``accu``'s ``32 * lane``, the ``int8`` DRAM boundary), so the instance is
-engine-generic in exactly one unit (F8). Cycles: 175 at 4x4x4 on the
-instance, the frozen design and the published table alike (§5), once the
-host's linker was worked around (F13).
+engine-generic in exactly one unit (F8). Cycles: 175/265/421/482/674 on
+the instance, the published row to the cycle at all five shapes (§5), once
+the host's linker was worked around (F13).
 
 1. What is reused, what is re-expressed
 =======================================
@@ -282,9 +282,9 @@ QD=16; ``TPU_INSTANCE=frozen`` through the same mount is the control.
    * - composition vs ``ip/tinytpu.py``
      - same 8 units in order, same 16 channels, 4 memories, parameter set
      - --
-   * - ``run_gates.py cosim`` at 4x4x4 (§5)
-     - 175 cycles, 0 mismatches
-     - frozen through the mount: 175; published 175
+   * - ``run_gates.py cosim`` (§5)
+     - 175/265/421/482/674, 0 mismatches at every shape
+     - frozen through the mount at 4x4x4: 175; published 175/265/421/482/674
    * - ``run_mutate.py`` (§6)
      - 34 caught, 0 survived, 4 not applicable, 1 RTL-only
      - frozen ``mutate.py``: cannot locate ``vadd_holds_stale_x`` (F11b)
@@ -314,7 +314,41 @@ testbench, one csynth each.
      - 175
      - 0 / 16 (both)
 
-COSIM5_PENDING
+The run infrastructure being up, the remaining four shapes cost one more
+background sweep (instance only; ``TPU_SHAPES`` unset, one csynth):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 20 20 40
+
+   * - shape
+     - instance
+     - published reference
+     - mismatches
+   * - 4x4x4
+     - 175
+     - 175
+     - 0 / 16
+   * - 8x8x8
+     - 265
+     - 265
+     - 0 / 64
+   * - 12x12x12
+     - 421
+     - 421
+     - 0 / 144
+   * - 16x16x8
+     - 482
+     - 482
+     - 0 / 128
+   * - 16x16x16
+     - 674
+     - 674
+     - 0 / 256
+
+``COSIM OK``: the instance reproduces the frozen reference's published row
+to the cycle at every shape (D-4's retirement condition, on the
+performance testbench; ``TPU_TB=stress`` not run, §9).
 
 The instance's RTL is a different build from the frozen one -- its PE calls
 ``mul_int8``/``add_int32``/``pack_int32`` (``func.call``, emitted as C++
@@ -548,7 +582,8 @@ track is the owner's to update; nothing here edits it.
 9. Not done
 ===========
 
-- The cycle table beyond what §5 shows (owner's scope change: one shape).
+- The frozen control at the four larger shapes (the published numbers
+  stand in; the 4x4x4 control is on this host).
 - ``TPU_TB=stress`` cosim and ``mutate --cosim`` (RTL-only mutant
   ``ar_claim_false``): not run; the accumulator's dependence obligation is
   discharged on the frozen design only.
