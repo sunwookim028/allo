@@ -1,0 +1,409 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+############################################################################
+U4 track A: front and address (decode, resolve, adapt, scalar AGU, fetch, loop)
+############################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-08.** zhang-21, branch ``u4-front``
+   (worktree ``scratch/wt-u4a``) from ``origin/u1-pilot`` at ``d1116048``
+   (README D-23/D-24), with its own bindings (``mlir/build``: Ninja,
+   ``LLVM_DIR``/``MLIR_DIR`` under ``/work/shared/common/llvm-project-main/
+   build-rhel8``, gcc-toolset-13 13.3.1). MiniTPU at ``b3ba0a4d``, read only.
+   Verilator 5.052 (conda-forge); SystemC 2.3.3 of Catapult 2024.2 compiled
+   by Catapult's g++ 10.3.0 (``harness/env-zhang21.sh``). Oracles: Phase 0
+   (``u4_phase0_2026-10-08.rst``); plan ``u4_plan_2026-10-08.rst`` section 5,
+   track A = C1, S1, F1, L1 on the simulator and SystemC csim; H1, H2, H3,
+   H8; the H6 draft (fetch owns the flush). The owner is away: every call is
+   **provisional** (D-9). **Nothing under ``allo/`` or ``mlir/`` changed**;
+   the one core defect found is a repro and a proposal (T-1).
+
+Reproduce (``source examples/minitpu/harness/env-zhang21.sh``, ``export
+PYTHONPATH=$PWD``)::
+
+   dev/records/minitpu/u4_track_a_2026-10-08/checks.sh <project dir>        # every verdict, ~5 min
+   $ALLO_PYTHON -m examples.minitpu.template.flush_stream --backend simulator --backend systemc   # H6, ~3 min
+   (cd tests/limits && $ALLO_PYTHON new_sim_wide_stream_heap.py)            # T-1, ~3 min
+
+Logs: ``u4_track_a_2026-10-08/`` (one ``check_*.log`` per unit/instance with
+its wall time, ``gated_contract_*.log``, ``control_geometry.log``,
+``h6_flush_stream.log``).
+
+1. What was built
+=================
+
+Every unit file gained ``VARIANTS`` (and ``WIDTH``) that ``check.py`` runs; no
+harness file changed. Wide words never cross a port: a 128-bit bundle is
+``UInt(32)[4]`` lanes, a record wider than 32 bits two lanes (U3 P-8; helpers
+in ``units/ctrl_lanes.py``).
+
+* **C1** (``seq_decoder``, ``agu_resolve``, ``vpu_adapter``, ``dma_addr_gen``):
+  plain Allo functions -- the callees track B's issue unit calls -- held alone
+  through a one-kernel region. The decoder is **one function per slot**
+  (``decode_v/m/x/d/c/l/s``, each the slot's packed record, MSB first as
+  ``sequencer_pkg``), never the 233-bit struct. The VPU adapter is **D-23's
+  three slot commands**, ``adapt_v`` (``vpu_ctrl_t[84:38]``), ``adapt_x``
+  (memory, ``[37:18]``), ``adapt_m`` (matrix, ``[17:0]``); ``slots_gated``
+  adds D-23's allowed payload gating (``gate_v/x/m``).
+* **S1** ``scalar_agu.s1``: one kernel; the write pipeline is **data**,
+  ``S_LAT`` entries, shifted each edge with the issuing op in entry 0 and
+  entry ``S_LAT - 1`` committed -- one body for ``S_LAT`` 1 (the RTL's
+  ``g_lat1``), 2 and 3 (``g_latN``); SMAC's add after the pipe register; read
+  ports from committed state only (no bypass).
+* **F1** ``fetch.f1``: IRAM (4,096 x 128, read register, written on every
+  edge) + ``sequencer_fetch_queue`` register for register, for the ``iram``,
+  ``fq`` and ``fq_a8`` instances. ``fetch.f1_d12`` (``units/fetch_d12.py``):
+  the IRAM as a D-12 ``Memory(host w, fetch r latency 1, reset=False)`` with
+  a loader unit and the queue unit.
+* **L1** ``loop_ctrl.l1``: ``sequencer_loop_ctrl`` + ``sequencer_loop_buffer``
+  register for register, widths from the D-20 record. ``loop_ctrl.l1_d12``
+  (``units/loop_ctrl_d12.py``): the loop buffer as a D-12 ``Memory(cap w,
+  replay r latency 0, reset=False)``, the RTL's two modules as two units
+  (``capture`` owns ``cap``, ``ctrl`` owns ``replay``) whose same-cycle
+  overflow/control exchange is one token each way per cycle.
+* **D-20** ``template/control_geometry.py``: ``ControlGeometry`` (declared:
+  ``LEVEL_SEL_W``, ``INSTR_ADDR_W``, ``LB_CAP``, ``IRAM_MEM_LATENCY``,
+  ``FQ_DEPTH``, ``S_LAT`` as a booking); derived properties ``STACK_DEPTH``,
+  ``SP_W``, ``LB_COUNT_W``, ``LB_IDX_W``, fetch->valid, flush->target, branch
+  bubbles, refetch cost, ``loop.begin.r`` skip latency; ``control_legality``;
+  ``check_against_phase0`` against Phase 0's probes **and** MiniTPU's own
+  bookings read from ``asm.py``/``isa_latency.json`` (P-9: through
+  ``harness/minitpu_asm``); ``refusals``.
+* **H6** ``template/flush_stream.py``: the fetch queue as Streams between a
+  ``fetcher`` and a ``queue`` unit (plan F2), two flush forms, judged on the
+  fetch contract (section 4).
+
+2. Verdicts
+===========
+
+Simulator = order only; csim = per iteration, time unchecked (P-2: per-cycle
+timing is Catapult's, track D). Counts are ``check.py``'s (Phase 0's traces
+plus the seeded tbs, joined).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 26 20 27 27
+
+   * - unit:instance / variant
+     - RTL oracle (this run)
+     - Allo simulator
+     - SystemC csim
+   * - ``dma_addr_gen`` C1 ``c1``
+     - 200,700 vectors, comb
+     - **match** 200,700/200,700
+     - **match** 200,700/200,700
+   * - ``agu_resolve:base`` C1 ``c1``
+     - 38,432 rows, comb
+     - **match** 38,432/38,432
+     - **match** 38,432/38,432
+   * - ``seq_decoder:base`` C1 ``c1`` (per-slot functions)
+     - 25,458 rows (25,416 + ``tb_bundle_encoding``)
+     - **match** 25,458/25,458
+     - **match** 25,458/25,458
+   * - ``vpu_adapter:base`` C1 ``slots`` (D-23)
+     - 24,866 rows
+     - **match** 24,866/24,866
+     - **match** 24,866/24,866
+   * - ``vpu_adapter`` ``slots_gated`` (D-23 deviation)
+     - same
+     - **deviation, as declared**: ``UNIT-DIFF`` 966/24,866 rows equal;
+       contract **match** 318,113/318,113 sampled fields
+       (``gated_contract_sim.log``)
+     - same: 966/24,866; contract 318,113/318,113
+   * - ``scalar_agu:lat2`` S1 ``s1``
+     - 201,065 slots, 5 masked
+     - **match** 201,065/201,065
+     - **match** 201,065/201,065
+   * - ``scalar_agu:lat1`` / ``lat3``
+     - 200,885 / 200,755
+     - **match** both
+     - **match** both
+   * - ``fetch:iram`` F1 ``f1``
+     - 25,026 slots, 1,602 masked (reset 56, uninit 1,546)
+     - **match** 25,026/25,026
+     - **match** 25,026/25,026
+   * - ``fetch:fq`` / ``fq_a8`` F1 ``f1``
+     - 112,864 / 126,871
+     - **match** both
+     - **match** both
+   * - ``fetch:iram`` ``f1_d12`` (IRAM = D-12 memory)
+     - 25,026
+     - **match** 25,026/25,026 (T-2 noted)
+     - **match** 25,026/25,026
+   * - ``loop_ctrl:shipped`` L1 ``l1``
+     - 527,446 slots, 760 masked
+     - **match** 527,446/527,446
+     - **match** 527,446/527,446
+   * - ``loop_ctrl`` ``l1_d12`` (loop buffer = D-12 memory, two units)
+     - same
+     - **match** 527,446/527,446
+     - **match** 527,446/527,446
+   * - D-20 control geometry
+     - --
+     - **match**: 12 derived numbers = Phase 0 and MiniTPU's bookings; 7
+       wrong declarations refused (``control_geometry.log``)
+     - n/a (composition time)
+   * - H6 ``fetch`` F2 ``drain`` / ``epoch`` (probe)
+     - contract
+     - section 4
+     - section 4
+
+Sanity: the harness is not vacuous -- one-constant mutants of ``l1`` (branch
+target ``+2``) and ``f1`` (room test ``< 4``) gave ``UNIT-DIFF`` 491,764/527,446
+and 21,671/25,026 (reverted, not committed).
+
+Timings (wall, both backends, warm Verilator cache): 12-20 s per unit, 56 s
+for ``loop_ctrl`` (both variants); csim dominates (6-27 s per run). Bindings
+build ~10 min (``nice ninja -j16``).
+
+3. Hypotheses
+=============
+
+* **H1** (C1 functions match first time): **yes on Sim and SC**, all four, no
+  logic change after the first run (the only rebuild was T-3, a front-end
+  form). The decoder's per-slot records avoided the 233-bit port entirely.
+  Cat/RTLG/AMC columns: open (tracks D, E).
+* **H2** (S1 at ``S_LAT``): **yes on Sim and SC** at ``S_LAT`` 1, 2, 3 with one
+  body. ``S_LAT`` is a D-20 booking held to ``asm.py`` and
+  ``isa_latency.json scalar.latency`` (and refused when built 3 while booked
+  2). The ``latency=S_LAT`` pin and Catapult: track D. Writing it back through
+  ``gen_isa_delta``: track B's calendar emitter.
+* **H3** (F1 + L1 match; IRAM/loop buffer as D-12 memories): **yes on Sim and
+  SC**, both the body-array forms and the D-12 forms (``reset=False``,
+  two-unit loop buffer). Catapult ROM/RAM inference: track D. One semantic
+  finding on the way (T-2).
+* **H8** (A's part): ``STACK_DEPTH = 2**LEVEL_SEL_W``, the loop buffer's count
+  and index widths, ``CAP == LB_CAP``, the fetch depth, the flush/refetch
+  costs and ``S_LAT`` are properties or legality; ``loop_ctrl`` takes its
+  widths from the record. 12/12 derived = measured; 7/7 wrong declarations
+  refused.
+* **H6** (no Allo stream can be flushed; the workaround costs a cycle per
+  flush): **missing abstraction confirmed**; the cost is subtler than the
+  hypothesis -- section 4.
+
+4. H6: the flushable stream (probe and D-n draft)
+=================================================
+
+``template/flush_stream.py`` splits the fetch path at its FIFO: ``fetcher``
+(address counter, in-flight read, IRAM) puts each landed bundle into
+``fifo: Stream[UInt(128), 4]`` with ``{epoch, addr}`` in a parallel
+``ftag: Stream[UInt(13), 4]`` (one 141-bit element triggers T-1); ``queue``
+holds the head and serves issue. Control crosses once per cycle each way
+(``k_ctl``: occupancy, flush, target; ``k_push``), so iteration = cycle and
+nothing races. A Stream cannot show a FIFO's head while empty (the RTL drives
+a shifted stale entry with ``valid = 0``), so the head is compared only while
+valid (T-8). Two ways to get rid of what a flush strands in ``fifo``:
+
+* ``drain``: in the flush's edge, ``get`` and discard every stranded token (a
+  bounded loop of conditional gets in ONE iteration);
+* ``epoch``: drop stranded tokens as they surface, one ``get`` per cycle; the
+  fetcher's room test counts them, since they still occupy ``fifo``.
+
+``h6_flush_stream.log`` (identical on both backends):
+
+.. list-table::
+   :header-rows: 1
+
+   * - trace
+     - RTL
+     - ``drain``
+     - ``epoch``
+   * - Phase 0 ``fetch:iram`` programs (random pops, pauses; 3,804 cycles)
+     - 2,622 issued; flush->target {3: 153, 4: 7}
+     - **match** 24,362/24,362; 2,622 issued; {3: 153, 4: 7}
+     - **differs** 24,348/24,362; **2,621** issued; {3: 152, **4: 8**}
+   * - closed loop (II=1 issue, a branch every 5-25 cycles; 3,134 cycles)
+     - 2,234 issued; {3: 383}
+     - **match** 20,040/20,040
+     - **match** 20,040/20,040
+
+What it shows. (1) ``drain`` is exact per iteration but only because an
+iteration may make up to ``DEPTH - 1`` extra gets: a FIFO serves one per
+cycle, so in hardware the flush cycle stretches -- the cost is hidden from
+both untimed backends, and is exactly what D-24 (cycle-locked) forbids.
+(2) ``epoch`` is cycle-honest and free while issue runs at II=1 (the stranded
+tokens drain inside the 2 bubbles the branch costs anyway), and costs a
+bundle when the queue was full at the flush (1 of 2,622; 8 of 160 flushes
+take 4 cycles). (3) It needs the room test to count stranded tokens -- or a
+``2 * DEPTH - 1`` deep FIFO -- else the producer can block in ``put`` while
+the consumer waits for its ``k_push``: a deadlock by construction (D-23's
+condition; reasoned, not run). (4) A 1-bit epoch is **wrong**: two flushes
+before the stranded tokens drain flip it back and stale bundles issue (T-5,
+``f2_epochwrap`` below); in lockstep the stale COUNT is exact and is what the
+prototype uses.
+
+**D-n draft (for the owner): a stream may be flushed by its consumer.**
+
+* ``Stream[T, D, flush=True]`` gains ``s.flush()``, callable only by the
+  channel's one consumer: at that iteration's edge every buffered token is
+  discarded, and a ``put`` of the same edge is dropped (the RTL's "drop the
+  landing response").
+* Lowering: a FIFO with a synchronous clear (``count <= 0``), no data moved --
+  zero cycles, what ``sequencer_fetch_queue.sv`` is; the simulator empties the
+  buffer at the iteration boundary.
+* Cycle-locked producer and consumer need nothing else. A self-timed producer
+  may ``put`` before it hears of the flush, so the channel (not the bodies)
+  carries an epoch of ``ceil(log2(F + 1))`` bits for ``F`` flushes in flight,
+  with a declared 1-deep flush link to the producer; the composition checks
+  ``F`` against that link's depth.
+* A backend that cannot build the clear refuses, naming the channel (D-1);
+  ``drain`` and ``epoch`` stay the recorded workarounds until it lands.
+* *Reverses if* a cycle-locked composition (I1) never needs a FIFO between
+  fetch and issue -- then the flush stays inside one unit, as F1 has it.
+
+5. Findings
+===========
+
+.. list-table::
+   :header-rows: 1
+   :widths: 6 16 78
+
+   * - id
+     - class
+     - finding
+   * - T-1
+     - **bug** (simulator; silent, then fatal; high)
+     - A ``Stream`` whose element is wider than 128 bits corrupts the heap:
+       the data arrive intact, then the process aborts ("corrupted size vs.
+       prev_size", "free(): invalid pointer"), segfaults, or hangs in
+       ``malloc``'s lock inside LLVM's signal handler (gdb: thread 1 in
+       ``__lll_lock_wait_private`` under ``SignalHandler``). 128 bits: 0 of 13
+       runs; 129-160 bits: 6 of 14. Repro ``tests/limits/
+       new_sim_wide_stream_heap.py`` (``REPRODUCES: {128: 0, 141: 2}`` of 5).
+       Cause not isolated: the buffer is a ``memref.alloc`` of ``D + 1`` x
+       ``iN`` (``allo/backend/simulator.py`` ``_process_function_streams``);
+       an ``iN > i128`` store/alloc size mismatch is the suspect. Smallest
+       change: refuse an element wider than 128 bits in the simulator (D-1)
+       until the lowering is fixed. Workaround (F2): split the token.
+   * - T-2
+     - **semantic mismatch** (D-12 lowering)
+     - A ``registers`` read port of latency ``L >= 1`` on Stream links
+       delivers the read issued in iteration ``t`` in iteration ``t + L - 1``
+       (the server's pipe-as-data puts its last entry in the same iteration;
+       the word-array record's ``issue`` shift is the same fact). So the
+       IRAM's ``latency=1`` read is combinational in body terms and
+       ``fetch_d12``'s queue keeps the RTL's read register itself; on the Wire
+       links Catapult gets, ``memory.json`` says "registered link + L-deep
+       pipe", so the same body would count that register twice. A
+       cycle-locked body cannot be written once for both link kinds.
+       Proposal: define a port's ``L`` as iterations in the body's terms on
+       every link kind (deliver at ``t + L``), the Wire link's register being
+       one of the ``L`` stages; check on Catapult (track D).
+   * - T-3
+     - **workaround** (front end; U3 A9 again)
+     - A Python ``bool`` closed over by a kernel compiles to ``scf.if`` on an
+       ``i32`` (``'scf.if' op operand #0 must be 1-bit``); ``slots`` and
+       ``slots_gated`` are two functions, not one with a flag.
+   * - T-4
+     - **missing abstraction** (Stream)
+     - No stream can be flushed (H6): section 4; D-n draft above.
+   * - T-5
+     - **semantic** (the epoch workaround)
+     - A 1-bit epoch tag drops the wrong tokens after two flushes closer than
+       the stranded tokens take to drain: on the Phase 0 program trace the
+       first ``epoch`` run desynchronised and hung (killed after 10 min); a
+       directed repro (``u4_track_a_2026-10-08/f2_epochwrap.py`` gap 0: full queue,
+       flushes on consecutive cycles) issued 2, 3 before the target 4 with the
+       tag test; with the committed count test it issues 4 first. In
+       lockstep, dropping by the stale count is exact; self-timed needs the
+       wider epoch of the draft.
+   * - T-6
+     - **semantic mismatch** (documentation)
+     - README D-23 names the slot commands "V (vector), X (matrix), M
+       (memory)"; in the RTL and the plan (Q1(b)) **X is the memory slot**
+       (vld/vst, ``mem_ldst_t``) and **M the matrix slot** (vmatload/push/pop).
+       The code follows the RTL: ``adapt_x`` = memory, ``adapt_m`` = matrix.
+       For the owner to correct the wording.
+   * - T-7
+     - harness note (U3 A8 again)
+     - ``check_trace`` passes ``make`` the instance but not the runner, so
+       ``fetch.run_f1`` infers it from the command's ports
+       (``bram_data_i`` present = the queue alone).
+   * - T-8
+     - **semantic** (by design)
+     - A FIFO built from a Stream has no "head while empty"; the RTL's shift
+       register shows a stale entry with ``bundle_valid = 0``. F2 is judged
+       with the head masked while not valid (P-2: probes on contracts).
+   * - T-9
+     - front-end note
+     - A slice bound that is a name (``v[128:W]``) warns "Cannot infer the
+       bitwidth of the slice, use UInt(32) as default" (D-17's named-bound
+       gap); every unit here writes literal bounds.
+
+MiniTPU: nothing new beyond Phase 0's list (P-10).
+
+6. Provisional calls (D-9)
+==========================
+
+* **P-A1.** The decoder's interface is seven per-slot functions plus
+  ``delay``, each returning its ``sequencer_pkg`` record; the 233-bit struct
+  exists only in the runner. *Reason:* U3 P-8 and the plan's C1.
+* **P-A2.** The VPU adapter follows D-23 with the RTL's slot names (T-6);
+  ``slots`` (ungated) is the default, ``slots_gated`` the declared deviation,
+  verified on the contract.
+* **P-A3.** ``vmem_store_read_hint`` is grouped with the X command (gated by
+  ``vmem.valid``): Phase 0 found nothing reads it.
+* **P-A4.** The F1/L1 bodies keep IRAM/loop buffer as body arrays (the
+  default, cycle-locked by construction); the D-12 forms are variants beside
+  them until T-2 is settled on Catapult.
+* **P-A5.** F2's flush uses the stale count in lockstep, the epoch tag only
+  carried (T-5).
+
+7. Proposed matrix rows (for the integrator's ``u4_matrix.rst``)
+================================================================
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 22 22 20 20
+
+   * - unit
+     - Allo simulator
+     - SystemC csim
+     - Catapult RTL + DC
+     - RTLGen / AMC
+   * - ``seq_decoder``
+     - **match** 25,458/25,458 (C1, per-slot)
+     - **match** 25,458/25,458
+     - open (track D)
+     - open (track E)
+   * - ``agu_resolve``
+     - **match** 38,432/38,432
+     - **match** 38,432/38,432
+     - open
+     - open
+   * - ``vpu_adapter``
+     - **match** 24,866/24,866 (D-23 slots); gated: contract match, T-6
+     - **match**; gated contract match
+     - open
+     - open
+   * - ``dma_addr_gen``
+     - **match** 200,700/200,700
+     - **match** 200,700/200,700
+     - open
+     - open
+   * - ``scalar_agu``
+     - **match** at S_LAT 1/2/3; S_LAT a D-20 booking (H2)
+     - **match** at 1/2/3
+     - open (``latency=S_LAT``)
+     - opt
+   * - ``fetch``
+     - **match** (f1: iram, fq, fq_a8; f1_d12); **finding** T-2; F2 probe:
+       **finding** T-1, T-4, T-5
+     - **match** (same); F2 as simulator
+     - open (IRAM inference)
+     - --
+   * - ``loop_ctrl``
+     - **match** (l1, l1_d12); D-20 widths
+     - **match** (l1, l1_d12)
+     - open
+     - --
+
+8. Not done
+===========
+
+* Catapult, RTLGen and AMC columns (tracks D, E). The D-12 variants' Wire form
+  (``make("systemc")``) is not built here: it belongs with T-2 on Catapult.
+* ``dma_desc_adapter`` (A1) is track B's; ``dma`` track C's.
+* The H6 draft's ``flush()`` itself (core change: a proposal only).

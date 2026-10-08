@@ -110,4 +110,37 @@ def run_bits(mod, stim_):
     return w
 
 
-VARIANTS = {"bits": (bits, run_bits)}
+
+# Track A (plan C1) form: the same module as ``addr_gen`` + a ``c1`` variant.
+U32, U14 = UInt(32), UInt(14)
+
+def addr_gen(base_addr: UInt(32), row: UInt(14), stride: UInt(32)) -> UInt(32):
+    """``dma_addr_gen.sv``: ``base_addr + {18'h0, row} * stride``, kept to 32 bits."""
+    r: UInt(32) = row
+    prod: UInt(32) = r * stride
+    word_addr: UInt(32) = base_addr + prod
+    return word_addr
+
+
+def c1(n):
+    @df.region()
+    def top(B: U32[n], R: U14[n], S: U32[n], A: U32[n]):
+        @df.kernel(mapping=[1], args=[B, R, S, A])
+        def gen(b: U32[n], r: U14[n], s: U32[n], a: U32[n]):
+            for i in range(n):
+                a[i] = addr_gen(b[i], r[i], s[i])
+
+    return top
+
+
+def run_c1(mod, stim):
+    b = np.ascontiguousarray(stim[:, 0]).astype(np.uint32)
+    r = np.ascontiguousarray(stim[:, 1]).astype(np.uint16)
+    s = np.ascontiguousarray(stim[:, 2]).astype(np.uint32)
+    a = np.zeros(len(stim), dtype=np.uint32)
+    mod(b, r, s, a)
+    return a
+
+
+
+VARIANTS = {"bits": (bits, run_bits), "c1": (c1, run_c1)}

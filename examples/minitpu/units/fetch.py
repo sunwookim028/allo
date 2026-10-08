@@ -29,6 +29,11 @@ unreset: a head shown while the queue has never been written is masked.
 
 import os
 
+import numpy as np
+
+import allo.dataflow as df
+from allo.ir.types import UInt, int32, uint1
+
 from examples.minitpu.harness import ref_ctrl_front, rtl
 from examples.minitpu.harness.traces import Trace, rng_for, word
 
@@ -214,4 +219,213 @@ def seeds():
     return [("tb_fetch_queue_shift", "fq_a8", cmd, seen, True)]
 
 
-VARIANTS = {}
+# ---------------------------------------------------------------------------
+# Allo (U4 track A, plan F1 ``bits``). One kernel, one iteration per cycle:
+# the "pre" outputs from the registers, then the edge. The fetch queue is
+# transcribed register for register (``sequencer_fetch_queue.sv``): the
+# free-running address, the in-flight flag and address, the 4-entry shift
+# FIFO (head in entry 0) and its count. Behind the ``iram`` instance the
+# IRAM is a 4,096 x 128 array read every cycle into a read register (the old
+# word on a same-cycle write); IRAM and its read register are written on
+# every edge, reset or not, as the RTL's ``always_ff @(posedge clk)``. Bundles
+# are four 32-bit lanes (P-8). The FIFO entries and IRAM start as whatever
+# the array holds: the harness masks what the RTL leaves unreset (D-14).
+#
+# F1's IRAM is an array in the body; ``f1_d12`` declares it a D-12 memory.
+# ---------------------------------------------------------------------------
+
+WIDTH = {k: 128 for k in AW}
+U32 = UInt(32)
+
+
+def f1(n, w, inst):
+    if inst == "iram":
+        return _f1_iram(n)
+    return _f1_fq(n, AW[inst])
+
+
+def _f1_iram(n):
+    A = UInt(12)
+
+    @df.region()
+    def top(RST: uint1[n], WE: uint1[n], WA: A[n], WD: U32[n, 4], PAUSE: uint1[n], FLUSH: uint1[n],
+            RADDR: A[n], POP: uint1[n],
+            DATA: U32[n, 4], RDA: A[n], RDV: uint1[n], VALID: uint1[n], BADDR: A[n], EMPTY: uint1[n],
+            FULL: uint1[n]):
+        @df.kernel(mapping=[1], args=[RST, WE, WA, WD, PAUSE, FLUSH, RADDR, POP,
+                                      DATA, RDA, RDV, VALID, BADDR, EMPTY, FULL])
+        def fetch(rst: uint1[n], we: uint1[n], wa: A[n], wd: U32[n, 4], pause: uint1[n], flush: uint1[n],
+                  raddr: A[n], pop_i: uint1[n],
+                  data_o: U32[n, 4], rda_o: A[n], rdv_o: uint1[n], valid_o: uint1[n], baddr_o: A[n],
+                  empty_o: uint1[n], full_o: uint1[n]):
+            iram: U32[4096, 4] = 0
+            rd_reg: U32[4] = 0  # sequencer_iram's read register
+            fq_addr: A[4] = 0
+            fq_data: U32[4, 4] = 0
+            next_addr: A = 0
+            req_pending: uint1 = 0
+            req_addr: A = 0
+            count: UInt(3) = 0
+            for t in range(n):
+                if rst[t] == 0:
+                    next_addr = 0
+                    req_pending = 0
+                    req_addr = 0
+                    count = 0
+                empty: uint1 = count == 0
+                rd_valid: uint1 = 0
+                if pause[t] == 0 and count < 3:  # room for the read in flight
+                    rd_valid = 1
+                for k in range(4):
+                    data_o[t, k] = fq_data[0, k]  # A5: the 2-D output stored first
+                rda_o[t] = next_addr
+                rdv_o[t] = rd_valid
+                valid_o[t] = 1 - empty
+                baddr_o[t] = fq_addr[0]
+                empty_o[t] = empty
+                full_o[t] = count == 4
+                # ---- rising edge: IRAM (never reset) ----
+                bram: U32[4]
+                for k in range(4):
+                    bram[k] = rd_reg[k]
+                ir: int32 = next_addr
+                for k in range(4):
+                    rd_reg[k] = iram[ir, k]
+                if we[t]:
+                    iw: int32 = wa[t]
+                    for k in range(4):
+                        iram[iw, k] = wd[t, k]
+                # ---- rising edge: the fetch queue ----
+                if rst[t]:
+                    if flush[t]:
+                        next_addr = raddr[t]
+                        req_pending = 0
+                        count = 0
+                    else:
+                        push: uint1 = req_pending
+                        pop: uint1 = pop_i[t] & (1 - empty)
+                        if pop:
+                            for j in range(3):
+                                fq_addr[j] = fq_addr[j + 1]
+                                for k in range(4):
+                                    fq_data[j, k] = fq_data[j + 1, k]
+                        if push:
+                            slot: UInt(2) = count
+                            if pop:
+                                slot = count - 1
+                            si: int32 = slot
+                            fq_addr[si] = req_addr
+                            for k in range(4):
+                                fq_data[si, k] = bram[k]
+                        count = count + push - pop
+                        req_pending = rd_valid
+                        req_addr = next_addr
+                        if rd_valid:
+                            next_addr = next_addr + 1
+
+    return top
+
+
+def _f1_fq(n, aw):
+    """The fetch queue alone: ``bram_data_i`` is a port (the IRAM's word)."""
+    A = UInt(aw)
+
+    @df.region()
+    def top(RST: uint1[n], BRAM: U32[n, 4], PAUSE: uint1[n], FLUSH: uint1[n], RADDR: A[n], POP: uint1[n],
+            DATA: U32[n, 4], RDA: A[n], RDV: uint1[n], VALID: uint1[n], BADDR: A[n], EMPTY: uint1[n],
+            FULL: uint1[n]):
+        @df.kernel(mapping=[1], args=[RST, BRAM, PAUSE, FLUSH, RADDR, POP,
+                                      DATA, RDA, RDV, VALID, BADDR, EMPTY, FULL])
+        def fq(rst: uint1[n], bram_i: U32[n, 4], pause: uint1[n], flush: uint1[n], raddr: A[n],
+               pop_i: uint1[n],
+               data_o: U32[n, 4], rda_o: A[n], rdv_o: uint1[n], valid_o: uint1[n], baddr_o: A[n],
+               empty_o: uint1[n], full_o: uint1[n]):
+            fq_addr: A[4] = 0
+            fq_data: U32[4, 4] = 0
+            next_addr: A = 0
+            req_pending: uint1 = 0
+            req_addr: A = 0
+            count: UInt(3) = 0
+            for t in range(n):
+                if rst[t] == 0:
+                    next_addr = 0
+                    req_pending = 0
+                    req_addr = 0
+                    count = 0
+                empty: uint1 = count == 0
+                rd_valid: uint1 = 0
+                if pause[t] == 0 and count < 3:
+                    rd_valid = 1
+                for k in range(4):
+                    data_o[t, k] = fq_data[0, k]  # A5: the 2-D output stored first
+                rda_o[t] = next_addr
+                rdv_o[t] = rd_valid
+                valid_o[t] = 1 - empty
+                baddr_o[t] = fq_addr[0]
+                empty_o[t] = empty
+                full_o[t] = count == 4
+                bram: U32[4]
+                for k in range(4):
+                    bram[k] = bram_i[t, k]
+                if rst[t]:
+                    if flush[t]:
+                        next_addr = raddr[t]
+                        req_pending = 0
+                        count = 0
+                    else:
+                        push: uint1 = req_pending
+                        pop: uint1 = pop_i[t] & (1 - empty)
+                        if pop:
+                            for j in range(3):
+                                fq_addr[j] = fq_addr[j + 1]
+                                for k in range(4):
+                                    fq_data[j, k] = fq_data[j + 1, k]
+                        if push:
+                            slot: UInt(2) = count
+                            if pop:
+                                slot = count - 1
+                            si: int32 = slot
+                            fq_addr[si] = req_addr
+                            for k in range(4):
+                                fq_data[si, k] = bram[k]
+                        count = count + push - pop
+                        req_pending = rd_valid
+                        req_addr = next_addr
+                        if rd_valid:
+                            next_addr = next_addr + 1
+
+    return top
+
+
+def run_f1(mod, cmd, n, w):
+    """Ports by instance: ``iram`` has the loader's write port and plain
+    names; ``fq``/``fq_a8`` take ``bram_data_i`` (A8: the runner is not told
+    the instance, so the command's ports say which)."""
+    from examples.minitpu.units.ctrl_lanes import col, join, split
+
+    fq = "bram_data_i" in cmd
+    P = ref_ctrl_front.FQ_PORTS if fq else ref_ctrl_front.FETCH_PORTS
+    u8 = lambda p: col(cmd, p, n, np.uint8)  # noqa: E731
+    u16 = lambda p: col(cmd, p, n, np.uint16)  # noqa: E731
+    data = np.zeros((n, 4), dtype=np.uint32)
+    o = {k: np.zeros(n, dtype=np.uint16 if k in ("rd_addr", "addr") else np.uint8)
+         for k in ("rd_addr", "rd_valid", "valid", "addr", "empty", "full")}
+    tail = [data, o["rd_addr"], o["rd_valid"], o["valid"], o["addr"], o["empty"], o["full"]]
+    if fq:
+        mod(u8("rst_n"), split(cmd["bram_data_i"][:n], 4), u8(P["pause"]), u8(P["flush"]), u16(P["restart"]),
+            u8(P["pop"]), *tail)
+    else:
+        mod(u8("rst_n"), u8("instr_write_en"), u16("iram_addr"), split(cmd["dma_iram_din"][:n], 4),
+            u8(P["pause"]), u8(P["flush"]), u16(P["restart"]), u8(P["pop"]), *tail)
+    res = {P["data"]: join(data)}
+    for k in o:
+        res[P[k]] = o[k]
+    return res
+
+
+VARIANTS = {"f1": (f1, run_f1)}
+
+# F1 with the IRAM declared as a D-12 memory (Stream links: simulator, csim)
+from examples.minitpu.units import fetch_d12 as _d12  # noqa: E402
+
+VARIANTS["f1_d12"] = (_d12.make("simulator"), _d12.run)

@@ -26,6 +26,9 @@ import sys
 
 import numpy as np
 
+import allo.dataflow as df
+from allo.ir.types import UInt
+
 from examples.minitpu.harness import minitpu_asm, rtl
 from examples.minitpu.harness import ref_ctrl_decode as R
 from examples.minitpu.harness.traces import rng_for
@@ -277,7 +280,198 @@ def main(argv=None):
     return 0
 
 
-VARIANTS = {}
+# ---------------------------------------------------------------------------
+# Allo (U4 track A, plan C1). The decoder is one plain function per slot of
+# ``bundle_fields_t`` -- the per-slot records the plan asks for instead of one
+# 233-bit port (U3 P-8) -- each taking the 128-bit bundle and returning that
+# slot's packed record (``sequencer_pkg``'s layout, MSB first, as
+# ``R.<SLOT>_SLOT``). The issue unit (track B) calls the ones it needs. The
+# region feeds the bundle as four 32-bit lanes and returns the eight records
+# (two lanes where a record is wider than 32 bits); the runner concatenates
+# them only to compare with the RTL's flattened struct.
+# Bundle: V[127:108] = op rd ra rb; M[107:100]; MEM kind[99:98] payload[97:66];
+# S[65:53]; C[52:46] = op operand; IMM[45:22]; DELAY[21:15].
+# ---------------------------------------------------------------------------
+
+WIDTH = {"base": R.FIELDS_W}
+U32 = UInt(32)
+
+
+def decode_v(w: UInt(128)) -> UInt(46):
+    op: UInt(5) = w[123:128]
+    rd: UInt(5) = w[118:123]
+    rb: UInt(5) = w[108:113]
+    f: UInt(46) = 0
+    f[41:46] = w[113:118]  # raddr_a
+    f[36:41] = rb  # raddr_b
+    if op >= 1 and op <= 4:  # vadd vsub vmul vmov -> ALU op 0..3
+        f[35] = 1
+        f[21:24] = op - 1
+        f[16:21] = rd
+    elif op == 11 or op == 12:  # vmax vmin -> ALU op 4, 5
+        f[35] = 1
+        f[21:24] = op - 7
+        f[16:21] = rd
+    elif op >= 5 and op <= 8:  # vgelu vexp vrecip vrsqrt -> SFU op 0..3
+        f[15] = 1
+        f[13:15] = op - 5
+        f[8:13] = rd
+    elif op == 9 or op == 10:  # vredsum vredmax
+        f[7] = 1
+        f[6] = op - 9
+        f[0:5] = rd
+    elif op == 15:  # vlanered: rb[0] picks sum or max
+        f[7] = 1
+        f[6] = rb[0]
+        f[5] = 1
+        f[0:5] = rd
+    elif op == 13:  # vtxin
+        f[34] = 1
+        f[32:34] = rb[0:2]
+    elif op == 14:  # vtxout
+        f[31] = 1
+        f[29:31] = rb[0:2]
+        f[24:29] = rd
+    return f
+
+
+def decode_m(w: UInt(128)) -> UInt(8):
+    m: UInt(8) = w[100:108]
+    return m
+
+
+def decode_x(w: UInt(128)) -> UInt(27):
+    f: UInt(27) = 0
+    if w[98:100] == 1:  # MEM_LDST
+        p: UInt(32) = w[66:98]
+        f[26] = 1
+        f[25] = p[31]  # dir
+        f[20:25] = p[26:31]  # vreg_idx
+        f[8:20] = p[14:26]  # literal (word, VMEM_ADDR_W)
+        f[7] = p[13]  # agu_valid
+        f[6] = p[0]  # agu_level_hi
+        f[4:6] = p[11:13]  # agu_level_lo
+        f[3] = p[7]  # agu_shift_hi
+        f[0:3] = p[8:11]  # agu_shift_lo
+    return f
+
+
+def decode_d(w: UInt(128)) -> UInt(57):
+    f: UInt(57) = 0
+    if w[98:100] == 2:  # MEM_DESC
+        p: UInt(32) = w[66:98]
+        f[56] = 1
+        f[55] = p[31]  # is_store
+        f[53:55] = p[29:31]  # channel_sel
+        f[41:53] = p[17:29]  # vmem_address
+        f[29:41] = p[5:17]  # rows_m1
+        f[28] = p[4]  # has_disp
+        f[2:4] = p[2:4]  # base_sreg
+        f[0:2] = p[0:2]  # stride_sreg
+        if p[4]:  # mem_owns_imm
+            f[4:28] = w[22:46]
+    return f
+
+
+def decode_c(w: UInt(128)) -> UInt(7):
+    cop: UInt(3) = w[50:53]
+    f: UInt(7) = 0
+    if cop == 2:  # C_OP_LEND
+        f[4:7] = 1
+    elif cop == 3:  # C_OP_FLUSH -> wait.channel
+        f[4:7] = 2
+        f[0:4] = w[46:50]
+    elif cop == 4:  # C_OP_HALT
+        f[4:7] = 3
+    return f
+
+
+def decode_l(w: UInt(128)) -> UInt(45):
+    cop: UInt(3) = w[50:53]
+    f: UInt(45) = 0
+    if cop == 1 or cop == 5:  # loop.begin / loop.begin.r: valid, and c_owns_imm
+        f[44] = 1
+        if cop == 5:
+            f[43] = 1
+            f[42] = w[48]  # loop_bound.from_arg
+            f[40:42] = w[46:48]  # loop_bound.idx
+            f[0:16] = w[22:38]  # skip
+        else:
+            f[16:32] = w[22:38]  # hi
+        f[32:36] = w[38:42]  # step
+        f[36:40] = w[42:46]  # lo
+    return f
+
+
+def decode_s(w: UInt(128)) -> UInt(36):
+    f: UInt(36) = 0
+    f[35] = w[65]  # valid
+    f[32:35] = w[62:65]  # op
+    f[30:32] = w[60:62]  # rd
+    f[28:30] = w[58:60]  # rs
+    f[27] = w[57]  # use_iv
+    f[26] = w[53]  # level_hi
+    f[24:26] = w[55:57]  # level_lo
+    if w[65] == 1 and w[62:65] != 1:  # s_owns_imm: valid and not SMOV_ARG
+        f[0:24] = w[22:46]
+    return f
+
+
+def c1(n, w_unused):
+    @df.region()
+    def top(B: U32[n, 4], V: U32[n, 2], D: U32[n, 2], L: U32[n, 2], S: U32[n, 2],
+            M: U32[n], X: U32[n], C: U32[n], DL: U32[n]):
+        @df.kernel(mapping=[1], args=[B, V, D, L, S, M, X, C, DL])
+        def decoder(b: U32[n, 4], v: U32[n, 2], d: U32[n, 2], lp: U32[n, 2], s: U32[n, 2],
+                    m: U32[n], x: U32[n], c: U32[n], dl: U32[n]):
+            for t in range(n):
+                w: UInt(128) = 0
+                w[0:32] = b[t, 0]
+                w[32:64] = b[t, 1]
+                w[64:96] = b[t, 2]
+                w[96:128] = b[t, 3]
+                fv: UInt(46) = decode_v(w)
+                fd: UInt(57) = decode_d(w)
+                fl: UInt(45) = decode_l(w)
+                fs: UInt(36) = decode_s(w)
+                v[t, 0] = fv[0:32]
+                v[t, 1] = fv[32:46]
+                d[t, 0] = fd[0:32]
+                d[t, 1] = fd[32:57]
+                lp[t, 0] = fl[0:32]
+                lp[t, 1] = fl[32:45]
+                s[t, 0] = fs[0:32]
+                s[t, 1] = fs[32:36]
+                m[t] = decode_m(w)
+                x[t] = decode_x(w)
+                c[t] = decode_c(w)
+                dl[t] = w[15:22]
+
+    return top
+
+
+#: (name, slot width, lanes) in ``bundle_fields_t`` order, MSB first
+SLOT_OUTS = [("v", 46, 2), ("m", 8, 1), ("x", 27, 1), ("d", 57, 2), ("c", 7, 1), ("l", 45, 2),
+             ("s", 36, 2), ("delay", 7, 1)]
+
+
+def run_c1(mod, cmd, n, w):
+    from examples.minitpu.units.ctrl_lanes import join, split
+
+    outs = {k: np.zeros((n, nl) if nl > 1 else n, dtype=np.uint32) for k, _, nl in SLOT_OUTS}
+    mod(split(cmd["bundle_i"][:n], 4), outs["v"], outs["d"], outs["l"], outs["s"], outs["m"], outs["x"],
+        outs["c"], outs["delay"])
+    vals = {k: (join(outs[k]) if nl > 1 else [int(x) for x in outs[k]]) for k, _, nl in SLOT_OUTS}
+    res = []
+    for t in range(n):
+        f = 0
+        for k, wd, _ in SLOT_OUTS:
+            f = (f << wd) | vals[k][t]
+        res.append(f)
+    return {"fields_o": res}
+
+
+VARIANTS = {"c1": (c1, run_c1)}
 
 if __name__ == "__main__":
     sys.exit(main())

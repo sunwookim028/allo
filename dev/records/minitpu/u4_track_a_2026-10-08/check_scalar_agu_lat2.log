@@ -1,0 +1,25 @@
+RTL u4_scalar_agu:lat2: 40214 cycles in 9 traces, 201065 defined slots, RTL vs reference on defined: 201065/201065 (1.8s)
+/work/shared/users/phd/sk3463/scratch/wt-u4a/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui1[0m
+  warnings.warn(self.message, category=self.category)
+/work/shared/users/phd/sk3463/scratch/wt-u4a/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui3[0m
+  warnings.warn(self.message, category=self.category)
+/work/shared/users/phd/sk3463/scratch/wt-u4a/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui2[0m
+  warnings.warn(self.message, category=self.category)
+UNIT-MATCH scalar_agu:lat2 s1 simulator 201065/201065 defined (5 masked: before reset=5; allo==rtl on 0) cycle=order-only (build 0.8s, run 0.3s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[10:48:50] Compiling with g++ ...
+[10:48:56] Running simulation ...
+UNIT-MATCH scalar_agu:lat2 s1 systemc 201065/201065 defined (5 masked: before reset=5; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.7s, run 11.6s)
+
+real	0m19.368s
+user	0m18.382s
+sys	0m1.246s

@@ -673,3 +673,14 @@ I. ``bf16`` ran in the simulator and aborted every HLS emitter
 
 No issue yet. Analysis: archived register, under this heading.
 
+
+.. _limitation-j:
+
+J. A ``Stream`` element wider than 128 bits corrupts the simulator's heap
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+No issue yet. The data arrive intact; the process then aborts, segfaults or
+hangs in ``malloc`` (0 of 13 runs at 128 bits, 6 of 14 at 129-160). Repro
+``tests/limits/new_sim_wide_stream_heap.py``; analysis and workaround (split
+the token into streams of at most 128 bits):
+``dev/records/minitpu/u4_track_a_2026-10-08.rst`` (T-1).

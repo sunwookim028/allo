@@ -1,0 +1,19 @@
+RTL dma_addr_gen: 200700 vectors, latency [0] (declared 0), 0.1s
+/work/shared/users/phd/sk3463/scratch/wt-u4a/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui16 vs ui14[0m
+  warnings.warn(self.message, category=self.category)
+UNIT-MATCH dma_addr_gen c1 simulator 200700/200700 latency=untimed (rtl 0) (build 0.2s, run 0.1s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[10:47:34] Compiling with g++ ...
+[10:47:38] Running simulation ...
+UNIT-MATCH dma_addr_gen c1 systemc 200700/200700 latency=unchecked (rtl 0) (build 0.2s, run 6.4s)
+
+real	0m12.228s
+user	0m9.657s
+sys	0m1.226s

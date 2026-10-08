@@ -520,7 +520,7 @@ valid-qualified slot commands plus four declared resources.**
 - MiniTPU's `vpu_ctrl_t` (an 85-bit combinational struct, valid in the issue
   cycle only, nine valid bits, payload ignored outside each op's valid
   cycle; U4 Phase 0) is declared in Allo as three slot commands -- V
-  (vector), X (matrix), M (memory) -- each a `Stream`, and four shared
+  (vector), X (memory), M (matrix), the RTL's own letters -- each a `Stream`, and four shared
   resources declared as D-12 ports: VREG read ports A/B, port C (a store
   loses to the matrix stream), the write port under the calendar, the VMEM
   compute port. The collisions the RTL resolves by convention become

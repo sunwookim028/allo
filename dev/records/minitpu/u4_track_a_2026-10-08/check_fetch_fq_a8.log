@@ -1,0 +1,22 @@
+RTL sequencer_fetch_queue:fq_a8: 18142 cycles in 8 traces, 126871 defined slots, RTL vs reference on defined: 126871/126871 (0.3s)
+/work/shared/users/phd/sk3463/scratch/wt-u4a/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui1[0m
+  warnings.warn(self.message, category=self.category)
+/work/shared/users/phd/sk3463/scratch/wt-u4a/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui16 vs ui8[0m
+  warnings.warn(self.message, category=self.category)
+UNIT-MATCH fetch:fq_a8 f1 simulator 126871/126871 defined (123 masked: reset=119, uninit=4; allo==rtl on 112) cycle=order-only (build 0.8s, run 0.1s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[10:50:09] Compiling with g++ ...
+[10:50:15] Running simulation ...
+UNIT-MATCH fetch:fq_a8 f1 systemc 126871/126871 defined (123 masked: reset=119, uninit=4; allo==rtl on 112) cycle=per-iteration, time unchecked (build 0.7s, run 6.9s)
+
+real	0m12.476s
+user	0m11.695s
+sys	0m1.075s

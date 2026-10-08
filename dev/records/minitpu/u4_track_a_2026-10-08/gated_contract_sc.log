@@ -1,0 +1,14 @@
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[10:48:35] Compiling with g++ ...
+[10:48:41] Running simulation ...
+CONTRACT-MATCH vpu_adapter slots_gated systemc: 318113/318113 sampled fields equal (250483 unsampled payload fields zeroed where the RTL drives the fetch head's)
+
+real	0m12.604s
+user	0m11.222s
+sys	0m1.289s
