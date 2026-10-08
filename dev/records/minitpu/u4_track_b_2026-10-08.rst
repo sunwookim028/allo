@@ -573,7 +573,7 @@ master ``9622f754`` ``isa/latency.json`` sha256 ``7eb2bdeb...e11e85e``
 (``/opt/siemens/catapult/2024.2``), its SystemC 2.3.3 and g++ 10.3.0 for csim.
 
 10. Follow-up: ``result_latency.vmatpush`` at the issue edge; deltas re-keyed to ``v1``
-======================================================================================
+=======================================================================================
 
 minitpu-comp confirmed ``b3ba0a4d`` is ``v1`` (F-B1 resolved: ``v1-course`` is
 ``613190d``'s timing; ``05e1bdf``, an ancestor of the pin, brought the one-beat
