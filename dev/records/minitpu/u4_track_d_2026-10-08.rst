@@ -1,0 +1,45 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+##############################################################################
+U4 track D: Catapult RTL and Design Compiler for the landed U4 variants
+##############################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-08 (in progress: units are added as
+   they land).** zhang-21, branch ``u4-catapult`` (worktree
+   ``scratch/wt-u4d``) from ``origin/u1-pilot`` at ``c7abcce4``, this
+   worktree's own bindings (``mlir/build``: Ninja, LLVM/MLIR
+   ``/work/shared/common/llvm-project-main/build-rhel8``, gcc-toolset-13).
+   MiniTPU at ``b3ba0a4d``, read only. Catapult Ultra Synthesis
+   2024.2/1130128, library ``nangate-45nm_beh``; Verilator 5.052; Design
+   Compiler W-2024.09 with the U1/U3 flow (``dc_u3c.tcl`` unchanged:
+   FreePDK45 ``stdcells.db`` md5 ``f5560259ca91a4b67336b715b729f94d``).
+   Plan ``u4_plan_2026-10-08.rst`` section 5 track D; oracles Phase 0
+   (``u4_phase0_2026-10-08.rst``); the variants: tracks A, B, C. Nothing
+   under ``allo/`` or ``mlir/`` changed. Every Catapult job ran alone
+   (``flock``), under ``ulimit -v 32000000`` and a 90-minute timeout.
+
+Reproduce (``source examples/minitpu/harness/env-zhang21.sh``, worktree root,
+``R=dev/records/minitpu/u4_track_d_2026-10-08``, scratch ``scratch/u4d``)::
+
+   $R/scripts/u4d_run.sh issue_3p33_L1 seq_issue locked --clock 3.33 --pipeline-all --unroll-inner --latency issue_0=1
+   $ALLO_PYTHON $R/scripts/u4d_check.py seq_issue locked $S/issue_3p33_L1.prj --declared 1
+   $R/scripts/u4d_run.sh vpucmd_d2_3p33 vpu_cmd streams --clock 3.33 --pipeline-all --unroll-inner
+   $ALLO_PYTHON $R/scripts/u4d_check.py vpu_cmd streams $S/vpucmd_d2_3p33.prj --token-outs 16 17 18
+   $ALLO_PYTHON $R/scripts/d23_rtl.py $S/vpucmd_d2_3p33.prj
+
+Results so far
+==============
+
+``seq_issue:locked`` (I1 + A1) at 3.33 and 2.0 ns, ``latency=1``: **UNIT-MATCH
+1,042,595/1,042,595 per cycle**, 1.000 cyc/row, 0 stall cycles, every output
+row ``t`` at cycle ``t + 2``; manifest latency 1 / II 1 scheduled =
+measured.
+
+``vpu_cmd:streams`` (D-23): depth 2 and 4 at 3.33 ns, depth 2 at 2.0 ns:
+**UNIT-MATCH 888,217/888,217**, 0 stall cycles, **5,447/5,447 issues at the
+RTL's cycle** (+2), every command token at its receiver 3 cycles after its
+row. Depth 1: 808 stall cycles, 2/5,447 issues on time (F-B3, larger than
+csim's 488). The pad loop kept rolled: the csyn takes 1.5 min (F-B10).
