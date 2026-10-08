@@ -325,7 +325,11 @@ simulator's region) a token arrives in the iteration it is put, so the
 server puts its pipe's last stage at the top of its iteration, before it
 shifts and before it takes any address, and the pipe starts at 0.
 ``memory.json`` says so per port ("delivered L owner iterations after the
-access"). ``latency=0`` is a same-iteration read on both.
+access"). ``latency=0`` is a same-iteration read on both. Within an
+iteration the server answers every read port before it waits on any
+write-only port, whatever the declaration order (U4 S-2: a write that depends
+on the same iteration's read through another channel deadlocked when its
+port was declared first).
 
 Before the rule a Stream link delivered at ``t + L - 1`` (U4 track A, T-2),
 so a cycle-locked body could not be written once for both link kinds, and a

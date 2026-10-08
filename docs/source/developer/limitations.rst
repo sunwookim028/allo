@@ -399,6 +399,12 @@ checked-in snapshot.
        workaround's failure)
      - none yet (closed on ``core-fixes-4``: README D-25)
 
+   * - :ref:`N <limitation-n>`
+     - The D-12 server served its ports in declaration order: a write port
+       declared before a read port it depends on hung the simulator, silently
+       (U4 sequencer loop, S-2)
+     - none yet (closed on ``core-fixes-4``)
+
 :ref:`Item 13 <limitation-13>` is **not** in this table: it was largely
 retracted, but a real convenience gap (no ``allo.dma`` intrinsic) remains
 under the same item number, so its status is not unambiguous enough to close
@@ -748,3 +754,20 @@ stale bundles after two close flushes and hung the long trace (T-5). Closed by
 :doc:`/developer/dataflow_semantics`). Not built: D-25's epoch for a
 self-timed producer (a follow-up). Tests ``tests/dataflow/test_stream_flush.py``;
 record ``dev/records/limitations/core_fixes_4_2026-10-08.rst``.
+
+.. _limitation-n:
+
+N. The D-12 server's port order could deadlock a composition -- closed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Found by the U4 sequencer loop (S-2, ``dev/records/minitpu/
+u4_seqloop_2026-10-08.rst``): the ``registers`` server took each port's
+address in declaration order with blocking gets, so a write port declared
+before a read port whose answer decides the write (the loop buffer's capture
+and replay) deadlocked, and the simulator hung with no message. Closed: the
+server answers every read port before it waits on any write-only port, in any
+declaration order (and, since the D-12 latency fix, puts every latency-``L >=
+1`` read before it takes any address). Repro
+``tests/limits/new_d12_server_port_order_deadlock.py`` (now FIXED); test
+``tests/dataflow/test_compose_server_port_order.py``; record
+``dev/records/limitations/core_fixes_4_2026-10-08.rst``.

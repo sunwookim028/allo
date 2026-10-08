@@ -129,7 +129,6 @@ def fq(rst: uint1[N], mem):
     """``sequencer_fetch_queue.sv`` behind the IRAM's read register (F1).
     Head first (state), then this cycle's pop and flush, then the edge. The
     flush (a taken branch or the entry) is the queue's own synchronous clear."""
-    rd_reg: UInt(128) = 0  # sequencer_iram's read register (T-2: on Stream links the port's L=1 is this)
     fq_addr: UInt(AW)[4] = 0
     fq_data: UInt(128)[4] = 0
     next_addr: UInt(AW) = 0
@@ -153,10 +152,11 @@ def fq(rst: uint1[N], mem):
         f_head.put(head)
         f_data.put(fq_data[0])
         f_cap.put(fq_data[0])
-        # the edge: port B reads the fetch address every cycle
-        bram: UInt(128) = rd_reg
+        # port B reads the fetch address every cycle; its latency-1 read returns
+        # the word addressed last cycle -- sequencer_iram's read register, which
+        # the port is (README D-12 amended: L in the owner's iterations, T-2)
         ir: int32 = next_addr
-        rd_reg = mem[ir]
+        bram: UInt(128) = mem[ir]
         ci: UInt(16) = i_fq.get()
         cl: UInt(16) = l_fq.get()
         if live:
@@ -695,14 +695,18 @@ def mrx(rm: UInt(32)[N]):
 IRAM = Memory("iram", "UInt(128)", rows=str(G.IRAM_ROWS),
               ports=(Port("host", "w", visible=1), Port("fetch", "r", latency=G.IRAM_MEM_LATENCY)),
               collision="refuse", reset=False)
-# The replay port is declared FIRST: the D-12 server serves its ports in
-# declaration order each iteration, and with ``cap`` first it waits for the
-# capture's address before answering the replay read -- which loop control
-# needs before issue can decide what lcap's write is: a deadlock by
-# construction (record finding S-2).
-LB = Memory("lb", "UInt(128)", rows="CAP",
-            ports=(Port("replay", "r", latency=0), Port("cap", "w", visible=1)),
-            collision="refuse", reset=False)
+# The ports in the RTL's order (capture, then replay). Before core-fixes-4 the
+# D-12 server served its ports in declaration order, so ``cap`` first waited for
+# the capture's address before answering the replay read that decides it: a
+# deadlock (record finding S-2), worked around by declaring ``replay`` first.
+# The server now answers every read port before it waits on a write port.
+# ``SEQ_LB_PORTS=replay_first`` keeps the workaround's order, to compare.
+import os as _os  # noqa: E402
+
+_LB_PORTS = (Port("cap", "w", visible=1), Port("replay", "r", latency=0))
+if _os.environ.get("SEQ_LB_PORTS") == "replay_first":
+    _LB_PORTS = _LB_PORTS[::-1]
+LB = Memory("lb", "UInt(128)", rows="CAP", ports=_LB_PORTS, collision="refuse", reset=False)
 
 #: (boundary array, Allo type, numpy dtype, source): the region's arguments in order.
 #: ``source`` is the trace port an input reads (None: an output).

@@ -302,3 +302,52 @@ self-timed units carries the ordering obligation as the author's premise
 (``stream_ports.rst``). Also open: ``empty()``/``full()`` and arrays of
 flushable streams in SystemC (the front end accepts arrays; the emitter path
 is exercised only for scalar streams), and the RTL per-cycle check.
+
+4. S-2: the D-12 server's port order (U4 sequencer loop)
+========================================================
+
+Merged ``origin/u1-pilot`` at ``7fba744a`` first (it brings the sequencer-loop
+composition, ``examples/minitpu/template/sequencer.py``, and the repro).
+
+**Before** (``dev/records/minitpu/u4_seqloop_2026-10-08.rst``, S-2). The
+``registers`` server took each port's address in declaration order with
+blocking gets. With the loop buffer declared as the RTL has it (``cap`` write,
+then ``replay`` read) the server waited for the capture's address before
+answering the replay read that, through loop control and issue, decides that
+address: the simulator hung with no message. The composition declared
+``replay`` first as a workaround. (For latency ``>= 1`` reads, fix 2 already
+put every read before any address; S-2 is the latency-0 case.)
+
+**Change** (``allo/compose.py`` ``_server``): the body serves every port that
+reads (``r``, ``rw``) before any write-only port's address get; the writes
+still come last, in declaration order, so a read sees the pre-edge word and
+Catapult's per-port ``if`` numbering (``_server_ops``) is unchanged.
+
+**Tests.** ``tests/dataflow/test_compose_server_port_order.py`` (2 pass): the
+repro's two units, both declaration orders, each build in a child process
+with a 120 s timeout (a regression fails instead of hanging the suite); every
+read is the previous one + 1. The repro itself now prints ``FIXED`` (both
+orders return; ``(w, r)`` used to be killed at 90 s).
+
+**Sequencer** (``logs/s2_sequencer_*.log``): the composition now declares the
+ports in the RTL's order (``cap``, ``replay``), and ``SEQ_LB_PORTS=
+replay_first`` keeps the workaround's order to compare. The merged
+``sequencer.py`` carried its own copy of ``fetch_d12.fq`` with the T-2
+read register (``rd_reg``); with fix 2 that register counts twice, so it went
+the same way as ``fetch_d12``'s.
+
+.. list-table::
+   :header-rows: 1
+
+   * - ``check sequencer`` (52,236 cycles, 15 traces)
+     - simulator
+     - SystemC csim
+   * - ports ``(cap, replay)`` -- the RTL's order, hung before the fix
+     - **UNIT-MATCH** 940,408/940,408 (13.4 s run)
+     - **UNIT-MATCH** 940,408/940,408 (49.7 s run)
+   * - ports ``(replay, cap)`` -- the old workaround
+     - **UNIT-MATCH** 940,408/940,408
+     - **UNIT-MATCH** 940,408/940,408
+
+Masked on both: 156,548 (D-23 gate 154,378, reset 945, uninit IRAM 1,225), as
+the sequencer record.

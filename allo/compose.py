@@ -1958,8 +1958,15 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
         pinit = " = 0" if early else ""
         head = ["@df.kernel(mapping=[1])", f"def {m.name}_mem():",
                 f"    mem: {dt}[{rows}]{attr}"]
-        body, writes, puts = [], [], []
-        for p in m.ports:
+        body, puts = [], []
+        writes_of = {}  # port name -> its write lines, emitted in declaration order
+        # README D-12 (U4 S-2): every reading port is served before the server
+        # waits on any write-only port's address, whatever the declaration
+        # order -- a write whose address or enable depends (through another
+        # channel) on this iteration's read would otherwise deadlock the
+        # exchange. Reads see the pre-edge word either way (writes come last).
+        for p in [q for q in m.ports if q.reads] + [q for q in m.ports if not q.reads]:
+            writes = writes_of.setdefault(p.name, [])
             for k in range(p.count):
                 pk = p.name + (str(k) if p.count > 1 else "")
                 ch = f"{m.name}_{pk}"
@@ -1998,6 +2005,7 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
                     writes += [f"_{pk}_d: {dt} = {ch}_d.get()",
                                f"_{pk}_e: uint1 = {ch}_e.get()",
                                f"if _{pk}_e:", f"    mem[_{pk}_i] = _{pk}_d"]
+        writes = [x for p in m.ports for x in writes_of.get(p.name, [])]
         lines = head + [f"    for _ in {loop_iter}:"] + [f"        {x}" for x in puts + body + writes]
         return textwrap.indent("\n".join(lines), "    ")
 
