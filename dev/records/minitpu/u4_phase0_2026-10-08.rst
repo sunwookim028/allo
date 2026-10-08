@@ -366,8 +366,10 @@ run with the clone as working directory: ``tb_fetch_queue_shift``,
 **PASS**. ``tb_cdma_fabric_axi_mem`` is not a testbench (the AXI slave model
 of the xsim-only ``tb_cdma_fabric_e2e``). The sequencer + VPU tbs
 (``tb_vpu_latency_probe``, ``tb_bundle_delay``, ``tb_bundle_vadd_loop``,
-``tb_bundle_interlocks``, ``tb_vpu_reduction_writeback``): see
-``tbs_issue.log`` (RESULT_ISSUE_TBS).
+``tb_bundle_interlocks``, ``tb_vpu_reduction_writeback``) all **PASS**;
+``tb_vpu_latency_probe``, MiniTPU's own RAW-by-function measurement,
+reports L = 7, 6, 7, 8, 12, 4, 16 (vld, vadd, vld->vst, vgelu, vlanesum,
+vtxout, vredsum): equal to this record's ``W + 1`` column.
 
 Findings
 ========

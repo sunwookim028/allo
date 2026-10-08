@@ -249,7 +249,7 @@ composition re-derives ``W`` from manifests and the assembler re-schedules
 
 **Q5. Memories (D-12).** IRAM (1 host ``w`` + 1 fetch ``r`` lat 1, 4,096 x
 128, unreset), loop buffer (1 ``w`` + 1 async ``r``, 24 x 128, unreset),
-sregs (1 ``w`` + 3 async ``r``, 4 x 32, reset), VMEM's DMA port (``rw`` lat
+sregs (1 ``w`` + 4 async ``r``: two descriptor reads, the loop bound, the ``rs`` operand; 4 x 32, reset), VMEM's DMA port (``rw`` lat
 2 on the 128 B word, 4-beat gather; compute ``rw`` lat 3; same-word
 collision an obligation, MiniTPU #21). ``asic_memories`` measured that
 Catapult refuses II=1 on a read-or-write RAM port: VMEM's two ``rw`` ports
