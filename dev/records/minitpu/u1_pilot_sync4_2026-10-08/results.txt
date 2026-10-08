@@ -1,0 +1,160 @@
+# summary.txt, baseline (main 552db66a)
+HEAD 552db66a608959374d32adb0e8b664a6981f2ec4 start 2026-10-08T04:46:50-04:00
+allo_where EXIT 0 5s
+hashes EXIT 0 76s
+gen_isa EXIT 0 72s
+lift_units EXIT 0 5s
+bench_isa EXIT 0 15s
+stress_isa EXIT 0 240s
+act_gate EXIT 0 7s
+mutate_none EXIT 0 252s
+systemc_csim EXIT 0 55s
+df_unit EXIT 0 15s
+region_stateful EXIT 0 7s
+eva EXIT 0 20s
+minitpu_quick EXIT 0 204s
+u3e EXIT 0 67s
+check_bf16_add EXIT 1 17s
+check_vpu_regfile EXIT 1 432s
+check_sfu EXIT 0 21s
+check_mxu_pe EXIT 0 68s
+check_vpu_word_array_narrow EXIT 1 82s
+DONE 2026-10-08T05:14:30-04:00
+
+# summary.txt, branch (u1-pilot 20937d9e)
+HEAD 20937d9e97e2ca60d74d476fc67f90edabcf4347 start 2026-10-08T05:14:45-04:00
+allo_where EXIT 0 5s
+hashes EXIT 0 80s
+gen_isa EXIT 0 61s
+lift_units EXIT 0 5s
+bench_isa EXIT 0 14s
+stress_isa EXIT 0 229s
+act_gate EXIT 0 7s
+mutate_none EXIT 0 239s
+systemc_csim EXIT 0 53s
+df_unit EXIT 0 6s
+region_stateful EXIT 0 4s
+eva EXIT 0 18s
+minitpu_quick EXIT 0 166s
+u3e EXIT 0 59s
+check_bf16_add EXIT 1 4s
+check_vpu_regfile EXIT 1 3s
+check_sfu EXIT 1 3s
+check_mxu_pe EXIT 1 4s
+check_vpu_word_array_narrow EXIT 1 3s
+reproduce_nocosim EXIT 1 59s
+DONE 2026-10-08T05:31:47-04:00
+m_check_bf16_add RERUN EXIT 1 19s
+m_check_vpu_regfile RERUN EXIT 1 417s
+m_check_sfu RERUN EXIT 0 20s
+m_check_mxu_pe RERUN EXIT 0 65s
+m_check_vpu_word_array_narrow RERUN EXIT 1 85s
+reproduce_nocosim RERUN EXIT 0 137s
+RERUN DONE 2026-10-08T05:44:47-04:00
+
+# pytest
+78 failed, 1004 passed, 10 skipped, 1 xfailed, 96 warnings in 2290.29s (0:38:10)
+PYTEST_EXIT 1 WALL 2293s
+78 failed, 1010 passed, 10 skipped, 1 xfailed, 96 warnings in 2274.69s (0:37:54)
+PYTEST_EXIT 1 WALL 2278s
+
+# jdiff.py pytest_base.xml pytest_branch.xml
+base Counter({'pass': 1004, 'fail': 78, 'skip': 11}) branch Counter({'pass': 1010, 'fail': 78, 'skip': 11})
+  pass -> absent tests.act.test_tutorial::test_the_fused_instruction_patches_still_apply
+new-and-passing on branch: 7
+
+# mvoutrelu.patch
+a313ddfd5d46750ebe68eef0f4520fc1265430e326373a09ac6567dc9379b3c6  examples/tinytpu/mvoutrelu.patch
+CHECK_OK
+APPLIED
+ 14 files changed, 230 insertions(+), 21 deletions(-)
+REVERSED
+14
+0
+
+# test_tutorial.py in isolation (branch, then base)
+...                                                                      [100%]
+3 passed in 4.92s
+...                                                                      [100%]
+3 passed in 4.42s
+
+# hashes
+HASH vhls 6bc774bc9d97f0e7b9d97a25941296e463c73aa733c082f37eec1ff894b2ef95 166563
+HASH catapult ade1ab5dfd20d72af7d879f17819b6de513733cbfcdb885ca90a5fe8df88e038 170812
+HASH systemc 06d365336c307ffc16df3946dd52bcfc0e9fa8b604518cf0f7b6bb8ed78646b7 267151
+HASH vhls 6bc774bc9d97f0e7b9d97a25941296e463c73aa733c082f37eec1ff894b2ef95 166563
+HASH catapult ade1ab5dfd20d72af7d879f17819b6de513733cbfcdb885ca90a5fe8df88e038 170812
+HASH systemc 06d365336c307ffc16df3946dd52bcfc0e9fa8b604518cf0f7b6bb8ed78646b7 267151
+
+# check.py verdicts, baseline (script form)
+UNIT-MATCH mxu_pe:pe bits systemc 360202/360202 defined (338 masked: reset fill=338; allo==rtl on 337) cycle=per-iteration, time unchecked (build 0.6s, run 8.7s
+UNIT-MATCH mxu_pe:pe unit systemc 360196/360196 defined (338 masked: reset fill=338; allo==rtl on 337) cycle=per-iteration, time unchecked (build 1.0s, run 9.9s
+UNIT-MATCH sfu bits systemc 462144/462144 latency=unchecked (rtl 5) (build 0.4s, run 7.6s)
+UNIT-MATCH sfu staged systemc 462144/462144 latency=unchecked (rtl 5) (build 0.3s, run 7.2s)
+UNIT-MATCH vpu_regfile:w16 trace systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.2s, run 6.3s)
+UNIT-MATCH vpu_regfile:w16 trace_raw systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.2s, run 6.4
+UNIT-MATCH vpu_regfile:w16 stateful systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.3s, run 333.
+UNIT-MATCH vpu_regfile:w16 ported systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.5s, run 7.0s)
+UNIT-FAIL  vpu_regfile shared systemc: RuntimeError: Stateful `mem` (`__stateful_top_mem_1`) is used by 4 kernels: port_a_0, port_b_0, port_c_0, port_w_0. One S
+UNIT-FAIL  vpu_regfile shared_sync systemc: RuntimeError: Stateful `mem` (`__stateful_top_mem_1`) is used by 4 kernels: port_a_0, port_b_0, port_c_0, port_w_0. 
+UNIT-MATCH vpu_regfile:w16 annotated systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.2s, run 6.0
+UNIT-DIFF  vpu_regfile:w16 wire systemc 21217/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.4s, run 6.3s)
+UNIT-DIFF  vpu_regfile:w16 wire_stateful systemc 21217/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.5s, run 
+UNIT-DIFF  vpu_regfile:w16 comb systemc 23010/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.5s, run 6.5s)
+UNIT-DIFF  vpu_regfile:w16 comb_unreset systemc 23010/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.5s, run 6
+UNIT-MATCH vpu_regfile:w16 d12_server systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 1.0s, run 11
+UNIT-DIFF  vpu_regfile:w16 d12_server_wire systemc 23010/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 1.0s, ru
+UNIT-MATCH vpu_regfile:w16 d12_replica systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.9s, run 9
+UNIT-DIFF  vpu_regfile:w16 d12_replica_wire systemc 23010/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.9s, r
+UNIT-MATCH vpu_word_array:narrow trace systemc 67717/67717 defined (93501 masked: collision=2693, no read=41104, uninit=7, write cycle=48344, ww collision=1353;
+UNIT-MATCH vpu_word_array:narrow trace_rw systemc 67717/67717 defined (93501 masked: collision=2693, no read=41104, uninit=7, write cycle=48344, ww collision=13
+UNIT-MATCH vpu_word_array:narrow issue systemc 67717/67717 defined (93498 masked: collision=2693, no read=41101, uninit=7, write cycle=48344, ww collision=1353;
+UNIT-MATCH vpu_word_array:narrow ported systemc 67717/67717 defined (93501 masked: collision=2693, no read=41104, uninit=7, write cycle=48344, ww collision=1353
+UNIT-FAIL  vpu_word_array shared systemc: RuntimeError: Stateful `mem` (`__stateful_top_mem_1`) is used by 2 kernels: compute_0, dma_0. One Stateful has one ker
+UNIT-FAIL  vpu_word_array shared_sync systemc: RuntimeError: Stateful `mem` (`__stateful_top_sync_mem_1`) is used by 2 kernels: compute_0, dma_0. One Stateful h
+UNIT-MATCH vpu_word_array:narrow annotated systemc 67717/67717 defined (93501 masked: collision=2693, no read=41104, uninit=7, write cycle=48344, ww collision=1
+UNIT-DIFF  vpu_word_array:narrow wire systemc 8452/67717 defined (93501 masked: collision=2693, no read=41104, uninit=7, write cycle=48344, ww collision=1353; a
+UNIT-MATCH vpu_word_array:narrow d12_server systemc 67717/67717 defined (93501 masked: collision=2693, no read=41104, uninit=7, write cycle=48344, ww collision=
+UNIT-DIFF  vpu_word_array:narrow d12_server_wire systemc 5975/67717 defined (93501 masked: collision=2693, no read=41104, uninit=7, write cycle=48344, ww collis
+UNIT-FAIL  vpu_word_array d12_sram systemc: AssertionError: vpu_word_array narrow: no SRAM macro for this instance (SRAMS has ['mid', 'small', 'w512']); asic_me
+UNIT-FAIL  vpu_word_array d12_sram_wire systemc: AssertionError: vpu_word_array narrow: no SRAM macro for this instance (SRAMS has ['mid', 'small', 'w512']); as
+UNIT-DIFF  bf16_add native systemc 249907/251936 latency=unchecked (rtl 0) (build 0.2s, run 5.8s)
+UNIT-MATCH bf16_add bits systemc 251936/251936 latency=unchecked (rtl 0) (build 0.4s, run 6.2s)
+
+# check.py verdicts, branch (-m form)
+UNIT-DIFF  bf16_add native systemc 249907/251936 latency=unchecked (rtl 0) (build 0.2s, run 6.5s)
+UNIT-MATCH bf16_add bits systemc 251936/251936 latency=unchecked (rtl 0) (build 0.4s, run 6.5s)
+UNIT-MATCH vpu_word_array:narrow trace systemc 67717/67717 defined (93501 masked: collision=2693, no read=41104, uninit=7, write cycle=48344, ww collision=1353;
+UNIT-MATCH vpu_word_array:narrow trace_rw systemc 67717/67717 defined (93501 masked: collision=2693, no read=41104, uninit=7, write cycle=48344, ww collision=13
+UNIT-MATCH vpu_word_array:narrow issue systemc 67717/67717 defined (93498 masked: collision=2693, no read=41101, uninit=7, write cycle=48344, ww collision=1353;
+UNIT-MATCH vpu_word_array:narrow ported systemc 67717/67717 defined (93501 masked: collision=2693, no read=41104, uninit=7, write cycle=48344, ww collision=1353
+UNIT-FAIL  vpu_word_array shared systemc: RuntimeError: Stateful `mem` (`__stateful_top_mem_1`) is used by 2 kernels: compute_0, dma_0. One Stateful has one ker
+UNIT-FAIL  vpu_word_array shared_sync systemc: RuntimeError: Stateful `mem` (`__stateful_top_sync_mem_1`) is used by 2 kernels: compute_0, dma_0. One Stateful h
+UNIT-MATCH vpu_word_array:narrow annotated systemc 67717/67717 defined (93501 masked: collision=2693, no read=41104, uninit=7, write cycle=48344, ww collision=1
+UNIT-DIFF  vpu_word_array:narrow wire systemc 8452/67717 defined (93501 masked: collision=2693, no read=41104, uninit=7, write cycle=48344, ww collision=1353; a
+UNIT-MATCH vpu_word_array:narrow d12_server systemc 67717/67717 defined (93501 masked: collision=2693, no read=41104, uninit=7, write cycle=48344, ww collision=
+UNIT-DIFF  vpu_word_array:narrow d12_server_wire systemc 5975/67717 defined (93501 masked: collision=2693, no read=41104, uninit=7, write cycle=48344, ww collis
+UNIT-FAIL  vpu_word_array d12_sram systemc: AssertionError: vpu_word_array narrow: no SRAM macro for this instance (SRAMS has ['mid', 'small', 'w512']); asic_me
+UNIT-FAIL  vpu_word_array d12_sram_wire systemc: AssertionError: vpu_word_array narrow: no SRAM macro for this instance (SRAMS has ['mid', 'small', 'w512']); as
+UNIT-MATCH mxu_pe:pe bits systemc 360202/360202 defined (338 masked: reset fill=338; allo==rtl on 337) cycle=per-iteration, time unchecked (build 0.7s, run 8.3s
+UNIT-MATCH mxu_pe:pe unit systemc 360196/360196 defined (338 masked: reset fill=338; allo==rtl on 337) cycle=per-iteration, time unchecked (build 1.0s, run 9.6s
+UNIT-MATCH vpu_regfile:w16 trace systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.2s, run 6.2s)
+UNIT-MATCH vpu_regfile:w16 trace_raw systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.2s, run 6.3
+UNIT-MATCH vpu_regfile:w16 stateful systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.2s, run 317.
+UNIT-MATCH vpu_regfile:w16 ported systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.5s, run 7.2s)
+UNIT-FAIL  vpu_regfile shared systemc: RuntimeError: Stateful `mem` (`__stateful_top_mem_1`) is used by 4 kernels: port_a_0, port_b_0, port_c_0, port_w_0. One S
+UNIT-FAIL  vpu_regfile shared_sync systemc: RuntimeError: Stateful `mem` (`__stateful_top_mem_1`) is used by 4 kernels: port_a_0, port_b_0, port_c_0, port_w_0. 
+UNIT-MATCH vpu_regfile:w16 annotated systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.2s, run 6.0
+UNIT-DIFF  vpu_regfile:w16 wire systemc 21217/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.4s, run 6.3s)
+UNIT-DIFF  vpu_regfile:w16 wire_stateful systemc 21217/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.4s, run 
+UNIT-DIFF  vpu_regfile:w16 comb systemc 23010/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.5s, run 7.6s)
+UNIT-DIFF  vpu_regfile:w16 comb_unreset systemc 23010/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.7s, run 7
+UNIT-MATCH vpu_regfile:w16 d12_server systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 1.0s, run 11
+UNIT-DIFF  vpu_regfile:w16 d12_server_wire systemc 23010/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.9s, ru
+UNIT-MATCH vpu_regfile:w16 d12_replica systemc 180780/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.8s, run 8
+UNIT-DIFF  vpu_regfile:w16 d12_replica_wire systemc 23010/180780 defined (3 masked: uninit=3; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.8s, r
+UNIT-MATCH sfu bits systemc 462144/462144 latency=unchecked (rtl 5) (build 0.4s, run 7.4s)
+UNIT-MATCH sfu staged systemc 462144/462144 latency=unchecked (rtl 5) (build 0.4s, run 7.0s)
+
+# branch check.py, script form (all five)
+AttributeError: module 'calendar' has no attribute 'day_abbr'
