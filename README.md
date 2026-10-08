@@ -481,6 +481,21 @@ from Allo, mostly as RTL IP; and Allo's MXU integrated into MiniTPU.**
   testbench digest (`examples/minitpu-rtl/oracle.json`); cycles are reported
   beside the testbench's, a difference is a recorded finding. One looped GEMM
   first, then the `sim_kernel.py` set.
+- Re-scoped (owner, 2026-10-08): the wrapped core is not a demo but the
+  **substitution spine** for U4/U5. Once `minitpu_core.sv` runs inside an
+  Allo region against the testbench-digest oracle, each Allo-modelled unit
+  replaces its RTL counterpart inside the same region -- the MXU first, then
+  the VPU units, then the control -- with the same oracle on every step,
+  until the core is all Allo (U5). M-R3 is therefore the first swap, not the
+  AXI top. Its probe target is the tool gap that a transaction-level IP seam
+  cannot carry a per-cycle sideband (`vpu_ctrl_t`): the first swap is RTL
+  inside the same Verilated model (a file-list replacement), and a
+  cycle-level mixed RTL/Allo co-simulation seam is what a later swap needs.
+- Status: M-R1 and M-R2 passed on 2026-10-08
+  (`minitpu_rtl_m1_2026-10-08.rst`): all 52 oracle launches bit-identical
+  to MiniTPU's testbench digests inside the Allo region; cycles differ only
+  through the shim's memory model (one request in flight, no bridge), to be
+  closed by putting MiniTPU's own bridge in the shim.
 
 **D-22 (2026-10-08). TinyTPU is the toy instance for communication; MiniTPU
 is the design driver.**
