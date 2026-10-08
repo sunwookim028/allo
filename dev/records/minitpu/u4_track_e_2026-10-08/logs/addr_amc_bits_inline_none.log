@@ -1,0 +1,5 @@
+BUILT addr_bits_inline amc none 0.2s
+cycle time: 98305
+RAN addr_bits_inline amc: 1 chunks of 16384, cycles/chunk [98305] (13.0s)
+UNIT-MATCH dma_addr_gen bits_inline amc-amc none: 16384/16384 (cycles/chunk [98305])
+WALL 14s rc=0

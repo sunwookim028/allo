@@ -1,0 +1,17 @@
+BUILT addr_bits_inline amc pipeline 0.1s
+cycle time: 16390
+cycle time: 16390
+cycle time: 16390
+cycle time: 16390
+cycle time: 16390
+cycle time: 16390
+cycle time: 16390
+cycle time: 16390
+cycle time: 16390
+cycle time: 16390
+cycle time: 16390
+cycle time: 16390
+cycle time: 16390
+RAN addr_bits_inline amc: 13 chunks of 16384, cycles/chunk [16390] (173.5s)
+UNIT-MATCH dma_addr_gen bits_inline amc-amc pipeline: 200700/200700 (cycles/chunk [16390])
+WALL 175s rc=0

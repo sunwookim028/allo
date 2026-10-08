@@ -1,0 +1,5 @@
+BUILT desc_amc amc pipeline 0.3s
+cycle time: 20064
+RAN desc_amc amc: 1 chunks of 20056, cycles/chunk [20064] (19.1s)
+UNIT-MATCH dma_desc_adapter amc amc-amc pipeline: 180495/180495 defined slots (rows 20056)
+WALL 21s rc=0

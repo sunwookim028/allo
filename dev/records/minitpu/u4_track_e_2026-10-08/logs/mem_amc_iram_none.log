@@ -1,0 +1,4 @@
+BUILT mem_iram amc none 0.2s
+cycle time: 4291
+UNIT-MATCH mem iram amc none: read-back 32 rows, same-cycle row 3 got ['0xe5afcdbc', '0x31414454', '0x3d541055', '0x5f4788b5'] old ['0xe5afcdbc', '0x31414454', '0x3d541055', '0x5f4788b5']; cycles=4291
+WALL 13s rc=0

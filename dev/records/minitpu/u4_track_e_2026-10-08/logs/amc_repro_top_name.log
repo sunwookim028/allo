@@ -1,0 +1,142 @@
+RESULT top llvm: built
+loc("-":2:3): error: redefinition of symbol named 'top'
+    %false_0 = hw.constant false
+    %0 = comb.or %p0_rd_en, %p0_wr_en : i1
+    %p0_done_d0 = seq.compreg sym @p0_done_d0 %p0_rd_en, %clk reset %rst, %false_0 : i1  
+    hw.output %bram0_dout, %p0_done_d0, %p0_addr, %0, %p0_wr_en, %p0_wr_data : i32, i1, i2, i1, i1, i32
+    %false_0 = hw.constant false
+    %0 = comb.or %p0_rd_en, %p0_wr_en : i1
+    %p0_done_d0 = seq.compreg sym @p0_done_d0 %p0_rd_en, %clk reset %rst, %false_0 : i1  
+    hw.output %bram0_dout, %p0_done_d0, %p0_addr, %0, %p0_wr_en, %p0_wr_data : i32, i1, i2, i1, i1, i32
+    oplib.operator @i4_addi_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_addi_i4(%arg0: i4, %arg1: i4) -> i4 {
+        %0 = oplib.operation "arith.addi"(%arg0, %arg1 : i4, i4) : i4
+        oplib.output %0 : i4
+      }
+      oplib.hw_match(@arith_addi_i4 : (i4, i4) -> i4) produce (in %arg0 : i4, in %arg1 : i4) {
+        %0 = comb.add %arg0, %arg1 : i4
+        oplib.hw_return %0 : i4
+      }
+    }
+    oplib.operator @i32_addi_l0 latency<0>, incDelay<0.45499999999999996>, outDelay<0.45499999999999996> {
+      oplib.target @arith_addi_i32(%arg0: i32, %arg1: i32) -> i32 {
+        %0 = oplib.operation "arith.addi"(%arg0, %arg1 : i32, i32) : i32
+        oplib.output %0 : i32
+      }
+      oplib.hw_match(@arith_addi_i32 : (i32, i32) -> i32) produce (in %arg0 : i32, in %arg1 : i32) {
+        %0 = comb.add %arg0, %arg1 : i32
+        oplib.hw_return %0 : i32
+      }
+    }
+    oplib.operator @i4_cmpi_slt_l0 latency<0>, incDelay<5.000000e-02>, outDelay<5.000000e-02> {
+      oplib.target @arith_cmpi_slt_i4(%arg0: i4, %arg1: i4) -> i1 {
+        %0 = oplib.operation "arith.cmpi" with {predicate = 2 : i64}(%arg0, %arg1 : i4, i4) : i1
+        oplib.output %0 : i1
+      }
+      oplib.hw_match(@arith_cmpi_slt_i4 : (i4, i4) -> i1) produce (in %arg0 : i4, in %arg1 : i4) {
+        %0 = comb.icmp slt %arg0, %arg1 : i4
+        oplib.hw_return %0 : i1
+      }
+    }
+    oplib.operator @amcmem_top_d4_w32_l1 latency<1>, incDelay<1.000000e-01>, outDelay<5.150000e-01> {
+    }
+    %c2_i4 = hw.constant 2 : i4
+    %c0_i2 = hw.constant 0 : i2
+    %c0_i32 = hw.constant 0 : i32
+    %true_0 = hw.constant true
+    %false_1 = hw.constant false
+    %c1_i4 = arith.constant 1 : i4
+    %c4_i4 = arith.constant 4 : i4
+    %c0_i4 = arith.constant 0 : i4
+    %c1_i32 = arith.constant 1 : i32
+    %mem1_inst.p0_rd_data, %mem1_inst.p0_done, %mem1_inst.bram0_addr, %mem1_inst.bram0_en, %mem1_inst.bram0_we, %mem1_inst.bram0_din = hw.instance "mem1_inst" @mem1_bram(clk: %clk: !seq.clock, rst: %rst: i1, p0_addr: %24: i2, p0_rd_en: %false_1: i1, p0_wr_data: %26: i32, p0_wr_en: %22: i1, bram0_dout: %mem1_bram0_dout: i32) -> (p0_rd_data: i32, p0_done: i1, bram0_addr: i2, bram0_en: i1, bram0_we: i1, bram0_din: i32)
+    %mem0_inst.p0_rd_data, %mem0_inst.p0_done, %mem0_inst.bram0_addr, %mem0_inst.bram0_en, %mem0_inst.bram0_we, %mem0_inst.bram0_din = hw.instance "mem0_inst" @mem0_bram(clk: %clk: !seq.clock, rst: %rst: i1, p0_addr: %29: i2, p0_rd_en: %27: i1, p0_wr_data: %c0_i32: i32, p0_wr_en: %false_1: i1, bram0_dout: %mem0_bram0_dout: i32) -> (p0_rd_data: i32, p0_done: i1, bram0_addr: i2, bram0_en: i1, bram0_we: i1, bram0_din: i32)
+    %0:9 = fsm.hw_instance "top_fsm_inst" @top_fsm(%start, %true_0, %loop0_cond_next_reg, %false_1), clock %clk, reset %rst : (i1, i1, i1, i1) -> (i1, i1, i1, i1, i1, i1, i1, i1, i1)
+    %tx_in_flight = seq.compreg sym @tx_in_flight %3, %clk reset %rst, %false_1 : i1  
+    %1 = comb.xor %0#0, %true_0 : i1
+    %2 = comb.and %tx_in_flight, %1 : i1
+    %3 = comb.or %start, %2 : i1
+    %4 = comb.xor %0#1, %true_0 : i1
+    %5 = comb.and %0#2, %4, %0#5, %21 : i1
+    %early_done_sent = seq.compreg sym @early_done_sent %5, %clk reset %rst, %false_1 : i1  
+    %6 = comb.xor %early_done_sent, %true_0 : i1
+    %7 = comb.and %0#0, %6 : i1
+    %8 = comb.or %7, %5 : i1
+    %9 = comb.or %0#5, %0#4 : i1
+    %loop0_iter_arg_0 = seq.compreg.ce sym @loop0_iter_arg_0 %16, %clk, %9 reset %rst, %c0_i4 : i4  
+    %10 = comb.mux %0#4, %c0_i4, %loop0_iter_arg_0 : i4
+    %11 = comb.add %10, %c1_i4 : i4
+    %12 = arith.trunci %10 : i4 to i3
+    %13 = comb.extract %12 from 0 : (i3) -> i2
+    %14 = comb.add %mem0_inst.p0_rd_data, %c1_i32 : i32
+    %15 = comb.extract %12 from 0 : (i3) -> i2
+    %16 = comb.mux %0#4, %c0_i4, %11 : i4
+    %17 = comb.icmp slt %11, %c4_i4 : i4
+    %18 = comb.add %10, %c2_i4 : i4
+    %19 = comb.icmp slt %18, %c4_i4 : i4
+    %20 = comb.mux %0#4, %17, %19 : i1
+    %loop0_cond_next_reg = seq.compreg.ce sym @loop0_cond_next_reg %20, %clk, %9 reset %rst, %false_1 : i1  
+    %21 = comb.xor %loop0_cond_next_reg, %true_0 : i1
+    %22 = comb.and %0#2, %0#6, %0#8 : i1
+    %23 = comb.and %0#2, %0#6 : i1
+    %24 = comb.mux %23, %15, %c0_i2 : i2
+    %25 = comb.and %0#2, %0#6 : i1
+    %26 = comb.mux %25, %14, %c0_i32 : i32
+    %27 = comb.and %0#2, %0#6, %0#7 : i1
+    %28 = comb.and %0#2, %0#6 : i1
+    %29 = comb.mux %28, %13, %c0_i2 : i2
+    %30 = comb.xor %tx_in_flight, %true_0 : i1
+    hw.output %30, %8, %mem0_inst.bram0_addr, %mem0_inst.bram0_en, %mem0_inst.bram0_we, %mem0_inst.bram0_din, %mem1_inst.bram0_addr, %mem1_inst.bram0_en, %mem1_inst.bram0_we, %mem1_inst.bram0_din : i1, i1, i2, i1, i1, i32, i2, i1, i1, i32
+    %loop0_first_iter = fsm.variable "loop0_first_iter" {initValue = true} : i1
+    fsm.state @IDLE output {
+      fsm.output %false, %false, %false, %false, %false, %false, %false, %false, %false : i1, i1, i1, i1, i1, i1, i1, i1, i1
+    } transitions {
+      fsm.transition @FRAME_0 guard {
+        fsm.return %arg0
+      }
+    }
+    fsm.state @FRAME_0 output {
+      fsm.output %false, %true, %true, %false, %true, %false, %false, %false, %false : i1, i1, i1, i1, i1, i1, i1, i1, i1
+    } transitions {
+      fsm.transition @loop0_FRAME_0_0 guard {
+        fsm.return %arg1
+      } action {
+        fsm.update %loop0_first_iter, %false : i1
+      }
+      %0 = comb.xor %arg1, %true : i1
+      fsm.transition @DONE guard {
+        fsm.return %0
+      }
+    }
+    fsm.state @loop0_FRAME_0_0 output {
+      fsm.output %false, %false, %true, %false, %loop0_first_iter, %false, %true, %true, %false : i1, i1, i1, i1, i1, i1, i1, i1, i1
+    } transitions {
+      fsm.transition @loop0_FRAME_0_1 guard {
+        %0 = comb.xor %arg3, %true : i1
+        fsm.return %0
+      }
+    }
+    fsm.state @loop0_FRAME_0_1 output {
+      fsm.output %false, %false, %true, %false, %loop0_first_iter, %true, %true, %false, %true : i1, i1, i1, i1, i1, i1, i1, i1, i1
+    } transitions {
+      fsm.transition @loop0_FRAME_0_0 guard {
+        %0 = comb.xor %arg3, %true : i1
+        %1 = comb.and %0, %arg2 : i1
+        fsm.return %1
+      }
+      fsm.transition @DONE guard {
+        %0 = comb.xor %arg2, %true : i1
+        %1 = comb.xor %arg3, %true : i1
+        %2 = comb.and %1, %0 : i1
+        fsm.return %2
+      }
+    }
+    fsm.state @DONE output {
+      fsm.output %true, %false, %false, %false, %false, %false, %false, %false, %false : i1, i1, i1, i1, i1, i1, i1, i1, i1
+    } transitions {
+      fsm.transition @IDLE
+    }
+RESULT top amc: RuntimeError: FSM verilog emission failed
+RESULT topk llvm: built
+RESULT topk amc: built
+WALL 2s rc=0

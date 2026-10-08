@@ -1,0 +1,5 @@
+BUILT vpa_amc amc none 0.3s
+cycle time: 74599
+RAN vpa_amc amc: 1 chunks of 24866, cycles/chunk [74599] (16.1s)
+UNIT-MATCH vpu_adapter amc amc-amc none: 24866/24866 defined slots (rows 24866)
+WALL 18s rc=0

@@ -1,0 +1,4 @@
+SCHED regs: latency 160857 | cyclic II [4] | QOR lat 160857 fmax 415.6 area Utilization(lut=1690, logic_lut=1688, srl=2, ff=1174, dsp=3, carry8=46, muxf=0, bram36=0, uram288=0)
+COSIM 1 chunks of 40214: cycles/chunk [160857] (103.3s)
+UNIT-MATCH scalar_agu:lat2 regs rtlgen: 201065/201065 defined slots (rows 40214)
+WALL 105s rc=0

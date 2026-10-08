@@ -1,0 +1,4 @@
+RESULT cond_from_input llvm: OK
+cycle time: 39
+RESULT cond_from_input amc: OK
+WALL 13s rc=0

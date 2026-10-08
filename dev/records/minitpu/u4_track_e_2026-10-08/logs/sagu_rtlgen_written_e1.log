@@ -1,0 +1,6 @@
+WARN: [PREP] Conditional left as an opaque scheduling unit because 'affine.for' cannot be predicated; the enclosing loop cannot pipeline across it (at 'written' u4e_sagu_written_e1_40214.py:42:8)
+WARN: [PREP] Conditional left as an opaque scheduling unit because 'func.call' cannot be predicated; the enclosing loop cannot pipeline across it (at 'written' u4e_sagu_written_e1_40214.py:67:8)
+SCHED written_e1: latency 1206425 | cyclic II [1, 1, 1, 1, 1, 1, 1, 1, 1] | QOR lat None fmax 430.1 area Utilization(lut=1536, logic_lut=1535, srl=1, ff=980, dsp=3, carry8=36, muxf=0, bram36=0, uram288=0)
+COSIM 1 chunks of 40214: cycles/chunk [884422] (512.8s)
+UNIT-MATCH scalar_agu:lat2 written_e1 rtlgen: 201065/201065 defined slots (rows 40214)
+WALL 513s rc=0

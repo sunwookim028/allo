@@ -1,0 +1,5 @@
+loc("-":7:5): error: problem is infeasible
+BUILT mem_loopbuf amc pipeline 0.2s
+cycle time: 157
+UNIT-DIFF  mem loopbuf amc pipeline: read-back 32 rows, same-cycle row 3 got ['0x71f08551', '0xbde4b368', '0xe7671733', '0x84e3a36e'] old ['0x71f08551', '0xbde4b368', '0xe7671733', '0x84e3a36e']; cycles=157
+WALL 14s rc=0

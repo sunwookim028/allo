@@ -14,6 +14,9 @@ forms:
            ``p0_v .. p1_mac``), inner loops expanded, ``scalar_result`` and
            dynamic register selects (``sreg[i]``) as if-chains: the U3
            "RTLGen cell" spelling (generated text)
+  written_e1  ``written`` with E-R1 avoided: ``scalar_result`` takes ``op`` as
+           ``u32`` and narrows it to a local ``u3`` (a narrow unsigned
+           PARAMETER compared with 4 is never equal; ``repro_param_cmp.py``)
   regs_split  ``regs`` with the four-lane ``SREG[N, 4]`` output split into
            four 1-D ports (the lane array's 4 writes per iteration cost II=4)
 """
@@ -178,7 +181,12 @@ def regs_src():
     return "\n".join(L) + "\n"
 
 
-src = WRITTEN if form == "written" else regs_src()
+src = WRITTEN if form in ("written", "written_e1") else regs_src()
+if form == "written_e1":
+    src = src.replace("def written(", "def written_e1(").replace(
+        "def scalar_result(op: u3, base: u32, imm: u24, arg: u32) -> u32:\n    r: u32 = 0\n",
+        "def scalar_result(op32: u32, base: u32, imm: u24, arg: u32) -> u32:\n    op: u3 = op32\n    r: u32 = 0\n")
+    assert "op32" in src
 if form == "regs_split":
     src = src.replace("def regs(", "def regs_split(").replace("SREG: u32[N, 4]", "SREG0: u32[N], SREG1: u32[N], SREG2: u32[N], SREG3: u32[N]")
     for i in range(4):
