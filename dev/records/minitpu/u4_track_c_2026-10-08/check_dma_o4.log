@@ -1,0 +1,15 @@
+RTL dma:o4: 15639 cycles in 13 traces, 317520 defined slots, RTL vs reference on defined: 317520/317520 (0.8s)
+UNIT-MATCH dma:o4 bits simulator 317520/317520 defined (26538 masked: landing empty=26516, power-up=22; allo==rtl on 26511) cycle=order-only (build 2.5s, run 0.3s)
+loc("-":1257:11): error: unreset storage `lnd_ch` (dma_0): the kernel has a non-Wire argument (argument 0); the write runs at every clock edge, which matches the kernel's iterations only when every port is a Wire (README D-14: its write is a clock-edge process with no reset action)
+UNIT-FAIL  dma bits systemc: RuntimeError: Failed to emit HLS code. Check error messages above for details. Common issues: nested functions with multi-dimensional arrays when wrap_io=False.
+loc("-":1257:11): error: unreset storage `lnd_ch` (dma_0): the kernel has a non-Wire argument (argument 0); the write runs at every clock edge, which matches the kernel's iterations only when every port is a Wire (README D-14: its write is a clock-edge process with no reset action)
+UNIT-MATCH dma:o4 bits_reset simulator 317520/317520 defined (26538 masked: landing empty=26516, power-up=22; allo==rtl on 26511) cycle=order-only (build 2.5s, run 0.4s)
+UNIT-MATCH dma:o4 bits_reset systemc 317520/317520 defined (26538 masked: landing empty=26516, power-up=22; allo==rtl on 26511) cycle=per-iteration, time unchecked (build 2.2s, run 7.1s)
+UNIT-MATCH dma:o4 streams simulator 317520/317520 defined (26538 masked: landing empty=26516, power-up=22; allo==rtl on 26511) cycle=order-only (build 3.4s, run 1.8s)
+loc("-":1662:11): error: unreset storage `lnd_ch` (dma_engine_0): the kernel has a non-Wire argument (`x_desc`); the write runs at every clock edge, which matches the kernel's iterations only when every port is a Wire (README D-14: its write is a clock-edge process with no reset action)
+UNIT-FAIL  dma streams systemc: RuntimeError: Failed to emit HLS code. Check error messages above for details. Common issues: nested functions with multi-dimensional arrays when wrap_io=False.
+loc("-":1662:11): error: unreset storage `lnd_ch` (dma_engine_0): the kernel has a non-Wire argument (`x_desc`); the write runs at every clock edge, which matches the kernel's iterations only when every port is a Wire (README D-14: its write is a clock-edge process with no reset action)
+UNIT-MATCH dma:o4 streams_reset simulator 317520/317520 defined (26538 masked: landing empty=26516, power-up=22; allo==rtl on 26511) cycle=order-only (build 3.6s, run 1.7s)
+UNIT-MATCH dma:o4 streams_reset systemc 317520/317520 defined (26538 masked: landing empty=26516, power-up=22; allo==rtl on 26511) cycle=per-iteration, time unchecked (build 2.9s, run 23.1s)
+Command exited with non-zero status 1
+wall 62.51 s

@@ -62,4 +62,52 @@ def stimulus():
     return np.concatenate([edge, np.stack([rb, rr, rs], axis=1)])
 
 
-VARIANTS = {}
+# ---------------------------------------------------------------------------
+# Allo variants (U4 track C, ``dev/records/minitpu/u4_track_c_2026-10-08.rst``).
+# ``make(n)`` returns a region over ``n`` vectors; the runner takes the built
+# module and the ``uint64[n, 3]`` stimulus and returns ``uint32[n]``.
+# ---------------------------------------------------------------------------
+
+import allo.dataflow as df  # noqa: E402
+from allo.ir.types import UInt, uint32  # noqa: E402
+
+ROW_BITS = 14  # dma.sv ROW_BITS == sequencer_pkg::DESC_BEAT_ROWS_W (dma_desc_adapter.LEGALITY)
+
+
+def addr(base: UInt(32), row: UInt(14), stride: UInt(32)) -> UInt(32):
+    """``dma_addr_gen.sv`` as a function (plan C1): the DMA's issue view calls
+    it, as ``dma.sv`` instantiates the module. The product is formed at 46
+    bits (14 + 32) and the sum truncated to 32 on return, as the RTL's
+    32-bit ``assign`` truncates."""
+    p: UInt(46) = row * stride
+    w: UInt(32) = base + p
+    return w
+
+
+def bits(n):
+    """C1: one kernel calling ``addr`` per vector; region ports are ``uint32``
+    (row carried in 32 bits, masked to ``ROW_BITS`` by the narrowing)."""
+
+    @df.region()
+    def top(B: uint32[n], R: uint32[n], S: uint32[n], W: uint32[n]):
+        @df.kernel(mapping=[1], args=[B, R, S, W])
+        def agu(b: uint32[n], r: uint32[n], s: uint32[n], w: uint32[n]):
+            for i in range(n):
+                bb: UInt(32) = b[i]
+                rr: UInt(14) = r[i]
+                ss: UInt(32) = s[i]
+                w[i] = addr(bb, rr, ss)
+
+    return top
+
+
+def run_bits(mod, stim_):
+    b = np.ascontiguousarray(stim_[:, 0]).astype(np.uint32)
+    r = np.ascontiguousarray(stim_[:, 1]).astype(np.uint32)
+    s = np.ascontiguousarray(stim_[:, 2]).astype(np.uint32)
+    w = np.zeros(len(stim_), dtype=np.uint32)
+    mod(b, r, s, w)
+    return w
+
+
+VARIANTS = {"bits": (bits, run_bits)}

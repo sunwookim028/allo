@@ -1,0 +1,13 @@
+RTL u4_dma_vmem:o1: 6405 cycles in 7 traces, 128260 defined slots, RTL vs reference on defined: 128260/128260 (9.7s)
+/work/shared/users/phd/sk3463/scratch/wt-u4c/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+UNIT-MATCH dma_vmem:o1 d12 simulator 128260/128260 defined (12650 masked: landing empty=11048, power-up=22, vmem uninit=1580; allo==rtl on 11033) cycle=order-only (build 6.2s, run 2.2s)
+loc("-":1643:11): error: unreset storage `lnd_ch` (dma_engine_0): the kernel has a non-Wire argument (`x_desc`); the write runs at every clock edge, which matches the kernel's iterations only when every port is a Wire (README D-14: its write is a clock-edge process with no reset action)
+UNIT-FAIL  dma_vmem d12 systemc: RuntimeError: Failed to emit HLS code. Check error messages above for details. Common issues: nested functions with multi-dimensional arrays when wrap_io=False.
+loc("-":1643:11): error: unreset storage `lnd_ch` (dma_engine_0): the kernel has a non-Wire argument (`x_desc`); the write runs at every clock edge, which matches the kernel's iterations only when every port is a Wire (README D-14: its write is a clock-edge process with no reset action)
+UNIT-MATCH dma_vmem:o1 d12_reset simulator 128260/128260 defined (12650 masked: landing empty=11048, power-up=22, vmem uninit=1580; allo==rtl on 11033) cycle=order-only (build 6.1s, run 2.1s)
+/bin/sh: line 1: 1957645 Segmentation fault      (core dumped) ./sim
+UNIT-FAIL  dma_vmem d12_reset systemc: RuntimeError: Simulation failed.
+UNIT-MATCH dma_vmem:o1 d12_reset_r256 simulator 128260/128260 defined (12650 masked: landing empty=11048, power-up=22, vmem uninit=1580; allo==rtl on 11033) cycle=order-only (build 5.6s, run 2.1s)
+UNIT-MATCH dma_vmem:o1 d12_reset_r256 systemc 128260/128260 defined (12650 masked: landing empty=11048, power-up=22, vmem uninit=1580; allo==rtl on 11033) cycle=per-iteration, time unchecked (build 4.1s, run 16.0s)
+Command exited with non-zero status 1
+wall 76.66 s
