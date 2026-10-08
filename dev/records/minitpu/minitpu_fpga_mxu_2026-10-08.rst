@@ -228,4 +228,70 @@ pop->next valid 28 (``mxu.sv`` 0, +28; the pop mask is the lag plus one),
 ``mxu_stream_engine``'s ``ifndef SYNTHESIS`` assertion, so it cannot change
 hardware behaviour), FIFO bits as above.
 
-.. In progress: section 3 (DIM 16, the bitstream) and section 4 (the ISA version) follow in later commits.
+3. DIM 16: the build, the rate, the area
+=========================================
+
+**Allo.** ``mxu_wide_v`` at DIM 16 (258 processes, 769 links, 48 unused
+streams): customize 86 s, 260 ``s.unroll`` 69-85 s, 258 ``s.pipeline``
+67-86 s, emission 22 s -- **244-280 s**, ``kernel.cpp`` 362,861 lines. The
+same with the eleven partitions as ``s.partition`` had not left the first
+partition's use-def walk after 49 min (finding 4); the build uses the tcl
+partitions.
+
+**Vitis HLS.** 3,073 s (pass 1, ``v16v``) and 3,965 s (``v16w``, with the
+depths) on one core, ~11 GB. **Every kernel II 1**: front depth 2, 16 row-0
+PEs depth 7, 240 PEs depth 9, back depth 3. HLS estimate 339,319 FF /
+752,620 LUT (326 %; the estimate runs ~3 x Vivado's here). The original form
+(``mxu_wide.py``, ``v16t``) scheduled the front and all 256 PEs at II 1 in
+under 45 min and then spent **over 2 h 14 min** in the back's scheduling
+(its 256:1 head muxes, section 1) without finishing; it was stopped
+(``logs/vitis/v16t_csynth_stopped.log.gz``).
+
+**Depths.** ``balance_depths.py --stages-from`` the DIM 2 build (process
+kinds: front, back, PE row 0, PE) predicted the DIM 16 depths before any DIM
+16 csynth; pass 2 (``v16w``) used them and pass 1's own schedule gives
+**DEPTHS-MATCH** on all 769 links. Depths 3-249 (``ctl`` 249; the front's
+links to ``PE(r, 0)`` 8 r + 1; ``px[16, c]`` into the back 123 - 8 c),
+5,643 slots, **235,872 FIFO bits**; the back starts at A = 247 cycles.
+
+**Vivado out-of-context synthesis of the DIM 16 core at 5 ns** (``v16w``,
+``ooc_synth.tcl``, 14 min, 6.1 GB, 8 threads):
+
+.. list-table:: the MXU alone, Vivado 2023.2 synthesis, xczu7ev-ffvc1156-2-e
+   :header-rows: 1
+   :widths: 30 14 14 10 10 22
+
+   * - MXU
+     - LUT
+     - FF
+     - DSP
+     - BRAM
+     - timing at 5 ns
+   * - MiniTPU's ``mxu.sv`` (``i_mxu`` in the b3ba0a4d synth-check)
+     - 100,261
+     - 48,386
+     - 512
+     - 0
+     - (the shipped bitstream: WNS +0.054 post-route, whole design)
+   * - Allo/Vitis ``mxu_widev_dim16`` (OOC)
+     - **213,429** (192,180 logic, 21,249 LUTRAM/SRL)
+     - 256,332
+     - 0
+     - 0.5
+     - **WNS +2.332 ns**, 0 failing endpoints
+   * - of which the 256 PEs / back / front
+     - ~174,000 (max 704 per PE) / 5,675 / 662
+     - -- / 18,009 / 1,091
+     - 0
+     - 0
+     -
+
+The rest of MiniTPU synthesizes to **100,961 LUT** (201,222 for the whole
+b3ba0a4d design less its ``i_mxu``; ``logs/vivado/base_b3ba0a4d_*``), so the
+MXU's room on the XCZU7EV is at most **129,439 LUT at 100 %**; the Allo MXU
+needs 213,429, i.e. the design would be **~314 K LUT, 136 % of the part**.
+The ZCU102's XCZU9EG (274,080 LUT; MiniTPU's flow also accepts ``zcu102``)
+would be at ~115 %. The DSP lever (section 1) saves ~17 K LUT at DIM 16 and
+does not change the verdict. **Timing closes; area does not.**
+
+.. In progress: the DIM 16 rate (initializer fix), the board flow, section 4 (the ISA version).
