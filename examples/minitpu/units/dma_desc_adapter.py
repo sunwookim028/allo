@@ -158,7 +158,7 @@ def bits(n, w=0, inst="base"):
     """Plan A1, cycle-locked: the two-state FSM transcribed. ``d_i`` is
     snapshotted as the four fields the outputs read (``d_q`` whole is
     equivalent: nothing else of it is observable); words -> beats is a
-    slice store (``{vmem_address, 2'b00}``, ``{rows, 2'b11}``), the D-20
+    shift (``{vmem_address, 2'b00}``, ``{rows, 2'b11}``), the D-20
     relation ``ROW_BITS == DESC_BEAT_ROWS_W`` is checked at make time."""
     GEOMETRY.legality()
     SL = GEOMETRY.SUBLANE_SEL_W
@@ -192,10 +192,13 @@ def bits(n, w=0, inst="base"):
                     rows_q = 0
                     base_q = 0
                     stride_q = 0
-                vrow: UInt(BW) = 0
-                vrow[SL:BW] = va_q
-                brow: UInt(BW) = (1 << SL) - 1
-                brow[SL:BW] = rows_q
+                # words -> beats by shift, not a slice store: a slice bounded
+                # by closure names widens to UInt(32) with a warning (D-17,
+                # finding C3); the shift is the same circuit
+                vrow: UInt(BW) = va_q
+                vrow = vrow << SL
+                brow: UInt(BW) = rows_q
+                brow = (brow << SL) | ((1 << SL) - 1)
                 done: UInt(1) = 0
                 if issue == 1:
                     done = acc
