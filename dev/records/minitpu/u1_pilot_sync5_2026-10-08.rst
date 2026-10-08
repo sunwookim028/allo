@@ -1,0 +1,277 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+##############################################################################
+u1-pilot sync 5: can ``u1-pilot`` (027a2a93) fast-forward ``main`` (33b7cbf6)?
+##############################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-08.** zhang-21, 64 cores, load 8-11
+   from other sessions (the FPGA agent's Vivado among them), so wall times are
+   upper bounds. Branch: ``origin/u1-pilot`` at
+   ``027a2a937ac60c2b47b7a5b299efbae45e90e957`` (unchanged on ``origin`` from
+   start to end of this run) in a throwaway detached worktree
+   (``scratch/wt-reg5``) with its **own** ``mlir/build`` (Ninja,
+   gcc-toolset-13, ``LLVM_DIR``/``MLIR_DIR`` under
+   ``/work/shared/common/llvm-project-main/build-rhel8``, ``nice ninja -j16``,
+   336 steps, 71 s). Baseline: the main checkout at ``33b7cbf6``, its existing
+   ``mlir/build`` used read-only (never rebuilt; ``reproduce.sh`` not run
+   there; its three pytest output directories and ``examples/tinytpu/.mutants``
+   from this run were deleted afterwards, ``git status`` clean).
+   ``origin/main`` is an ancestor of ``origin/u1-pilot``: the merge is a
+   fast-forward. ``TMPDIR`` on local disk for every run. Scripts:
+   ``u1_pilot_sync5_2026-10-08/scripts/``; raw summaries, verdict lines and
+   the pytest diff: ``u1_pilot_sync5_2026-10-08/results.txt``.
+
+REGRESS_RESULT: READY -- ``u1-pilot`` 027a2a93 may fast-forward ``main``. Emissions byte-identical; every gate and every ``check`` verdict equal to the baseline (and the U4 ``dma``/``seq_issue`` verdicts equal to ``u4_wave1_int``); M-R1 52/52 bits and cycles; ``ip_integration`` 63 passed 1 skipped; mlp_small cosim 1636+1145=2781, 0 mismatches. pytest: no test goes pass -> fail; 17 go fail -> pass (the ``TPU_MAXDIM`` leak fix, ``test_tutorial``'s walk-through among them). One environment hazard, not a regression: the full suite under ``env-zhang21.sh`` aborts in ``tests/ip_integration/test_rtl.py`` (s.3).
+
+What this batch adds over ``main``: PR #48 and its follow-up
+(``allo/backend`` RTLModule, ``validate_rtl --json-only``, the
+``allo/ir/units.py`` stream-wiring check counting IP calls, ``allo/passes.py``
+merge, ``depth=`` on Vitis ``m_axi`` pragmas, ``cosim.py``'s depth
+replacement, ``tests/ip_integration``); the RTL-wrapped MiniTPU core
+(``examples/minitpu/rtl/``); U4 tracks A/B/C and their integration
+(``examples/minitpu/units/*``, ``harness/wb_calendar.py``, ``template/*``,
+``tests/limits/new_*``); the ``TPU_MAXDIM`` leak fix in
+``tests/dataflow/test_stream_ports_tinytpu.py``; README D-16/D-21/D-23/D-24;
+records. 15 files under ``allo/`` and ``mlir/``, 204 in all.
+
+1. Emission hashes
+==================
+
+``customize(tinytpu_isa); schedule(s); str(s.build(target=T))``, sha256 of the
+text (``scripts/gates.sh``). The ``depth=`` change lives in the Vitis
+*project* path (``vitis.py`` / ``cosim.py``), not in the ``vhls`` emission,
+and the ``vhls`` text is unchanged.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Target
+     - Baseline 33b7cbf6
+     - Branch 027a2a93
+     - Bytes
+   * - ``vhls``
+     - ``6bc774bc9d97f0e7…``
+     - identical
+     - 166,563
+   * - ``catapult``
+     - ``ade1ab5dfd20d72a…``
+     - identical
+     - 170,812
+   * - ``systemc``
+     - ``06d365336c307ffc…``
+     - identical
+     - 267,151
+
+2. Gates
+========
+
+Both sides ran concurrently (07:31-07:58), branch-only runs to 08:10. Plain
+``allo`` env, the conda python by path, ``PYTHONPATH`` = the checkout;
+``check`` (``-m`` form on both sides now) and the two SystemC gates under
+``env-zhang21.sh`` with the conda python by path (they need Catapult's
+``MGC_HOME``; the first pass without it failed on both sides with "Catapult
+binary not found" and was rerun, ``scripts/rerun_sc.sh``). Wall times are
+baseline / branch.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Gate
+     - Baseline
+     - Branch
+     - Wall (s)
+   * - ``reproduce.sh --no-cosim``
+     - not run (read-only baseline)
+     - ``REPRODUCED (functional only)``; ISA OK, UNITS OK, ALL EXACT, stress 492/492, ACT 12/12
+     - -- / 157
+   * - ``gen_isa.py --check``
+     - ISA OK (9 consumers)
+     - same
+     - 54 / 53
+   * - ``lift_units.py --check``
+     - UNITS OK
+     - same
+     - 4 / 5
+   * - ``bench_isa.py``
+     - ALL EXACT
+     - same
+     - 13 / 12
+   * - ``stress_isa.py`` (default MAXDIM)
+     - STRESS OK 640/640
+     - same
+     - 229 / 236
+   * - ``TPU_MAXDIM=16 stress_isa.py`` (as ``reproduce.sh``)
+     - STRESS OK 492/492
+     - same
+     - 34 / 32
+   * - ``act_compile.py --gate``
+     - ACT GATE OK 12/12
+     - same
+     - 5 / 5
+   * - ``mutate.py none``
+     - MUTATE OK (control passes)
+     - same
+     - 240 / 241
+   * - ``systemc_csim.py 3``
+     - SYSTEMC CSIM OK
+     - same
+     - 53 / 53
+   * - ``tests/dataflow/test_df_unit.py``
+     - Passed
+     - same
+     - 5 / 5
+   * - ``pytest tests/dataflow/test_region_stateful.py``
+     - 16 passed
+     - same
+     - 10 / 9
+   * - ``examples/eva/cosim_eva_systemc.py``
+     - PASS (bit-exact)
+     - same
+     - 16 / 16
+   * - ``examples/minitpu/run.py --quick``
+     - PASS
+     - same
+     - 152 / 156
+   * - ``template/run_u3e.py``
+     - U3E-GATE OK, 27 U3E-OK
+     - same
+     - 57 / 55
+   * - ``check bf16_add``
+     - native DIFF 249907/251936, bits MATCH
+     - same
+     - 17 / 16
+   * - ``check vpu_regfile``
+     - 7 MATCH, 6 DIFF, 2 FAIL (D-11 shared)
+     - same
+     - 385 / 386
+   * - ``check sfu``
+     - MATCH
+     - same
+     - 20 / 19
+   * - ``check mxu_pe``
+     - MATCH
+     - same
+     - 62 / 61
+   * - ``check dma --inst core/o1/o4/bw`` (simulator)
+     - n/a: main's older ``dma.py`` has no ``WIDTH`` (AttributeError)
+     - 4 x 4 UNIT-MATCH, equal to ``u4_wave1_int`` logs
+     - -- / 27, 26, 21, 22
+   * - ``check seq_issue`` (simulator)
+     - n/a (unit not on main)
+     - UNIT-MATCH 1042595/1042595, equal to ``u4_wave1_int``
+     - -- / 22
+   * - ``pytest tests/ip_integration tests/utils/test_backend_utils.py -k "not csynth and not lib_gemm"``
+     - --
+     - 63 passed, 1 skipped (Vivado HLS not found), with ``VERILATOR`` set
+     - -- / 172
+   * - ``examples/minitpu/rtl/reproduce.sh --all``
+     - --
+     - 52/52 drains bit-identical, cycles equal to the TB on 52/52 (build 67 s)
+     - -- / 154
+   * - ``make mlp-cosim MODEL=mlp_small`` (Vitis cosim)
+     - not run (optional)
+     - l0 1636 + l1 1145 = 2781 cycles, mismatches 0/4096 each
+     - -- / 220
+
+``check`` verdict lines (timings and paths stripped) are line-for-line equal
+between the sides for the four U1/U2 units and equal in counts to sync 4.
+The U4 lines were compared, sorted, against the simulator lines of
+``u4_wave1_int_2026-10-08/logs`` (``ac/C_check_dma_*.log``,
+``check_seq_issue.log``): identical. ``harness/check.py`` as a script was not
+rerun; ``wb_calendar.py`` (fork #51) removes sync 4's shadowing cause.
+
+The first ``ip_integration`` run, in the plain env without ``VERILATOR``,
+gave 53 passed, 11 skipped: the 10 extra skips are "Verilator is not
+installed; set VERILATOR". With Verilator on ``PATH``, ``VERILATOR`` set and
+gcc-toolset-13 it is the expected 63/1.
+
+3. pytest
+=========
+
+``pytest -p no:cacheprovider -q tests/dataflow --ignore=tests/dataflow/aie
+tests/act tests/test_*.py tests/utils/test_backend_utils.py tests/ip_integration
+--junitxml`` under ``env-zhang21.sh`` (sync 4's selection and env, plus the two
+paths this batch touches; ``scripts/pytest.sh``), serial, both sides
+concurrently. ``tests/limits/new_*`` are scripts with no ``test_`` functions,
+so they do not appear in any pytest run (they are not collected on either side).
+
+.. list-table::
+   :header-rows: 1
+
+   * - Side
+     - Passed
+     - Failed
+     - Skipped
+     - Wall
+   * - Baseline 33b7cbf6
+     - 1025
+     - 84
+     - 11 + 1 xfail
+     - 1939 s
+   * - Branch 027a2a93, run 1
+     - aborted at 93 % (exit 134), no junit
+     - --
+     - --
+     - 1996 s
+   * - Branch 027a2a93, run 2 (``test_rtl.py``, ``test_rtl_adapter.py`` ignored)
+     - 1052
+     - 67
+     - 12 + 1 xfail
+     - 1906 s
+
+Per-test diff, baseline vs branch run 2 (``jdiff.py``): **no test goes pass ->
+fail.** 17 go fail -> pass: ``tests/act/test_tinytpu.py``'s 16
+``test_every_encodable_mapping_computes_the_spec`` cases and
+``test_tutorial::test_the_walk_through_compiles_and_matches_pytorch``. All 17
+fail on the baseline with ``cannot reshape array of size 4096`` -- the
+``TPU_MAXDIM=16`` leak from ``test_stream_ports_tinytpu.py`` that sync 4
+diagnosed -- and pass once ``1bbb152e`` keeps it local. So the walk-through
+**does** pass in the full suite on the branch. New on the branch: 10 pass
+(``ip_integration/test_df`` 1, ``test_stream_ip`` 3, ``test_stream_ip_sim`` 5,
+``test_backend_utils::test_postprocess_axi_depths``) and
+``test_stream_ip_csynth`` skips (``vitis_hls not available`` in that
+process). The remaining 67 failures are the same set on both sides (Vitis
+builds, ``test_verify``, ``test_systolic_array``, ..., and
+``ip_integration/test_external``'s five pybind/nanobind tests and
+``test_lib_gemm``).
+
+**Run 1's abort: an environment hazard of the full-suite env, not a branch
+regression.** ``Fatal Python error: Aborted`` in
+``tests/ip_integration/test_rtl.py::test_stream_backpressure_and_repeated_calls``
+(inside ``allo/backend/simulator.py`` ``__init__``). It reproduces with just
+``tests/utils/test_backend_utils.py tests/ip_integration`` under
+``env-zhang21.sh``. Isolated: in that env, after ``test_backend_utils``
+the process has the system ``/lib64/libstdc++.so.6`` loaded. The pybind modules
+built by Catapult's g++ 10.3 then fail to import (``GLIBCXX_3.4.26 not found``,
+the same five failures as on the baseline), and a later in-process RTL model
+built with a newer g++ aborts the interpreter. Each file alone passes in that env,
+and the whole directory under the plain env with ``VERILATOR`` set does not abort
+(58 passed, 6 failed: the same pybind/``lib_gemm`` failures, now
+``GLIBCXX_3.4.32``). The Verilator tests are covered by the dedicated 63/1 run
+(s.2). Consequence for the next sync: run ``tests/ip_integration`` as its own
+pytest invocation in the plain env with ``VERILATOR`` set, not inside the
+``env-zhang21.sh`` full suite.
+
+4. ``mvoutrelu.patch``
+======================
+
+In the branch worktree: ``git apply --check`` OK; ``git apply`` touches 14
+files (+230/-21); ``git apply -R`` restores all 14 byte-for-byte (sha256 of
+each before and after). The 3 entries ``git status --porcelain`` showed were the
+pytest run's output directories (``test_stateful_*_systemc``,
+``test_stream_nb_scalar_2``), not patch residue. Patch sha256
+``a313ddfd5d46750e…`` (unchanged since sync 4).
+
+5. Notes
+========
+
+* Brief vs method: the brief said not to source ``env-zhang21.sh`` for
+  python runs. The gates ran in the plain env, but ``systemc_csim``, eva,
+  ``check`` and the full pytest need Catapult's ``MGC_HOME``/SystemC, so those
+  ran under it with the conda python **by path** (``$ALLO_PYTHON``), which is
+  what keeps Catapult's python from shadowing the env's. This is sync 4's form.
+* Load: ``ninja -j16`` once (branch build), pytest serial, one Verilator
+  build at a time (``rtl/reproduce.sh``, then the ``ip_integration`` runs).
