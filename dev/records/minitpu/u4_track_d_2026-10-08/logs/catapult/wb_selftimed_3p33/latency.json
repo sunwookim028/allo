@@ -1,0 +1,92 @@
+{
+ "clock_period_ns": 3.33,
+ "definition": "latency: rising edges from the input-accepting edge to the edge after which the output is visible, no stall; ii: cycles between iterations of the I/O loop",
+ "solution": "/work/shared/users/phd/sk3463/scratch/u4d/wb_selftimed_3p33.prj/build/Catapult/top.v1",
+ "tool": "catapult",
+ "units": {
+  "cmd_0": {
+   "ii": 2,
+   "io": {
+    "v0.Pop()": 0,
+    "v1.Pop()": 0,
+    "v2.Pop()": 0,
+    "v3.Pop()": 0,
+    "v4.Pop()": 0,
+    "v5.Pop()": 0,
+    "v6.Pop()": 0,
+    "v7.Push()": 1,
+    "v8.Push()": 1,
+    "v9.Push()": 1
+   },
+   "iterations": 24218,
+   "latency": 1,
+   "loop": "l_S_j_1_j",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/top/cmd_0/run",
+   "reason": "I/O in several loops ['l_S_j_1_j', 'l_S_t_0_t']",
+   "status": "unreliable"
+  },
+  "munit_0": {
+   "ii": 1,
+   "io": {
+    "v134.Pop()": 0,
+    "v135.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/top/munit_0/run",
+   "status": "scheduled"
+  },
+  "vunit_0": {
+   "ii": 1,
+   "io": {
+    "v85.Pop()": 0,
+    "v86.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/top/vunit_0/run",
+   "status": "scheduled"
+  },
+  "wbst_0": {
+   "ii": 1,
+   "io": {
+    "v161.Push()": 1,
+    "v162.Push()": 1,
+    "v163.Push()": 1,
+    "v164.Push()": 1,
+    "v165.Pop()": 0,
+    "v166.Pop()": 0,
+    "v167.Pop()": 0
+   },
+   "iterations": 24218,
+   "latency": 1,
+   "loop": "l_S_c_0_c3",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/top/wbst_0/run",
+   "status": "scheduled"
+  },
+  "xunit_0": {
+   "ii": 1,
+   "io": {
+    "v119.Pop()": 0,
+    "v120.Push()": 1
+   },
+   "iterations": null,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/top/xunit_0/run",
+   "status": "scheduled"
+  }
+ }
+}

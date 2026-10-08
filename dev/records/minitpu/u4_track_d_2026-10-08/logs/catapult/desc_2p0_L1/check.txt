@@ -1,0 +1,6 @@
+RTL u4_dma_desc_adapter:base: 20056 cycles in 3 traces, 180495 defined slots, RTL vs reference on defined: 180495/180495 (0.7s)
+VERILATOR built /work/shared/users/phd/sk3463/scratch/u4d/hcache/cat-top-6c354cce464158df/Vtop in 7s
+UNIT-MATCH dma_desc_adapter:base form:desc_packed catapult-rtl[desc_2p0_L1] 180495/180495 defined (9 masked: before reset=9; catapult==rtl on 3) cycle=per-cycle: 1.0000 cyc/row (20058 cycles in all), stall cycles 0, row->token offset [2]; CYCLE-FOR-CYCLE yes (run 7.7s)
+    L (accept edge -> token edge) over every row-aligned output: {1: 20056}; first row accepted at cycle 1; rows at interval 1: 20055/20055
+    L {1: 20056}: v106
+    LATENCY-MATCH adapter_0: reported 1 ii=1 (scheduled), measured 1 at 1 cyc/vector; unit declares 1; pinned 1

@@ -1,0 +1,46 @@
+{
+ "clock_period_ns": 3.33,
+ "definition": "latency: rising edges from the input-accepting edge to the edge after which the output is visible, no stall; ii: cycles between iterations of the I/O loop",
+ "solution": "/work/shared/users/phd/sk3463/scratch/u4d/loop_3p33_L1.prj/build/Catapult/top.v1",
+ "tool": "catapult",
+ "units": {
+  "loop_0": {
+   "declared": 1,
+   "ii": 1,
+   "io": {
+    "v0.Pop()": 0,
+    "v1.Pop()": 0,
+    "v10.Pop()": 0,
+    "v11.Push()": 1,
+    "v12.Push()": 1,
+    "v13.Push()": 1,
+    "v14.Push()": 1,
+    "v15.Push()": 1,
+    "v16.Push()": 1,
+    "v17.Push()": 1,
+    "v18.Push()": 1,
+    "v19.Push()": 1,
+    "v2.Pop()": 0,
+    "v20.Push()": 1,
+    "v21.Push()": 1,
+    "v22.Push()": 1,
+    "v23.Push()": 1,
+    "v24.Push()": 1,
+    "v3.Pop()": 0,
+    "v4.Pop()": 0,
+    "v5.Pop()": 0,
+    "v6.Pop()": 0,
+    "v7.Pop()": 0,
+    "v8.Pop()": 0,
+    "v9.Pop()": 0
+   },
+   "iterations": 37729,
+   "latency": 1,
+   "loop": "l_S_t_0_t",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/top/loop_0/run",
+   "status": "scheduled"
+  }
+ }
+}

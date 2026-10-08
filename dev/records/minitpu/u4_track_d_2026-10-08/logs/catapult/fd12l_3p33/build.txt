@@ -1,0 +1,9 @@
+[latency] fq_landed_0: latency=1 ii=1 scheduled comb ports ['v49']
+[latency] iram_mem_0: latency=1 ii=1 scheduled unreset storage ['__stateful_iram_mem_0_mem_1']
+[latency] loader_0: latency=1 ii=1 scheduled comb ports ['v28', 'v29', 'v30']
+[latency] sink_0: latency=None ii=1 unreliable (no Pop or no Push in the I/O loop)
+[latency] src_0: latency=None ii=1 unreliable (no Pop or no Push in the I/O loop)
+BUILD fetch form:fetch_d12_packed inst=iram n=3804 unroll=[] pipeline=['src_0:t', 'loader_0:_', 'fq_landed_0:_', 'sink_0:t', 'iram_mem_0:_'] partition=[] tcl=[] {'clock_period': 3.33}: ok 75s
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:20.36
+	Maximum resident set size (kbytes): 885316
+RUN_EXIT 0

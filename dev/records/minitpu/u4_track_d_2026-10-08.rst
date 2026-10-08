@@ -1,0 +1,884 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+##############################################################################
+U4 track D: Catapult RTL and Design Compiler for the landed U4 variants
+##############################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-08.** zhang-21, branch
+   ``u4-catapult`` (worktree ``scratch/wt-u4d``) from ``origin/u1-pilot`` at
+   ``c7abcce4``, this worktree's own bindings (``mlir/build``: Ninja,
+   LLVM/MLIR ``/work/shared/common/llvm-project-main/build-rhel8``,
+   gcc-toolset-13 13.3.1, 336 steps). MiniTPU at ``b3ba0a4d``, read only.
+   Catapult Ultra Synthesis 2024.2/1130128, library ``nangate-45nm_beh``,
+   clocks 3.33 and 2.0 ns; Verilator 5.052 (conda-forge); Design Compiler
+   W-2024.09 with the U1/U3 flow (``scripts/dc_u3c.tcl``, byte-identical to
+   U3 track C's: FreePDK45 ``stdcells.db`` md5
+   ``f5560259ca91a4b67336b715b729f94d``, the same ``view-standard`` ADK).
+   Plan: ``u4_plan_2026-10-08.rst`` section 5, track D; oracles: Phase 0
+   (``u4_phase0_2026-10-08.rst``); the variants: tracks A, B, C
+   (``u4_track_{a,b,c}_2026-10-08.rst``). The owner approved track D on
+   2026-10-08; calls below that the plan did not settle are **provisional**
+   (D-9). **Nothing under ``allo/`` or ``mlir/`` changed**; every gap is a
+   finding with its smallest proposal (section 6). Core-fixes-4's C2 fix is
+   not on ``u1-pilot`` (``origin/u1-pilot`` = ``c7abcce4``), so ``dma``
+   ``bits``/``streams`` stay refused (C2, re-confirmed at emit) and the
+   ``*_reset`` deviations were built.
+
+Every Catapult job ran alone (``flock``), under ``ulimit -v 32000000`` and a
+90-minute ``timeout``, with ``/usr/bin/time -v`` recording wall time and peak
+RSS (``scripts/u4d_run.sh``); one DC job and one Verilator build at a time.
+The longest Catapult run took 3 min 10 s and the largest peak was 977 MB, except
+one run that was stopped by hand (section 5.4).
+
+Reproduce (``source examples/minitpu/harness/env-zhang21.sh``; worktree
+root; ``R=dev/records/minitpu/u4_track_d_2026-10-08``; scratch
+``S=scratch/u4d``). One build and its check, for example::
+
+   $R/scripts/u4d_run.sh issue_3p33_L1 seq_issue locked --clock 3.33 --pipeline-all --unroll-inner --latency issue_0=1
+   $ALLO_PYTHON $R/scripts/u4d_check.py seq_issue locked $S/issue_3p33_L1.prj --declared 1
+   $R/scripts/u4d_run.sh vpucmd_d2_3p33 vpu_cmd streams --clock 3.33 --pipeline-all --unroll-inner
+   $ALLO_PYTHON $R/scripts/u4d_check.py vpu_cmd streams $S/vpucmd_d2_3p33.prj --token-outs 16 17 18
+   $ALLO_PYTHON $R/scripts/d23_rtl.py $S/vpucmd_d2_3p33.prj
+   $R/scripts/u4d_run.sh loop_3p33_L1 loop_ctrl form:loop_packed --clock 3.33 --pipeline-all --unroll-nested --latency loop_0=1
+   U4D_BODY=amended $R/scripts/u4d_run.sh fd12a_3p33 fetch form:fetch_d12_packed --inst iram --clock 3.33 --pipeline-all --unroll-nested
+   $ALLO_PYTHON $R/scripts/u4d_check.py fetch form:fetch_d12_packed $S/fd12a_3p33.prj --inst iram --shift 4
+   $R/scripts/u4d_dc_batch.sh $R/scripts/dc_minitpu.txt      # and dc_catapult{1..6}.txt
+   python3 $R/scripts/u4d_dc_summary.py $S/dc > dc.tsv && python3 $R/scripts/u4d_dc_table.py dc.tsv
+   $R/scripts/u4d_bookings.sh
+
+``scripts/builds.txt`` lists every build; each build's exact flags are its
+``BUILD`` line in ``logs/catapult/<build>/build.txt`` (with wall time and
+peak RSS); ``check.txt`` is its per-cycle verdict; ``latency.json``,
+``cycle.rpt.gz``, ``rtl.rpt.gz``, ``run.tcl.gz`` are Catapult's;
+``logs/catapult_summary.tsv`` one row per build; ``logs/dc/`` the DC
+reports and ``logs/dc_summary.tsv``; ``logs/bookings.txt``
+``check_booking``'s lines; ``SHA256SUMS.txt`` every emitted ``kernel.cpp``
+and ``concat_rtl.v`` and the MiniTPU sources used; ``logs/dc_mapped_sha256.txt``
+every DC netlist; ``logs/dc/sequencer_iram_dc.sv`` the IRAM stand-in.
+
+.. contents::
+   :local:
+   :depth: 1
+
+1. Method
+=========
+
+**The check is ``check.py``'s, with the Catapult RTL as the backend**
+(``scripts/u4d_check.py``). ``check.py`` has no Catapult backend; U3 track C
+wrote a comparator per port order. Here the unit's own runner
+(``VARIANTS[v][1]``, or a form's ``run``) is called with ``CatapultRtl``
+standing in for the built module: called with the region's arrays in
+declaration order, it drives ``concat_sim_rtl.v`` in Verilator -- every input
+port offers row ``t`` until accepted, every output always ready -- and writes
+each output port's tokens back into the caller's arrays. The trace set
+(``check._trace_all``), the RTL oracle run, ``u.REF``'s masks and the
+comparison over every defined slot are ``check.check_trace``'s, unchanged;
+only the backend differs. A ``comb`` unit (``dma_addr_gen``) takes
+``check.main``'s stimulus path.
+
+**``cycle=per-cycle``.** Every accepted row and every output token is
+stamped with its clock cycle. A verdict line gives the rate (row accepts per
+cycle), the stall cycles (rows not accepted one cycle after the previous), the
+measured ``L`` per output (token edge minus its row's accept edge, ``rtl.py``'s
+count), and the **row -> token offset**: output token ``t`` leaves at cycle
+``t + c``. **CYCLE-FOR-CYCLE yes** = one ``c`` over the whole trace and 0
+stalls: with the values equal to the oracle's row ``t``, the Catapult RTL is
+MiniTPU's timing shifted by ``c`` edges (U3's "cycle-equal", generalised to a
+composite whose ``c`` is not 1 + the first accept). The manifest is held to
+the measurement (``latency.verdict`` for one kernel, ``latency.composite``
+for several).
+
+**Schedule.** Every kernel's iteration loop pipelined at II=1
+(``--pipeline-all``); every nested constant-trip loop marked fully unrolled
+(``--unroll-nested``, D-2 below); ``latency=1`` pinned on every one-kernel
+unit (the RTL's register edges are rows of data, so the Pop->Push edge
+completes them: U3 track C section 2); composites free.
+
+**Forms.** Only ``seq_issue``, ``vpu_cmd``, ``vpu_wb`` and ``dma_addr_gen``
+reached a per-cycle Connections boundary as landed. Every other unit has a
+``[n, k]`` lane array (P-8) or a conditional port read, which the emitter
+makes RAM pins (U3 track C's C1 and C2, again). ``forms/`` holds one
+track-D form per unit, changing only the boundary: one ``UInt(32 k)`` port
+per row, every port read once and unconditionally at the top of the
+iteration; the body's logic is the landed text (``dma`` and the DMA
+composites are generated from it, ``scripts/gen_dma_bits_form.py``). The
+runner is the unit's own: ``CatapultRtl`` packs a ``[n, k]`` lane array into
+the one wide port (lane 0 the LSBs) and unpacks outputs.
+
+**DC.** Each Catapult ``concat_rtl.v`` through ``dc_u3c.tcl`` at the build's
+clock; MiniTPU's own module (its ``u4_*`` wrapper, which has no logic, or the
+module itself) through the same flow at both clocks (``dc_minitpu.txt``;
+comb modules on a virtual clock). The sequencer is synthesised with
+``sequencer_iram`` cut to 2 rows (``scripts/gen_iram_dc.py``: FreePDK45 has
+no memory macro, asic_memories s.1.1). Registers are counted in the mapped
+netlist (``ungroup -start_level 2`` keeps a level of hierarchy that the top's
+reference report hides). Fmax = 1 / (period - worst slack); DC stops
+optimising at slack 0, so 300/500 MHz rows are "met", not a limit.
+
+2. Results per unit
+===================
+
+``match`` = every defined slot of the Phase 0 trace set equal per row;
+offset/stall/L as section 1; manifest = ``latency.json`` (latency / II /
+status), checked against the measured L and rate. Counts are defined slots
+(masked: as the csim verdicts of the track records).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 9 30 22 17
+
+   * - unit:variant (form)
+     - clock
+     - values vs Phase 0 oracle, per cycle
+     - timing on the RTL
+     - manifest (all scheduled unless said)
+   * - ``seq_issue:locked`` (I1+A1)
+     - 3.33, 2.0
+     - **match** 1,042,595/1,042,595 (15 program traces, 52,236 cycles)
+     - offset 2, 0 stalls, L 1 on all 19 outputs: **cycle for cycle**
+     - 1 / 1 = measured
+   * - ``vpu_cmd:streams`` (D-23, depth 2)
+     - 3.33, 2.0
+     - **match** 888,217/888,217 (154,378 masked by D-23's gate)
+     - issue kernel offset 2, 0 stalls; 5,447/5,447 issues at the RTL's cycle (section 3)
+     - issue_0 1/2 unreliable (the harness pad loop); receivers 1/1
+   * - ``vpu_cmd:streams_d4``
+     - 3.33
+     - **match** 888,217/888,217
+     - as depth 2
+     - as depth 2
+   * - ``vpu_cmd:streams_d1``
+     - 3.33
+     - **match** 888,217/888,217 (values)
+     - **808 stall cycles**; 2/5,447 issues on time, up to 808 late (F-B3)
+     - as depth 2
+   * - ``vpu_wb:locked`` (W1)
+     - 3.33, 2.0
+     - **match** 121,075/121,075
+     - offset 2, 0 stalls, L 1: **cycle for cycle**
+     - 1 / 1 = measured (after D-2's unroll; unreliable before, section 5)
+   * - ``vpu_wb:units`` (W1 owns ``vreg.w``, compose)
+     - 3.33, 2.0
+     - **match** 121,075/121,075
+     - offset 4, 0 stalls, L 3 (two kernels + one FIFO hop): **cycle for cycle**
+     - sources 1/1, wb 1/1; composite: L 3 = 1 + 1 + the hop
+   * - ``vpu_wb:selftimed`` (D-24 probe)
+     - 3.33
+     - **no verdict**: the RTL stalls (section 4)
+     - after 547 rows / 33 claims, cycle 20,548
+     - cmd 1/2 unreliable; units and merge 1/1
+   * - ``fetch:fq`` F1 (``fetch_packed``)
+     - 3.33, 2.0
+     - **match** 112,864/112,864
+     - offset 2, 0 stalls, L 1: **cycle for cycle**
+     - 1 / 1 = measured
+   * - ``fetch:iram`` F1, IRAM 4,096 x 128 body array
+     - 3.33
+     - **refused**: SCHD-30 (pinned and free)
+     - --
+     - IRAM -> ``ccs_ram_sync_1R1W`` (H3)
+   * - ``fetch:iram`` F1, IRAM 256 rows as registers
+     - 3.33
+     - **match** 25,026/25,026
+     - offset 2, 0 stalls, L 1: **cycle for cycle**
+     - 1 / 1 = measured; ``REGISTER_THRESHOLD 4096``
+   * - ``fetch:iram`` ``f1_d12`` amended body (T-2)
+     - 3.33
+     - 24,971/25,002 at shift 4: the 31 differences are same-cycle read/write collisions (D-6)
+     - Wire-linked composite: sink token ``t`` = RTL row ``t - 4``
+     - server/owners 1/1; src/sink unreliable (no Pop+Push pair)
+   * - ``fetch:iram`` ``f1_d12`` landed body (T-2)
+     - 3.33
+     - 22,992/25,002 at shift 4: 2,010 ``bundle_data`` slots one register late
+     - as above
+     - as above
+   * - ``loop_ctrl`` L1 (``loop_packed``)
+     - 3.33, 2.0
+     - **match** 527,446/527,446
+     - offset 2 (3 at 2.0 ns: first accept one cycle later), 0 stalls, L 1: **cycle for cycle**
+     - 1 / 1 = measured
+   * - ``seq_decoder`` C1 (``dec_packed``)
+     - 3.33, 2.0
+     - **match** 25,458/25,458
+     - offset 2, 0 stalls, L 1
+     - 1 / 1 = measured
+   * - ``agu_resolve`` C1 (``agu_packed``)
+     - 3.33, 2.0
+     - **match** 38,432/38,432
+     - offset 2, 0 stalls, L 1
+     - 1 / 1 = measured
+   * - ``vpu_adapter:slots`` C1 (``vad_packed``)
+     - 3.33, 2.0
+     - **match** 24,866/24,866
+     - offset 2, 0 stalls, L 1
+     - 1 / 1 = measured
+   * - ``scalar_agu`` S1 at ``S_LAT`` 1 / 2 / 3 (``sagu_packed``)
+     - 3.33 (2: also 2.0)
+     - **match** 200,885 / 201,065 / 200,755
+     - offset 2, 0 stalls, I/O L 1; write -> visible = ``S_LAT`` rows (H2)
+     - 1 / 1 = measured; booking ``S_LAT`` not a manifest number (D-7)
+   * - ``dma_addr_gen:bits`` and ``:c1``
+     - 3.33 (bits also 2.0)
+     - **match** 200,700/200,700 vectors
+     - 1.000 cyc/vector, L 1 (MiniTPU's 0: a comb module; the pin's register)
+     - 1 / 1 = measured
+   * - ``dma_desc_adapter:bits`` A1 (``desc_packed``)
+     - 3.33, 2.0
+     - **match** 180,495/180,495
+     - offset 2, 0 stalls, L 1
+     - 1 / 1 = measured
+   * - ``dma:bits_reset`` D1, core / o1 / o4 / bw (``dma_bits_packed``, landing FIFO partitioned)
+     - 3.33
+     - **match** 805,652 / 764,284 / 317,520 / 394,464
+     - offset 2, 0 stalls, L 1: **cycle for cycle**, all four
+     - 1 / 1 = measured
+   * - same, core
+     - 2.0
+     - **refused**: SCHD-30, a one-cycle recurrence through the next-state logic does not fit 2.0 ns
+     - --
+     - --
+   * - ``dma:bits_reset`` landing FIFO unpartitioned
+     - 3.33, 2.0
+     - **refused**: SCHD-30 on ``lnd_data`` -> ``ccs_ram_sync_1R1W``
+     - --
+     - --
+   * - ``dma:streams_reset`` D1 over Streams (``dma_packed``, partitioned)
+     - 3.33
+     - **match** 805,652/805,652 per row
+     - **1.333 cyc/row**, 13,238 stalls; L 5-6: **not cycle for cycle** (section 5.5)
+     - every kernel 1/1 (rate MISMATCH: 1.333 measured)
+   * - ``dma:bits``, ``dma:streams`` (``reset=False`` payload, P-7)
+     - --
+     - **refused at emit** (C2, verbatim in ``u4_track_c``)
+     - --
+     - --
+   * - ``dma_vmem:d12_reset_r256`` D2 (``dma_packed``)
+     - 3.33
+     - **refused**: SCHD-30 in ``vmem_mem`` (H11)
+     - --
+     - --
+
+``check_booking`` (``logs/bookings.txt``): **BOOKING-MATCH** on all 22 pinned
+manifests at their clock (latency 1); the D-20 booking ``S_LAT`` 2 and 3 is
+**BOOKING-MISMATCH** against the manifest's 1 -- by construction, not by
+fault: the manifest's latency is the I/O edge, ``S_LAT`` is a
+write-to-visible latency the body carries as rows (D-7).
+
+3. D-23 on Catapult RTL: confirmed at depth >= 2
+================================================
+
+README D-23's pass check -- Phase 0's sequencer programs issuing cycle for
+cycle as the RTL does -- on the Catapult RTL of ``vpu_cmd`` (the issue kernel
++ three command Streams + three receivers), Verilator, every output always
+ready (``scripts/d23_rtl.py`` on ``u4d_check``'s stamps; ``logs/catapult/
+vpucmd_*/d23.txt``):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 14 18 26 26
+
+   * - depth, clock
+     - stall cycles
+     - issue rows at interval 1
+     - issues at the RTL's cycle (+2)
+     - command token: row accept -> receiver output
+   * - 2, 3.33 ns
+     - **0**
+     - 52,235 / 52,235
+     - **5,447 / 5,447**
+     - 3 cycles, every V (753), X (908), M (9) command
+   * - 2, 2.0 ns
+     - **0**
+     - 52,235 / 52,235
+     - **5,447 / 5,447**
+     - 3 (all)
+   * - 4, 3.33 ns
+     - **0**
+     - 52,235 / 52,235
+     - **5,447 / 5,447**
+     - 3 (all)
+   * - 1, 3.33 ns
+     - **808**
+     - 51,427 / 52,235
+     - 2 / 5,447 (up to 808 late)
+     - 3, 4 or 5
+
+**D-23 holds on Catapult RTL at depth >= 2**, at both clocks: no deadlock, no
+issue-rate loss, every command delivered (888,217/888,217 values), every
+issue in the RTL's cycle. Depth 1 is a legality failure on the RTL as in csim,
+larger (808 stall cycles against csim's 488): F-B3's ">= 2" holds for
+Catapult too. The non-blocking fallback was not needed. The three Streams
+cost one cycle of latency to the receivers' outputs (3 = the issue kernel's 1
++ the FIFO hop + the receiver's 1), which the VPU side would book (D-24).
+
+4. T-2 on Catapult RTL, and the D-12 amendment
+==============================================
+
+README D-12's 2026-10-08 amendment: "a port's latency is counted in the
+owner's own iterations on every link kind" (deliver at ``t + L``). T-2: on
+Stream links a ``registers`` port of latency ``L`` delivers at ``t + L - 1``,
+so ``fetch_d12``'s queue body keeps the RTL's read register itself.
+
+**What had to change to build ``f1_d12`` for Catapult at all.** On the
+SystemC target the server's pins are ``comb`` (address, data, enable) and the
+read data a registered ``Wire``. The landed composition (Stream channels from
+``src`` to the owners) is **refused at emit** by D-13's rules, verbatim:
+``comb port `iram_host_a` (loader_0): its value reads a stream or channel; a
+combinational output may read only Wire inputs and storage`` and ``comb port
+`iram_fetch_a` (fq_0): its value reads next_addr after a store to it in the
+same iteration``. ``forms/fetch_d12_packed.py`` therefore (a) links ``src`` ->
+owners -> ``sink`` by ``Wire`` channels, (b) writes the queue body "every
+state read first, then stores" (the address as a select of the old state;
+the shift as next-state temporaries), and (c) cuts the IRAM to 256 rows
+(section 5.4). Two bodies, otherwise identical: **landed** keeps
+``bram = rd_reg; rd_reg = mem[a]``; **amended** reads ``bram = mem[a]`` and
+counts the port's ``L = 1`` as the memory's.
+
+**Measured** (3.33 ns, Verilator; ``logs/catapult/fd12{a,l}_3p33/``). A
+Wire-linked composite has no token alignment: the sink pushes a token every
+cycle from reset, so its token ``t`` is held against RTL row ``t - k``. At
+``k = 4`` (two Wire hops + the kernels' start skew) every control output of
+both bodies matches; ``k = 0..3, 5, 6`` differ on the control outputs too:
+
+* **amended**: 24,971/25,002 defined slots; the 31 that differ are all
+  ``bundle_data``, all in the first cycles after a reset of programs 1-3,
+  and are exactly the slots where a *write-first* IRAM would differ from the
+  RTL's old-word read (31/31 positions and 31/31 values, checked against
+  ``ref_ctrl_front`` with the write applied before the read) -- a separate
+  finding, D-6;
+* **landed**: 22,992/25,002; 2,010 ``bundle_data`` slots in all four
+  programs, each the word one fetch address behind: one register late.
+
+**T-2 confirmed, and the amendment's rule is what Catapult's lowering
+already does**: on Wire links the IRAM's ``L = 1`` read issued in owner
+iteration ``t`` is the value of iteration ``t + 1`` (``t + L``); a body
+written for the Stream links (``t + L - 1``) counts the register twice. The
+amendment makes the Stream lowering the one to change (deliver at ``t + L``),
+so the amended body is the one body for both link kinds; until then the
+simulator/csim and Catapult need different bodies, and nothing reports it.
+Caveat: the composite that confirms it is not the one tracks A built (D-13
+refuses that), so the regression test per link kind the amendment asks for
+needs D-3's form.
+
+5. Hypotheses and probes
+========================
+
+5.1 H4 (I1 per cycle on Catapult RTL) and H12
+---------------------------------------------
+
+**Confirmed.** ``seq_issue:locked`` matches ``ref_ctrl_issue`` per cycle on
+every Phase 0 program trace and image at both clocks (section 2); the issue
+cycle of every bundle is the RTL's (+2). H12 (Q1(b) without an 85-bit port):
+the three slot commands synthesise and run cycle for cycle (section 3).
+
+5.2 H2 (S1 at ``latency=S_LAT``)
+--------------------------------
+
+**Confirmed in the row form, with a different pin.** S1 carries the
+``S_LAT``-deep write pipe as data, so the Catapult pin is ``latency=1`` (U3
+track C section 2: rows + 1) and a write is visible ``S_LAT`` rows later; all
+three ``S_LAT`` builds match per cycle with one body. A ``latency=S_LAT`` pin
+belongs to a combinational S1 that no track built. ``S_LAT`` as a D-20
+booking has no manifest number to be checked against (D-7).
+
+5.3 H3 (F1 + L1 match; IRAM / loop buffer inference)
+----------------------------------------------------
+
+**F1/L1 match per cycle** (fq at both clocks, loop at both clocks, iram with
+a 256-row register IRAM). **Inference:** the 4,096 x 128 IRAM as a body array
+is mapped to ``ccs_sample_mem.ccs_ram_sync_1R1W`` (MEM-4) and **refused at
+II=1** (SCHD-30: the read of row ``t`` feeds the read register in the same
+iteration as the write -- a synchronous RAM returns it a cycle later),
+pinned or free; partitioned into registers at 256 rows it needs
+``REGISTER_THRESHOLD 4096`` (MEM-8 otherwise) and matches; at 4,096 rows as
+registers (the D-12 ``registers`` server) ``architect`` grew to 15.7 GB in
+10 min and was stopped (5.4). The 24 x 128 loop buffer (``lbmem``,
+kernel-local) became registers with no directive. So no Catapult form of a
+4,096-row IRAM reaches II=1 with the libraries on this host (no macro, no
+1R1W-with-bypass model): a cycle-locked IRAM needs an ``Sram`` macro with a
+registered read (asic_memories) or the D-12 ``rw``-port refusal (H11).
+
+5.4 The 4,096-row ``registers`` IRAM
+------------------------------------
+
+``fetch_d12`` at the RTL's 4,096 rows (``fd12_amended_3p33``) spent 583 s in
+``architect`` and reached 15.7 GB (``SOL-15`` lines) before it was stopped
+by hand (no result). At 256 rows the same composite builds in 77 s, 860 MB.
+The 256-row cut is exact on these traces: every write is below word 48, a
+read above the written words is uninitialised (masked), and both the queue
+and the loader mask the address.
+
+5.5 H7 again: D1 over Streams on Catapult RTL
+---------------------------------------------
+
+``dma:streams_reset`` (``src`` -> engine -> ``sink``, depth-2 channels, every
+kernel II 1) computes every row (805,652/805,652) at **1.333 cycles per row**
+(13,238 stall cycles in 39,718 rows) with outputs 5-6 cycles after their row:
+the "depth-2 link between two II-1 kernels sustains 2 tokens per 3 cycles"
+of ``minitpu_rtl_mxu`` on another unit. Every kernel's manifest says II 1;
+the composite's rate is not a manifest number (``latency.composite``:
+MISMATCH). The one-kernel D1 is cycle for cycle.
+
+5.6 H11: the VMEM DMA port beside the compute port at II=1
+----------------------------------------------------------
+
+**Confirmed refused**, as ``asic_memories`` s.2.2 predicted: in
+``dma_vmem:d12_reset_r256`` the generated ``vmem_mem`` server (two ``rw``
+ports, 256 x 1,024 b) is mapped to ``ccs_ram_sync_1R1W_rwport`` and
+``could not schedule partition '/dma_vmem_core_r256_packed/vmem_mem_0/run' -
+could not schedule even with unlimited resources`` (SCHD-30: the read and
+the write of one RAM in one II=1 iteration). Partitioning 262,144 bits into
+registers was not attempted (5.4's blow-up at a quarter of that). AMC is
+H11's other place to ask (track E).
+
+5.7 H13 (W2, the interlock Option)
+----------------------------------
+
+**Not run**: no W2 variant landed in wave 1 (track B built W1 and the
+self-timed probe; plan P-6 makes W2 a probe the owner decides, O3).
+
+5.8 D-24 on Catapult: ``vpu_wb:selftimed``
+------------------------------------------
+
+The self-timed write port (three class units, a merge polling ``empty()``
+then ``Pop()``) **synthesises** (57 s; every unit II 1) and **stalls on the
+RTL**: after 547 command rows and 33 claims on each output, no port moves for
+20,000 cycles (the driver's stall guard). The emitter lowers ``empty()`` to
+the FIFO's ``empty`` signal read as an ``sc_in<bool>`` beside the Connections
+``Pop`` (seen in ``kernel.cpp``); csim ran it (track B: UNIT-DIFF by design),
+the simulator hangs (F-B4). [I] The Catapult schedule samples that signal
+out of step with the handshake, so the merge stops popping; not isolated. So
+the self-timed form has no Catapult RTL comparison (cycles) yet; area is in
+section 6 (DC 4,137 um2 at 3.33 ns against locked W1's 4,696: the self-timed class units carry no destination-tag pipelines).
+
+6. DC area and timing beside MiniTPU
+====================================
+
+Same flow both sides (section 1). Allo = the Catapult RTL of the variant
+(with its Connections handshakes and, on every one-kernel unit, the
+``latency=1`` register on every output); MiniTPU = its module. "--" = no
+MiniTPU module of that scope (the issue FSM, the command boundary and the
+write-back are parts of ``sequencer.sv`` / ``vpu.sv``); the last row compares
+the sequencer as a whole.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 26 10 32 32
+
+   * - unit / variant
+     - clock
+     - Allo: Catapult RTL -> DC (area um2 (regs/reset); slack; Fmax)
+     - MiniTPU module, same DC flow
+   * - seq_issue:locked (I1+A1)
+     - 3.33
+     - 5,084 (638/638 reset); +0.01 ns; 301 MHz
+     - --
+   * - seq_issue:locked (I1+A1)
+     - 2.0
+     - 5,185 (638/638 reset); +0.01 ns; 503 MHz
+     - --
+   * - vpu_cmd:streams (D-23, depth 2)
+     - 3.33
+     - 8,771 (1138/1138 reset); +0.25 ns; 325 MHz
+     - --
+   * - vpu_cmd:streams (D-23, depth 2)
+     - 2.0
+     - 8,873 (1138/1138 reset); +0.00 ns; 500 MHz
+     - --
+   * - vpu_wb:locked (W1)
+     - 3.33
+     - 4,696 (624/624 reset); +0.36 ns; 337 MHz
+     - --
+   * - vpu_wb:locked (W1)
+     - 2.0
+     - 4,714 (624/624 reset); +0.00 ns; 500 MHz
+     - --
+   * - vpu_wb:units (W1 owns vreg.w)
+     - 3.33
+     - 6,665 (888/888 reset); +0.60 ns; 366 MHz
+     - --
+   * - vpu_wb:units (W1 owns vreg.w)
+     - 2.0
+     - 6,723 (890/890 reset); +0.01 ns; 503 MHz
+     - --
+   * - vpu_wb:selftimed (D-24 probe)
+     - 3.33
+     - 4,137 (531/531 reset); +1.35 ns; 505 MHz
+     - --
+   * - fetch:fq (F1 queue)
+     - 3.33
+     - 6,340 (924/924 reset); +2.19 ns; 877 MHz
+     - 3,607 (588/28 reset); +2.24 ns; 917 MHz
+   * - fetch:fq (F1 queue)
+     - 2.0
+     - 6,340 (924/924 reset); +0.91 ns; 917 MHz
+     - 3,608 (588/28 reset); +0.94 ns; 943 MHz
+   * - fetch:iram (F1, IRAM 256 rows as registers)
+     - 3.33
+     - 216,231 (33829/33829 reset); +1.47 ns; 538 MHz
+     - --
+   * - fetch f1_d12 amended (IRAM 256 rows, D-12 server)
+     - 3.33
+     - 191,510 (34303/1535 reset); +2.01 ns; 758 MHz
+     - --
+   * - loop_ctrl (L1)
+     - 3.33
+     - 27,197 (4057/4057 reset); +0.03 ns; 303 MHz
+     - 21,186 (3642/570 reset); +0.01 ns; 301 MHz
+   * - loop_ctrl (L1)
+     - 2.0
+     - 34,846 (4207/4207 reset); +0.00 ns; 500 MHz
+     - 21,452 (3642/570 reset); +0.00 ns; 500 MHz
+   * - seq_decoder (C1)
+     - 3.33
+     - 2,615 (378/378 reset); +2.16 ns; 855 MHz
+     - 255 (0/0 reset); +2.89 ns; 2273 MHz
+   * - seq_decoder (C1)
+     - 2.0
+     - 2,615 (378/378 reset); +0.83 ns; 855 MHz
+     - 255 (0/0 reset); +1.56 ns; 2273 MHz
+   * - agu_resolve (C1)
+     - 3.33
+     - 1,310 (159/159 reset); +1.56 ns; 565 MHz
+     - 209 (0/0 reset); +1.91 ns; 704 MHz
+   * - agu_resolve (C1)
+     - 2.0
+     - 1,310 (159/159 reset); +0.23 ns; 565 MHz
+     - 209 (0/0 reset); +0.58 ns; 704 MHz
+   * - vpu_adapter:slots (C1)
+     - 3.33
+     - 1,265 (180/180 reset); +2.32 ns; 990 MHz
+     - 72 (0/0 reset); +3.07 ns; 3846 MHz
+   * - vpu_adapter:slots (C1)
+     - 2.0
+     - 1,265 (180/180 reset); +0.99 ns; 990 MHz
+     - 72 (0/0 reset); +1.74 ns; 3846 MHz
+   * - scalar_agu S_LAT 1
+     - 3.33
+     - 9,212 (816/816 reset); +0.00 ns; 300 MHz
+     - 4,388 (132/132 reset); +0.00 ns; 300 MHz
+   * - scalar_agu S_LAT 2 (shipped)
+     - 3.33
+     - 9,595 (884/884 reset); +0.00 ns; 300 MHz
+     - 4,576 (200/200 reset); +0.00 ns; 300 MHz
+   * - scalar_agu S_LAT 2 (shipped)
+     - 2.0
+     - 11,420 (1037/1037 reset); +0.00 ns; 500 MHz
+     - 5,437 (200/200 reset); +0.00 ns; 500 MHz
+   * - scalar_agu S_LAT 3
+     - 3.33
+     - 10,069 (952/952 reset); +0.01 ns; 301 MHz
+     - 4,937 (268/268 reset); +0.00 ns; 300 MHz
+   * - dma_addr_gen:bits
+     - 3.33
+     - 2,516 (141/141 reset); +0.00 ns; 300 MHz
+     - 1,407 (0/0 reset); +0.00 ns; 300 MHz
+   * - dma_addr_gen:bits
+     - 2.0
+     - 2,607 (141/141 reset); +0.00 ns; 500 MHz
+     - 1,614 (0/0 reset); +0.00 ns; 500 MHz
+   * - dma_addr_gen:c1
+     - 3.33
+     - 2,516 (141/141 reset); +0.00 ns; 300 MHz
+     - 1,407 (0/0 reset); +0.00 ns; 300 MHz
+   * - dma_addr_gen:c1
+     - 2.0
+     - --
+     - 1,614 (0/0 reset); +0.00 ns; 500 MHz
+   * - dma_desc_adapter (A1)
+     - 3.33
+     - 2,699 (327/327 reset); +0.02 ns; 302 MHz
+     - 664 (91/91 reset); +0.28 ns; 328 MHz
+   * - dma_desc_adapter (A1)
+     - 2.0
+     - 2,954 (327/327 reset); +0.01 ns; 503 MHz
+     - 783 (91/91 reset); +0.13 ns; 535 MHz
+   * - dma:bits_reset core (D1)
+     - 3.33
+     - 35,620 (5082/5082 reset); +0.00 ns; 300 MHz
+     - 17,645 (2839/623 reset); +0.01 ns; 301 MHz
+   * - dma:bits_reset core (D1)
+     - 2.0
+     - 38,863 (5082/5082 reset); +0.00 ns; 500 MHz -- the 3.33 ns RTL (Catapult refused II=1 at 2.0 ns)
+     - 18,098 (2839/623 reset); +0.00 ns; 500 MHz
+   * - sequencer (IRAM 2 rows) / Allo issue+fq+loop+sagu2
+     - 3.33
+     - 48,215 (6503/6503 reset); worst +0.00 ns (sum of 4)
+     - 28,783 (4195/750 reset); +0.00 ns; 300 MHz
+   * - sequencer (IRAM 2 rows) / Allo issue+fq+loop+sagu2
+     - 2.0
+     - 57,791 (6806/6806 reset); worst +0.00 ns (sum of 4)
+     - 31,072 (4195/751 reset); -0.06 ns; 485 MHz
+
+What the numbers say:
+
+* **Combinational C1 units cost a boundary, not logic.** ``sequencer_decoder``,
+  ``_agu_resolve``, ``_vpu_adapter`` and ``dma_addr_gen`` are 72-1,614 um2 of
+  gates with no register in MiniTPU; the Catapult forms add an input and an
+  output register on every bit plus the valid/ready logic (159-378 flops).
+  The like-for-like Catapult form is plan C2 (``Wire[..., comb]`` units),
+  which no track built.
+* **Reset storage.** Catapult resets every register (D-13's recorded
+  deviation): the fetch queue's 560 payload flops are unreset in MiniTPU (28
+  reset) and reset here; the loop buffer's 3,072 likewise. Together with the
+  I/O registers this is most of the area difference on ``fq`` and
+  ``loop_ctrl``.
+* **Unreset storage (D-14), one data point.** The 256-row IRAM as reset
+  registers (``fetch:iram`` form, 33,829 reset flops) is 216,231 um2; as the
+  D-12 server's unreset ``sc_signal`` array (``f1_d12`` amended, 34,303
+  flops of which 1,535 reset) the whole composite is 191,510 um2 -- 11 %
+  less, with the boundary units included. Not U3's H14 measurement (the
+  units differ), but the direction it predicted.
+* **The DMA** is 2.0x MiniTPU's (35,620 vs 17,645 um2 at 3.33 ns): the
+  landing payload is reset here (``bits_reset``: C2 keeps ``reset=False``
+  out of a Stream-port kernel; 5,082 reset flops vs MiniTPU's 2,839 of which
+  623 reset), and the four row ports add about 2,100 I/O flops.
+* **The sequencer as a whole** (issue + fq + loop + sagu, Allo, summed:
+  48,216 um2 at 3.33 ns) against MiniTPU's ``sequencer`` with its IRAM cut to
+  2 rows (28,783): the boundaries between the four units are Connections
+  ports with registers here and wires in ``sequencer.sv``, and every Allo
+  register is reset.
+* **Timing.** Every one-kernel unit closes at 3.33 ns, and at 2.0 ns where
+  Catapult built it; ``dma`` did not schedule at 2.0 ns, and the MiniTPU
+  sequencer itself misses 2.0 ns in DC (worst slack -0.06 ns).
+
+7. Findings
+===========
+
+Classified per D-9; ids ``D-n`` (track D). Verbatim messages are in the
+``logs/catapult/<build>/build.txt`` / ``errors.txt``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 6 16 50 28
+
+   * - id
+     - class
+     - finding
+     - smallest change / proposal
+   * - D-1
+     - missing abstraction (emitter; U3 C1/C2 again)
+     - Every U4 unit with a ``[n, k]`` lane array (P-8) or a port read under a
+       condition reaches Catapult as RAM pins, so no per-cycle boundary: 9
+       of the 13 landed units needed a track-D form (``forms/``). The forms
+       change only ports; the bodies are the landed text.
+     - U3 C1's proposal: a declared ``Stream[UInt(32)[k]]`` / wide-port
+       boundary, so P-8's lanes and Catapult's one word per row are one
+       declaration; and an emitter error (not RAM pins) on a conditional port
+       read in a pinned kernel.
+   * - D-2
+     - workaround (schedule; U3 proposal 6 again)
+     - ``s.unroll("k:name")`` reaches the first of several sibling loops that
+       share a name (every ``for k`` is ``k``; ``get_affine_loop_nests``
+       follows one path), so ``vpu_wb``'s 12 ``k`` loops stayed rolled,
+       merged into the pipelined loop and made the manifest ``unreliable``
+       (each vector up to 16 iterations). Worked around by setting
+       ``unroll=0`` on every nested ``affine.for`` (``--unroll-nested``):
+       then scheduled 1/1 and cycle for cycle.
+     - ``s.unroll`` of a loop object (or ``unroll_all_inner(kernel)``); the
+       frontend naming sibling loops uniquely.
+   * - D-3
+     - missing abstraction (D-12 / D-13)
+     - A D-12 memory's owner on the SystemC target is a comb-pin kernel, and
+       D-13 refuses the composition tracks A and C built: a comb pin cannot
+       read a Stream, and no state may be read after a store in the
+       iteration. ``f1_d12`` needed Wire boundary links and a
+       read-then-store rewrite of its body to build at all; then its outputs
+       have no token alignment (a shift of 4 rows found by search).
+     - The owner's port pins registered (``Wire``) instead of ``comb`` when
+       the owner has Stream ports, or the server taking its address from the
+       owner over a Stream with the latency counted (D-12 amended); a
+       regression test per link kind.
+   * - D-4
+     - finding (Catapult, budget)
+     - The D-12 ``registers`` lowering of a 4,096 x 128 memory sends
+       ``architect`` past 15.7 GB in 10 min (stopped). The same at 256 rows:
+       77 s.
+     - ``registers`` refused above a declared size on the SystemC target
+       (naming ``sram`` / ``Sram``), as ``replica`` is refused off FPGA.
+   * - D-5
+     - semantic mismatch (Catapult memory inference; H3, H11)
+     - A body array read and written in one II=1 iteration (the IRAM, the
+       DMA landing FIFO, the VMEM server's two ``rw`` ports) is mapped to
+       ``ccs_ram_sync_1R1W`` and refused (SCHD-30); nothing in the source
+       says "registers". ``s.partition`` (+ ``REGISTER_THRESHOLD``) is the
+       workaround for small arrays.
+     - D-12 ``Memory(impl=registers)`` honoured on a kernel-local array (U3
+       C5's proposal), so the source states the storage; an emitter warning
+       when a pipelined kernel's array is RAM-mapped.
+   * - D-6
+     - **bug** (D-12 server on Catapult; silent wrong answer)
+     - The ``registers`` server of an unreset memory (``reset=False``:
+       ``sc_signal`` storage, clock-edge write ``SC_METHOD``) returns the word
+       being written in the same cycle on Catapult RTL (write-first), where
+       the declaration says ``visible=1`` and MiniTPU's IRAM returns the old
+       word: 31 IRAM slots after a reset (section 4), proven against a
+       write-first reference. [I] the server's pipeline (manifest latency 1)
+       samples the storage one c-step after the address. Csim and the
+       simulator (Stream links) are not affected on these traces.
+     - The server reads storage in the address's own c-step (latency 0
+       inside the server, the L-deep pipe after it), and a same-cycle
+       read/write test in the D-12 regression set for each link kind.
+   * - D-7
+     - semantic mismatch (D-10 / D-20)
+     - A booking that is a state-visibility latency (``S_LAT``: write ->
+       visible) has no manifest number: ``check_booking`` reports
+       MISMATCH (1 vs 2, 3) although the RTL matches per cycle at every
+       ``S_LAT``. The per-cycle trace is the evidence.
+     - ``check_booking`` takes a booking kind (``io`` vs ``visible``) and
+       refuses to compare a ``visible`` booking with a manifest latency.
+   * - D-8
+     - finding (Catapult; D-24 probe)
+     - ``vpu_wb:selftimed`` synthesises and stalls on the RTL after 33 claims
+       (section 5.8): the ``empty()``-polling merge does not drain.
+     - Isolate with a two-producer merge repro in ``tests/limits/``; until
+       then ``empty()`` polling is not a Catapult form.
+   * - D-9
+     - finding (Catapult composites; H7, ``minitpu_rtl_mxu``)
+     - Depth-2 Connections channels between II-1 kernels that move a token
+       every cycle sustain 2 tokens per 3 cycles (D1 over Streams: 1.333
+       cyc/row); D-23's command channels are sparse and lose nothing at
+       depth 2. The rate is not in any manifest.
+     - Depth >= 3 on every-cycle channels as a legality (as F-B3's >= 2 for
+       sparse ones), measured per backend.
+   * - D-10
+     - harness note
+     - A compose region's synthesised top is the architecture's name, not
+       ``top`` (``CatapultRtl`` reads ``run.tcl``'s ``DESIGN_HIERARCHY``);
+       a Wire-linked composite's outputs need a row shift (``--shift``).
+     - --
+
+Resolved here: **F-B10** (the 86 GB ``vpu_cmd`` csyn) was the unrolled
+harness pad loop: kept rolled, the csyn takes 1 min 33 s at 886 MB.
+**F-B3** holds on Catapult RTL (808 stall cycles at depth 1). **C2**
+re-confirmed at emit for ``dma:bits``.
+
+8. Proposed Catapult-column entries (``u4_matrix.rst``, the integrator's)
+=========================================================================
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 50 30
+
+   * - row
+     - Catapult RTL + DC
+     - evidence
+   * - ``fetch``
+     - **match** per cycle ``fq`` (3.33, 2.0) and ``iram`` with a 256-row
+       register IRAM (3.33); **refused** the 4,096-row IRAM (SCHD-30 on
+       ``ccs_ram_sync_1R1W``, D-5; the ``registers`` server: D-4). ``f1_d12``:
+       T-2 **confirmed** (t + L on Wire links; landed body 2,010 slots late),
+       **finding** D-3, **bug** D-6. DC: fq 6,340 um2 vs MiniTPU 3,607
+     - track D sections 2, 4, 5.3
+   * - ``loop_ctrl``
+     - **match** per cycle ``l1`` (3.33, 2.0); ``l1_d12`` not built (D-3
+       applies). DC 27,197 vs MiniTPU 21,186 um2 (3.33 ns)
+     - sections 2, 6
+   * - ``seq_decoder``
+     - **match** per cycle (3.33, 2.0); DC: the Connections boundary dominates (D-1)
+     - section 2, 6
+   * - ``agu_resolve``
+     - **match** per cycle (3.33, 2.0)
+     - section 2
+   * - ``scalar_agu``
+     - **match** per cycle at ``S_LAT`` 1/2/3 (3.33; 2 also 2.0), pin 1 (H2);
+       **finding** D-7
+     - sections 2, 5.2
+   * - ``dma_desc_adapter``
+     - **match** per cycle (3.33, 2.0)
+     - section 2
+   * - ``vpu_adapter``
+     - **match** per cycle ``slots`` (3.33, 2.0)
+     - section 2
+   * - ``sequencer`` / ``seq_issue``
+     - **match** per cycle (3.33, 2.0), every issue in the RTL's cycle (H4)
+     - section 2, 5.1
+   * - ``vpu_cmd``
+     - **match**; **D-23 confirmed** at depth 2 and 4 (0 stalls,
+       5,447/5,447 issues on time; 3.33 and 2.0); depth 1 **finding** F-B3
+       (808 stalls); F-B10 resolved
+     - section 3
+   * - ``vpu_writeback`` / ``vpu_wb``
+     - **match** per cycle ``locked`` and ``units`` (3.33, 2.0); **finding** D-2
+     - section 2
+   * - ``vpu_wb:selftimed``
+     - **finding** D-8 (stalls on the RTL); DC 4,137 um2 vs locked 4,696 (3.33 ns)
+     - section 5.8
+   * - ``dma_addr_gen``
+     - **match** ``bits`` (3.33, 2.0) and ``c1`` (3.33)
+     - section 2
+   * - ``dma``
+     - **match** per cycle ``bits_reset`` core/o1/o4/bw (3.33, landing FIFO
+       partitioned, D-5); **refused** at 2.0 ns (SCHD-30) and unpartitioned;
+       ``streams_reset`` **semantic mismatch** per cycle (1.333 cyc/row, D-9);
+       ``bits``/``streams`` **refused** (C2)
+     - sections 2, 5.5
+   * - ``dma_vmem``
+     - **refused** (H11 confirmed: SCHD-30 on the two-``rw``-port server)
+     - section 5.6
+   * - ``dma_selftimed``
+     - not run (budget; probe, contract-judged)
+     - --
+
+9. Not run, and why
+===================
+
+* ``loop_ctrl:l1_d12``: the D-12 two-unit form meets D-3 as ``f1_d12`` did
+  (Stream-fed comb pins); the T-2 question was answered on ``f1_d12``.
+* ``dma_selftimed`` (H10 probe), ``vpu_adapter:slots_gated``,
+  ``dma`` instances other than core at 2.0 ns: budget; the 2.0 ns core
+  refusal applies to the same body.
+* ``W2`` (H13): no variant landed.
+* DC of ``dma_vmem`` (no RTL) and of MiniTPU's IRAM / VMEM at full size (no
+  macro; asic_memories).
+
+10. Settings and pins
+=====================
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - item
+     - value
+   * - Allo
+     - ``u4-catapult`` from ``origin/u1-pilot`` ``c7abcce4``; own bindings
+       (``scratch/u4d/build.sh``: CMake + Ninja, ``nice ninja -j16``, 336 steps)
+   * - MiniTPU
+     - ``b3ba0a4d``, read only (RTL, ``asm.py`` via ``harness/minitpu_asm``)
+   * - Catapult
+     - Ultra Synthesis 2024.2/1130128 (``module load catapult-2024``);
+       ``solution library add nangate-45nm_beh`` (``nangate-45nm_beh.lib`` md5
+       ``e820fa616c50d078cd3880434939dcf8``; Catapult warns LIB-83: the
+       library was built by Library Builder 2025.1 > 2024.2) and
+       ``ccs_sample_mem``; ``run.tcl`` as Allo writes it (``-IO_MODE super``,
+       ``-SPECULATE true``), plus ``REGISTER_THRESHOLD 4096`` on the one
+       build that says so (``--tcl``, recorded in its BUILD line)
+   * - caps
+     - ``ulimit -v 32000000`` and ``timeout 90m`` per Catapult job, one at a
+       time (``flock``); wall 0:40-3:10 per build, peak RSS 844-977 MB,
+       except ``fd12_amended_3p33`` (4,096-row IRAM): stopped by hand at
+       583 s, 15.7 GB in ``architect``
+   * - Verilator
+     - 5.052 (conda-forge), ``-O3``, the U3 track C driver generalised
+       (``u4d_check.CatapultRtl``), g++ from gcc-toolset-13; builds 8-16 s,
+       runs 8-17 s
+   * - Design Compiler
+     - W-2024.09 (``module load synopsys-dc-W-2024.09``), ``dc_u3c.tcl``
+       (sha256 ``9b5f6aba0dfb1c65...``, identical to U3 track C's):
+       ``compile_ultra -gate_clock``, ``ungroup -start_level 2``, inputs and
+       outputs at 0 delay, ``set_max_transition`` 0.25 x period
+   * - FreePDK45 ADK
+     - ``/scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard``:
+       ``stdcells.db`` md5 ``f5560259ca91a4b67336b715b729f94d``, ``adk.tcl``
+       ``5e884494824b75be2350b2e43ea9608a``; ``dw_foundation.sldb``
+       ``d955c61b84f986958ce94ccd738f45e7``
+   * - clocks
+     - 3.33 ns and 2.0 ns (Catapult ``CLOCK_PERIOD``; DC ``create_clock`` on
+       ``clk``, a virtual clock for MiniTPU's comb modules)
+   * - DC jobs
+     - one at a time (``flock``); wall 1:01-2:32 per run (larger for the
+       register IRAM forms, ``logs/dc_summary.tsv``), peak 0.68-0.86 GB

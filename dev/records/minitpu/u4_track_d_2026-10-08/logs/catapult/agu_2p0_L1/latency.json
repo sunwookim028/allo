@@ -1,0 +1,27 @@
+{
+ "clock_period_ns": 2.0,
+ "definition": "latency: rising edges from the input-accepting edge to the edge after which the output is visible, no stall; ii: cycles between iterations of the I/O loop",
+ "solution": "/work/shared/users/phd/sk3463/scratch/u4d/agu_2p0_L1.prj/build/Catapult/top.v1",
+ "tool": "catapult",
+ "units": {
+  "agu_0": {
+   "declared": 1,
+   "ii": 1,
+   "io": {
+    "v20.Pop()": 0,
+    "v21.Pop()": 0,
+    "v22.Pop()": 0,
+    "v23.Pop()": 0,
+    "v24.Pop()": 0,
+    "v25.Push()": 1
+   },
+   "iterations": 38432,
+   "latency": 1,
+   "loop": "l_S_t_0_t",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/top/agu_0/run",
+   "status": "scheduled"
+  }
+ }
+}

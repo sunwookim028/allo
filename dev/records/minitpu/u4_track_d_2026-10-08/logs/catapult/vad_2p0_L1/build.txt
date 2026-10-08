@@ -1,0 +1,5 @@
+[latency] adapter_0: latency=1 ii=1 scheduled
+BUILD vpu_adapter form:vad_packed inst=base n=24866 unroll=[] pipeline=['adapter_0:t'] partition=[] tcl=[] {'clock_period': 2.0, 'latency': {'adapter_0': 1}}: ok 40s
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:44.51
+	Maximum resident set size (kbytes): 867908
+RUN_EXIT 0

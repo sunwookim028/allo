@@ -1,0 +1,36 @@
+{
+ "clock_period_ns": 3.33,
+ "definition": "latency: rising edges from the input-accepting edge to the edge after which the output is visible, no stall; ii: cycles between iterations of the I/O loop",
+ "solution": "/work/shared/users/phd/sk3463/scratch/u4d/fpi256t_3p33_L1.prj/build/Catapult/top.v1",
+ "tool": "catapult",
+ "units": {
+  "fetch_0": {
+   "declared": 1,
+   "ii": 1,
+   "io": {
+    "v0.Pop()": 0,
+    "v1.Pop()": 0,
+    "v10.Push()": 1,
+    "v11.Push()": 1,
+    "v12.Push()": 1,
+    "v13.Push()": 1,
+    "v14.Push()": 1,
+    "v2.Pop()": 0,
+    "v3.Pop()": 0,
+    "v4.Pop()": 0,
+    "v5.Pop()": 0,
+    "v6.Pop()": 0,
+    "v7.Pop()": 0,
+    "v8.Push()": 1,
+    "v9.Push()": 1
+   },
+   "iterations": 3804,
+   "latency": 1,
+   "loop": "l_S_t_0_t",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/top/fetch_0/run",
+   "status": "scheduled"
+  }
+ }
+}

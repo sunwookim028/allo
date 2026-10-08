@@ -1,0 +1,4 @@
+BUILD dma form:dma_packed inst=core n=39718 unroll=[] pipeline=['dma_src_0:t', 'dma_engine_0:_t', 'dma_sink_0:t'] partition=[] tcl=[] {'clock_period': 3.33}: RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:14.35
+	Maximum resident set size (kbytes): 945472
+RUN_EXIT 1

@@ -1,0 +1,6 @@
+RTL u4_vpu_wb:shipped: 24218 cycles in 6 traces, 121075 defined slots, RTL vs reference on defined: 121075/121075 (3.4s)
+VERILATOR built /work/shared/users/phd/sk3463/scratch/u4d/hcache/cat-top-2e23060f13d4776f/Vtop in 8s
+UNIT-MATCH vpu_wb:shipped locked catapult-rtl[wb_locked_2p0_L1] 121075/121075 defined (96887 masked: not modelled=96872, reset=15; catapult==rtl on 49024) cycle=per-cycle: 1.0000 cyc/row (24220 cycles in all), stall cycles 0, row->token offset [2]; CYCLE-FOR-CYCLE yes (run 8.8s)
+    L (accept edge -> token edge) over every row-aligned output: {1: 96872}; first row accepted at cycle 1; rows at interval 1: 24217/24217
+    L {1: 24218}: v292, v293, v294, v295
+    LATENCY-MATCH wbk_0: reported 1 ii=1 (scheduled), measured 1 at 1 cyc/vector; unit declares 1; pinned 1

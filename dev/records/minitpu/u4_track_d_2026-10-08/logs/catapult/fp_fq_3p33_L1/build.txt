@@ -1,0 +1,5 @@
+[latency] fq_0: latency=1 ii=1 scheduled
+BUILD fetch form:fetch_packed inst=fq n=16138 unroll=['fq_0:j'] pipeline=['fq_0:t'] partition=[] tcl=[] {'clock_period': 3.33, 'latency': {'fq_0': 1}}: ok 50s
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:53.82
+	Maximum resident set size (kbytes): 878832
+RUN_EXIT 0

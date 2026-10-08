@@ -1,0 +1,6 @@
+[latency] sources_0: latency=1 ii=1 scheduled
+[latency] wb_0: latency=1 ii=1 scheduled
+BUILD vpu_wb units inst=shipped n=24218 unroll=[] pipeline=['sources_0:t', 'wb_0:t'] partition=[] tcl=[] {'clock_period': 2.0}: ok 65s
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:10.41
+	Maximum resident set size (kbytes): 881460
+RUN_EXIT 0

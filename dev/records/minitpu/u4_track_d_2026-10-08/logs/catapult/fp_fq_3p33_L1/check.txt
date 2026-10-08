@@ -1,0 +1,6 @@
+RTL sequencer_fetch_queue:fq: 16138 cycles in 7 traces, 112864 defined slots, RTL vs reference on defined: 112864/112864 (0.4s)
+VERILATOR built /work/shared/users/phd/sk3463/scratch/u4d/hcache/cat-top-2893cefd7f8e0b50/Vtop in 8s
+UNIT-MATCH fetch:fq form:fetch_packed catapult-rtl[fp_fq_3p33_L1] 112864/112864 defined (102 masked: reset=98, uninit=4; catapult==rtl on 91) cycle=per-cycle: 1.0000 cyc/row (16140 cycles in all), stall cycles 0, row->token offset [2]; CYCLE-FOR-CYCLE yes (run 8.3s)
+    L (accept edge -> token edge) over every row-aligned output: {1: 112966}; first row accepted at cycle 1; rows at interval 1: 16137/16137
+    L {1: 16138}: v99, v100, v101, v102, v103, v104, v105
+    LATENCY-MATCH fq_0: reported 1 ii=1 (scheduled), measured 1 at 1 cyc/vector; unit declares 1; pinned 1

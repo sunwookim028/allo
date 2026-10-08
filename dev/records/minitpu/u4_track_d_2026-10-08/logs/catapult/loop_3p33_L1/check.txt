@@ -1,0 +1,6 @@
+RTL u4_loop_ctrl:shipped: 37729 cycles in 21 traces, 527446 defined slots, RTL vs reference on defined: 527446/527446 (9.5s)
+VERILATOR built /work/shared/users/phd/sk3463/scratch/u4d/hcache/cat-top-e32bee1c11bbbcfd/Vtop in 8s
+UNIT-MATCH loop_ctrl:shipped form:loop_packed catapult-rtl[loop_3p33_L1] 527446/527446 defined (760 masked: reset=756, uninit=4; catapult==rtl on 750) cycle=per-cycle: 1.0000 cyc/row (37731 cycles in all), stall cycles 0, row->token offset [2]; CYCLE-FOR-CYCLE yes (run 9.4s)
+    L (accept edge -> token edge) over every row-aligned output: {1: 528206}; first row accepted at cycle 1; rows at interval 1: 37728/37728
+    L {1: 37729}: v320, v321, v322, v323, v324, v325, v326, v327, v328, v329, v330, v331, v332, v333
+    LATENCY-MATCH loop_0: reported 1 ii=1 (scheduled), measured 1 at 1 cyc/vector; unit declares 1; pinned 1

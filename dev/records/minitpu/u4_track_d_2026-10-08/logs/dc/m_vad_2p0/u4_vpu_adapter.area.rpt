@@ -1,0 +1,31 @@
+ 
+****************************************
+Report : area
+Design : u4_vpu_adapter
+Version: W-2024.09
+Date   : Thu Oct  8 10:13:01 2026
+****************************************
+
+Information: Updating design information... (UID-85)
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                          180
+Number of nets:                           170
+Number of cells:                           96
+Number of combinational cells:             95
+Number of sequential cells:                 0
+Number of macros/black boxes:               0
+Number of buf/inv:                         83
+Number of references:                       6
+
+Combinational area:                 71.553999
+Buf/Inv area:                       59.849999
+Noncombinational area:               0.000000
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                    71.553999
+Total area:                 undefined
+1

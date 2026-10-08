@@ -1,0 +1,102 @@
+{
+ "clock_period_ns": 3.33,
+ "definition": "latency: rising edges from the input-accepting edge to the edge after which the output is visible, no stall; ii: cycles between iterations of the I/O loop",
+ "solution": "/work/shared/users/phd/sk3463/scratch/u4d/vpucmd_d4_3p33.prj/build/Catapult/top.v1",
+ "tool": "catapult",
+ "units": {
+  "issue_0": {
+   "ii": 2,
+   "io": {
+    "v347.Pop()": 0,
+    "v348.Pop()": 0,
+    "v349.Pop()": 0,
+    "v350.Pop()": 0,
+    "v351.Pop()": 0,
+    "v352.Pop()": 0,
+    "v353.Pop()": 0,
+    "v354.Pop()": 0,
+    "v355.Pop()": 0,
+    "v356.Pop()": 0,
+    "v357.Pop()": 0,
+    "v358.Pop()": 0,
+    "v359.Pop()": 0,
+    "v360.Pop()": 0,
+    "v361.Pop()": 0,
+    "v362.Pop()": 0,
+    "v363.Pop()": 0,
+    "v364.Pop()": 0,
+    "v365.Pop()": 0,
+    "v366.Pop()": 0,
+    "v367.Push()": 1,
+    "v368.Push()": 1,
+    "v369.Push()": 1,
+    "v370.Push()": 1,
+    "v371.Push()": 1,
+    "v372.Push()": 1,
+    "v373.Push()": 1,
+    "v374.Push()": 1,
+    "v375.Push()": 1,
+    "v376.Push()": 1,
+    "v377.Push()": 1,
+    "v378.Push()": 1,
+    "v379.Push()": 1,
+    "v380.Push()": 1,
+    "v381.Push()": 1,
+    "v382.Push()": 1,
+    "v383.Push()": 1,
+    "v384.Push()": 1,
+    "v385.Push()": 1
+   },
+   "iterations": 52236,
+   "latency": 1,
+   "loop": "l_S_j_1_j",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/top/issue_0/run",
+   "reason": "I/O in several loops ['l_S_j_1_j', 'l_S_t_0_t']",
+   "status": "unreliable"
+  },
+  "mrx_0": {
+   "ii": 1,
+   "io": {
+    "v756.Push()": 1,
+    "v757.Pop()": 0
+   },
+   "iterations": 52236,
+   "latency": 1,
+   "loop": "l_S_k_0_k2",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/top/mrx_0/run",
+   "status": "scheduled"
+  },
+  "vrx_0": {
+   "ii": 1,
+   "io": {
+    "v750.Push()": 1,
+    "v751.Pop()": 0
+   },
+   "iterations": 52236,
+   "latency": 1,
+   "loop": "l_S_k_0_k",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/top/vrx_0/run",
+   "status": "scheduled"
+  },
+  "xrx_0": {
+   "ii": 1,
+   "io": {
+    "v753.Push()": 1,
+    "v754.Pop()": 0
+   },
+   "iterations": 52236,
+   "latency": 1,
+   "loop": "l_S_k_0_k1",
+   "loop_c_steps": 2,
+   "port_style": "connections",
+   "process": "/top/xrx_0/run",
+   "status": "scheduled"
+  }
+ }
+}

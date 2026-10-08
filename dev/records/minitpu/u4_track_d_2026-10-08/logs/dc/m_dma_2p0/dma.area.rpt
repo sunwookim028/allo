@@ -1,0 +1,31 @@
+ 
+****************************************
+Report : area
+Design : dma_DMA_CHANNEL_COUNT2_OUTSTANDING2_TIMEOUT_CYCLES1024_LANDING_DEPTH8_M_AXI_DATA_WIDTH256
+Version: W-2024.09
+Date   : Thu Oct  8 10:16:45 2026
+****************************************
+
+Information: Updating design information... (UID-85)
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                         1401
+Number of nets:                          7456
+Number of cells:                         6606
+Number of combinational cells:           3685
+Number of sequential cells:              2860
+Number of macros/black boxes:               0
+Number of buf/inv:                        510
+Number of references:                      59
+
+Combinational area:               4678.940047
+Buf/Inv area:                      323.455998
+Noncombinational area:           13418.901744
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                 18097.841791
+Total area:                 undefined
+1

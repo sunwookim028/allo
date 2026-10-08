@@ -1,0 +1,13 @@
+RTL u4_seq_cmd:shipped: 52236 cycles in 15 traces, 888217 defined slots, RTL vs reference on defined: 888217/888217 (8.1s)
+VERILATOR built /work/shared/users/phd/sk3463/scratch/u4d/hcache/cat-top-8b05da7a168fabf0/Vtop in 9s
+UNIT-MATCH vpu_cmd:shipped streams_d4 catapult-rtl[vpucmd_d4_3p33] 888217/888217 defined (156503 masked: payload, slot not valid (D-23 gate)=154378, reset=900, uninit IRAM=1225; catapult==rtl on 153489) cycle=per-cycle: 1.0000 cyc/row (156712 cycles in all), stall cycles 0, row->token offset [2]; CYCLE-FOR-CYCLE yes (run 11.1s)
+    port v795: 52236 tokens (not held to rows), cycles 62..156711
+    port v796: 52236 tokens (not held to rows), cycles 54..156711
+    port v797: 52236 tokens (not held to rows), cycles 197..156711
+    L (accept edge -> token edge) over every row-aligned output: {1: 835776}; first row accepted at cycle 1; rows at interval 1: 52235/52235
+    L {1: 52236}: v779, v780, v781, v782, v783, v784, v785, v786, v787, v788, v789, v790, v791, v792, v793, v794
+    LATENCY-UNRELIABLE issue_0+mrx_0+vrx_0+xrx_0: kernel latencies [1, 1, 1, 1] (sum 4), ii [2, 1, 1, 1] (rate max 2), measured 1 at 1 cyc/vector; unreliable: ['issue_0']
+      issue_0: latency 1 ii 2 (unreliable: I/O in several loops ['l_S_j_1_j', 'l_S_t_0_t'])
+      mrx_0: latency 1 ii 1 (scheduled)
+      vrx_0: latency 1 ii 1 (scheduled)
+      xrx_0: latency 1 ii 1 (scheduled)

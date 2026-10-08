@@ -1,0 +1,5 @@
+[latency] issue_0: latency=1 ii=1 scheduled
+BUILD seq_issue locked inst=shipped n=52236 unroll=[] pipeline=['issue_0:t'] partition=[] tcl=[] {'clock_period': 3.33, 'latency': {'issue_0': 1}}: ok 180s
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 3:09.95
+	Maximum resident set size (kbytes): 889920
+RUN_EXIT 0

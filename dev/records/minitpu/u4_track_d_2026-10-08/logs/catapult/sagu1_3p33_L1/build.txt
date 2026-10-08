@@ -1,0 +1,5 @@
+[latency] agu_0: latency=1 ii=1 scheduled
+BUILD scalar_agu form:sagu_packed inst=lat1 n=40178 unroll=[] pipeline=['agu_0:t'] partition=[] tcl=[] {'clock_period': 3.33, 'latency': {'agu_0': 1}}: ok 57s
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:02.40
+	Maximum resident set size (kbytes): 921124
+RUN_EXIT 0

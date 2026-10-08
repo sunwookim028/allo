@@ -1,0 +1,6 @@
+RTL u4_scalar_agu:lat2: 40214 cycles in 9 traces, 201065 defined slots, RTL vs reference on defined: 201065/201065 (9.4s)
+VERILATOR built /work/shared/users/phd/sk3463/scratch/u4d/hcache/cat-top-60b2358417dbae0c/Vtop in 8s
+UNIT-MATCH scalar_agu:lat2 form:sagu_packed catapult-rtl[sagu2_3p33_L1] 201065/201065 defined (5 masked: before reset=5; catapult==rtl on 0) cycle=per-cycle: 1.0000 cyc/row (40216 cycles in all), stall cycles 0, row->token offset [2]; CYCLE-FOR-CYCLE yes (run 8.9s)
+    L (accept edge -> token edge) over every row-aligned output: {1: 201070}; first row accepted at cycle 1; rows at interval 1: 40213/40213
+    L {1: 40214}: v232, v233, v234, v235, v236
+    LATENCY-MATCH agu_0: reported 1 ii=1 (scheduled), measured 1 at 1 cyc/vector; unit declares 1; pinned 1

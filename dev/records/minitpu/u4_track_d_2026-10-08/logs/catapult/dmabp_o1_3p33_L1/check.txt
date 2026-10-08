@@ -1,0 +1,6 @@
+RTL dma:o1: 37906 cycles in 13 traces, 764284 defined slots, RTL vs reference on defined: 764284/764284 (2.8s)
+VERILATOR built /work/shared/users/phd/sk3463/scratch/u4d/hcache/cat-top-977a57caba000845/Vtop in 8s
+UNIT-MATCH dma:o1 form:dma_bits_packed catapult-rtl[dmabp_o1_3p33_L1] 764284/764284 defined (69648 masked: landing empty=69626, power-up=22; catapult==rtl on 69622) cycle=per-cycle: 1.0000 cyc/row (37908 cycles in all), stall cycles 0, row->token offset [2]; CYCLE-FOR-CYCLE yes (run 10.0s)
+    L (accept edge -> token edge) over every row-aligned output: {1: 75812}; first row accepted at cycle 1; rows at interval 1: 37905/37905
+    L {1: 37906}: v829, v830
+    LATENCY-MATCH dma_0: reported 1 ii=1 (scheduled), measured 1 at 1 cyc/vector; unit declares 1; pinned 1
