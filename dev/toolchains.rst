@@ -370,6 +370,14 @@ A row marked **unpinned** is an open defect.
        scipy 1.17.1, scikit-learn 1.9.1, ngspice 41) pinned by URL and md5 in
        ``dev/records/minitpu/asic_memories_2026-10-04/openram_env/``
      - ``dev/records/minitpu/asic_memories_2026-10-04.rst``
+   * - OpenRAM bank macro ``sram_2rw_64x512_freepdk45`` (``mid`` = 8 banks)
+     - generated once (OpenRAM as above, ``openram/cfg_2rw_64x512.py``, 1,151 s)
+       and reused for every bank; sha256 ``.v`` ``bc3ceb63fd91…``, ``.lib``
+       ``f207b9246b42…``, ``.lef`` ``d5cc4f848f79…`` (all three committed in
+       ``asic_memories_2026-10-04/openram/``), ``.gds`` ``96c2b751fd07…``
+       (14.4 MB, not committed: regenerate and compare); its ``lc_shell``
+       ``.db`` md5 ``8b619e1feb7f…``
+     - ``asic_memories_2026-10-04.rst`` s.5.1
    * - Catapult Memory Generator (``/MemGen/MemoryGenerator_BuildLib``), Library Compiler
      - part of Catapult 2024.2/1130128 (plain Catapult licence);
        ``lc_shell`` W-2024.09-SP5-3 (``/opt/synopsys/lc/W-2024.09-SP5-3``; the

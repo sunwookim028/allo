@@ -1,0 +1,106 @@
+{
+  "vmem": {
+    "catapult": {
+      "block_size": 512,
+      "file": "/work/shared/users/phd/sk3463/scratch/asicmem2_cat/B_mid_ii1/memgen/memgen/sram_2rw_64x512_freepdk45.lib",
+      "independent": [
+        [
+          "*:if:write_mem(mem:rsc*",
+          "*:if#1:write_mem(mem:rsc*"
+        ],
+        [
+          "*:if:write_mem(mem:rsc*",
+          "*:else#1:*read_mem(mem:rsc*"
+        ],
+        [
+          "*:else:*read_mem(mem:rsc*",
+          "*:if#1:write_mem(mem:rsc*"
+        ],
+        [
+          "*:if#1:write_mem(mem:rsc*",
+          "*:if:write_mem(mem:rsc*"
+        ],
+        [
+          "*:if#1:write_mem(mem:rsc*",
+          "*:else:*read_mem(mem:rsc*"
+        ],
+        [
+          "*:else#1:*read_mem(mem:rsc*",
+          "*:if:write_mem(mem:rsc*"
+        ]
+      ],
+      "library": "sram_2rw_64x512_freepdk45",
+      "library_built": true,
+      "memory": "vmem",
+      "module": "sram_2rw_64x512_freepdk45",
+      "rsc": "/wa_d12g/vmem_mem_0/run/mem:rsc"
+    },
+    "collision": "obligation",
+    "cross_port_independent": "Catapult may overlap the ports' accesses: the collision obligation excludes a same-word access by two ports in one cycle (ignore_memory_precedences between ports; same-port order kept)",
+    "dtype": "UInt(W)",
+    "implementation": "one storage in generated kernel vmem_mem mapped onto the macro sram_2rw_64x512_freepdk45; each port a bundle of links (address, data, enable) to its owner, on one macro port",
+    "links": "declared",
+    "lowering": "sram",
+    "macro": {
+      "area_um2": 103782.068775,
+      "banking": "8 x 512 rows, contiguous blocks (the high address bits pick the bank)",
+      "banks": 8,
+      "catapult_lib": null,
+      "liberty": "/work/shared/users/phd/sk3463/scratch/wt-asicmem2/examples/minitpu/units/../../../dev/records/minitpu/asic_memories_2026-10-04/openram/sram_2rw_64x512_freepdk45_TT_1p0V_25C.lib",
+      "module": "sram_2rw_64x512_freepdk45",
+      "port_map": {
+        "c": 0,
+        "d": 1
+      },
+      "ports": [
+        "rw",
+        "rw"
+      ],
+      "read_latency": 1,
+      "rows": 512,
+      "total_area_um2": 830256.5502,
+      "verilog": "/work/shared/users/phd/sk3463/scratch/wt-asicmem2/examples/minitpu/units/../../../dev/records/minitpu/asic_memories_2026-10-04/openram/sram_2rw_64x512_freepdk45.v",
+      "visible": 1,
+      "width": 64
+    },
+    "obligation": "MiniTPU issue #21: the program keeps compute and DMA off one word in one cycle (asserted in simulation only, vpu_vmem_simd.sv:121); masked in verdicts",
+    "port_map": {
+      "c": "0 (rw)",
+      "d": "1 (rw)"
+    },
+    "ports": {
+      "c": {
+        "count": 1,
+        "kind": "rw",
+        "latency": 3,
+        "macro_port": {
+          "index": 0,
+          "kind": "rw"
+        },
+        "owner": "port_c",
+        "read": "macro read, latency 1, inside a 3-deep pipe as data; the achieved latency is measured on the RTL (D-10), not assumed",
+        "visible": 1,
+        "write": "macro write, visible after 1"
+      },
+      "d": {
+        "count": 1,
+        "kind": "rw",
+        "latency": 2,
+        "macro_port": {
+          "index": 1,
+          "kind": "rw"
+        },
+        "owner": "port_d",
+        "read": "macro read, latency 1, inside a 2-deep pipe as data; the achieved latency is measured on the RTL (D-10), not assumed",
+        "visible": 1,
+        "write": "macro write, visible after 1"
+      }
+    },
+    "reset": false,
+    "rows": 4096,
+    "status": "lowered",
+    "storage": "SRAM macro sram_2rw_64x512_freepdk45 x8 (512 x 64, ports ['rw', 'rw']), unreset by nature; the server's array is mapped onto it (Catapult: MAP_TO_MODULE)",
+    "target": "systemc",
+    "technology": "asic"
+  }
+}

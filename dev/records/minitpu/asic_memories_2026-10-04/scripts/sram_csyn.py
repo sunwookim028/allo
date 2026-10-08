@@ -43,6 +43,13 @@ ap.add_argument("--latencies", default=None,
                 help="word_array: override the instance's compute,dma read latencies (a probe; e.g. 1,1)")
 ap.add_argument("--post-tcl", action="append", default=[],
                 help="hand-patch line after `go architect`, before `go extract` (e.g. ignore_memory_precedences)")
+ap.add_argument("--kinds", default="rw,rw",
+                help="word_array: the compute,dma port kinds (s.6 port-kind probes; MiniTPU is rw,rw)")
+ap.add_argument("--openram", default=None,
+                help="word_array: an OpenRAM macro <.v>,<.lib> to declare as the memory's Sram (s.6)")
+ap.add_argument("--map", default=None, help="with --openram: Sram.mapped(...), e.g. c=0,d=1")
+ap.add_argument("--banks", type=int, default=1, help="with --openram: Sram.banked(n)")
+ap.add_argument("--rdwr", default=None, help="with --openram: the library's RDWRRESOLUTION (UNKNOWN|RBW|WBR)")
 a = ap.parse_args()
 
 if a.unit == "regfile":
@@ -55,7 +62,20 @@ else:
         ww, words, aw, _, _ = wa.GEOM[a.inst]
         rl, drl = (int(x) for x in a.latencies.split(","))
         wa.GEOM[a.inst] = (ww, words, aw, rl, drl)  # this process only
-    arch, mem, top_name = d.architecture(a.n, a.inst, reset=a.reset), "vmem", "wa_d12"
+    impl = None
+    if a.openram:
+        from allo.compose import Sram  # noqa: E402
+        v, lib = a.openram.split(",")
+        impl = Sram.from_openram(v, lib, catapult_lib=os.environ.get("SRAM_CATAPULT_LIB"))
+        if a.map:
+            impl = impl.mapped(**{k: int(x) for k, x in (kv.split("=") for kv in a.map.split(","))})
+        if a.banks > 1:
+            impl = impl.banked(a.banks)
+        if a.rdwr:
+            import dataclasses  # noqa: E402
+            impl = dataclasses.replace(impl, rdwr=a.rdwr)
+    arch, mem, top_name = d.architecture(a.n, a.inst, reset=a.reset, impl=impl,
+                                         kinds=tuple(a.kinds.split(","))), "vmem", "wa_d12"
 low = {mem: a.lowering}
 kernels = arch.port_kernels("systemc", low)
 

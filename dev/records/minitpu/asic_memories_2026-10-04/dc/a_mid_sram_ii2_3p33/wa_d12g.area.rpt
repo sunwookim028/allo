@@ -1,0 +1,32 @@
+ 
+****************************************
+Report : area
+Design : wa_d12g
+Version: W-2024.09
+Date   : Sun Oct  4 13:28:26 2026
+****************************************
+
+Information: Updating design information... (UID-85)
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+    sram_2rw_64x512_freepdk45_TT_1p0V_25C_lib (File: /work/shared/users/phd/sk3463/scratch/asicmem_lc/sram_2rw_64x512.db)
+
+Number of ports:                          295
+Number of nets:                          2483
+Number of cells:                         1812
+Number of combinational cells:           1520
+Number of sequential cells:               280
+Number of macros/black boxes:               8
+Number of buf/inv:                        607
+Number of references:                      21
+
+Combinational area:               1589.616017
+Buf/Inv area:                      425.599993
+Noncombinational area:            1486.940048
+Macro/Black Box area:           830256.562500
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                833333.118565
+Total area:                 undefined
+1

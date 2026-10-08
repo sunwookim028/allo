@@ -1,0 +1,48 @@
+{
+ "clock_period_ns": 3.33,
+ "definition": "latency: rising edges from the input-accepting edge to the edge after which the output is visible, no stall; ii: cycles between iterations of the I/O loop",
+ "solution": "/work/shared/users/phd/sk3463/scratch/asicmem2_cat/D_small_1r1w_rw_ii1/build/Catapult/wa_d12g.v1",
+ "tool": "catapult",
+ "units": {
+  "port_c_r_0": {
+   "ii": 1,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 1,
+   "port_style": "wire",
+   "ports": {
+    "v28": "comb",
+    "v30": "comb"
+   },
+   "process": "/wa_d12g/port_c_r_0/run",
+   "process_latency": null,
+   "status": "scheduled"
+  },
+  "port_d_w_0": {
+   "ii": 1,
+   "latency": 1,
+   "loop": "while",
+   "loop_c_steps": 1,
+   "port_style": "wire",
+   "ports": {
+    "v46": "comb",
+    "v47": "comb",
+    "v48": "comb",
+    "v49": "comb"
+   },
+   "process": "/wa_d12g/port_d_w_0/run",
+   "process_latency": null,
+   "status": "scheduled"
+  },
+  "vmem_mem_0": {
+   "ii": 1,
+   "latency": 2,
+   "loop": "while",
+   "loop_c_steps": 2,
+   "port_style": "wire",
+   "process": "/wa_d12g/vmem_mem_0/run",
+   "process_latency": 2,
+   "status": "scheduled"
+  }
+ }
+}

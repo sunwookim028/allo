@@ -45,6 +45,12 @@ ap.add_argument("--stretch", type=int, default=1,
 ap.add_argument("--cut-module", default=None,
                 help="remove `module <name>` from a copy of the netlist (the MemGen copy of the macro "
                      "model, replaced by --extra-src's sim model)")
+ap.add_argument("--restrict", default=None,
+                help="compute,dma port kinds of a port-kind probe (s.6), e.g. r,w: the trace is narrowed "
+                     "for BOTH RTLs (an r port never writes: we := 0; a w port only writes: en := en & we), "
+                     "and only the probes those kinds can make are run")
+ap.add_argument("--lead", type=int, default=0,
+                help="idle MiniTPU cycles after reset before the trace, in both RTLs (a start-up probe)")
 a = ap.parse_args()
 
 prj = os.path.abspath(a.prj)
@@ -75,6 +81,25 @@ imap = dict(zip(u.CMD, [p for p, _ in ins]))
 omap = dict(zip(u.RESP, [p for p, _ in outs]))
 
 cmd, spans = check._trace_all(u, a.inst, a.n)
+KINDS = dict(zip(("compute", "dma"), (a.restrict or "rw,rw").split(",")))
+
+
+def narrow(c):
+    """The command trace narrowed to the port kinds (``--restrict``)."""
+    c = {k: list(v) for k, v in c.items()}
+    for p, kd in KINDS.items():
+        if kd == "r":
+            c[f"{p}_we_i"] = [0] * len(c[f"{p}_we_i"])
+        elif kd == "w":
+            c[f"{p}_en_i"] = [int(e) & int(w) for e, w in zip(c[f"{p}_en_i"], c[f"{p}_we_i"])]
+    return c
+
+
+cmd = narrow(cmd)
+if a.lead:
+    _idle = u._defaults()
+    cmd = {k: [_idle.get(k, 0)] * a.lead + list(v) for k, v in cmd.items()}
+    spans = [("lead", 0, a.lead)] + [(lb, s0 + a.lead, s1 + a.lead) for lb, s0, s1 in spans]
 n = len(next(iter(cmd.values())))
 unit = u.INSTANCES[a.inst]
 ww, words, aw, rl, drl = u.GEOM[a.inst]
@@ -155,17 +180,22 @@ def probes():
     resm, resc = {}, {}
     for p in u.PORTS:
         o = "dma" if p == "compute" else "compute"
+        if KINDS[p] == "w" or KINDS[o] == "r":
+            continue  # the probe writes on the other port and reads on this one
         t = Trace(u._defaults())
         t.cycle(**u._acc(o, 1, one)).cycle(**u._acc(o, 2, two)).idle(2)
         t.idle(8, **u._acc(p, 1))
         ev = len(t)
         t.idle(8, **u._acc(p, 2))
         c = t.cmd()
+        c = narrow(c)
         resm[p] = rtl.probe_trace(unit, {kk: rtl.pack(c[kk], w2) for kk, w2 in unit.inputs}, f"{p}_rdata_o", ev)
         resc[p] = _probe(cat_unit("post"), cat_cmd(c, len(t), P), omap[f"{p}_rdata_o"], ev * ST + P)
         out.append((f"read {p}", lat[p], resm[p], resc[p]))
     for wp in u.PORTS:
         for rp in u.PORTS:
+            if KINDS[wp] == "r" or KINDS[rp] == "w" or rp not in resm:
+                continue
             t = Trace(u._defaults())
             t.cycle(**u._acc(wp, 3, one)).idle(2)
             t.idle(8, **u._acc(rp, 3))
@@ -175,7 +205,7 @@ def probes():
                 row.update({f"{rp}_en_i": 0, f"{rp}_addr_i": 3})  # held address: the probe for an unconditional-read port
             t.cycle(**row)
             t.idle(8, **u._acc(rp, 3))
-            c = t.cmd()
+            c = narrow(t.cmd())
             mm = rtl.probe_trace(unit, {kk: rtl.pack(c[kk], w2) for kk, w2 in unit.inputs}, f"{rp}_rdata_o", ev) - resm[rp]
             mc = _probe(cat_unit("post"), cat_cmd(c, len(t), P), omap[f"{rp}_rdata_o"], ev * ST + P)
             mc = mc - resc[rp] if isinstance(mc, int) and isinstance(resc[rp], int) else mc
@@ -204,7 +234,8 @@ for lab, dcl, mt, mc in pr:
 # iterations the read spends in the pipe-as-data (an iteration shift, not a
 # schedule property): the manifest can only know the former.
 mc_read = {lab.split()[1]: mc for lab, _, _, mc in pr if lab.startswith("read")}
-kern_meas = {p: (mc_read[p] - (decl[f"{p}_rdata_o"] - 1)) if isinstance(mc_read[p], int) else None for p in u.PORTS}
+kern_meas = {p: (mc_read[p] - (decl[f"{p}_rdata_o"] - 1)) if isinstance(mc_read.get(p), int) else None
+             for p in u.PORTS}
 print(f"    kernel port-to-port latency, measured = read probe - (L - 1): {kern_meas}")
 try:
     from allo.backend import catapult as cb

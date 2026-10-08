@@ -257,7 +257,11 @@ probes on ``small`` (``scratch/asicmem_cat/small_ii1*``), all SCHD-30:
    * - the pipe head assigned in both branches (write-first; no held value)
      - SCHD-30, now ``pmx.sva#1``: the port's read-or-write mux itself
 
-So the obstacle is Catapult's model of a ReadWrite port whose read and write
+*(Superseded by s.6.3: the edge none of these probes released is the order
+between the two ports' WRITES; released together with the cross-port
+read/write edges -- what the collision obligation already states -- the
+2RW macro schedules at II=1 and matches MiniTPU per cycle.)* So the obstacle
+is Catapult's model of a ReadWrite port whose read and write
 alternate under a per-cycle condition: the memory-state and read-data
 feedbacks are chained within one cycle whatever the delays and precedences.
 A 1R1W macro (read and write on different physical ports) would avoid the
@@ -453,15 +457,16 @@ REGRESS_RESULT; TinyTPU emission unchanged (``vhls`` sha256 ``6bc774bc…``
 166,563 B, ``catapult`` ``ade1ab5d…`` 170,812 B, ``hash_tinytpu.py``);
 ``pylint`` on ``compose.py``/``catapult.py`` adds no message.
 
-4. Open
-=======
+4. Open (as of stage 3; see s.5-6 for what the follow-up closed)
+=================================================================
 
-* **II=1 on a read-or-write RAM port** is refused by Catapult in every form
+* *(Closed in s.6: II=1 on the 2RW macro once the cross-port order is
+  released.)* **II=1 on a read-or-write RAM port** is refused by Catapult in every form
   tried (s.2.2). A macro with separate read and write ports (1R1W, which
   OpenRAM's FreePDK45 also offers as ``1rw_1r``) avoids the per-cycle mux and
   is the thing to try when a design can live with it; MiniTPU's VMEM cannot.
   RTLGen/AMC (M2) are the other place to ask, as D-12 s.6 said.
-* **``mid`` (4,096 x 64 b) as one macro** did not build in this record's time
+* *(Closed in s.5: eight ``w512`` banks, II=1.)* **``mid`` (4,096 x 64 b) as one macro** did not build in this record's time
   (OpenRAM's pin connection is O(cells x pins); 512 words took 19 min,
   1,024 words 53 min, 4,096 was still connecting pins after 76 min); eight
   ``w512`` or four ``w1024`` banks under Catapult's ``-BLOCK_SIZE``
@@ -475,3 +480,401 @@ REGRESS_RESULT; TinyTPU emission unchanged (``vhls`` sha256 ``6bc774bc…``
 * Per-cycle latency at II=2 is reported but not comparable with MiniTPU's
   3/2/1 (s.2.3); ``cmp_wa_sram.py --stretch`` is the only harness path for
   an II=2 unit.
+
+5. ``mid`` on eight ``w512`` banks, at II=1
+===========================================
+
+.. note::
+
+   **Follow-up, 2026-10-04 afternoon.** zhang-21, branch ``asic-memories-2``
+   (worktree ``scratch/wt-asicmem2`` from ``origin/asic-memories`` at
+   ``5aa08a5d``, its own ``mlir/build``). Scratch (not kept):
+   ``scratch/asicmem2_*``. Tools as s.1 (OpenRAM ``b2b069ce`` unchanged,
+   ``git status`` clean). s.6 is the second item of the same session; this
+   section uses its result (the cross-port release that gives II=1).
+
+5.1 The bank macro, pinned
+--------------------------
+
+``sram_2rw_64x512_freepdk45`` (s.2.1): OpenRAM ``b2b069ce``,
+``openram/cfg_2rw_64x512.py`` (routers and DRC/LVS off), generated **once**
+(``scratch/asicmem_openram/w512``, 1,151 s) and reused for every bank. LEF
+``SIZE 410.295 BY 252.945`` = **103,782.07 um^2** a bank. sha256: ``.v``
+``bc3ceb63fd91…``, ``.lib`` ``f207b9246b42…``, ``.lef`` ``d5cc4f848f79…``
+(the three files are in ``openram/``; the LEF is new here), ``.gds``
+``96c2b751fd07…`` (14.4 MB, not committed: regenerate from the config and
+compare), the ``lc_shell`` ``.db`` md5 ``8b619e1feb7f…``. Full hashes in
+``dev/toolchains.rst``. ``mid`` as eight of them is **830,256.6 um^2** of
+macro; four ``w1024`` banks (s.1.3, 182,918.1 each) would be 731,672.4
+(-12 %) and were not taken through Catapult.
+
+5.2 Banks are declared
+----------------------
+
+``Sram.banked(n)`` (``allo/compose.py``) declares ``n`` copies of the macro,
+each a contiguous block of ``rows`` words (the high address bits pick the
+bank). Never inferred, as D-13/D-14 say of their properties: a memory with
+more rows than one macro is refused until it declares its banks (``4096 rows
+do not fit the macro ... (512 rows x 1 bank); declare the banks,
+Sram.banked(8) -- banking is never inferred``), and a bank count with an
+empty bank is refused too. The SystemC build adds ``directive set <rsc>
+-BLOCK_SIZE <macro rows>`` after the ``MAP_TO_MODULE`` (``memory_directives``);
+``memory.json`` carries ``banks``, ``banking`` and ``total_area_um2``.
+Catapult's block split was taken over an explicit bank unit in ``compose``:
+every bank keeps both macro ports, so each declared port is still one
+physical port per bank and the port calendar does not change; Catapult builds
+the decode and the read-data mux itself. ``-INTERLEAVE`` would put adjacent
+words in different banks, which nothing in a two-port-per-bank VMEM needs.
+``vpu_word_array_d12.SRAMS["mid"]`` is ``SRAMS["w512"]().banked(8).mapped(c=0,
+d=1)`` (the placement of s.6.4, stated).
+
+5.3 Catapult
+------------
+
+``sram_csyn.py sram <prj> --unit word_array --inst mid --ii {1,2}``, the
+library built by ``build_memory_library`` (``RDWRRESOLUTION UNKNOWN``, as
+s.2.1), nothing hand-patched. Catapult reports ``MEM-4`` eight times,
+``mem:rsc(0..7)(0)`` each ``mapped to 'sram_2rw_64x512_freepdk45...' (size:
+512 x 64)``, and ``concat_rtl.v`` instantiates eight macros.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 30 48
+
+   * - ``mid``, 8 x ``w512``
+     - schedule
+     - note
+   * - **II=1** (``catapult/mid_sram_ii1``)
+     - ``port_c_0``/``port_d_0`` ii 1, 1 c-step; ``vmem_mem_0`` ii 1, 2 c-steps;
+       44 s; area score 833,499.3
+     - with the six cross-port ``ignore_memory_precedences`` the collision
+       obligation implies (s.6.3), emitted by ``compose``
+   * - II=2 (``catapult/mid_sram_ii2``)
+     - ports ii 2; ``vmem_mem_0`` 3 c-steps; 40 s; area score 833,041.5
+     - as ``w512`` in s.2.2; the first run, before s.6, scheduled the same with
+       no release at all
+   * - II=1 without the release
+     - SCHD-30, chained feedback ``while:if:write_mem(mem:rsc(0)(0).@)`` ->
+       ``while:if#1:write_mem(...)``
+     - ``probes_s6.txt``, ``mid_sram_rbw_ii1`` (an RBW library, s.6.3, so the
+       read/write chain of s.2.2 is gone and this one shows): the two ports'
+       writes, the edge s.2.2's probes never released
+
+5.4 Per cycle against ``vpu_word_array.sv``
+--------------------------------------------
+
+``cmp_wa_sram.py`` as s.2.3 (macro model ``_sim.v``, ``--cut-module``),
+``inst=mid`` (the 4,096 x 64 b MiniTPU instance, ``MINITPU_NUM_LANES=1``).
+
+* **II=1: defined 8,244/8,244** with one idle cycle after reset (``--lead
+  1``): compute 4,129/4,129, DMA 4,115/4,115, 16,976 masked, both ports at
+  output-row offset **+0**, i.e. MiniTPU's own rows; the step probes give
+  read **3** and **2** cycles and same-port write->read visibility **1**, all
+  MiniTPU's (``logs/cmp_mid_sram_ii1_lead1.txt``). The two cross-port
+  held-address visibility probes give 0 against MiniTPU's 1: that probe
+  writes a word on one port while the other port, disabled, still reads it
+  (S6, an unconditional read) -- a same-cycle cross-port access of one word,
+  the collision obligation's cycle; OpenRAM's model resolves it
+  write-through. Masked in verdicts, as D-12 says.
+* **Without the idle lead: 8,243/8,244** (``cmp_mid_sram_ii1.txt``). The one
+  miss is a write on the first cycle after reset release
+  (``wr-offsets-compute->compute`` cycle 0, read back at cycle 6, which
+  returns Verilator's initial word): the pipelined server takes its first
+  command one cycle after reset. Same at 32 and 512 words
+  (``cmp_{small,w512}_sram_ii1*.txt``: 10,512/10,513 and 9,666/9,667, all
+  defined with the lead). Inside MiniTPU this cycle carries no VMEM access on
+  the compute side -- ``vpu_vmem_simd`` registers the request and resets
+  ``compute_valid_q`` -- and the DMA side needs a descriptor from the
+  sequencer first (not traced cycle by cycle here). A recorded deviation of
+  the unit, not of the core.
+* **II=2: defined 8,244/8,244** with ``--stretch 2``, the same offsets and
+  probe values as ``w512`` in s.2.3 (``logs/cmp_mid_sram_ii2.txt``).
+* The trace reaches every bank: accesses per bank 1,817 / 3,843 / 4,031 /
+  3,980 / 1,766 / 504 / 595 / 1,715, and of the cycles where both ports are
+  enabled 4,952 are in different banks and 1,869 in the same bank.
+
+5.5 DC: eight macros as black boxes
+-----------------------------------
+
+As s.2.4 (``dc/dc_sram.tcl``, 3.33 ns, the bank macro's ``.db`` linked).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 36 15 13 17 19
+
+   * - 3.33 ns, um^2
+     - total
+     - comb
+     - seq (cells)
+     - macro
+   * - **``mid`` (4,096 x 64 b, 262,144 bit)**
+     -
+     -
+     -
+     -
+   * - MiniTPU flop-mapped (``mtpu_word_array_flops.sv``)
+     - see s.5.6
+     -
+     -
+     -
+   * - Allo ``sram``, 8 x ``w512``, **II=1** (``dc/a_mid_sram_ii1_3p33``)
+     - **833,541.9**
+     - 1,448.6
+     - 1,836.7 (354)
+     - **830,256.6**
+   * - Allo ``sram``, 8 x ``w512``, II=2 (``dc/a_mid_sram_ii2_3p33``)
+     - 833,333.1
+     - 1,589.6
+     - 1,486.9 (288)
+     - 830,256.6
+   * - *one ``w512`` macro, II=1, for the bank cost* (``dc/a_w512_sram_ii1_3p33``)
+     - 105,911.4
+     - 377.7
+     - 1,751.6 (331)
+     - 103,782.1
+
+Slack 1.00 ns (II=1) and 0.95 ns (II=2) at 3.33 ns; the macro's own
+Liberty timing is the analytical model (s.1.3). **The bank decode and mux
+cost 1,156 um^2** at II=1 (comb +1,070.9, seq +85.1 against the one-macro
+build): 0.14 % of the macros. All macro numbers are the core without power
+ring, escape routing or DRC/LVS (s.1.3).
+
+5.6 Still open in this section
+------------------------------
+
+* **MiniTPU's flop-mapped ``mid``**: no earlier record has it (``u2_word_array``
+  and ``u2_d12_prototype`` measured ``narrow``; s.2.4 ``small`` and ``w512``).
+  DC on ``mtpu_word_array_flops.sv`` with ``MINITPU_NUM_LANES=1`` was started
+  here (``scratch/asicmem2_dc``, 4 h timeout) and was still in its first
+  mapping pass when this section was committed; its number is recorded below
+  when it ends. Linear scale from ``w512`` (262,797.6 um^2 x 8 = 2,102,381) is
+  an estimate only.
+* **The one-macro ``mid`` OpenRAM job** (s.1.3, started 11:07, 4 h timeout):
+  still running at 13:30 (CPU 2 h). Its result is recorded below when it ends.
+
+6. II=1 on MiniTPU's two read/write ports
+=========================================
+
+The question this section was given: does a macro with a read-only port
+(1RW+1R, or 1R1W) reach II=1 where the 2RW macro did not (s.2.2), and if
+MiniTPU's ports do not fit such a macro, which access pattern forces ``rw``?
+Both are answered below; the answer to the question behind them -- II=1 for
+MiniTPU's VMEM on an SRAM macro -- turned out not to need a different macro.
+
+6.1 What MiniTPU's two ports do per cycle
+-----------------------------------------
+
+From the RTL at ``b3ba0a4d`` (``vpu_vmem_simd.sv``, ``vpu_dma_group.sv``) and
+the U2 conflict table (``u2_phase0_2026-10-02.rst`` rows 9-11):
+
+* **compute port**: ``en = compute_valid_q``, ``we = compute_req_q.op`` --
+  a ``vld`` reads, a ``vst`` writes. **DMA port**: ``word_en = commit ||
+  read_fetch``, ``word_we = commit`` -- a DMA-out word fetch reads, a DMA-in
+  word commit writes. **Each port reads in some cycles and writes in others,
+  one access a cycle**: both are ``rw`` in D-12's kinds. A same-port read and
+  write in one cycle never happens (row 11: one MEM op per bundle; the sim
+  model's read in a write cycle is masked, the XPM is ``no_change``).
+* **Across the ports, in one cycle**, all four combinations are legal on
+  different words: two reads (row 10, also on one word), a read and a write
+  either way, and **two writes** (row 9 forbids only one word). The harness's
+  ``mid`` trace has, of the cycles with both ports enabled, 2,437 read/read,
+  1,652 + 1,607 write/read, and **1,125 write/write**.
+* So a cycle may need **two writes, or two reads**. A two-port macro serves
+  that only with both ports ``rw``; without ``rw`` ports it needs 2R+2W.
+  **The pattern that forces ``rw`` is a ``vst`` and a DMA-in commit in the
+  same cycle** (two writes) -- with, in other cycles, a ``vld`` beside a
+  DMA-out fetch (two reads). A 1RW+1R macro has one writer: the DMA port's
+  commits (or the compute port's stores) have no port in a write/write cycle.
+
+6.2 Macros built (OpenRAM ``b2b069ce``, FreePDK45, routers and DRC/LVS off)
+----------------------------------------------------------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 14 18 38
+
+   * - Macro (``openram/``)
+     - Wall time
+     - Liberty area, um^2
+     - Note
+   * - ``sram_1rw1r_64x32`` (1RW+1R)
+     - 48 s
+     - 19,990.8
+     - vs 28,295.5 for the 2RW at 32 words
+   * - ``sram_1r1w_64x32`` (1W+1R, ``num_rw_ports=0``)
+     - 37 s
+     - 18,562.5
+     - OpenRAM lists the write port as port 0
+   * - ``sram_1rw1r_64x512``
+     - 1,069 s
+     - 98,967.6
+     - vs 103,782.1 for the 2RW bank macro (-4.6 %)
+   * - ``sram_1r1w_64x512``
+     - 826 s
+     - 97,488.3
+     - built; no Catapult run uses it
+   * - 2R+2W at 32 words (``cfg_2r2w_64x32.py``)
+     - 7 s, **refused**
+     - --
+     - ``pbitcell.py:1173``: "Two ports for bitcell_2port only" -- OpenRAM at
+       the pin builds at most two ports, so no 4-port macro
+
+6.3 Catapult at II=1: the probes, and the release that works
+------------------------------------------------------------
+
+All at 3.33 ns on 32 words unless named, ``sram_csyn.py`` with ``--kinds``
+(the port-kind probes of ``vpu_word_array_d12``: a MiniTPU port narrowed to
+read-only or write-only -- **not** MiniTPU's VMEM), ``--openram`` and, for
+two rows, ``--rdwr``. Every probe's macro, resolution, hand-patch lines and
+result are in ``catapult/probes_s6.txt``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 14 11 13 34 28
+
+   * - macro
+     - kinds c,d
+     - RDWR
+     - released (``ignore_memory_precedences``)
+     - II=1
+   * - 2RW
+     - rw,rw
+     - UNKNOWN
+     - nothing / cross read<->write (s.2.2)
+     - SCHD-30
+   * - 2RW
+     - rw,rw
+     - RBW
+     - nothing
+     - SCHD-30 on ``write_mem`` c -> ``write_mem`` d
+   * - 2RW
+     - rw,rw
+     - RBW
+     - write<->write only
+     - SCHD-4 (3 port uses for 2 ports)
+   * - 2RW
+     - rw,rw
+     - RBW
+     - all memory precedences (same-port too)
+     - scheduled; 10,512/10,513 (s.6.4)
+   * - **2RW**
+     - **rw,rw**
+     - **RBW / UNKNOWN**
+     - **the six cross-port pairs** (``while:if``/``else`` = c, ``if#1``/``else#1`` = d)
+     - **scheduled**, ports 1 c-step, server 2
+   * - 1RW+1R
+     - rw,r
+     - UNKNOWN / RBW
+     - nothing
+     - SCHD-30 / SCHD-4
+   * - 1RW+1R
+     - rw,r / r,w
+     - UNKNOWN
+     - the cross-port pairs (compose)
+     - SCHD-4: 2 ``rwport`` needed, 1 available
+   * - 1RW+1R
+     - r,w
+     - RBW
+     - nothing; also with the Read port listed first in the MemGen spec; also at 512 words
+     - SCHD-4
+   * - 1RW+1R
+     - rw,r (II=2)
+     - RBW / UNKNOWN
+     - --
+     - scheduled at II=2 **with the R port tied off** (``.csb1(1'b1)``)
+   * - 1R1W
+     - r,w
+     - UNKNOWN
+     - nothing
+     - SCHD-30, ``read_mem`` c -> ``write_mem`` d
+   * - 1R1W
+     - r,w
+     - RBW, or UNKNOWN + the cross-port pairs
+     - --
+     - scheduled; 8,624/8,624 (s.6.4)
+
+What this shows:
+
+* **The obstacle was never the ``rw`` port.** It is the order Catapult keeps
+  between the two ports' accesses of one memory: a write on c and a write on d
+  in one iteration may hit one word, so Catapult chains them (and each read
+  behind the other port's write), and the chain plus the macro's read delay
+  is longer than one cycle. s.2.2's probes released the read/write edges but
+  not the **write/write** one. D-12's collision obligation is exactly the
+  statement that the two ports never touch one word in one cycle (MiniTPU
+  issue #21); with it, no order between them is observable and Catapult may
+  drop it. Same-port order is kept: releasing it too (the "all" row)
+  scheduled as well, but nothing licenses it.
+* **The release is now emitted by ``compose``**, not hand-patched:
+  ``Architecture.cross_port_independence(m)`` gives the ``(from, to)``
+  operation patterns of every cross-port pair with a write in it, only when
+  ``collision`` is ``obligation`` or ``undefined``; ``memory_independence``
+  writes them after ``go architect`` in ``run.tcl``; ``memory.json`` states
+  ``cross_port_independent``. The patterns follow the server ``compose``
+  generates (``_server_ops``: each ``rw`` port one ``if``/``else`` in order,
+  an ``r`` port a plain read, each ``w`` port an ``if`` after them), so they
+  name each port's operations, in every bank.
+* **RBW is not needed** (the UNKNOWN rows schedule identically with the
+  release), and it would be a false statement about this macro: OpenRAM's
+  model resolves a same-cycle cross-port read of a written word write-through
+  (the held-address probes, s.5.4). The library stays ``UNKNOWN``;
+  ``Sram.rdwr`` records it, and a memory with ``collision="refuse"`` and a
+  reader beside a different writer is refused on such a macro ("visible=1
+  says it sees the old word; the macro leaves that cycle UNKNOWN").
+* **Catapult does not use the Read port of a ReadWrite+Read macro**: every
+  access is bound to the ``rwport``, the R port is tied off. A 1RW+1R macro
+  through Catapult is a 1RW memory, which would drop a declared port; the
+  SystemC build now refuses a macro that mixes ``rw`` with ``r``/``w`` ports.
+  1R1W (no ``rw``) works.
+
+6.4 Per cycle at II=1
+---------------------
+
+* **MiniTPU's VMEM on the 2RW macro, from ``compose`` alone (UNKNOWN
+  library, the cross-port release)**: ``small`` 10,513/10,513, ``w512``
+  9,667/9,667, ``mid`` (8 banks, s.5.4) 8,244/8,244, each with one idle
+  cycle after reset and each **at MiniTPU's own rows** (offset +0 on both
+  ports): read latency 3 and 2, same-port visibility 1, as the RTL. Without
+  the idle cycle: 10,512/10,513, 9,666/9,667, 8,243/8,244 -- the first-cycle
+  command (s.5.4). ``logs/cmp_{small,w512,mid}_sram_ii1*.txt``;
+  ``catapult/{small,w512,mid}_sram_ii1``.
+* **The 1R1W probe** (compute read-only on the R port, DMA write-only on the W
+  port; ``cmp_wa_sram.py --restrict r,w`` narrows the trace for both RTLs):
+  compute defined 8,624/8,624 at offset +0, read probe 3 = MiniTPU's
+  (``logs/cmp_small_1r1w_rw_ii1.txt``, ``catapult/small_1r1w_rw_ii1``).
+* The D-10 manifest: the port kernels report latency 1, ii 1 (LATENCY-MATCH
+  against the measured kernel latency 1); ``vmem_mem_0`` reports latency 2
+  against the measured 1, the kind of server-manifest mismatch s.2.3 already
+  printed; not investigated here.
+
+6.5 The answer, and the mapping
+-------------------------------
+
+* **MiniTPU's VMEM reaches II=1 on a 2RW SRAM macro**, one or eight banks,
+  cycle-exact with ``vpu_word_array.sv`` at latencies 3/2/1, once the
+  composition's collision obligation is handed to Catapult as cross-port
+  independence. II=2 is no longer the ASIC answer; s.2.2-2.4's II=2 rows
+  stand as measured. D-12's reverses-if ("a two-port VMEM cannot reach II=1")
+  does not fire on the macro path either.
+* **A 1RW+1R (or 1R1W) macro does not fit MiniTPU's VMEM**: both ports are
+  ``rw``, and the cycle that forces it is a ``vst`` beside a DMA-in commit
+  (two writes), with a ``vld`` beside a DMA-out fetch in others (two reads)
+  -- s.6.1. ``compose`` refuses the placement naming the port ("port d (rw)
+  has no port of the macro ... left to honour it ... a declared rw port needs
+  an rw macro port"); a pinned placement on the wrong kind is refused the same
+  way (``Sram.mapped(c=1)``: "port c (rw) cannot sit on port 1 ... a 'r'
+  port"). Even where the kinds fit, Catapult would not drive the 1RW+1R
+  macro's R port (s.6.3).
+* **``memory.json``** of the shipped ``mid`` (``catapult/mid_sram_ii1``):
+  ``macro`` ``sram_2rw_64x512_freepdk45`` x 8 (``banking`` "8 x 512 rows,
+  contiguous blocks"), ``port_map`` ``{"c": "0 (rw)", "d": "1 (rw)"}``,
+  ``cross_port_independent`` stated, ``obligation`` MiniTPU issue #21. Of the
+  1R1W probe: ``{"c": "1 (r)", "d": "0 (w)"}``.
+* Tests (``tests/dataflow/test_compose_sram.py``): ``test_sram_banked_mid``,
+  ``test_sram_port_kinds_placement`` (every kind refusal and the mixed-macro
+  refusal), ``test_sram_cross_port_independence`` (the six pairs, nothing
+  same-port, nothing under ``refuse``, the ``run.tcl`` order). Regression
+  as s.3 plus these: **132 passed** (``pytest tests/dataflow/test_systemc*.py tests/test_memory.py tests/dataflow/test_compose_memory_ports.py tests/dataflow/test_compose_sram.py``, 315 s); TinyTPU emission unchanged (``vhls``
+  ``6bc774bc…`` 166,563 B, ``catapult`` ``ade1ab5d…`` 170,812 B);
+  ``pylint`` on ``compose.py``/``catapult.py`` adds no message type (counts
+  of the existing ``too-many-*`` move by one or two).
