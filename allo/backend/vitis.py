@@ -3,6 +3,7 @@
 
 import re
 import json
+from math import prod
 import numpy as np
 
 from .utils import format_str
@@ -409,13 +410,20 @@ def postprocess_hls_code(hls_code, top=None, pragma=True, align_value=None):
             out_str += line + "\n"
             # Add extra interfaces
             if pragma:
-                for i, arg in enumerate(func_args):
-                    out_str += f"  #pragma HLS interface m_axi port={arg} offset=slave bundle=gmem{i}\n"
+                for i, (arg, depth) in enumerate(func_args):
+                    depth_option = f" depth={depth}" if depth is not None else ""
+                    out_str += f"  #pragma HLS interface m_axi port={arg} offset=slave bundle=gmem{i}{depth_option}\n"
         elif func_decl:
             if pragma:
                 dtype, var = line.strip().rsplit(" ", 1)
                 comma = "," if var[-1] == "," else ""
                 if "[" in var:  # array
+                    dims = re.findall(r"\[([^\]]*)\]", var)
+                    depth = (
+                        prod(int(dim) for dim in dims)
+                        if all(dim.isdecimal() for dim in dims)
+                        else None
+                    )
                     var = var.split("[")[0]
                     align = (
                         f"__attribute__((align_value({align_value}))) "
@@ -424,7 +432,7 @@ def postprocess_hls_code(hls_code, top=None, pragma=True, align_value=None):
                     )
                     out_str += "  " + dtype + " *" + align + var + f"{comma}\n"
                     # only add array to interface
-                    func_args.append(var)
+                    func_args.append((var, depth))
                 else:  # scalar
                     var = var.split(",")[0]
                     out_str += "  " + dtype + " " + var + f"{comma}\n"

@@ -3149,6 +3149,7 @@ class ASTTransformer(ASTBuilder):
         ):
             # Local imports to avoid cyclic dependencies
             from ..backend.ip import IPModule, STREAM
+            from ..backend.rtl import RTLModule
 
             try:
                 from ..backend.aie.external_kernel import ExternalModule
@@ -3412,6 +3413,19 @@ class ASTTransformer(ASTBuilder):
             else:
                 new_args = build_stmts(ctx, node.args)
             if isinstance(obj, (IPModule, ExternalModule)):
+                if isinstance(obj, RTLModule) and obj in ctx.ext_libs:
+                    raise ValueError(
+                        "Use one static call site per RTLModule; create separately named instances for parallel calls"
+                    )
+                if any(
+                    lib is not obj
+                    and lib.top == obj.top
+                    and (isinstance(obj, RTLModule) or isinstance(lib, RTLModule))
+                    for lib in ctx.ext_libs
+                ):
+                    raise ValueError(
+                        f"Duplicate external IP symbol {obj.top}; set RTLModule(name=...)"
+                    )
                 # input_idx / output_idx give per-argument direction (which args
                 # the IP reads vs writes). ExternalModule has always carried them;
                 # IPModule now does too, which is what lets us direct hls::stream
