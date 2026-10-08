@@ -458,6 +458,21 @@ from Allo, mostly as RTL IP; and Allo's MXU integrated into MiniTPU.**
   `versions.<name>` seam, not a silent change.
 - Neither replaces the ladder (U4, U5) nor moves the pin (D-16).
 - Evidence as it lands: `dev/records/minitpu/minitpu_rtl_*.rst`.
+- Settled after the probes (owner, 2026-10-08; `minitpu_rtl_plan_2026-10-08.rst`,
+  `pr48_probe_2026-10-08.md`, `minitpu_rtl_m0_2026-10-08.rst`):
+  (1) the baseline wraps the **core seam** (`minitpu_core.sv`: a ready/valid
+  memory pipe, IRAM port, start/done, two CSRs), not the AXI top; the AXI top
+  is an optional later milestone. (2) **PR #48 is merged** once `main` is
+  clean, and its debts are fixed in one fork follow-up commit (the Verilator
+  5.052 `--json-only` port, flag pass-through, a stall knob, docs to Sphinx,
+  the Verilator pin); the shim may extend it. (3) The headline claim is the
+  whole core's: "MiniTPU RTL obtained from Allo, all units the real RTL"; the
+  hybrid (real `mxu.sv` inside Allo units) runs in parallel; Allo's MXU
+  inside MiniTPU's tree is queued behind Catapult II=1 and the `versions`
+  seam. (4) The gate is **bits**: the drain bit-identical to MiniTPU's own
+  testbench digest (`examples/minitpu-rtl/oracle.json`); cycles are reported
+  beside the testbench's, a difference is a recorded finding. One looped GEMM
+  first, then the `sim_kernel.py` set.
 
 **D-22 (2026-10-08). TinyTPU is the toy instance for communication; MiniTPU
 is the design driver.**

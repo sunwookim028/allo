@@ -510,6 +510,30 @@ not a requirement). Issue audit recorded
 ``main``, prune the 13 merged branches, add the README naming paragraph
 (after the cleanup lands).
 
+**Checkpoint 22 (2026-10-08, owner decisions on D-21; U3 on main).**
+The owner settled the four D-21 choices (README D-21, last bullet): core seam
+first; merge PR #48 with a fork follow-up fixing its debts; the whole-core
+claim is the headline, the hybrid in parallel, Allo's MXU into MiniTPU after
+Catapult II=1; bits are the gate, cycles reported. ``u1-pilot-sync3``
+regressed clean (132 passed, emissions byte-identical, all gates and
+``check.py`` verdicts equal to the baseline, pytest 1004/78 vs 924/80 with
+only ``tests/act/test_bindings`` changing, fail -> pass); ``main`` and
+``u1-pilot`` fast-forwarded to ``552db66a``; sixteen merged branches deleted.
+M-R0 landed on ``minitpu-rtl-m0`` (``e25cc1be``): 52 launches, the RTL halts
+on all, the emulator's drain is bit-identical on 29 and is a functional model
+for the rest (float64 MXU, exact SFU), so the bit oracle is the testbench's
+digest; ``minitpu_core`` builds standalone under #48's flags with no
+warnings; #48's ``MemPort`` runs under the simulator. Landed for review:
+``u4-phase0`` (``c66ac2fa``; eleven control units matched, W = latency +
+``VPU_WB_STAGES`` measured three ways, findings F-W1..W4 for MiniTPU),
+``tinytpu-instance`` (``12d11cc6``; the instance reproduces the published
+cycles 175/265/421/482/674 and the mutant score; findings F1/F3 core bugs,
+F8 engine swap reaches one unit, F13 host ``ld`` 2.30 breaks every Vitis
+cosim link), ``tinytpu-example`` (``5d74701f``; cosim not reproducible on
+this host for the same ``ld`` reason), ``minitpu-rtl-mxu`` (``2aaad780``;
+MiniTPU's ``tb_mxu_single_port`` passes against the Allo MXU at DIM 2,
+depth-4 links give the first declarable latency: push->valid 20, pop 9).
+
 **Checkpoint 21 (2026-10-08, two D-21 probes landed; owner review pending).**
 ``pr48_probe_2026-10-08.md``: PR #48 merges onto ``main`` with two one-hunk
 conflicts and leaves every existing design's emission byte-identical; as
