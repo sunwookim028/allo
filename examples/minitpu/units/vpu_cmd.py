@@ -368,3 +368,189 @@ def _variant(depth):
 
 VARIANTS = {"streams": (_variant(2), run_streams), "streams_d1": (_variant(1), run_streams),
             "streams_d4": (_variant(4), run_streams)}
+
+
+# ---------------------------------------------------------------------------------
+# The four shared resources (README D-23) as D-12 ports, checked at composition
+# ---------------------------------------------------------------------------------
+# A structural declaration: every unit body moves one token a cycle on each of
+# its channels and touches its ports the way the RTL's unit does in a command's
+# issue cycle. What it buys is the ownership check: the collisions ``vpu.sv``
+# resolves by convention (one raddr_a/raddr_b for whichever V op issues; port C
+# shared by a store and a streaming vmatload/vmatpush, the matrix read winning
+# silently at vpu.sv:430; six sources OR-ed onto the write port; the VMEM
+# compute port) are refused unless one unit owns each port.
+from allo.compose import Architecture, Channel, Memory, Port, unit  # noqa: E402
+
+
+@unit(memories=("CV", "CX", "CM"), writes=("cv", "cx", "cxs", "cm"), parameters=("N",))
+def r_issue(xv: UInt(64)[N], xx: UInt(32)[N], xm: UInt(32)[N]):
+    """The issue unit's three command Streams (V, X, M); the store's port-C
+    read request leaves with the X command (``cxs``), as ``vpu_vmem_simd``
+    samples port C in the issue cycle."""
+    for t in range(N):
+        cv.put(xv[t])
+        cx.put(xx[t])
+        cxs.put(xx[t])
+        cm.put(xm[t])
+
+
+@unit(memories=("vreg.ra", "vreg.rb"), reads=("cv",), writes=("wv",), parameters=("N",))
+def r_vop(ra, rb):
+    """Whichever V op issues reads VREG ports A and B (the ALU, SFU, tree and
+    transpose share them: one owner, the V unit)."""
+    for t in range(N):
+        c: UInt(64) = cv.get()
+        a: int32 = c[37:42]
+        b: int32 = c[32:37]
+        x: UInt(8) = ra[a]
+        y: UInt(8) = rb[b]
+        wv.put(x ^ y)
+
+
+@unit(memories=("vmem.c",), reads=("cx", "sd"), writes=("wx",), parameters=("N",))
+def r_xop(vm):
+    """X: the VMEM compute port's one owner (vld reads it, vst writes the data
+    port C returned)."""
+    for t in range(N):
+        c: UInt(32) = cx.get()
+        d: UInt(8) = sd.get()
+        a: int32 = c[1:13]
+        q: UInt(8) = vm[a]
+        st: uint1 = 0
+        if c[19:20] != 0 and c[18:19] != 0:
+            st = 1
+        if st:
+            vm[a] = d
+        wx.put(q)
+
+
+@unit(reads=("cm",), writes=("mreq", "wm"), parameters=("N",))
+def r_mop():
+    """M: the stream engine asks port C for a row each cycle it streams; the
+    pop engine sends its beat to the write port."""
+    for t in range(N):
+        c: UInt(32) = cm.get()
+        mreq.put(c[0:5])
+        wm.put(c[10:15])
+
+
+@unit(memories=("vreg.rc",), reads=("cxs", "mreq"), writes=("sd", "mdata"), parameters=("N",))
+def r_portc(rc):
+    """Port C's one owner: the matrix stream and a store both ask for it in a
+    cycle; the matrix read wins (vpu.sv:430), now a declared priority."""
+    for t in range(N):
+        s: UInt(32) = cxs.get()
+        m: UInt(8) = mreq.get()
+        a: int32 = s[13:18]
+        if m != 0:
+            a = m
+        d: UInt(8) = rc[a]
+        sd.put(d)
+        mdata.put(d)
+
+
+@unit(reads=("mdata",), memories=("MD",), parameters=("N",))
+def r_mxu(md: UInt(8)[N]):
+    for t in range(N):
+        md[t] = mdata.get()
+
+
+@unit(memories=("vreg.w",), reads=("wv", "wx", "wm"), parameters=("N",))
+def r_wb(w):
+    """The write port's one owner (W1, units/vpu_wb.py)."""
+    for t in range(N):
+        a: UInt(8) = wv.get()
+        b: UInt(8) = wx.get()
+        c: UInt(8) = wm.get()
+        x: int32 = (a | b | c) & 31
+        w[x] = a
+
+
+VREG = Memory("vreg", "UInt(8)", rows="32",
+              ports=(Port("ra", "r", latency=0), Port("rb", "r", latency=0), Port("rc", "r", latency=0),
+                     Port("w", "w", visible=1)),
+              collision="refuse", reset=False)
+VMEM_C = Memory("vmem", "UInt(8)", rows="4096", ports=(Port("c", "rw", latency=3, visible=1),),
+                collision="refuse")
+R_UNITS = (r_issue, r_vop, r_xop, r_mop, r_portc, r_mxu, r_wb)
+R_CHANNELS = ("cv", "cx", "cxs", "cm", "wv", "wx", "wm", "sd", "mreq", "mdata")
+
+
+def resources(n=8, units=R_UNITS):
+    """The D-23 boundary with its four shared resources as D-12 ports: VREG A/B
+    (``r_vop``), VREG C (``r_portc``), the write port (``r_wb``), the VMEM
+    compute port (``r_xop``). Construction runs every composition check."""
+    return Architecture(
+        name="vpu_cmd_resources",
+        parameters={"N": n},
+        memories=(Memory("CV", "UInt(64)[N]"), Memory("CX", "UInt(32)[N]"), Memory("CM", "UInt(32)[N]"),
+                  Memory("MD", "UInt(8)[N]"), VREG, VMEM_C),
+        channels=tuple(Channel(c, "UInt(64)" if c == "cv" else "UInt(32)" if c in ("cx", "cxs", "cm") else "UInt(8)",
+                               "2") for c in R_CHANNELS),
+        units=units,
+    )
+
+
+@unit(memories=("vmem.c", "vreg.ra"), reads=("cx", "sd"), writes=("wx",), parameters=("N",))
+def p_xop_reads_a(vm, ra):
+    """``r_xop`` that also reads VREG port A (a second reader of the V unit's port)."""
+    for t in range(N):
+        c: UInt(32) = cx.get()
+        d: UInt(8) = sd.get()
+        a: int32 = c[1:13]
+        r: int32 = c[13:18]
+        q: UInt(8) = vm[a]
+        e: UInt(8) = ra[r]
+        wx.put(q ^ d ^ e)
+
+
+@unit(memories=("vmem.c", "vreg.rc"), reads=("cx", "sd"), writes=("wx",), parameters=("N",))
+def p_store_reads_c(vm, rc):
+    """``r_xop`` reading port C itself for its store, beside the arbiter."""
+    for t in range(N):
+        c: UInt(32) = cx.get()
+        d: UInt(8) = sd.get()
+        a: int32 = c[1:13]
+        r: int32 = c[13:18]
+        q: UInt(8) = vm[a]
+        e: UInt(8) = rc[r]
+        wx.put(q ^ d ^ e)
+
+
+@unit(memories=("vmem.c", "vreg.w"), reads=("cx", "sd"), writes=("wx",), parameters=("N",))
+def p_load_writes(vm, w):
+    """``r_xop`` writing its load into the register file itself (vpu.sv's
+    load source driving the OR-ed write port), beside W1."""
+    for t in range(N):
+        c: UInt(32) = cx.get()
+        d: UInt(8) = sd.get()
+        a: int32 = c[1:13]
+        r: int32 = c[13:18]
+        q: UInt(8) = vm[a]
+        w[r] = q
+        wx.put(d)
+
+
+def resource_probes(n=8):
+    """[(label, verdict)]: the declared composition, and one wrong ownership per
+    shared resource, each of which must be refused at composition."""
+    out = []
+
+    def try_(label, units, expect_ok=False):
+        try:
+            resources(n, units)
+            out.append((label, "composed" if expect_ok else "ACCEPTED (bug)"))
+        except AssertionError as e:
+            out.append((label, ("REFUSED (bug): " if expect_ok else "refused: ") + str(e).splitlines()[0]))
+
+    try_("D-23 boundary: four resources, one owner each", R_UNITS, expect_ok=True)
+    try_("port A: the X unit also reads vreg.ra beside the V unit",
+         (r_issue, r_vop, p_xop_reads_a, r_mop, r_portc, r_mxu, r_wb))
+    try_("port C: the store reads vreg.rc itself beside the arbiter",
+         (r_issue, r_vop, p_store_reads_c, r_mop, r_portc, r_mxu, r_wb))
+    try_("write port: the load unit writes vreg.w beside W1",
+         (r_issue, r_vop, p_load_writes, r_mop, r_portc, r_mxu, r_wb))
+    try_("port C left without its owner (the arbiter dropped; the netlist rule on its channel fires first)",
+         (r_issue, r_vop, r_xop, r_mop, r_mxu, r_wb))
+    return out
