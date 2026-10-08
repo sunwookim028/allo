@@ -389,8 +389,13 @@ def sagu(rst: uint1[N], ka: UInt(32)[N, 4], sreg_o: UInt(32)[N, 4]):
         s_b.put(sreg[ib])
         s_s.put(sreg[i_s])
         raw: UInt(32) = sreg[il]
+        # kernel_arg_csr[il] read every cycle, not under the `if`: in csim a
+        # 2-D boundary array read at a data-dependent index is a memory port,
+        # and a read under a condition cost the thread 2 cycles exactly on the
+        # loop.begin.r-from-argument cycles (record, S-4)
+        karg: UInt(32) = ka[t, il]
         if q[40]:
-            raw = ka[t, il]
+            raw = karg
         bound: UInt(32) = raw[0:16]
         if raw[16:32] != 0:
             bound = 0xFFFF

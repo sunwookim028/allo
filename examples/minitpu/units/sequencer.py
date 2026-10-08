@@ -336,6 +336,8 @@ def seeds():
         cmd = {p: rows[p] for p, _ in INPUTS}
         seen = {p: rows[p] for p, _ in R.OUTS}
         out.append((tb, "shipped", cmd, seen, True))
+        if os.environ.get("U4_SEQLOOP_SEEDS") == "1":  # the loop instance too (opt-in: 271,834 cycles)
+            out.append((tb, "loop", cmd, seen, True))
     return out
 
 
