@@ -457,8 +457,12 @@ principle. Worktrees not in flight are removed; ``wt-u1`` is the integrator
 and has its own build at ``8ceb3011``.
 
 **Agreed seam with ``minitpu-comp``, 2026-10-08** (their master ``7676911``;
-the ISA JSON moves from ``docs/`` to a top-level ``isa/`` on branch
-``isa-tree``, unmerged -- **pin to a commit, not a path**):
+the ISA JSON moved from ``docs/`` to a top-level ``isa/`` on master
+``f1e978e`` (move commit ``08b19dd``): ``isa/latency.json`` (``versions``
+unchanged inside) and ``isa/slots.json``; ``isa/experimental.json`` is new and
+not ours to read; a future ``isa/faults.json`` for v2. Their ``make host``
+now fails on any code reading under ``docs/``. **Our generator targets
+``isa/latency.json`` and pins ``--check`` to ``f1e978e`` or later**):
 
 - Our generator ``gen_isa_delta.py`` emits ``versions.list.<name>.deltas`` as
   a **list** of ``{"what": str, "set": {<dotted path>: value}, "source": str}``,
