@@ -526,7 +526,15 @@ files. A ``bitstreams`` entry (BUILD_ID) is added only after the image has
 been validated on a board: ``make identity`` reads that id with fault 0 and
 the board suite passes twice after programming (MiniTPU's CLAUDE.md rule);
 the entry's text cites the board, date and commit like the ``v1`` entries.
-Opening the PR needs the owner's approval.
+Opening the PR needs the owner's approval. **Hold (agreed 2026-10-08):** no
+DIM-2 version is listed -- ``profile.num_lanes`` is a valid path, but the
+emitters, ``asm.py``'s encoder and the runtime assume 16 lanes and 4
+sublanes, so a 2-lane entry would label 16-lane images for a 2-lane machine
+(a silent semantic change; their rule 1 says refuse). Interim numbers stay
+in our records or go in as ``"deltas": null`` (reserved; readers refuse it by
+name) with the figures in ``describes``. ``allo-selftimed`` (3 of 8
+quantities) is held too. The first entry to land is ``allo-mxu-vitis`` at
+DIM 16. The 82/85 definition is confirmed as theirs.
 
 **Checkpoint 25 (2026-10-08, the pin is ``v1``; U4 B and C landed).**
 minitpu-comp confirmed track B's measurement: ``b3ba0a4d`` is ISA ``v1``,
