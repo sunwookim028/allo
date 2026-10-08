@@ -1,0 +1,4 @@
+{"dim": 2, "push_to_valid": 20, "pop_interval": 9, "pop_beats": 1, "switch_span": null, "output_fifo_depth": 64,
+ "tokens_per_cycle": 1.0, "token_lag": 8, "acc_lag": 1,
+ "tb": "tb_mxu_single_port_lat (scratch copy of b3ba0a4d's tb_mxu_single_port)",
+ "rtl": "mxu_wide_dim2 Catapult 3.33 ns, grid links depth 4 (MRTL_PE_DEPTH=4), in mxu_allo.sv"}
