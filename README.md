@@ -333,8 +333,10 @@ accumulate order is a different function.**
   85-cycle result latency, `49d895d`'s 8-deep loop stack and `3bcf0b7`'s
   4-bit agu_shift are all ancestors of `b3ba0a4d`; U4 track B measured all
   eight `WB_W_*` equal to the `v1` base). The "82" the ladder measures is
-  push->valid at the MXU port (2 + 5*DIM); `v1`'s 85 counts from the issue
-  edge, the offset is being measured. `v2` = `docs/ISA_V2.md` (branches, one zero-overhead
+  push->valid at the MXU port (2 + 5*DIM); `v1`'s 85 is counted from the
+  vmatpush's issue to the issue of the first vmatpop that finds its result:
+  85 = 82 + 4 (the last of the four pushed rows lands at +4) - 1 (the pop
+  engine's own register), measured on the pin (U4 track B, §10). `v2` = `docs/ISA_V2.md` (branches, one zero-overhead
   loop, post-increment addressing, semaphores, a fault register, and
   interlocks). E03 (freeze-on-stall; new `en_i` ports and a VMEM landing
   ring) is in flight on branch `e03`.
