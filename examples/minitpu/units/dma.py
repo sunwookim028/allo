@@ -1090,4 +1090,18 @@ def bits_reset(n, w=256, inst="core"):
     return bits(n, w, inst, payload="reset")
 
 
-VARIANTS = {"bits": (bits, run_bits), "bits_reset": (bits_reset, run_bits)}
+def streams(n, w=256, inst="core", payload="unreset"):
+    """D1 as the track states it: ``dma_unit.dma_engine`` (this file's ``bits``
+    with every port a token) between a source and a sink over Streams, one
+    token per link per cycle; the same port arrays as ``bits``."""
+    from examples.minitpu.units.dma_unit import streams_architecture  # noqa: PLC0415
+
+    return streams_architecture(n, inst, payload).region("simulator")
+
+
+def streams_reset(n, w=256, inst="core"):
+    return streams(n, w, inst, payload="reset")
+
+
+VARIANTS = {"bits": (bits, run_bits), "bits_reset": (bits_reset, run_bits),
+            "streams": (streams, run_bits), "streams_reset": (streams_reset, run_bits)}
