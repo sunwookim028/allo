@@ -1,0 +1,31 @@
+ 
+****************************************
+Report : area
+Design : u4_scalar_agu_S_LAT1
+Version: W-2024.09
+Date   : Thu Oct  8 11:16:44 2026
+****************************************
+
+Information: Updating design information... (UID-85)
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                          657
+Number of nets:                          3475
+Number of cells:                         2854
+Number of combinational cells:           2713
+Number of sequential cells:               136
+Number of macros/black boxes:               0
+Number of buf/inv:                        342
+Number of references:                      45
+
+Combinational area:               3670.268013
+Buf/Inv area:                      219.715999
+Noncombinational area:             718.200023
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                  4388.468036
+Total area:                 undefined
+1

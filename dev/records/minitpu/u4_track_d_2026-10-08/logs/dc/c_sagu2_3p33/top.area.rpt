@@ -1,0 +1,31 @@
+ 
+****************************************
+Report : area
+Design : top
+Version: W-2024.09
+Date   : Thu Oct  8 10:46:20 2026
+****************************************
+
+Information: Updating design information... (UID-85)
+Library(s) Used:
+
+    NangateOpenCellLibrary (File: /scratch/users/sk3463/build_T4_MAXDIM16_shipped_baseline/1-freepdk-45nm/view-standard/stdcells.db)
+
+Number of ports:                         1526
+Number of nets:                          6435
+Number of cells:                         5128
+Number of combinational cells:           4168
+Number of sequential cells:               899
+Number of macros/black boxes:               0
+Number of buf/inv:                        706
+Number of references:                       2
+
+Combinational area:               4831.624036
+Buf/Inv area:                      419.482000
+Noncombinational area:            4763.262152
+Macro/Black Box area:                0.000000
+Net Interconnect area:      undefined  (Wire load has zero net area)
+
+Total cell area:                  9594.886188
+Total area:                 undefined
+1

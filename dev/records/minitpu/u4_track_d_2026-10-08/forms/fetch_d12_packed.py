@@ -6,20 +6,29 @@
 latency 1, ``reset=False``) and keeps the RTL's read register in the queue
 unit's body (``rd_reg``) because on Stream links (simulator, csim) the server
 delivers an ``L = 1`` read in the same iteration (T-2). On the SystemC target
-the read data link is a ``Wire`` (``compose._pin``: "registered at the owner's
-edge, then the pipe"), so that body counts the register twice. README D-12's
-2026-10-08 amendment: ``L`` is counted in the owner's own iterations on every
-link kind -- deliver at ``t + L``. Two queue bodies, both built with
+the server's pins are ``comb`` and the read data a registered ``Wire``. README
+D-12's 2026-10-08 amendment: ``L`` counts the owner's own iterations on every
+link kind (deliver at ``t + L``). Two queue bodies, built with
 ``target="systemc"`` and checked per cycle on the Catapult RTL:
 
-* ``landed``: ``fetch_d12.fq`` as landed (``bram = rd_reg; rd_reg = mem[a]``);
-* ``amended``: the body the amendment asks for (``bram = mem[a]``: the value
-  of the read issued one iteration earlier, the memory's ``L = 1``).
+* ``landed`` (``U4D_BODY=landed``): ``bram = rd_reg; rd_reg = mem[a]``, as
+  ``fetch_d12.fq``;
+* ``amended`` (default ``BODY`` below is ``landed``; ``U4D_BODY=amended``):
+  ``bram = mem[a]``, the port's ``L = 1`` counted as the memory's.
 
-The boundary units ``src``/``sink`` carry the 128-bit words as one
-``UInt(128)`` per row (U3 track C's C1: a ``[N, 4]`` lane array is RAM pins);
-everything else is ``fetch_d12``'s text. Runner: ``fetch_d12.run`` (lane arrays
-packed by ``u4d_check.CatapultRtl``).
+What the landed composition needed to build at all (track D, D-3): D-13
+refuses a comb pin that reads a Stream (the loader's address came from
+``h_wa``) and any state read after a store in the iteration (the queue's
+address after the reset store). So here (a) ``src`` -> owners -> ``sink`` are
+``Wire`` channels, (b) both queue bodies read every state first and store
+last (the address a select of the old state; the shift as next-state
+temporaries) -- the same logic as ``fetch_d12.fq``, and (c) the IRAM has
+``U4D_IRAM_ROWS`` rows (default 256; at 4,096 the ``registers`` server ran
+Catapult's architect to 15.7 GB, D-4), the address masked: exact on these
+traces (every write is below word 48; reads above are uninit, masked). The
+128-bit words cross the boundary as one ``UInt(128)`` per row (U3 track C
+C1). Runner: ``fetch_d12.run`` (lane arrays packed by ``u4d_check``).
+A Wire-linked composite's sink token ``t`` is RTL row ``t - 4`` (``--shift 4``).
 """
 from __future__ import annotations
 
