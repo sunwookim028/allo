@@ -1,0 +1,6 @@
+RTL u4_vpu_adapter:base: 24866 cycles in 3 traces, 24866 defined slots, RTL vs reference on defined: 24866/24866 (8.2s)
+VERILATOR built /work/shared/users/phd/sk3463/scratch/u4d/hcache/cat-top-469fbc97f3b82618/Vtop in 7s
+UNIT-MATCH vpu_adapter:base form:vad_packed catapult-rtl[vad_3p33_L1] 24866/24866 defined (0 masked: ; catapult==rtl on 0) cycle=per-cycle: 1.0000 cyc/row (24868 cycles in all), stall cycles 0, row->token offset [2]; CYCLE-FOR-CYCLE yes (run 7.7s)
+    L (accept edge -> token edge) over every row-aligned output: {1: 74598}; first row accepted at cycle 1; rows at interval 1: 24865/24865
+    L {1: 24866}: v149, v150, v151
+    LATENCY-MATCH adapter_0: reported 1 ii=1 (scheduled), measured 1 at 1 cyc/vector; unit declares 1; pinned 1

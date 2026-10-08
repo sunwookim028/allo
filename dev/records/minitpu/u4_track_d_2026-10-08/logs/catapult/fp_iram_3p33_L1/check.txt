@@ -1,0 +1,1 @@
+NO-RTL fp_iram_3p33_L1: BUILD fetch form:fetch_packed inst=iram n=3804 unroll=['fetch_0:j'] pipeline=['fetch_0:t'] partition=[] tcl=[] {'clock_period': 3.33, 'latency': {'fetch_0': 1}}: RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode

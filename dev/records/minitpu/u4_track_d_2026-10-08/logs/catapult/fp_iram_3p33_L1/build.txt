@@ -1,0 +1,4 @@
+BUILD fetch form:fetch_packed inst=iram n=3804 unroll=['fetch_0:j'] pipeline=['fetch_0:t'] partition=[] tcl=[] {'clock_period': 3.33, 'latency': {'fetch_0': 1}}: RuntimeError: Failed to synthesize the design with Catapult HLS in csyn mode
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:47.15
+	Maximum resident set size (kbytes): 878840
+RUN_EXIT 1

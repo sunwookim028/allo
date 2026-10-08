@@ -1,0 +1,5 @@
+[latency] decoder_0: latency=1 ii=1 scheduled
+BUILD seq_decoder form:dec_packed inst=base n=25458 unroll=[] pipeline=['decoder_0:t'] partition=[] tcl=[] {'clock_period': 3.33, 'latency': {'decoder_0': 1}}: ok 47s
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:51.15
+	Maximum resident set size (kbytes): 867656
+RUN_EXIT 0

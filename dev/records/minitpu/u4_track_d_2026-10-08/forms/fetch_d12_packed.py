@@ -46,9 +46,20 @@ def src(xrst: uint1[N], xwe: uint1[N], xwa: UInt(AW)[N], xwd: UInt(128)[N], xpau
         c_pop.put(xpop[t])
 
 
+@unit(memories=("iram.host",), reads=("h_we", "h_wa", "h_wd"), parameters=("N", "AW", "IRM"))
+def loader(mem):
+    for _ in range(N):
+        e: uint1 = h_we.get()
+        a_: UInt(AW) = h_wa.get()
+        a: int32 = a_ & IRM
+        d: UInt(128) = h_wd.get()
+        if e:
+            mem[a] = d
+
+
 @unit(memories=("iram.fetch",), reads=("c_rst", "c_pause", "c_flush", "c_raddr", "c_pop"),
       writes=("q_data", "q_rda", "q_rdv", "q_valid", "q_baddr", "q_empty", "q_full"),
-      parameters=("N", "AW"))
+      parameters=("N", "AW", "IRM"))
 def fq_amended(mem):
     fq_addr: UInt(AW)[4] = 0
     fq_data: UInt(128)[4] = 0
@@ -62,62 +73,101 @@ def fq_amended(mem):
         flush: uint1 = c_flush.get()
         raddr: UInt(AW) = c_raddr.get()
         pop_i: uint1 = c_pop.get()
-        # port B's address, read before any store (D-13: a comb pin sees the
-        # state loaded before the iteration's stores); 0 in a reset row
-        ir: int32 = next_addr
-        if rst == 0:
-            ir = 0
-        if rst == 0:
-            next_addr = 0
-            req_pending = 0
-            req_addr = 0
-            count = 0
-        empty: uint1 = count == 0
+        # D-13 discipline (a kernel with comb pins): every state read before any
+        # store; an asynchronous reset row shows the reset state (as selects)
+        ir: int32 = (next_addr if rst else 0) & IRM  # port B's address, every cycle (rows: IRM + 1)
+        bram: UInt(128) = mem[ir]  # the memory's latency 1 (README D-12 amended): no register here
+        na: UInt(AW) = next_addr if rst else 0
+        rp: uint1 = req_pending if rst else 0
+        rq: UInt(AW) = req_addr if rst else 0
+        cnt: UInt(3) = count if rst else 0
+        a0: UInt(AW) = fq_addr[0]
+        a1: UInt(AW) = fq_addr[1]
+        a2: UInt(AW) = fq_addr[2]
+        a3: UInt(AW) = fq_addr[3]
+        d0: UInt(128) = fq_data[0]
+        d1: UInt(128) = fq_data[1]
+        d2: UInt(128) = fq_data[2]
+        d3: UInt(128) = fq_data[3]
+        empty: uint1 = cnt == 0
         rd_valid: uint1 = 0
-        if pause == 0 and count < 3:
+        if pause == 0 and cnt < 3:
             rd_valid = 1
-        q_data.put(fq_data[0])
-        q_rda.put(next_addr)
+        q_data.put(d0)
+        q_rda.put(na)
         q_rdv.put(rd_valid)
         q_valid.put(1 - empty)
-        q_baddr.put(fq_addr[0])
+        q_baddr.put(a0)
         q_empty.put(empty)
-        full: uint1 = count == 4
+        full: uint1 = cnt == 4
         q_full.put(full)
-        # the edge: port B reads the fetch address every cycle; the port's
-        # latency 1 is the memory's (README D-12 amended): no register here
-        bram: UInt(128) = mem[ir]
+        # next state
+        n_na: UInt(AW) = na
+        n_rp: uint1 = rp
+        n_rq: UInt(AW) = rq
+        n_cnt: UInt(3) = cnt
+        n_a0: UInt(AW) = a0
+        n_a1: UInt(AW) = a1
+        n_a2: UInt(AW) = a2
+        n_a3: UInt(AW) = a3
+        n_d0: UInt(128) = d0
+        n_d1: UInt(128) = d1
+        n_d2: UInt(128) = d2
+        n_d3: UInt(128) = d3
         if rst:
             if flush:
-                next_addr = raddr
-                req_pending = 0
-                count = 0
+                n_na = raddr
+                n_rp = 0
+                n_cnt = 0
             else:
-                push: uint1 = req_pending
+                push: uint1 = rp
                 pop: uint1 = pop_i & (1 - empty)
                 if pop:
-                    for j in range(3):
-                        fq_addr[j] = fq_addr[j + 1]
-                        fq_data[j] = fq_data[j + 1]
+                    n_a0 = a1
+                    n_a1 = a2
+                    n_a2 = a3
+                    n_d0 = d1
+                    n_d1 = d2
+                    n_d2 = d3
                 if push:
-                    slot: UInt(2) = count
-                    if pop:
-                        slot = count - 1
-                    si: int32 = slot
-                    fq_addr[si] = req_addr
-                    fq_data[si] = bram
-                count = count + push - pop
-                req_pending = rd_valid
-                req_addr = next_addr
+                    slot: UInt(3) = cnt - pop
+                    if slot == 0:
+                        n_a0 = rq
+                        n_d0 = bram
+                    elif slot == 1:
+                        n_a1 = rq
+                        n_d1 = bram
+                    elif slot == 2:
+                        n_a2 = rq
+                        n_d2 = bram
+                    else:
+                        n_a3 = rq
+                        n_d3 = bram
+                n_cnt = cnt + push - pop
+                n_rp = rd_valid
+                n_rq = na
                 if rd_valid:
-                    next_addr = next_addr + 1
+                    n_na = na + 1
+        # stores
+        next_addr = n_na
+        req_pending = n_rp
+        req_addr = n_rq
+        count = n_cnt
+        fq_addr[0] = n_a0
+        fq_addr[1] = n_a1
+        fq_addr[2] = n_a2
+        fq_addr[3] = n_a3
+        fq_data[0] = n_d0
+        fq_data[1] = n_d1
+        fq_data[2] = n_d2
+        fq_data[3] = n_d3
 
 
 @unit(memories=("iram.fetch",), reads=("c_rst", "c_pause", "c_flush", "c_raddr", "c_pop"),
       writes=("q_data", "q_rda", "q_rdv", "q_valid", "q_baddr", "q_empty", "q_full"),
-      parameters=("N", "AW"))
+      parameters=("N", "AW", "IRM"))
 def fq_landed(mem):
-    rd_reg: UInt(128) = 0  # sequencer_iram's read register (fetch_d12.fq as landed)
+    rd_reg: UInt(128) = 0  # sequencer_iram's read register, in the body (fetch_d12.fq as landed)
     fq_addr: UInt(AW)[4] = 0
     fq_data: UInt(128)[4] = 0
     next_addr: UInt(AW) = 0
@@ -130,52 +180,96 @@ def fq_landed(mem):
         flush: uint1 = c_flush.get()
         raddr: UInt(AW) = c_raddr.get()
         pop_i: uint1 = c_pop.get()
-        ir: int32 = next_addr  # the one edit: the address read before any store (D-13)
-        if rst == 0:
-            ir = 0
-        if rst == 0:
-            next_addr = 0
-            req_pending = 0
-            req_addr = 0
-            count = 0
-        empty: uint1 = count == 0
+        # D-13 discipline (a kernel with comb pins): every state read before any
+        # store; an asynchronous reset row shows the reset state (as selects)
+        ir: int32 = (next_addr if rst else 0) & IRM  # port B's address, every cycle (rows: IRM + 1)
+        bram: UInt(128) = rd_reg
+        rd_new: UInt(128) = mem[ir]
+        na: UInt(AW) = next_addr if rst else 0
+        rp: uint1 = req_pending if rst else 0
+        rq: UInt(AW) = req_addr if rst else 0
+        cnt: UInt(3) = count if rst else 0
+        a0: UInt(AW) = fq_addr[0]
+        a1: UInt(AW) = fq_addr[1]
+        a2: UInt(AW) = fq_addr[2]
+        a3: UInt(AW) = fq_addr[3]
+        d0: UInt(128) = fq_data[0]
+        d1: UInt(128) = fq_data[1]
+        d2: UInt(128) = fq_data[2]
+        d3: UInt(128) = fq_data[3]
+        empty: uint1 = cnt == 0
         rd_valid: uint1 = 0
-        if pause == 0 and count < 3:
+        if pause == 0 and cnt < 3:
             rd_valid = 1
-        q_data.put(fq_data[0])
-        q_rda.put(next_addr)
+        q_data.put(d0)
+        q_rda.put(na)
         q_rdv.put(rd_valid)
         q_valid.put(1 - empty)
-        q_baddr.put(fq_addr[0])
+        q_baddr.put(a0)
         q_empty.put(empty)
-        full: uint1 = count == 4
+        full: uint1 = cnt == 4
         q_full.put(full)
-        bram: UInt(128) = rd_reg
-        rd_reg = mem[ir]
+        # next state
+        n_na: UInt(AW) = na
+        n_rp: uint1 = rp
+        n_rq: UInt(AW) = rq
+        n_cnt: UInt(3) = cnt
+        n_a0: UInt(AW) = a0
+        n_a1: UInt(AW) = a1
+        n_a2: UInt(AW) = a2
+        n_a3: UInt(AW) = a3
+        n_d0: UInt(128) = d0
+        n_d1: UInt(128) = d1
+        n_d2: UInt(128) = d2
+        n_d3: UInt(128) = d3
         if rst:
             if flush:
-                next_addr = raddr
-                req_pending = 0
-                count = 0
+                n_na = raddr
+                n_rp = 0
+                n_cnt = 0
             else:
-                push: uint1 = req_pending
+                push: uint1 = rp
                 pop: uint1 = pop_i & (1 - empty)
                 if pop:
-                    for j in range(3):
-                        fq_addr[j] = fq_addr[j + 1]
-                        fq_data[j] = fq_data[j + 1]
+                    n_a0 = a1
+                    n_a1 = a2
+                    n_a2 = a3
+                    n_d0 = d1
+                    n_d1 = d2
+                    n_d2 = d3
                 if push:
-                    slot: UInt(2) = count
-                    if pop:
-                        slot = count - 1
-                    si: int32 = slot
-                    fq_addr[si] = req_addr
-                    fq_data[si] = bram
-                count = count + push - pop
-                req_pending = rd_valid
-                req_addr = next_addr
+                    slot: UInt(3) = cnt - pop
+                    if slot == 0:
+                        n_a0 = rq
+                        n_d0 = bram
+                    elif slot == 1:
+                        n_a1 = rq
+                        n_d1 = bram
+                    elif slot == 2:
+                        n_a2 = rq
+                        n_d2 = bram
+                    else:
+                        n_a3 = rq
+                        n_d3 = bram
+                n_cnt = cnt + push - pop
+                n_rp = rd_valid
+                n_rq = na
                 if rd_valid:
-                    next_addr = next_addr + 1
+                    n_na = na + 1
+        # stores
+        rd_reg = rd_new
+        next_addr = n_na
+        req_pending = n_rp
+        req_addr = n_rq
+        count = n_cnt
+        fq_addr[0] = n_a0
+        fq_addr[1] = n_a1
+        fq_addr[2] = n_a2
+        fq_addr[3] = n_a3
+        fq_data[0] = n_d0
+        fq_data[1] = n_d1
+        fq_data[2] = n_d2
+        fq_data[3] = n_d3
 
 
 @unit(memories=("DATA", "RDA", "RDV", "VALID", "BADDR", "EMPTY", "FULL"),
@@ -206,9 +300,16 @@ def architecture(n, body, kind="wire"):
         ("DATA", "UInt(128)[N]"), ("RDA", f"{a}[N]"), ("RDV", "uint1[N]"), ("VALID", "uint1[N]"),
         ("BADDR", f"{a}[N]"), ("EMPTY", "uint1[N]"), ("FULL", "uint1[N]"))]
     fq = {"landed": fq_landed, "amended": fq_amended}[body]
-    return Architecture(name=f"fetch_d12_{body}", parameters={"N": n, "AW": D.G.INSTR_ADDR_W},
-                        memories=tuple(mems) + (D.IRAM,), channels=tuple(ch),
-                        units=(src, D.loader, fq, sink))
+    # IRAM_ROWS (default 256, U4D_IRAM_ROWS): the 4,096-row register lowering ran
+    # Catapult's architect to 15.7 GB in 10 min (stopped); every trace writes
+    # words < 48 and reads above them are uninit (masked), so 256 rows aliasing
+    # the address is exact on every defined slot (track C's C7 workaround).
+    import os
+    rows = int(os.environ.get("U4D_IRAM_ROWS", "256"))
+    iram = Memory("iram", "UInt(128)", rows=str(rows), ports=D.IRAM.ports, collision="refuse", reset=False)
+    return Architecture(name=f"fetch_d12_{body}", parameters={"N": n, "AW": D.G.INSTR_ADDR_W, "IRM": rows - 1},
+                        memories=tuple(mems) + (iram,), channels=tuple(ch),
+                        units=(src, loader, fq, sink))
 
 
 BODY = "landed"  # u4d_build/u4d_check: --form-arg body=amended (env U4D_BODY)

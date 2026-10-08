@@ -1,0 +1,3 @@
+VERILATOR built /work/shared/users/phd/sk3463/scratch/u4d/hcache/cat-top-9333da26a44bd20c/Vtop in 8s
+UNIT-MATCH dma_addr_gen bits catapult-rtl[dag_bits_3p33_L1] 200700/200700 vs MiniTPU RTL cycle=per-vector: 1.0000 cyc/vector, stall cycles 0, L {1: 200700} (declared 0); CYCLE-FOR-CYCLE yes (run 8.4s)
+    LATENCY-MATCH agu_0: reported 1 ii=1 (scheduled), measured 1 at 1 cyc/vector; unit declares 1; pinned 1

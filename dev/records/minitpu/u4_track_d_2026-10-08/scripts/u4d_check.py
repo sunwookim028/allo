@@ -61,7 +61,9 @@ def _w(t):
 class CatapultRtl:
     """The Catapult RTL of one project, callable as the built module."""
 
-    def __init__(self, prj, top="top"):
+    def __init__(self, prj, top=None):
+        if top is None:  # the synthesized top: run.tcl's DESIGN_HIERARCHY (a compose region's name)
+            top = re.search(r"-DESIGN_HIERARCHY (\w+)", open(os.path.join(prj, "run.tcl")).read()).group(1)
         self.prj, self.top = prj, top
         k = open(os.path.join(prj, "kernel.cpp")).read()
         blk = k[k.index(f"SC_MODULE({top})"):]
@@ -280,12 +282,47 @@ def timing(st, token_ports=()):
             "offset": sorted(offs), "c4c": c4c}
 
 
+def check_vectors(u, a):
+    """A ``comb``/``valid`` unit (``check.main``'s path): the unit's stimulus
+    through the RTL oracle, the variant's runner on the Catapult RTL; per
+    vector, with the same timing report (one row per vector)."""
+    name = os.path.basename(a.prj.rstrip("/")).replace(".prj", "")
+    stim = u.stimulus() if hasattr(u, "stimulus") else None
+    if a.n:
+        stim = stim[: a.n]
+    n = len(stim)
+    want, _ = rtl.run(u.RTL, stim.astype(np.uint64))
+    want = want[:, 0]
+    make, runner = u.VARIANTS[a.variant]
+    mod = CatapultRtl(a.prj, a.top)
+    t = time.time()
+    got = np.asarray(runner(mod, stim)).astype(np.uint64)
+    k = int((got != want.astype(np.uint64)).sum())
+    outs_ = [p for d_, p, w_ in mod.ports if d_ == "Out"]
+    tm = timing(mod.stamps)
+    tag = "UNIT-MATCH" if k == 0 else "UNIT-DIFF "
+    allL = {}
+    for nm, L, off in tm["lines"]:
+        for x, c in (L or {}).items():
+            allL[x] = allL.get(x, 0) + c
+    print(f"{tag} {a.unit} {a.variant} catapult-rtl[{name}] {n - k}/{n} vs MiniTPU RTL cycle=per-vector: "
+          f"{tm['rate']:.4f} cyc/vector, stall cycles {tm['stall_cycles']}, L {_compact(allL)} "
+          f"(declared {u.RTL.latency}); CYCLE-FOR-CYCLE {'yes' if tm['c4c'] and k == 0 else 'no'} "
+          f"(run {time.time() - t:.1f}s)", flush=True)
+    mpath = os.path.join(a.prj, "latency.json")
+    if os.path.exists(mpath):
+        man = latency.load(a.prj)
+        ks_ = sorted(man.get("units", {}))
+        print("    " + latency.verdict(man, ks_[0], allL or {0: 1}, tm["rate"], a.declared))
+    return 1 if k else 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("unit"); ap.add_argument("variant"); ap.add_argument("prj")
     ap.add_argument("--inst", default=None)
     ap.add_argument("--n", type=int, default=0)
-    ap.add_argument("--top", default="top")
+    ap.add_argument("--top", default=None)
     ap.add_argument("--declared", type=int, default=None, help="the unit's pinned I/O latency (default: none)")
     ap.add_argument("--token-outs", type=int, nargs="*", default=[],
                     help="indices (0-based, among the top's Out ports) of outputs that carry tokens, not rows")
@@ -293,6 +330,8 @@ def main():
                     help="rows of delay before the outputs (Wire-linked composites): got[t] held to rtl[t - shift]")
     a = ap.parse_args()
     u = importlib.import_module(f"examples.minitpu.units.{a.unit}")
+    if u.RTL.shape != "trace":
+        return check_vectors(u, a)
     inst = a.inst or u.DEFAULT
     unit = u.INSTANCES[inst]
     w = u.WIDTH[inst]
