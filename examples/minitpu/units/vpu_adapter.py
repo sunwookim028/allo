@@ -283,6 +283,52 @@ def run_slots(mod, cmd, n, w):
 
 VARIANTS = {"slots": (slots, run_slots), "slots_gated": (slots_gated, run_slots)}
 
+#: payload field -> the valid bits under which the VPU samples it (Phase 0:
+#: ``vpu_ctrl_gating.log``; every other cycle the field is ignored)
+SAMPLED_UNDER = {
+    "raddr_a": ("alu_valid", "sfu_valid", "reduce_valid", "txin_valid"), "raddr_b": ("alu_valid",),
+    "txin_index": ("txin_valid",), "txout_index": ("txout_valid",), "txout_vd": ("txout_valid",),
+    "alu_op": ("alu_valid",), "alu_vd": ("alu_valid",), "sfu_op": ("sfu_valid",), "sfu_vd": ("sfu_valid",),
+    "reduce_op": ("reduce_valid",), "reduce_lane": ("reduce_valid",), "reduce_vd": ("reduce_valid",),
+    "vmem.op": ("vmem.valid",), "vmem.vreg_idx": ("vmem.valid",), "vmem.vmem_address": ("vmem.valid",),
+    "vmem_store_read_hint": ("vmem.valid",), "vmatload_base": ("vmatload_valid",),
+    "vmatpush_vs": ("vmatpush_valid",), "vmatpop_vd": ("vmatpop_valid",)}
+
+
+def gated_contract(backend="simulator", project="/tmp/u4_vpu_adapter_gated"):
+    """``slots_gated`` held to the RTL on what the VPU samples: every valid
+    bit on every row, and each payload field in the rows its op is valid.
+    Prints one ``CONTRACT-`` line."""
+    import allo.dataflow as df
+    from examples.minitpu.harness.traces import concat
+
+    parts = [c for _, c, _ in traces("base")] + [c for _, _, c, _, _ in seeds()]
+    cmd = concat(*parts)
+    n = len(cmd["issue_i"])
+    want, _, _ = REF("base", {p: rtl.pack(cmd[p], w) for p, w in INPUTS})
+    want = rtl.unpack(want["vpu_ctrl_o"])
+    top = slots_gated(n, 85)
+    mod = (df.build(top, target="simulator") if backend == "simulator"
+           else df.build(top, target="systemc", mode="csim", project=project))
+    got = run_slots(mod, cmd, n, 85)["vpu_ctrl_o"]
+    tot = bad = zeroed = 0
+    for t in range(n):
+        r, g = R.unpack(R.VPU_CTRL, want[t]), R.unpack(R.VPU_CTRL, got[t])
+        for f, _ in R.VPU_CTRL:
+            if f in SAMPLED_UNDER:
+                if not any(r[v] for v in SAMPLED_UNDER[f]):
+                    zeroed += int(g[f] != r[f])
+                    continue
+            tot += 1
+            bad += int(g[f] != r[f])
+    tag = "CONTRACT-MATCH" if bad == 0 else "CONTRACT-DIFF "
+    print(f"{tag} vpu_adapter slots_gated {backend}: {tot - bad}/{tot} sampled fields equal "
+          f"({zeroed} unsampled payload fields zeroed where the RTL drives the fetch head's)")
+
+
 if __name__ == "__main__":
-    print(table())
+    if len(sys.argv) > 1 and sys.argv[1] == "--gated-contract":
+        gated_contract(*sys.argv[2:])
+    else:
+        print(table())
     sys.exit(0)
