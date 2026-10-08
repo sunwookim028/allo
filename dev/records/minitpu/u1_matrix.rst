@@ -510,6 +510,19 @@ not a requirement). Issue audit recorded
 ``main``, prune the 13 merged branches, add the README naming paragraph
 (after the cleanup lands).
 
+**Anchors (for anyone resuming this work), 2026-10-08.** MiniTPU is the
+practical design driver; TinyTPU is the toy instance for communicating the
+programming model (D-22). The ladder is a probe of the tools (D-9): findings
+first, the RTL match as the goal. Decisions D-9..D-22 are in the README;
+the owner reviews each programming-model change in chat, one at a time, and
+proceeds on recorded provisional calls when away. The checkpoint that closes
+this stage: U1-U3 on ``main`` with their decisions implemented, every branch
+merged or deleted, the handoff current; then U4 (control) against
+``b3ba0a4d`` (D-16), with the ``minitpu-rtl`` baseline (D-21) in parallel.
+Progress: U1-U3 done; U4 Phase 0, the TinyTPU-instance probe, the ``main``
+integration, the TinyTPU example cleanup, PR #48's probe and the two D-21
+studies are in flight (branches listed in the handoff below).
+
 1. **Merge the unsigned-compare fix** (``core-uint-compare``, B1-B3)? Zero
    measured impact on every gate, test and TinyTPU emission. *[merge; file
    the drafted upstream issue]*
