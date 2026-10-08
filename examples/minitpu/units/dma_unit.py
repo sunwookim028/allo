@@ -695,3 +695,180 @@ def streams_architecture(n, inst="core", payload="unreset"):
         channels=dma_channels(),
         units=(dma_src, dma_engine, dma_sink),
     )
+
+
+# ---------------------------------------------------------------------------
+# D2: the VMEM side as a README D-12 port.
+#
+# ``vmem`` is the U2 word array (``vpu_word_array_d12``'s declaration at the
+# full geometry: 4,096 words of SUB x L x 32 = 1,024 bits, unreset), with the
+# compute port ``c`` (``rw``, latency 3) and the DMA port ``d`` (``rw``,
+# latency ``VMEM_DMA_READ_LATENCY`` = 2, P-3), each write visible one edge
+# later, the same-word collision an obligation (MiniTPU issue #21).
+# ``vmem_group`` is ``vpu_dma_group`` + ``vpu_vmem_simd``'s ``dma_rvalid_q``
+# and owns ``vmem.d``; ``vmem_compute_idle`` owns ``vmem.c`` and never
+# writes (the compute side is out of D2's scope: U5).
+#
+# Token time: the generated server puts, at iteration t, its read pipe's
+# last stage -- the read issued at t - (VL - 1), i.e. the word array's
+# ``rdata`` AFTER edge t (the U2 record's post-edge row). The group samples
+# its inputs before the edge (``rtl.py``'s pre convention, as the DMA does),
+# so it holds the token one iteration (``hold``): during cycle t the word
+# array's output is the token of iteration t - 1. That register is the
+# token-time image of reading the pipe's last register, not hardware.
+# ---------------------------------------------------------------------------
+
+
+def _p3_legality(p):
+    """P-3 across three declarations: the port's read latency, the group's
+    rvalid pipe (VL) and the engine's capture (RDL_M1 + 1). Run by
+    ``vmem_architecture``: a unit's ``legality`` sees only its own parameters
+    and an owner cannot read its port's declared latency (finding C6)."""
+    assert p["VL"] == p["RDL_M1"] + 1 == p["PORT_D_LATENCY"], (
+        f"vmem.d declares read latency {p['PORT_D_LATENCY']}, vmem_group counts "
+        f"{p['VL']}, and the DMA engine captures vmem_rd_data {p['RDL_M1'] + 1} "
+        f"cycles after vmem_rd_en (I_ST_RDW); the "
+        f"store path would latch the wrong cycle. One number, "
+        f"DmaGeometry.VMEM_DMA_READ_LATENCY, must set both (P-3)")
+
+def _group_legality(p):
+    assert p["WB"] == p["SUB"] * p["L"] * 32, (
+        f"vmem word WB={p['WB']} is not SUB x beat = {p['SUB']} x {p['L']} x 32 bits")
+
+
+@unit(memories=("vmem.d",), reads=("y_vreq", "y_vwd"), writes=("x_vrd", "g_vmo", "g_vmd"),
+      parameters=("N", "L", "SUB", "VL", "WB", "ROWS_M"), legality=_group_legality)
+def vmem_group(mem):
+    gather: UInt(WB) = 0   # gather_q (unreset in the RTL: never cleared here)
+    scatter: UInt(WB) = 0  # scatter_q (unreset)
+    hold: UInt(WB) = 0     # the word array's rdata this cycle (token of t - 1)
+    gword: int32 = 0
+    filled: int32 = 0
+    sidx: int32 = 0
+    sfrom: int32 = 0
+    rvp: int32[VL] = 0     # vpu_vmem_simd dma_rvalid_q
+    wd: UInt(32)[L] = 0
+    ob: UInt(32)[L] = 0
+    for _t in range(N):
+        vq: UInt(64) = y_vreq.get()
+        with allo.meta_for(L) as k:
+            wd[k] = y_vwd[k].get()
+        g_vmo.put(vq)
+        with allo.meta_for(L) as k:
+            g_vmd[k].put(wd[k])
+        rst: int32 = vq[0]
+        wr_en: int32 = vq[1]
+        rd_en: int32 = vq[2]
+        wptr: int32 = vq[3:19]
+        rptr: int32 = vq[19:35]
+        # ---- beat_rdata_o: this cycle's vmem_rd_data, from state ----
+        with allo.meta_for(SUB) as s:
+            if sidx == s:
+                with allo.meta_for(L) as k:
+                    if sfrom == 1:
+                        ob[k] = scatter[32 * (s * L + k):32 * (s * L + k + 1)]
+                    else:
+                        ob[k] = hold[32 * (s * L + k):32 * (s * L + k + 1)]
+        with allo.meta_for(L) as k:
+            x_vrd[k].put(ob[k])
+        # ---- word side (minitpu_core.sv's select, then vpu_dma_group) ----
+        en: int32 = wr_en | rd_en
+        we: int32 = wr_en
+        ptr: int32 = rptr
+        if wr_en == 1:
+            ptr = wptr
+        a14: int32 = ptr & 0x3FFF
+        word: int32 = a14 >> 2
+        idx: int32 = a14 & 3
+        commit: int32 = 0
+        if en == 1 and we == 1 and idx == SUB - 1:
+            commit = 1
+        fetch: int32 = 0
+        if en == 1 and we == 0 and idx == 0:
+            fetch = 1
+        wwd: UInt(WB) = gather
+        if en == 1 and we == 1:
+            with allo.meta_for(SUB) as s:
+                if idx == s:
+                    with allo.meta_for(L) as k:
+                        wwd[32 * (s * L + k):32 * (s * L + k + 1)] = wd[k]
+        waddr: int32 = word & ROWS_M  # identity at the full 4,096 rows (C7: csim's rows)
+        q: UInt(WB) = mem[waddr]
+        cm: uint1 = commit
+        if cm:
+            mem[waddr] = wwd
+        # ---- the edge ----
+        rv_last: int32 = rvp[VL - 1]
+        if rst == 0:
+            filled = 0
+            gword = 0
+            sidx = 0
+            sfrom = 0
+            for j in range(VL):
+                rvp[j] = 0
+        else:
+            if en == 1 and we == 1:
+                gather = wwd
+                gword = word
+                if commit == 1:
+                    filled = 0
+                else:
+                    filled = filled | (1 << idx)
+            if en == 1 and we == 0:
+                sidx = idx
+                sfrom = 0
+                if idx != 0:
+                    sfrom = 1
+            if rv_last == 1:
+                scatter = hold
+            for j2 in range(VL - 1):
+                rvp[VL - 1 - j2] = rvp[VL - 2 - j2]
+            rvp[0] = fetch
+        hold = q
+
+
+@unit(memories=("vmem.c",), parameters=("N", "WB"))
+def vmem_compute_idle(mem):
+    # the compute port's owner: one read of word 0 per cycle, never a write
+    # (a D-12 port must have exactly one owner; U5 composes the real one)
+    for _t in range(N):
+        z: int32 = 0
+        x: UInt(WB) = mem[z]
+
+
+def vmem_architecture(n, inst="core", payload="unreset", rows=None):
+    """D2: source (no VMEM data) -> engine <-> vmem_group (vmem.d) -> sink;
+    vmem_compute_idle owns vmem.c. ``rows`` (default: the full 4,096) below
+    the geometry is the csim workaround of finding C7 (a kernel-local array
+    lives on the 64 KB SC_THREAD stack; 4,096 x 128 B segfaults): the word
+    index wraps at ``rows``, exact on traces that stay below it."""
+    from examples.minitpu.units.dma_params import GEOMETRIES  # noqa: PLC0415
+    from examples.minitpu.units.dma import CIN_NAMES, COUT_NAMES  # noqa: PLC0415
+
+    g = GEOMETRIES[inst]
+    params = engine_parameters(g, n, payload)
+    sub = g.NUM_SUBLANES
+    words = 1 << g.VMEM_ADDR_W
+    rows = rows or words
+    assert rows & (rows - 1) == 0 and rows <= words, f"rows={rows}: a power of two <= {words}"
+    params.update({"NC": len(CIN_NAMES), "NO": len(COUT_NAMES), "SUB": sub,
+                   "VL": g.VMEM_DMA_READ_LATENCY, "WB": sub * g.BEAT_BITS, "ROWS_M": rows - 1})
+    port_d = Port("d", "rw", latency=g.VMEM_DMA_READ_LATENCY, visible=1)
+    _p3_legality(dict(params, PORT_D_LATENCY=port_d.latency))
+    vmem = Memory("vmem", "UInt(WB)", rows=str(rows),
+                  ports=(Port("c", "rw", latency=3, visible=1),
+                         port_d),
+                  collision="obligation", reset=False)
+    return Architecture(
+        name=f"dma_vmem_{inst}" + ("" if rows == words else f"_r{rows}"),
+        parameters=params,
+        memories=(Memory("CI", "UInt(32)[N, NC]"), Memory("DI", "UInt(32)[N, 2 * L]"),
+                  Memory("CO", "UInt(32)[N, NO]"), Memory("DO", "UInt(32)[N, 2 * L]"), vmem),
+        channels=dma_channels() + (Channel("g_vmo", "UInt(64)", "2"),
+                                   Channel("g_vmd", "UInt(32)", "2", ("L",))),
+        units=(dma_src_closed, dma_engine, vmem_group, vmem_compute_idle,
+               Instance(dma_sink, "dma_sink_d2", {"y_vreq": "g_vmo", "y_vwd": "g_vmd"})),
+        obligations={"vmem": "MiniTPU issue #21: the program keeps compute and DMA off one "
+                             "word in one cycle (vpu_vmem_simd.sv:121, simulation only); "
+                             "here the compute port never writes"},
+    )
