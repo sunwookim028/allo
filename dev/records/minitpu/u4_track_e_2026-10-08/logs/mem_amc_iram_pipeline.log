@@ -1,0 +1,5 @@
+loc("-":7:5): error: problem is infeasible
+BUILT mem_iram amc pipeline 0.2s
+cycle time: 4229
+UNIT-MATCH mem iram amc pipeline: read-back 32 rows, same-cycle row 3 got ['0xe5afcdbc', '0x31414454', '0x3d541055', '0x5f4788b5'] old ['0xe5afcdbc', '0x31414454', '0x3d541055', '0x5f4788b5']; cycles=4229
+WALL 14s rc=0

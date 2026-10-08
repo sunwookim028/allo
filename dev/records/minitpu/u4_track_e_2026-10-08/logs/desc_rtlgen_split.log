@@ -1,0 +1,4 @@
+SCHED split: latency 20057 | cyclic II [1] | QOR lat 20057 fmax 521.4 area Utilization(lut=502, logic_lut=502, srl=0, ff=331, dsp=0, carry8=10, muxf=0, bram36=0, uram288=0)
+COSIM 1 chunks of 20056: cycles/chunk [20057] (19.8s)
+UNIT-MATCH dma_desc_adapter split rtlgen: 180495/180495 defined slots (rows 20056)
+WALL 21s rc=0

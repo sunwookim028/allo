@@ -1,0 +1,5 @@
+BUILT desc_amc amc none 0.3s
+cycle time: 60175
+RAN desc_amc amc: 1 chunks of 20056, cycles/chunk [60175] (18.5s)
+UNIT-MATCH dma_desc_adapter amc amc-amc none: 180495/180495 defined slots (rows 20056)
+WALL 20s rc=0

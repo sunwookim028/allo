@@ -1,0 +1,4 @@
+SCHED gated_split: latency 16386 | cyclic II [1] | QOR lat 16386 fmax 417.3 area Utilization(lut=956, logic_lut=956, srl=0, ff=177, dsp=0, carry8=4, muxf=0, bram36=0, uram288=0)
+COSIM 2 chunks of 16384: cycles/chunk [16386] (18.3s)
+CONTRACT-MATCH vpu_adapter gated_split rtlgen: 318113/318113 sampled fields equal (250483 unsampled payload fields zeroed)
+WALL 143s rc=0

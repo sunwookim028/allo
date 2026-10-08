@@ -1,0 +1,45 @@
+FAIL RuntimeError: Unsupported bit operation
+Traceback (most recent call last):
+    return fn(*a, **k)
+           ^^^^^^^^^^^
+    s = allo.customize(fn)
+        ^^^^^^^^^^^^^^^^^^
+    tree = TypeInferer()(ctx_type_inf, tree)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Unsupported bit operation
+FAIL RuntimeError: Unsupported bit operation
+Traceback (most recent call last):
+    return fn(*a, **k)
+           ^^^^^^^^^^^
+    s = allo.customize(fn)
+        ^^^^^^^^^^^^^^^^^^
+    tree = TypeInferer()(ctx_type_inf, tree)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Unsupported bit operation
+FAIL RuntimeError: Unsupported bit operation
+Traceback (most recent call last):
+    return fn(*a, **k)
+           ^^^^^^^^^^^
+    s = allo.customize(fn)
+        ^^^^^^^^^^^^^^^^^^
+    tree = TypeInferer()(ctx_type_inf, tree)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Unsupported bit operation
+FAIL RuntimeError: Unsupported bit operation
+Traceback (most recent call last):
+    return fn(*a, **k)
+           ^^^^^^^^^^^
+    s = allo.customize(fn)
+        ^^^^^^^^^^^^^^^^^^
+    tree = TypeInferer()(ctx_type_inf, tree)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Unsupported bit operation
+loc("-":71:13): error: updateCallOp: result type is not memref
+BUILT agu_written llvm none 0.1s
+RAN agu_written llvm: 1 chunks of 38432, cycles/chunk [] (0.0s)
+UNIT-MATCH agu_resolve written amc-llvm none: 38432/38432 defined slots (rows 38432)
+loc("-":37:13): error: updateCallOp: result type is not memref
+BUILT addr_bits_call llvm none 0.1s
+RAN addr_bits_call llvm: 13 chunks of 16384, cycles/chunk [] (0.0s)
+UNIT-MATCH dma_addr_gen bits_call amc-llvm none: 200700/200700 (cycles/chunk [])
+WALL 6s rc=0

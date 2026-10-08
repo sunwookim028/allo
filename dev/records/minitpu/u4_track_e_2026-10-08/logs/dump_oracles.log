@@ -1,0 +1,6 @@
+DUMP dma_addr_gen 200700 vectors, latency [0], RTL == reference
+DUMP seq_decoder:base 25458 cycles, 5 traces, 25458 defined slots, RTL vs reference on defined 25458/25458 (9.3s)
+DUMP agu_resolve:base 38432 cycles, 3 traces, 38432 defined slots, RTL vs reference on defined 38432/38432 (9.1s)
+DUMP vpu_adapter:base 24866 cycles, 3 traces, 24866 defined slots, RTL vs reference on defined 24866/24866 (9.1s)
+DUMP scalar_agu:lat2 40214 cycles, 9 traces, 201065 defined slots, RTL vs reference on defined 201065/201065 (11.6s)
+DUMP dma_desc_adapter:base 20056 cycles, 3 traces, 180495 defined slots, RTL vs reference on defined 180495/180495 (9.5s)

@@ -1,0 +1,4 @@
+SCHED inline: latency 16386 | cyclic II [1] | QOR lat 16386 fmax 488.9 area Utilization(lut=140, logic_lut=140, srl=0, ff=127, dsp=0, carry8=4, muxf=0, bram36=0, uram288=0)
+COSIM 3 chunks of 16384: cycles/chunk [16386] (18.5s)
+UNIT-MATCH agu_resolve inline rtlgen: 38432/38432 defined slots (rows 38432)
+WALL 19s rc=0

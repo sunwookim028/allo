@@ -1,0 +1,14 @@
+BUILT agu_amc amc pipeline 0.2s
+cycle time: 4099
+cycle time: 4099
+cycle time: 4099
+cycle time: 4099
+cycle time: 4099
+cycle time: 4099
+cycle time: 4099
+cycle time: 4099
+cycle time: 4099
+cycle time: 4099
+RAN agu_amc amc: 10 chunks of 4096, cycles/chunk [4099] (129.2s)
+UNIT-MATCH agu_resolve amc amc-amc pipeline: 38432/38432 defined slots (rows 38432)
+WALL 131s rc=0

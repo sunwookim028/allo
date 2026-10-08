@@ -1,0 +1,5 @@
+WARN: [EMIT] 2 combinational path(s) of this kernel miss the 3.33 ns clock. The worst takes 4.02 ns (-0.68 ns slack) reaching the input of a pipeline register at 'p1_mac' u4e_sagu_regs_split_40214.py:84:8; the design builds and simulates, and it is the part that may not hold the clock. The QoR report's `fmax` and its critical paths say where the time goes (at u4e_sagu_regs_split_40214.py:10:0)
+SCHED regs_split: latency 40218 | cyclic II [1] | QOR lat 40218 fmax 249.0 area Utilization(lut=1591, logic_lut=1590, srl=1, ff=1312, dsp=3, carry8=45, muxf=0, bram36=0, uram288=0)
+COSIM 1 chunks of 40214: cycles/chunk [40218] (35.1s)
+UNIT-MATCH scalar_agu:lat2 regs_split rtlgen: 201065/201065 defined slots (rows 40214)
+WALL 36s rc=0

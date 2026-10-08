@@ -1,0 +1,14 @@
+BUILT agu_amc amc none 0.2s
+cycle time: 12289
+cycle time: 12289
+cycle time: 12289
+cycle time: 12289
+cycle time: 12289
+cycle time: 12289
+cycle time: 12289
+cycle time: 12289
+cycle time: 12289
+cycle time: 12289
+RAN agu_amc amc: 10 chunks of 4096, cycles/chunk [12289] (126.0s)
+UNIT-MATCH agu_resolve amc amc-amc none: 38432/38432 defined slots (rows 38432)
+WALL 128s rc=0
