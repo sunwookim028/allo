@@ -1055,6 +1055,11 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
     # slots exist only with them. ``isa_slots(arch)`` reads both.
     slots: tuple = ()
     options: tuple = ()
+    # README D-19: a base an option COMPLETES (its sequencer dispatches to a
+    # unit only the option brings) is not a legal machine on its own, and
+    # legality is judged on the composed result. ``draft=True`` defers the
+    # netlist rules to ``with_options``; a draft cannot be emitted or built.
+    draft: bool = False
     #: The order the composite's verdict uses: ``order``, or the accepted
     #: order a bound part changed it to. Set by ``_check``.
     reference_order: str = field(default=None, init=False)
@@ -1066,7 +1071,14 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
     def __post_init__(self):
         if not isinstance(self.parameters, dict):
             self._bind_geometry()
-        self._check()
+        if not self.draft:
+            self._check()
+
+    def _not_draft(self, what):
+        assert not self.draft, (
+            f"{self.name}: {what} of a draft; a draft is a base for "
+            f"Architecture.with_options and is checked and emitted only as "
+            f"the composed result (README D-19)")
 
     def _bind_geometry(self):
         """README D-20: ``parameters`` may be a frozen geometry record whose
@@ -1243,12 +1255,14 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
             channels += list(o.channels)
             memories += list(o.memories)
             units += list(o.units)
-        return cls(name=name or "_".join([base.name] + [o.name for o in options]),
-                   parameters=params, memories=tuple(memories),
-                   channels=tuple(channels), units=tuple(units),
-                   obligations=dict(base.obligations), engines=engines,
-                   order=base.order, accepts=base.accepts, slots=base.slots,
-                   options=tuple(base.options) + tuple(options))
+        out = cls(name=name or "_".join([base.name] + [o.name for o in options]),
+                  parameters=params, memories=tuple(memories),
+                  channels=tuple(channels), units=tuple(units),
+                  obligations=dict(base.obligations), engines=engines,
+                  order=base.order, accepts=base.accepts, slots=base.slots,
+                  options=tuple(base.options) + tuple(options))
+        out.geometry = base.geometry   # the record the base was bound from (D-20)
+        return out
 
     # -- engines (README D-15) -------------------------------------------------
 
@@ -1428,6 +1442,7 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
         else ``local`` for one owner and ``registers`` otherwise. Vitis
         refuses a memory with more than one owner (README D-12).
         """
+        self._not_draft("plan")
         lowering = dict(lowering or {})
         names = {m.name for m in self._ported()}
         for k in lowering:
@@ -1929,6 +1944,7 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
         """The region's text. ``target="simulator"`` emits every link as a
         Stream (the simulator is untimed and refuses Wire); a memory with
         ports is lowered as ``plan`` says."""
+        self._not_draft("source")
         links = "stream" if target == "simulator" else None
         plan = self.plan(target, lowering, technology)
         srcs, extra, region_decls, servers = (
@@ -1994,6 +2010,7 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
         cannot: a compose ``Unit`` is a kernel, replicated by ``instances``,
         and an Action ``Unit`` is one dispatch domain.
         """
+        self._not_draft("machine")
         from allo.actions import structure  # noqa: PLC0415  -- one direction
 
         return structure(self, name)
@@ -2008,6 +2025,7 @@ class Architecture:  # pylint: disable=too-many-instance-attributes
         ``ctx.engine`` name the first binding. A directive naming a function
         the module does not hold as its own ``func.func`` (absent, or marked
         to be inlined) is refused naming the function, never dropped (D-1)."""
+        self._not_draft("directives")
         ctx = Directives(top=s.top_func_name, parameters=self.parameters)
         applied = set()
         for u in self.units:
