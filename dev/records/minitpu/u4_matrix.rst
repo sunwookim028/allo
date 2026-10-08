@@ -10,7 +10,9 @@ from ``u1-pilot``. **Wave 1 filled 2026-10-08** (branch ``u4-wave1-int`` from
 ``u1-pilot`` at ``bf4e3302``, tracks A, B, C merged): the Allo columns from the
 three track records, every verdict re-run once on the merged tree (section
 "Wave 1 on the merged tree"); the Catapult, RTLGen and AMC columns are
-**open (track D/E)** -- not run in wave 1.
+**open (track D/E)** -- not run in wave 1. **Track E filled** (RTLGen, AMC cells;
+``u4_track_e_2026-10-08.rst`` section 6) and the closed ``sequencer`` row added
+(``u4_seqloop_2026-10-08.rst`` section 8) on 2026-10-08.
 
 The oracle column is Phase 0 (``u4_phase0_2026-10-08.rst``): each RTL unit
 against its Python reference on every defined slot, at its declared latency,
@@ -66,11 +68,11 @@ All **CALENDAR-MATCH**: ``W = L + VPU_WB_STAGES``, the seam agreed with
      - **open** (track D: IRAM inference; T-2 on Wire links)
      - 
    * - RTLGen
-     - n/a
+     - n/a (as the matrix)
      - plan section 4 (H3: --)
    * - AMC
-     - **open** (track E: IRAM as a D-12 memory)
-     - 
+     - **match** (IRAM as an ``amc.memory`` ``w(1)`` + ``r(1)``: lowers to an unreset array with a registered read, latency 1 as declared, old word on a same-cycle collision; Verilator 3/3). Frontend: ports inferred, never declared (missing abstraction, d12's gap)
+     - ``u4_track_e_2026-10-08.rst`` section 6
 
 ``loop_ctrl`` (loop control + loop buffer)
 ------------------------------------------
@@ -98,8 +100,8 @@ All **CALENDAR-MATCH**: ``W = L + VPU_WB_STAGES``, the seam agreed with
      - n/a
      - 
    * - AMC
-     - **open** (track E: loop buffer as a D-12 memory)
-     - 
+     - **match** (loop buffer ``w(1)`` + ``r(0)``: combinational read; Verilator 3/3). **finding** E-A7 (bug, #126 class: frontend pipelined kernel infeasible -> wrong values); latency 0 not expressible from the frontend (missing abstraction)
+     - ``u4_track_e_2026-10-08.rst`` section 6
 
 ``seq_decoder`` (decoder)
 -------------------------
@@ -124,11 +126,11 @@ All **CALENDAR-MATCH**: ``W = L + VPU_WB_STAGES``, the seam agreed with
      - **open** (track D)
      - 
    * - RTLGen
-     - **open** (track E)
-     - 
+     - **match** 25,458/25,458 as written (inlined II=2 on lane ports, II=1 on 1-D ports; called 13N+1). **finding** E-R2 (missing abstraction: lane-array port costs II), E-R3 (workaround: no inline directive)
+     - ``u4_track_e_2026-10-08.rst`` section 6
    * - AMC
-     - n/a
-     - combinational
+     - **match** 25,458/25,458 after U1's workarounds (II=1, N+2); as written **refused** (A2). **finding** E-A4/E-F1 (typed constants)
+     - ``u4_track_e_2026-10-08.rst`` section 6; combinational unit, run because the track listed it
 
 ``agu_resolve`` (X-slot address)
 --------------------------------
@@ -153,11 +155,11 @@ All **CALENDAR-MATCH**: ``W = L + VPU_WB_STAGES``, the seam agreed with
      - **open** (track D)
      - 
    * - RTLGen
-     - **open** (track E)
-     - 
+     - **match** 38,432/38,432 (inlined II=1 N+2; called 15N+1)
+     - ``u4_track_e_2026-10-08.rst`` section 6
    * - AMC
-     - n/a
-     - combinational
+     - **match** 38,432/38,432 inlined (II=1); called **blocked** (A4); E-A5 (testbench, chunks of 4,096)
+     - ``u4_track_e_2026-10-08.rst`` section 6
 
 ``scalar_agu`` (scalar AGU)
 ---------------------------
@@ -182,11 +184,11 @@ All **CALENDAR-MATCH**: ``W = L + VPU_WB_STAGES``, the seam agreed with
      - **open** (track D: ``latency=S_LAT`` pinned)
      - 
    * - RTLGen
-     - **open** (track E, optional)
-     - 
+     - **finding** E-R1 (bug, silent: 152,372/201,065 as written); **match** 201,065/201,065 per cycle at ``S_LAT`` 2 with E-R1 avoided (``written_e1``, ``regs``, ``regs_split`` II=1 N+4, 249 MHz est.). ``S_LAT`` 1 and 3: **not run** (track E: the pipe is data, ``S_LAT`` only changes the generated depth; P-E5)
+     - ``u4_track_e_2026-10-08.rst`` section 6
    * - AMC
-     - n/a
-     - 
+     - **blocked** E-A6 (crash; ``llvm`` 201,065/201,065). ``S_LAT`` 1 and 3: **not run** (track E: P-E5)
+     - ``u4_track_e_2026-10-08.rst`` section 6
 
 ``dma_desc_adapter`` (descriptor adapter)
 -----------------------------------------
@@ -211,11 +213,11 @@ All **CALENDAR-MATCH**: ``W = L + VPU_WB_STAGES``, the seam agreed with
      - **open** (track D)
      - 
    * - RTLGen
-     - n/a
-     - not in track E's list (plan section 5)
+     - **match** 180,495/180,495 per cycle (II=9 on the lane ports, II=1 on 1-D ports) -- the matrix had n/a; run because the task listed it
+     - ``u4_track_e_2026-10-08.rst`` section 6
    * - AMC
-     - n/a
-     - no memory
+     - **match** 180,495/180,495 per cycle after workarounds (A2, A-D3); as written **refused** (A2)
+     - ``u4_track_e_2026-10-08.rst`` section 6
 
 ``vpu_adapter`` (``vpu_ctrl_t`` producer)
 -----------------------------------------
@@ -240,11 +242,11 @@ All **CALENDAR-MATCH**: ``W = L + VPU_WB_STAGES``, the seam agreed with
      - **open** (track D)
      - 
    * - RTLGen
-     - **open** (track E)
-     - 
+     - **match** ``slots`` 24,866/24,866 (II=2 lanes / II=1 split / called 9N+1); ``slots_gated`` **CONTRACT-MATCH** 318,113/318,113
+     - ``u4_track_e_2026-10-08.rst`` section 6
    * - AMC
-     - n/a
-     - combinational
+     - **match** ``slots`` 24,866/24,866 after workarounds; as written **refused** (A2)
+     - ``u4_track_e_2026-10-08.rst`` section 6
 
 ``sequencer`` / ``seq_issue`` (I1 + A1: bundle issue)
 -----------------------------------------------------
@@ -273,6 +275,35 @@ All **CALENDAR-MATCH**: ``W = L + VPU_WB_STAGES``, the seam agreed with
      - 
    * - AMC
      - n/a
+     - 
+
+``sequencer`` (the closed loop: F1 + L1 + S1 + I1/A1 + C1, D-23 commands)
+------------------------------------------------------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 40 42
+
+   * - Tool
+     - Cell
+     - Evidence / note
+   * - RTL oracle (Phase 0)
+     - **match** (Phase 0 ``sequencer`` at ``u4_seq_loop.sv``: slots + ``sreg_o``)
+     - ``u4_seqloop_2026-10-08.rst`` section 8
+   * - Allo simulator
+     - **match** 1,286,132/1,286,132 (programs, both images, 3 tbs). **finding** S-2 (bug: the D-12 server serves its ports in declaration order with blocking gets, so the loop buffer declared ``(cap w, replay r)`` deadlocks the simulator with no diagnostic; repro ``tests/limits/new_d12_server_port_order_deadlock.py``; workaround: replay port first), S-1 (missing abstraction: no same-cycle link kind, every exchange is a Stream), S-5 (workaround: literal slice bounds, D-17), S-6 (workaround: one ``rst_n`` boundary copy per unit)
+     - ``u4_seqloop_2026-10-08.rst`` sections 6, 8; template ``template/sequencer.py``
+   * - SystemC csim
+     - **match** 1,286,132/1,286,132; D-23: 0 stall cycles, 5,447/5,447 issues at the RTL cycle at QD 1/2/4 (29 csim cycles per RTL cycle, S-1). **finding** S-4 (semantic mismatch: a data-dependent 2-D boundary read under an ``if`` costs 2 csim cycles, fixed by an unconditional read), S-3 (missing abstraction: the D-12 memories' Wire lowering fails D-13's cone rule for all four owners, so csim runs the Stream lowering), S-7 (deviation: fetch-queue entries are reset arrays, C2)
+     - ``u4_seqloop_2026-10-08.rst`` sections 6, 8
+   * - Catapult RTL + DC
+     - **open** (track D); blocked for the D-12 memories' Wire lowering (S-3)
+     - needs the exchanges as wires (S-1)
+   * - RTLGen
+     - n/a (composition)
+     - 
+   * - AMC
+     - n/a (composition)
      - 
 
 ``vpu_cmd`` (D-23: the command boundary as three Streams + four resources)
@@ -414,11 +445,11 @@ All **CALENDAR-MATCH**: ``W = L + VPU_WB_STAGES``, the seam agreed with
      - **open** (track D)
      - 
    * - RTLGen
-     - **open** (track E; H1: a ``comb`` port refused, registered taken)
-     - 
+     - **match** 200,700/200,700, ``bits`` and ``c1``, inlined (II=1 N+4) and called (7N+1)
+     - ``u4_track_e_2026-10-08.rst`` section 6
    * - AMC
-     - n/a
-     - combinational
+     - **match** 200,700/200,700 inlined (II=1 N+6); called **blocked** (A4)
+     - ``u4_track_e_2026-10-08.rst`` section 6
 
 ``dma`` (D1: DMA engine)
 ------------------------
@@ -443,8 +474,8 @@ All **CALENDAR-MATCH**: ``W = L + VPU_WB_STAGES``, the seam agreed with
      - **open** (track D: ``bits_reset`` or a Wire form; C2 blocks P-7's declared form)
      - 
    * - RTLGen
-     - **open** (track E)
-     - 
+     - **not run** (track E: H9, optional, left out of the list)
+     - ``u4_track_e_2026-10-08.rst`` section 9
    * - AMC
      - n/a
      - 
@@ -475,8 +506,8 @@ All **CALENDAR-MATCH**: ``W = L + VPU_WB_STAGES``, the seam agreed with
      - n/a
      - 
    * - AMC
-     - **open** (track E: H11's other place to ask)
-     - 
+     - **refused** E-A3 (bug: ``rw(3,1)`` + ``rw(2,1)`` not lowered); workarounds lower (2R2W split: latencies 3/2 verified; ``rw(1,1)`` x 2: collision silently port 0 -- semantic mismatch with ``collision="obligation"``)
+     - ``u4_track_e_2026-10-08.rst`` section 6
 
 ``dma_selftimed`` (D2 probe, plan's self-timed form, H10)
 ---------------------------------------------------------
@@ -586,72 +617,103 @@ then a workaround or missing abstraction. Ids as in the track records.
    segfaults or hangs -- in 6 of 14 runs at 129-160 bits; the other 8 ended
    with no symptom. Memory corruption with no reliable signal ranks first. Proposal: the simulator refuses > 128-bit elements
    until the lowering is fixed.
-2. **F-B4** (bug, simulator / semantic mismatch, csim; B). A consumer that
+2. **E-R1** (bug, RTLGen frontend; E). Inside a nested ``@kernel``, a narrow
+   unsigned parameter compared with a literal whose top bit (at the parameter's
+   width) is set is never equal (``op: u3``, ``op == 4``): on RTLGen's ``cpu``
+   target and in the RTL alike, no warning. In S1 every ``SSHL`` writes 0:
+   48,693 wrong defined slots. Workaround: pass ``op`` as ``u32`` and narrow
+   inside. Draft issue: track E section 5.
+3. **E-F1** (bug, Allo front end; E). An untyped literal is ``int32``, so ``y:
+   UInt(64) = x | (1 << 35)`` leaves bit 35 clear on ``llvm`` and in the
+   simulator, no warning (``tests/limits/new_wide_literal_shift.py``). No landed
+   U4 unit is affected (slice stores, not literal shifts). Proposal: type a
+   literal shift by its annotated target, or refuse a shift amount >= the
+   literal's width.
+4. **F-B4** (bug, simulator / semantic mismatch, csim; B). A consumer that
    finishes while its producer is blocked on a full stream: the simulator
    never returns, no diagnostic; csim returns normally with the blocked
    producer invisible. Proposal: report "finished with kernel X blocked on
    stream S".
-3. **T-2** (semantic mismatch, D-12 lowering; A). A port's ``L`` delivers at
+5. **T-2** (semantic mismatch, D-12 lowering; A). A port's ``L`` delivers at
    ``t + L - 1`` on Stream links but "registered link + L-deep pipe" on Wire
    links: one cycle-locked body is off by a register on one of the two, and
    nothing reports it. Owner decision below.
-4. **C8** (semantic mismatch, D-12 server; C). The server's read token is
+6. **C8** (semantic mismatch, D-12 server; C). The server's read token is
    post-edge; a pre-sampling owner is one cycle off unless it adds a ``hold``
    register that is not hardware.
-5. **F-B9 / T-9 / C3** (front end; A, B, C). A slice with non-literal bounds
+7. **F-B9 / T-9 / C3** (front end; A, B, C). A slice with non-literal bounds
    defaults to ``UInt(32)`` with only a warning: a wider slice is truncated
    silently (no wrong result yet; every unit now uses literal bounds or
    shifts).
-6. **C9** (semantic mismatch, self-timed DMA; C). No peek on a Stream: the
+8. **C9** (semantic mismatch, self-timed DMA; C). No peek on a Stream: the
    credit frees ``len`` beats early, OUTSTANDING + 1 in flight against the
    RTL's OUTSTANDING; the contract still matched.
-7. **M5** (missing abstraction, RTLModule; ``minitpu_rtl_m1``). ``$readmem``
+9. **M5** (missing abstraction, RTLModule; ``minitpu_rtl_m1``). ``$readmem``
    paths resolve against the process's cwd, silent when wrong.
-8. **T-5** (semantic, the epoch workaround; A). A 1-bit epoch issues stale
-   bundles after two close flushes; the committed probe uses the stale count.
+10. **T-5** (semantic, the epoch workaround; A). A 1-bit epoch issues stale
+    bundles after two close flushes; the committed probe uses the stale count.
 
 **Crash or hang**
 
-9. **C7** (bug, SystemC emitter; C). A large kernel-local array lands on the
-   SC_THREAD's ~64 KB stack: csim segfaults (VMEM at 4,096 rows).
-10. **C10** (semantic mismatch, D-12 server, self-timed; C). The read pipe
+11. **S-2** (bug, D-12 server lowering; seqloop). The server serves its ports
+    in declaration order with blocking gets; the loop buffer declared ``(cap w,
+    replay r)`` deadlocks the simulator with no diagnostic (the RTL's ports have
+    no order). Repro ``tests/limits/new_d12_server_port_order_deadlock.py``.
+    Proposal: answer every read port before waiting on a write port, or
+    ``compose`` refuses a port order its channels make cyclic.
+12. **E-A6** (bug, AMC crash; E). S1 in the register discipline aborts the ``amc``
+    build (``'loopschedule.await' op operation destroyed but still has uses``)
+    on both schedules; reduced to 55 lines (``amc/repro_sagu_await.py``); A-D2 is
+    reachable at depth 2. Blocks S1 on AMC.
+13. **C7** (bug, SystemC emitter; C). A large kernel-local array lands on the
+    SC_THREAD's ~64 KB stack: csim segfaults (VMEM at 4,096 rows).
+14. **C10** (semantic mismatch, D-12 server, self-timed; C). The read pipe
     advances only with accesses: store-then-load deadlocked; a flush access
     after every store works around it.
-11. **C1** (bug, SystemC emitter; C). A local named ``done`` collides with the
+15. **C1** (bug, SystemC emitter; C). A local named ``done`` collides with the
     process's ``done`` port: g++ error (the simulator runs it).
-12. **F-B10** (Catapult, budget; B). ``vpu_cmd:streams`` csyn ran away in
+16. **F-B10** (Catapult, budget; B). ``vpu_cmd:streams`` csyn ran away in
     ``architect`` (86 GB, stopped); likely the unrolled harness pad loop.
     Track D's.
 
 **Refusal**
 
-13. **C2** (missing abstraction, honest refusal; C). ``@ Stateful(reset=False)``
+17. **E-A3** (bug, AMC; E). A ``static rw(R, W)`` port with ``R != W`` is legal at
+    the type level but fails ``seq.hlmem`` legalization (only a "failed to
+    legalize" message): blocks the VMEM with its latency-3 compute and
+    latency-2 DMA ports (H11) on AMC.
+18. **C2** (missing abstraction, honest refusal; C). ``@ Stateful(reset=False)``
     is refused in any kernel with a non-Wire port, so P-7's declared form
     has no csim (or Catapult) path in token time. Owner decision below.
-14. **F-B2** (missing abstraction, spurious refusal; B). ``compose`` refuses
+19. **F-B2** (missing abstraction, spurious refusal; B). ``compose`` refuses
     ``uint8/16/32/64`` (not in ``FRONTEND_NAMES``); one-line fix.
-15. **T-3** (workaround; A). A closed-over Python ``bool`` compiles to an
+20. **T-3** (workaround; A). A closed-over Python ``bool`` compiles to an
     ``i32`` ``scf.if`` and fails; two functions instead of a flag.
-16. **F-B5** (repro rot; B). ``item18_catapult_try_ops_blocking.py`` is now
+21. **F-B5** (repro rot; B). ``item18_catapult_try_ops_blocking.py`` is now
     refused by the netlist rules before reaching the backend.
 
 **Workaround / missing abstraction**
 
-17. **T-4 / H6** (A). No stream can be flushed; ``drain`` hides a stretched
+22. **S-1** (missing abstraction; seqloop). A same-cycle link kind: every one-cycle
+    exchange between cycle-locked units must be a Stream (29 csim cycles per RTL
+    cycle) because a unit ``Wire`` port is not wired, a region Wire is not
+    aligned in csim and a ``comb`` link is refused beside a Stream port.
+    D-n candidate below.
+23. **T-4 / H6** (A). No stream can be flushed; ``drain`` hides a stretched
     cycle, ``epoch`` costs a bundle when the queue was full. D-n draft below.
-18. **C11** (C). No reliable ``try_get`` (item 18, #23): no per-cycle
+24. **C11** (C). No reliable ``try_get`` (item 18, #23): no per-cycle
     arbitration between two blocking request streams.
-19. **C6** (C). An owner cannot read its port's declared latency; P-3's one
+25. **C6** (C). An owner cannot read its port's declared latency; P-3's one
     number is checked by hand in the architecture builder.
-20. **F-B6** (B). A per-cycle claim obligation on converging channels
+26. **F-B6** (B). A per-cycle claim obligation on converging channels
     cannot be declared (``obligations`` takes multi-write memories only).
-21. **F-B3** (B). Command-stream depth is a legality (>= 2 in csim).
-22. **M2, M3, M4, M6, R1** (RTLModule; ``minitpu_rtl_m1``/``m2b``): compose
+27. **F-B3** (B). Command-stream depth is a legality (>= 2 in csim).
+28. **M2, M3, M4, M6, R1** (RTLModule; ``minitpu_rtl_m1``/``m2b``): compose
     has no IP declaration category (M2); payloads <= 32 bits, a 256-bit word
     as eight ``MemPort``\ s (M3); fixed transfer counts (M4); no Verilator
     build cache (M6); a dual port only by aliasing one array to two
     ``MemPort``\ s (R1).
-23. **C4, C5** (C): the refusal text blames ``wrap_io``; beats as 8 x 32-bit
+29. **C4, C5** (C): the refusal text blames ``wrap_io``; beats as 8 x 32-bit
     lanes.
 
 Recorded, not ranked: T-6 (README D-23 swaps the X/M names: wording for the
@@ -679,7 +741,19 @@ What the owner decides
    half; drop the pad loop, F-B10), ``vpu_wb``, ``dma`` ``bits_reset``,
    ``dma_vmem`` (H11), ``scalar_agu`` (``latency=S_LAT``) and the T-2 check;
    E with C1, S1, D1 and AMC on IRAM / loop buffer.
-5. **Closing the sequencer loop**: F1, L1 and S1 composed with the issue
+5. **Closing the sequencer loop** (done: row ``sequencer``, 1,286,132/1,286,132):
+   F1, L1 and S1 composed with the issue
    kernel (instead of side columns) -- a wave-2 task of about a day, or
    leave the issue unit held by replay.
 6. **T-6**: correct README D-23's slot names (X = memory, M = matrix).
+7. **File the six draft issues of track E section 5**
+   (``u4_track_e_2026-10-08.rst``; none filed): RTLGen **E-R1**; AMC
+   **E-A3**; AMC **E-A6 + A-D2**; AMC minor trio **E-A1/E-A2/E-A5**; a
+   comment on AMC **#126** for **E-A7**; Allo **E-F1** upstream (repro
+   ``tests/limits/new_wide_literal_shift.py``).
+8. **S-1: a declared same-cycle link kind for cycle-locked compositions** as
+   a D-n candidate (one put and one get per iteration, required in the cone
+   order the composition checks for acyclicity; Stream depth 1 on the
+   simulator and csim, a wire on Catapult). Until then every one-cycle
+   exchange is a Stream at 29 csim cycles per RTL cycle
+   (``u4_seqloop_2026-10-08.rst`` section 6, S-1).
