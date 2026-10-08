@@ -860,8 +860,9 @@ Running it
 ==========
 
 **One model, every stage printed, run on the design:** ``make mlp``. The
-walk-through, and two changes to the machine put through it, are
-:doc:`tinytpu_tutorial`.
+walk-through, and two changes to the machine put through it, with every
+command's complete output, is ``examples/tinytpu/README.md``
+(:doc:`tinytpu_tutorial` points there).
 
 The suite's report, every model:
 

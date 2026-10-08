@@ -1,0 +1,582 @@
+diff --git a/docs/source/designs/tinytpu_isa_spec.rst b/docs/source/designs/tinytpu_isa_spec.rst
+index da9ae03f..86c7bc45 100644
+--- a/docs/source/designs/tinytpu_isa_spec.rst
++++ b/docs/source/designs/tinytpu_isa_spec.rst
+@@ -268,6 +268,14 @@ Opcodes
+        | ``f2`` = ar_s2: first row of the right source
+      - nr accumulator rows
+      - ``accu``
++   * - ``OP_MVOUTRELU``
++     - 11
++     - mvoutrelu
++     - | ``f0`` = ar0: first accumulator row to retire
++       | ``f1`` = dram_row0: first DRAM row of C
++       | ``f2`` = col_block: packed-word column block of C, 0 .. WPR-1
++     - nr accumulator rows
++     - ``accu``, ``dma_st``
+ 
+ The ``units`` column is **derived** from the actions below, not written beside each opcode: an opcode reaches whichever units its actions name. It used to be typed, and it was wrong twice -- ``mm`` did not name the array, and ``dma_ld`` named its destination in prose.
+ 
+@@ -647,6 +655,54 @@ Every instruction is an ordered list of per-unit **effects**. Each effect names
+      - ar_d
+      - nr
+      - --
++   * - mvoutrelu
++     - accu
++     - ar.read
++     - read
++     - ``ar``
++     - ar0
++     - nr
++     - --
++   * - mvoutrelu
++     - accu
++     - alu
++     - compute
++     - ``max0``
++     - --
++     - nr
++     - --
++   * - mvoutrelu
++     - accu
++     - alu
++     - compute
++     - ``to_operand``
++     - --
++     - nr
++     - --
++   * - mvoutrelu
++     - accu
++     - ac2sp
++     - emit
++     - --
++     - --
++     - nr
++     - --
++   * - mvoutrelu
++     - dma_st
++     - ac2sp
++     - receive
++     - --
++     - --
++     - nr
++     - --
++   * - mvoutrelu
++     - dma_st
++     - dram.write
++     - write
++     - ``C``
++     - dram_row0
++     - nr
++     - --
+ 
+ .. list-table:: Units: ports, step rate, elasticity
+    :header-rows: 1
+@@ -870,6 +926,12 @@ Every count but the static one is **the work a unit does**, summed over the issu
+    * - vaddrelu
+      - accu
+      - ``2 x nr``
++   * - mvoutrelu
++     - accu
++     - ``1 x nr``
++   * - mvoutrelu
++     - dma_st
++     - ``1 x nr``
+ 
+ Memory map
+ ~~~~~~~~~~
+@@ -903,7 +965,7 @@ Memory map
+      - ``NAR``
+      - ``T * 32`` bits
+      - ``mm``, ``vadd``, ``vrelu``, ``vaddrelu``
+-     - ``mm`` (the accumulate base) [acc == 1], ``vadd`` (a source), ``vrelu`` (a source), ``mvout`` (the value to retire), ``vaddrelu`` (a source)
++     - ``mm`` (the accumulate base) [acc == 1], ``vadd`` (a source), ``vrelu`` (a source), ``mvout`` (the value to retire), ``vaddrelu`` (a source), ``mvoutrelu`` (the value to retire)
+      - **no**
+    * - ``imem``
+      - ``sequencer``
+@@ -930,7 +992,7 @@ Memory map
+      - ``dma_st``
+      - ``MAXDIM * MAXDIM``
+      - ``8`` bits
+-     - ``mvout``
++     - ``mvout``, ``mvoutrelu``
+      - the host
+      - **no**
+ 
+diff --git a/examples/tinytpu/act_machine.py b/examples/tinytpu/act_machine.py
+index 8861df60..3ec8bc1e 100644
+--- a/examples/tinytpu/act_machine.py
++++ b/examples/tinytpu/act_machine.py
+@@ -13,7 +13,8 @@ from allo.act.schedule import Region  # noqa: E402
+ from allo.act.schedule import Step  # noqa: E402
+ from examples.tinytpu.microarch_isa import (  # noqa: E402
+     AGU_TERMS, DMA_SRC_B, DMA_TO_VR, LOOP_DEPTH, NAR, NVR, OP_DMA_LD,
+-    OP_ENDLOOP, OP_LOOP, OP_MM, OP_MVOUT, OP_VADD, OP_VLD, OP_VRELU,
++    OP_ENDLOOP, OP_LOOP, OP_MM, OP_MVOUT, OP_MVOUTRELU, OP_VADD, OP_VLD,
++    OP_VRELU,
+     SPAD_ROWS, T, expand,
+ )
+ 
+@@ -85,10 +86,14 @@ MVOUT = Opcode(
+     reads=(lambda nr, f0, **_: Region(AR, f0, nr),),
+     writes=(lambda nr, f1, f2, **_: Region(dram("C", f2), f1, nr),))
+ 
++MVOUTRELU = Opcode(
++    code=OP_MVOUTRELU, name="mvoutrelu",
++    loads=MVOUT.loads, reads=MVOUT.reads, writes=MVOUT.writes)
++
+ MACHINE = Machine(
+     name="tinytpu-isa",
+     spaces=(Space(SPAD, SPAD_ROWS), Space(VR, NVR), Space(AR, NAR)),
+-    opcodes=(DMA_LD, VLD, MM, VADD, VRELU, MVOUT))
++    opcodes=(DMA_LD, VLD, MM, VADD, VRELU, MVOUT, MVOUTRELU))
+ 
+ 
+ def is_control(prog):
+diff --git a/examples/tinytpu/act_target.py b/examples/tinytpu/act_target.py
+index 4c882c5e..8029f87d 100644
+--- a/examples/tinytpu/act_target.py
++++ b/examples/tinytpu/act_target.py
+@@ -32,6 +32,13 @@ EPILOGUE = {
+     "relu": lambda k, dst, src, rows: k.vrelu(dst, src, rows),
+ }
+ 
++# An epilogue op the retiring instruction can apply on its way out. When the
++# LAST op of the epilogue is one of these, it is folded into the `mvout` and
++# costs no accumulator pass of its own.
++FUSED_RETIRE = {
++    "relu": lambda k: k.mvoutrelu,
++}
++
+ # Which kind of gap each refusal is. `express` means the instruction word has no
+ # field or no room for what the nest asks; the design is fine and the encoding
+ # is not. `refuse` means the machine would accept the program and produce a
+@@ -260,10 +267,13 @@ class TinyTpu(Target):
+             result = into[workload.contractions[0]]
+             for term in workload.contractions[1:]:
+                 k.vadd(result, result, into[term], rows=rows)
+-            for op in workload.epilogue:
++            epilogue, retire = list(workload.epilogue), k.mvout
++            if epilogue and epilogue[-1] in FUSED_RETIRE:
++                retire = FUSED_RETIRE[epilogue.pop()](k)
++            for op in epilogue:
+                 EPILOGUE[op](k, result, result, rows)
+-            k.mvout(result, dram_row=walked(0, row_terms),
+-                    col_block=walked(0, column_terms), rows=rows)
++            retire(result, dram_row=walked(0, row_terms),
++                   col_block=walked(0, column_terms), rows=rows)
+ 
+         def walk(loops, open_loops):
+             if not loops:
+diff --git a/examples/tinytpu/ip/assembler.py b/examples/tinytpu/ip/assembler.py
+index b1712020..706d5f93 100644
+--- a/examples/tinytpu/ip/assembler.py
++++ b/examples/tinytpu/ip/assembler.py
+@@ -19,7 +19,7 @@ from examples.tinytpu.ip.isa import (
+     AGU_TERMS, AGU_TERM_BITS, AGU_LEVEL_BITS, DMA_SRC_B, DMA_TO_VR, FIELD_LO,
+     FIELD_MASK, LOOP_DEPTH, NHDR, NR_LO, NR_MASK, OPCODE_NAMES, OP_DMA_LD,
+     OP_DMA_ST, OP_ENDLOOP, OP_LOOP, OP_MASK, OP_MM, OP_MVOUT, OP_NOP, OP_VADD,
+-    OP_VADDRELU, OP_VLD, OP_VRELU)
++    OP_MVOUTRELU, OP_VADDRELU, OP_VLD, OP_VRELU)
+ 
+ 
+ def opcode_of(word):
+@@ -249,7 +249,7 @@ class Assembler:
+                     ar_read(source[i], accu_step + i, "a source")
+                     ar_write(dest[i], accu_step + i)
+                 accu_step += nr
+-            elif op == OP_MVOUT:
++            elif op in (OP_MVOUT, OP_MVOUTRELU):
+                 for i, row in enumerate(span("ar", f0, nr)):
+                     ar_read(row, accu_step + i, "the value to retire")
+                 accu_step += nr
+@@ -309,9 +309,9 @@ class Assembler:
+                   rows_to_spad + rows(OP_VLD) + n_mm * (p.T + 1),
+                   rows_to_vr + rows(OP_VLD) + mm_rows,
+                   n_mm | (mm_rows << 16),
+-                  rows(OP_MM, OP_VRELU, OP_MVOUT)
++                  rows(OP_MM, OP_VRELU, OP_MVOUT, OP_MVOUTRELU)
+                   + 2 * rows(OP_VADD, OP_VADDRELU),
+-                  rows(OP_MVOUT),
++                  rows(OP_MVOUT, OP_MVOUTRELU),
+                   a_span | (b_span << 16)]
+         assert len(header) == NHDR
+         # Every count is read back through a 16-bit slice, which used to
+diff --git a/examples/tinytpu/ip/isa.py b/examples/tinytpu/ip/isa.py
+index d93cbff9..71c3edab 100644
+--- a/examples/tinytpu/ip/isa.py
++++ b/examples/tinytpu/ip/isa.py
+@@ -22,11 +22,12 @@ OP_MVOUT = 7      # f0=ar0 f1=dram_row0 f2=col_block     nr=rows  acc -> DRAM
+ OP_LOOP = 8       # open a loop, body is the next instruction   nr=trip count
+ OP_ENDLOOP = 9    # close the innermost loop
+ OP_VADDRELU = 10  # f0=ar_d f1=ar_s1 f2=ar_s2            nr=rows
++OP_MVOUTRELU = 11  # f0=ar0 f1=dram_row0 f2=col_block    nr=rows  relu, acc -> DRAM
+ 
+ OPCODE_NAMES = {OP_NOP: "nop", OP_DMA_LD: "dma_ld", OP_DMA_ST: "dma_st",
+                 OP_VLD: "vld", OP_MM: "mm", OP_VADD: "vadd", OP_VRELU: "vrelu",
+                 OP_MVOUT: "mvout", OP_LOOP: "loop", OP_ENDLOOP: "endloop",
+-                OP_VADDRELU: "vaddrelu"}
++                OP_VADDRELU: "vaddrelu", OP_MVOUTRELU: "mvoutrelu"}
+ 
+ # `dma_ld`'s f0: bit 0 is the SOURCE matrix, bit 1 the DESTINATION memory.
+ #   0: A -> spad    1: B -> spad    2: A -> vr    3: B -> vr
+@@ -82,6 +83,7 @@ ISA_NAMESPACE = {
+     "OP_VLD": OP_VLD, "OP_MM": OP_MM, "OP_VADD": OP_VADD,
+     "OP_VRELU": OP_VRELU, "OP_MVOUT": OP_MVOUT, "OP_LOOP": OP_LOOP,
+     "OP_ENDLOOP": OP_ENDLOOP, "OP_VADDRELU": OP_VADDRELU,
++    "OP_MVOUTRELU": OP_MVOUTRELU,
+     "DMA_SRC_B": DMA_SRC_B, "DMA_TO_VR": DMA_TO_VR,
+     "AGU_TERMS": AGU_TERMS, "AGU_F0": AGU_F0, "AGU_F1": AGU_F1,
+     "AGU_F2": AGU_F2, "AGU_F3": AGU_F3,
+diff --git a/examples/tinytpu/ip/units/accumulator.py b/examples/tinytpu/ip/units/accumulator.py
+index a0092791..bf0c0c47 100644
+--- a/examples/tinytpu/ip/units/accumulator.py
++++ b/examples/tinytpu/ip/units/accumulator.py
+@@ -4,7 +4,8 @@
+ """The accumulator vector registers, their sole owner, and the vector ALU.
+ 
+ `mm` deposits or accumulates one k-tile's partial sums, `vadd` and `vrelu` are
+-elementwise, and `mvout` clips to int8 on the way out. Every arm is muxed down
++elementwise, and `mvout` clips to int8 on the way out (`mvoutrelu` also
++rectifies, in the same step). Every arm is muxed down
+ to ONE `ar` read and ONE `ar` write per iteration; `vadd` needs two reads, so
+ it takes two steps per row, which is why the sequencer sends this unit twice
+ its row count for a `vadd`. Its II=1 rests on a dependence claim the assembler
+@@ -37,7 +38,8 @@ def accumulator_directives(s, ctx):
+     reads=("c_acc", "cw"),
+     writes=("ac2sp",),
+     parameters=("NAR", "AW", "VW", "T"),
+-    isa=("OP_MM", "OP_VADD", "OP_VRELU", "OP_VADDRELU", "OP_MVOUT"),
++    isa=("OP_MM", "OP_VADD", "OP_VRELU", "OP_VADDRELU", "OP_MVOUT",
++         "OP_MVOUTRELU"),
+     directives=accumulator_directives,
+ )
+ def accu():
+@@ -77,6 +79,8 @@ def accu():
+             write_row = f1 + row
+         if op == OP_MVOUT:
+             read_row = f0 + row
++        if op == OP_MVOUTRELU:     # retires from f0, exactly as `mvout`
++            read_row = f0 + row
+         if two_source == 1:
+             if phase == 1:
+                 read_row = f2 + row
+@@ -124,6 +128,10 @@ def accu():
+                 write_word[32 * relu_lane : 32 * (relu_lane + 1)] = rectified
+         else:
+             do_write = 0
++            # `mvoutrelu` rectifies in the same step `mvout` clips in.
++            rectify: int32 = 0
++            if op == OP_MVOUTRELU:
++                rectify = 1
+             clipped_word: UInt(VW) = 0
+             with allo.meta_for(T) as clip_lane:
+                 retiring: int32 = read_word[32 * clip_lane : 32 * (clip_lane + 1)]
+@@ -131,6 +139,9 @@ def accu():
+                     retiring = 127
+                 if retiring < -128:
+                     retiring = -128
++                if rectify == 1:
++                    if retiring < 0:
++                        retiring = 0
+                 clipped: int8 = retiring
+                 clipped_word[8 * clip_lane : 8 * (clip_lane + 1)] = clipped
+             ac2sp.put(clipped_word)
+diff --git a/examples/tinytpu/ip/units/dma_store.py b/examples/tinytpu/ip/units/dma_store.py
+index 8111c6ab..3b020822 100644
+--- a/examples/tinytpu/ip/units/dma_store.py
++++ b/examples/tinytpu/ip/units/dma_store.py
+@@ -34,7 +34,8 @@ def dma_st(dram_c: int8[MAXDIM * MAXDIM]):
+     for work in range(n_row):
+         row += 1
+         if row >= instr_rows:
+-            # Only `mvout` reaches this queue, so there is no opcode test.
++            # Only `mvout` and `mvoutrelu` reach this queue, and `accu` has
++            # already applied the difference, so there is no opcode test.
+             word: UInt(64) = c_dst.get()
+             dram_row0 = word[18:30]
+             col_block = word[30:42]
+diff --git a/examples/tinytpu/ip/units/sequencer.py b/examples/tinytpu/ip/units/sequencer.py
+index b101676c..9a7adc9a 100644
+--- a/examples/tinytpu/ip/units/sequencer.py
++++ b/examples/tinytpu/ip/units/sequencer.py
+@@ -33,7 +33,7 @@ def sequencer_directives(s, ctx):
+     isa=("LOOP_DEPTH", "NHDR", "IWORDS", "AGU_TERMS", "AGU_F0", "AGU_F1",
+          "AGU_F2", "AGU_F3", "OP_LOOP", "OP_ENDLOOP", "OP_DMA_LD", "OP_VLD",
+          "OP_MM", "OP_VADD", "OP_VRELU", "OP_VADDRELU", "OP_MVOUT",
+-         "DMA_TO_VR"),
++         "OP_MVOUTRELU", "DMA_TO_VR"),
+     directives=sequencer_directives,
+ )
+ def sequencer(dram_imem: UInt(64)[IMEM_SIZE]):
+@@ -145,6 +145,9 @@ def sequencer(dram_imem: UInt(64)[IMEM_SIZE]):
+             if op == OP_MVOUT:
+                 c_acc.put(resolved)
+                 c_dst.put(resolved)
++            if op == OP_MVOUTRELU:
++                c_acc.put(resolved)
++                c_dst.put(resolved)
+             pc += 1
+ 
+         if pc >= n_instr:
+diff --git a/examples/tinytpu/isa_dsl.py b/examples/tinytpu/isa_dsl.py
+index 7bb6a5cb..18a1d811 100644
+--- a/examples/tinytpu/isa_dsl.py
++++ b/examples/tinytpu/isa_dsl.py
+@@ -87,7 +87,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
+ from examples.tinytpu.microarch_isa import (  # noqa: E402
+     AGU_F0, AGU_F1, AGU_F2, AGU_F3, AGU_TERMS, LOOP_DEPTH,
+     OP_DMA_LD, OP_ENDLOOP, OP_LOOP, OP_MM, OP_MVOUT, OP_NOP, OP_VADD, OP_VLD,
+-    OP_VADDRELU, OP_VRELU, enc, enc_agu,
++    OP_MVOUTRELU, OP_VADDRELU, OP_VRELU, enc, enc_agu,
+     A_VR, AR_C, B_SP, DMA_SRC_B, DMA_TO_VR, MAXDIM, MAXROWS, T,
+     SPAD_ROWS, NVR, NAR,
+ )
+@@ -247,6 +247,10 @@ class Program:
+         """Accumulator -> DRAM, clipped to int8 on the way."""
+         self._ins(OP_MVOUT, ar, dram_row, col_block, nr=rows)
+ 
++    def mvoutrelu(self, ar, dram_row=0, col_block=0, rows=0):
++        """`vrelu` then `mvout`, in one pass of the accumulator."""
++        self._ins(OP_MVOUTRELU, ar, dram_row, col_block, nr=rows)
++
+     def emit(self):
+         """The `(word, agu_word)` list `assemble()` takes."""
+         if self._open:
+diff --git a/examples/tinytpu/isa_encoding.py b/examples/tinytpu/isa_encoding.py
+index 049e00c0..a2d83d4b 100644
+--- a/examples/tinytpu/isa_encoding.py
++++ b/examples/tinytpu/isa_encoding.py
+@@ -119,6 +119,7 @@ OP_MVOUT = 7
+ OP_LOOP = 8
+ OP_ENDLOOP = 9
+ OP_VADDRELU = 10
++OP_MVOUTRELU = 11
+ 
+ OPCODE_NAME = {
+     OP_NOP: "nop",
+@@ -132,6 +133,7 @@ OPCODE_NAME = {
+     OP_LOOP: "loop",
+     OP_ENDLOOP: "endloop",
+     OP_VADDRELU: "vaddrelu",
++    OP_MVOUTRELU: "mvoutrelu",
+ }
+ RETIRED = frozenset({OP_DMA_ST})
+ 
+@@ -149,6 +151,7 @@ OPERAND_NAME = {
+     OP_LOOP: (None, None, None, None),
+     OP_ENDLOOP: (None, None, None, None),
+     OP_VADDRELU: ("ar_d", "ar_s1", "ar_s2", None),
++    OP_MVOUTRELU: ("ar0", "dram_row0", "col_block", None),
+ }
+ 
+ #: Values `op` field of an opcode admits, where the spec restricts them.
+@@ -520,6 +523,14 @@ ACTIONS = {
+         _A('accu', 'compute', port='alu', compute='max0', args=('total',), into='rectified'),
+         _A('accu', 'write', port='ar.write', state='ar', base='ar_d', args=('rectified',)),
+     ),
++    11: (
++        _A('accu', 'read', port='ar.read', state='ar', base='ar0', into='value', role='the value to retire'),
++        _A('accu', 'compute', port='alu', compute='max0', args=('value',), into='rectified'),
++        _A('accu', 'compute', port='alu', compute='to_operand', args=('rectified',), into='clipped'),
++        _A('accu', 'emit', port='ac2sp', args=('clipped',)),
++        _A('dma_st', 'receive', port='ac2sp', into='clipped_in', args=('clipped',)),
++        _A('dma_st', 'write', port='dram.write', state='C', base='dram_row0', args=('clipped_in',), offset='col_block * T'),
++    ),
+ }
+ 
+ #: How many rows one issue of each opcode runs.
+@@ -535,6 +546,7 @@ ROWS_EXPRESSION = {
+     8: '1',
+     9: '1',
+     10: 'nr',
++    11: 'nr',
+ }
+ 
+ #: Properties of PROGRAMS that no instruction can establish on its own.
+diff --git a/examples/tinytpu/isa_spec.json b/examples/tinytpu/isa_spec.json
+index 59bc4b88..3b507640 100644
+--- a/examples/tinytpu/isa_spec.json
++++ b/examples/tinytpu/isa_spec.json
+@@ -983,6 +983,90 @@
+         }
+       ],
+       "note": "`vadd` then `vrelu` in one pass: the accumulator already has both the adder and the rectifier, so the composition costs a mux and saves a pass over `ar` and an intermediate row. Two `ar` reads a row, so two accu steps a row -- which nothing here says, because it follows from `accu` having one `ar` read port."
++    },
++    {
++      "name": "mvoutrelu",
++      "value": 11,
++      "software_constant": "OP_MVOUTRELU",
++      "rows": "nr accumulator rows",
++      "operands": [
++        {
++          "field": "f0",
++          "name": "ar0",
++          "meaning": "first accumulator row to retire"
++        },
++        {
++          "field": "f1",
++          "name": "dram_row0",
++          "meaning": "first DRAM row of C"
++        },
++        {
++          "field": "f2",
++          "name": "col_block",
++          "meaning": "packed-word column block of C, 0 .. WPR-1"
++        }
++      ],
++      "note": "`vrelu` then `mvout` in one pass: the rectify happens on the way out, in the step that already clips to int8, so a fused-ReLU layer spends one accumulator pass and no intermediate write instead of two. Two chained lane operations a step (max0, then the clip), within the alu's declared depth. The worked example of adding a fused instruction: examples/tinytpu/README.md.",
++      "rows_expression": "nr",
++      "actions": [
++        {
++          "unit": "accu",
++          "kind": "read",
++          "port": "ar.read",
++          "state": "ar",
++          "base": "ar0",
++          "into": "value",
++          "role": "the value to retire"
++        },
++        {
++          "unit": "accu",
++          "kind": "compute",
++          "port": "alu",
++          "compute": "max0",
++          "args": [
++            "value"
++          ],
++          "into": "rectified"
++        },
++        {
++          "unit": "accu",
++          "kind": "compute",
++          "port": "alu",
++          "compute": "to_operand",
++          "args": [
++            "rectified"
++          ],
++          "into": "clipped"
++        },
++        {
++          "unit": "accu",
++          "kind": "emit",
++          "port": "ac2sp",
++          "args": [
++            "clipped"
++          ]
++        },
++        {
++          "unit": "dma_st",
++          "kind": "receive",
++          "port": "ac2sp",
++          "into": "clipped_in",
++          "args": [
++            "clipped"
++          ]
++        },
++        {
++          "unit": "dma_st",
++          "kind": "write",
++          "port": "dram.write",
++          "state": "C",
++          "base": "dram_row0",
++          "args": [
++            "clipped_in"
++          ],
++          "offset": "col_block * T"
++        }
++      ]
+     }
+   ],
+   "dispatch": {
+diff --git a/examples/tinytpu/microarch_isa.py b/examples/tinytpu/microarch_isa.py
+index a3a5513f..c723fda3 100644
+--- a/examples/tinytpu/microarch_isa.py
++++ b/examples/tinytpu/microarch_isa.py
+@@ -36,8 +36,8 @@ from examples.tinytpu.ip.assembler import (  # noqa: F401
+ from examples.tinytpu.ip.isa import (  # noqa: F401
+     AGU_F0, AGU_F1, AGU_F2, AGU_F3, AGU_TERMS, DMA_SRC_B, DMA_TO_VR, IWORDS,
+     LOOP_DEPTH, MAXROWS, NHDR, OP_DMA_LD, OP_DMA_ST, OP_ENDLOOP, OP_LOOP,
+-    OP_MM, OP_MVOUT, OP_NOP, OP_VADD, OP_VADDRELU, OP_VLD, OP_VRELU, enc,
+-    enc_agu)
++    OP_MM, OP_MVOUT, OP_MVOUTRELU, OP_NOP, OP_VADD, OP_VADDRELU, OP_VLD,
++    OP_VRELU, enc, enc_agu)
+ 
+ # Instruction slots. Sized to the longest program shipped (the stress harness's
+ # random programs), not to a round number: the sequencer's prefetch is
+diff --git a/examples/tinytpu/stress_isa.py b/examples/tinytpu/stress_isa.py
+index a859de84..5f4d3be2 100644
+--- a/examples/tinytpu/stress_isa.py
++++ b/examples/tinytpu/stress_isa.py
+@@ -282,7 +282,8 @@ def random_program(seed):
+         s = run_of("ar", n)
+         if s is None or not accu_ok([(s + i, i) for i in range(n)]):
+             return False
+-        k.mvout(s, dram_row=ri(0, MAXDIM - n), col_block=ri(0, WPR - 1), rows=n)
++        retire = k.mvoutrelu if ri(0, 1) else k.mvout
++        retire(s, dram_row=ri(0, MAXDIM - n), col_block=ri(0, WPR - 1), rows=n)
+         acc["it"] += n
+         return True
+ 
+diff --git a/examples/tinytpu/units_isa.py b/examples/tinytpu/units_isa.py
+index 4db1a8a6..1689c179 100644
+--- a/examples/tinytpu/units_isa.py
++++ b/examples/tinytpu/units_isa.py
+@@ -61,6 +61,7 @@ OP_LO = TPU.architecture.parameters["OP_LO"]
+ OP_LOOP = TPU.architecture.parameters["OP_LOOP"]
+ OP_MM = TPU.architecture.parameters["OP_MM"]
+ OP_MVOUT = TPU.architecture.parameters["OP_MVOUT"]
++OP_MVOUTRELU = TPU.architecture.parameters["OP_MVOUTRELU"]
+ OP_NOP = TPU.architecture.parameters["OP_NOP"]
+ OP_VADD = TPU.architecture.parameters["OP_VADD"]
+ OP_VADDRELU = TPU.architecture.parameters["OP_VADDRELU"]
+@@ -190,6 +191,9 @@ def sequencer(
+             if op == OP_MVOUT:
+                 c_acc.put(resolved)
+                 c_dst.put(resolved)
++            if op == OP_MVOUTRELU:
++                c_acc.put(resolved)
++                c_dst.put(resolved)
+             pc += 1
+ 
+         if pc >= n_instr:
+@@ -503,6 +507,8 @@ def accu(
+             write_row = f1 + row
+         if op == OP_MVOUT:
+             read_row = f0 + row
++        if op == OP_MVOUTRELU:  # retires from f0, exactly as `mvout`
++            read_row = f0 + row
+         if two_source == 1:
+             if phase == 1:
+                 read_row = f2 + row
+@@ -550,6 +556,10 @@ def accu(
+                 write_word[32 * relu_lane : 32 * (relu_lane + 1)] = rectified
+         else:
+             do_write = 0
++            # `mvoutrelu` rectifies in the same step `mvout` clips in.
++            rectify: int32 = 0
++            if op == OP_MVOUTRELU:
++                rectify = 1
+             clipped_word: UInt(VW) = 0
+             with allo.meta_for(T) as clip_lane:
+                 retiring: int32 = read_word[32 * clip_lane : 32 * (clip_lane + 1)]
+@@ -557,6 +567,9 @@ def accu(
+                     retiring = 127
+                 if retiring < -128:
+                     retiring = -128
++                if rectify == 1:
++                    if retiring < 0:
++                        retiring = 0
+                 clipped: int8 = retiring
+                 clipped_word[8 * clip_lane : 8 * (clip_lane + 1)] = clipped
+             ac2sp.put(clipped_word)
+@@ -579,7 +592,8 @@ def dma_st(
+     for work in range(n_row):
+         row += 1
+         if row >= instr_rows:
+-            # Only `mvout` reaches this queue, so there is no opcode test.
++            # Only `mvout` and `mvoutrelu` reach this queue, and `accu` has
++            # already applied the difference, so there is no opcode test.
+             word: UInt(64) = c_dst.get()
+             dram_row0 = word[18:30]
+             col_block = word[30:42]

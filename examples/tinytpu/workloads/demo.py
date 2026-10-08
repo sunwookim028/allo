@@ -16,8 +16,8 @@ model run on it layer by layer against PyTorch. Each stage is a function that
 prints its section and returns what the next one needs, so a script can reuse
 any of them. The output has no timings, so a captured run is reproducible.
 
-`run.py` is the suite's report over every model; this is the walk-through.
-Tutorial: docs/source/designs/tinytpu_tutorial.rst."""
+`run.py` is the suite's report over every model; this is the walk-through,
+whose every command and output is in README.md."""
 
 import argparse
 import inspect

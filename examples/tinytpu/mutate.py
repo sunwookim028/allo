@@ -146,8 +146,10 @@ MUTANTS = [
     ("vadd_src2_is_src1", "vadd reads its first source twice (x + x)",
      "if phase == 1:", "read_row = f2 + row", "read_row = f1 + row"),
     ("vadd_holds_stale_x", "vadd's first operand register is never loaded",
-     "vadd_first = read_word", "vadd_first = read_word",
-     "vadd_first = vadd_first"),
+     # `vaddrelu` has the same line; the opcode arm makes the anchor unique.
+     "        elif op == OP_VADD:\n            if phase == 0:\n"
+     "                vadd_first = read_word",
+     "vadd_first = read_word", "vadd_first = vadd_first"),
     ("vrelu_src_base_ignored", "vrelu reads ar[r], ignoring its f1 base",
      "        if op == OP_MVOUT:\n            read_row = f0 + row",
      "read_row = f0 + row",

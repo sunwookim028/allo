@@ -115,7 +115,7 @@ for arg in "$@"; do
 done
 
 source "$(conda info --base)/etc/profile.d/conda.sh"
-conda activate allo
+conda activate allo >/dev/null 2>&1   # its banner is not this script's output
 set -u                       # after activate: its scripts read unset vars
 # The env sets neither of these (CLAUDE.md).
 export LLVM_BUILD_DIR=${LLVM_BUILD_DIR:-/home/sk3463/llvm-allo-6b09f739/build}

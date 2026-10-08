@@ -241,16 +241,17 @@ export (see above):
 
 .. code-block:: text
 
-   $ cd examples/tinytpu && make mlp PYTHON=python      # 24 s
+   $ cd examples/tinytpu && make mlp                    # 28 s
      mlp_small_l0   8x32x32   design vs isa_ref over all 4096 bytes of C: 0 differ
      mlp_small_l1   8x32x16   design vs isa_ref over all 4096 bytes of C: 0 differ
    [✓] Against PyTorch
      0 of 384 output bytes differ
 
-``PYTHON=python`` matters: the Makefile probes ``python -c 'import allo'``,
-which fails because allo is not pip-installed (scripts put the repo on
-``sys.path``), and then falls back to ``conda run -n allo`` -- the *other*
-env, with torch 2.10.
+The Makefile probes whether the shell's ``python`` imports allo with the
+checkout on ``sys.path`` (allo is not pip-installed in this env; the scripts
+put the repo on ``sys.path``), and only otherwise falls back to
+``conda run -n allo`` -- the *other* env, with torch 2.10 and its activation
+banner.
 
 hlslibs ``ac_types`` (no Catapult licence needed)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -338,9 +339,9 @@ A row marked **unpinned** is an open defect.
        ace-01's ``~/.local/bin/verilator`` is an older build, development commit
        ``228635918ed0`` ("5.051")
      - ``scripts/verilator-setup.sh``
-   * - PyTorch (ACT tutorial)
+   * - PyTorch (the TinyTPU walk-through)
      - ``torch==2.14.0`` CPU
-     - ``docs/source/designs/tinytpu_tutorial.rst``
+     - ``examples/tinytpu/README.md``
    * - ``ucb-bar/chia``, opencode
      - ``16c35e9``, ``opencode-ai@1.18.25``
      - ``examples/tinytpu/chia_agent/requirements.txt``, ``package-lock.json``
