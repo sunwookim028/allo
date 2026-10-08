@@ -735,7 +735,8 @@ What the owner decides
    storage as a module member with no reset action (as reset ``Stateful``
    members, minus the reset); keep the clock-edge ``SC_METHOD`` for all-Wire
    kernels. Until then csim and Catapult run the ``*_reset`` deviation.
-4. **Tracks D (Catapult + DC) and E (RTLGen/AMC) now, on the landed
+4. **Tracks D (Catapult + DC) and E (RTLGen/AMC): approved 2026-10-08; E
+   landed (``u4_track_e_2026-10-08.rst``), D running.** (Was: both now, on the landed
    variants?** Every Allo column above is landed and matches; D would start
    with ``seq_issue``/``vpu_cmd`` at depth 2 and 4 (D-23's open Catapult
    half; drop the pad loop, F-B10), ``vpu_wb``, ``dma`` ``bits_reset``,
