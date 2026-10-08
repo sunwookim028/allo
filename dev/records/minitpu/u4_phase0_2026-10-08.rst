@@ -33,7 +33,7 @@ Reproduce (``source examples/minitpu/harness/env-zhang21.sh`` first)::
    $ALLO_PYTHON -m examples.minitpu.units.seq_decoder --asm-check
    $ALLO_PYTHON -m examples.minitpu.harness.characterize dma_addr_gen dma
    $ALLO_PYTHON -m examples.minitpu.harness.characterize sequencer vpu_writeback   # vpu build ~2.5 min cold
-   $ALLO_PYTHON -m examples.minitpu.harness.calendar                                 # ~3 min warm
+   $ALLO_PYTHON -m examples.minitpu.harness.wb_calendar                                 # ~3 min warm
 
 Logs in ``u4_phase0_2026-10-08/``: ``characterize_{front,decode,dma,sequencer,
 vpu_writeback}.log``, ``calendar.log``, ``vpu_ctrl_gating.log``, and the tb
@@ -58,7 +58,8 @@ Files
   and VMEM read pipe that generate the open-loop traces), ``ref_ctrl_issue.py``
   (the whole sequencer, composed from the part models plus the top FSM and
   the sim-only schedule checker), ``ref_ctrl_wb.py`` (``vpu_ctrl_t``'s layout
-  and the writeback calendar), ``calendar.py`` (the calendar as data).
+  and the writeback calendar), ``wb_calendar.py`` (the calendar as data; named
+  ``calendar.py`` until fork issue #51).
 * ``harness/rtl.py``, ``characterize.py``, ``vcd_seed.py``: **unchanged**.
 
 Results

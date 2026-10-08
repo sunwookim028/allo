@@ -3,7 +3,7 @@
 """U4: the VREG write-port calendar as data, from the RTL, held to its three
 written copies.
 
-    $ALLO_PYTHON -m examples.minitpu.harness.calendar
+    $ALLO_PYTHON -m examples.minitpu.harness.wb_calendar
 
 For every VREG-writing op class it measures on ``vpu.sv`` (through
 ``units/vpu_writeback``): the mux cycle ``L`` (``wb_source_valid``), the

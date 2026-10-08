@@ -1,0 +1,52 @@
+$ python examples/minitpu/harness/check.py agu_resolve --backend simulator --backend systemc
+RTL u4_agu_resolve:base: 38432 cycles in 3 traces, 38432 defined slots, RTL vs reference on defined: 38432/38432 (0.4s)
+/work/shared/users/phd/sk3463/scratch/wt-u4int/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui16 vs ui12[0m
+  warnings.warn(self.message, category=self.category)
+/work/shared/users/phd/sk3463/scratch/wt-u4int/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui1[0m
+  warnings.warn(self.message, category=self.category)
+/work/shared/users/phd/sk3463/scratch/wt-u4int/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui3[0m
+  warnings.warn(self.message, category=self.category)
+/work/shared/users/phd/sk3463/scratch/wt-u4int/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui4[0m
+  warnings.warn(self.message, category=self.category)
+UNIT-MATCH agu_resolve:base c1 simulator 38432/38432 defined (0 masked: ; allo==rtl on 0) cycle=order-only (build 0.3s, run 0.1s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[11:22:20] Compiling with g++ ...
+[11:22:26] Running simulation ...
+UNIT-MATCH agu_resolve:base c1 systemc 38432/38432 defined (0 masked: ; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.3s, run 7.6s)
+exit 0
+$ python -m examples.minitpu.harness.check agu_resolve --backend simulator --backend systemc
+RTL u4_agu_resolve:base: 38432 cycles in 3 traces, 38432 defined slots, RTL vs reference on defined: 38432/38432 (0.4s)
+/work/shared/users/phd/sk3463/scratch/wt-u4int/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui16 vs ui12[0m
+  warnings.warn(self.message, category=self.category)
+/work/shared/users/phd/sk3463/scratch/wt-u4int/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui1[0m
+  warnings.warn(self.message, category=self.category)
+/work/shared/users/phd/sk3463/scratch/wt-u4int/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui3[0m
+  warnings.warn(self.message, category=self.category)
+/work/shared/users/phd/sk3463/scratch/wt-u4int/allo/_mlir/exceptions.py:76: RuntimeWarning: 
+[93m[Data Type][0m [94mInput type mismatch: ui8 vs ui4[0m
+  warnings.warn(self.message, category=self.category)
+UNIT-MATCH agu_resolve:base c1 simulator 38432/38432 defined (0 masked: ; allo==rtl on 0) cycle=order-only (build 0.3s, run 0.1s)
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+Connections Clock: t.clk Period: 1 ns
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+[11:22:33] Compiling with g++ ...
+[11:22:39] Running simulation ...
+UNIT-MATCH agu_resolve:base c1 systemc 38432/38432 defined (0 masked: ; allo==rtl on 0) cycle=per-iteration, time unchecked (build 0.3s, run 7.6s)
+exit 0
