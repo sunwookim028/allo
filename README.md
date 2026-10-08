@@ -551,7 +551,8 @@ valid-qualified slot commands plus four declared resources.**
   (D-21).
 
 **D-25 (2026-10-08). Flushable streams.**
-- `Stream[T, D, flush=True]` gains `s.flush()`, callable only by the
+- `Stream[T, D, flush]` (spelled so: a keyword cannot appear inside a
+  subscript) gains `s.flush()`, callable only by the
   channel's one consumer. At that edge every buffered token is discarded and
   a put in the same edge is dropped. It lowers to a FIFO with a synchronous
   clear -- zero cycles, what MiniTPU's `sequencer_fetch_queue.sv` does. A
@@ -564,8 +565,10 @@ valid-qualified slot commands plus four declared resources.**
 - Why: the fetch queue of every sequencer with branches is flushed; the Allo
   prototypes without it either read several tokens in one cycle (not
   buildable) or lose a bundle under a full queue
-  (`u4_track_a_2026-10-08.rst`, H6). Until implemented, limitation entry;
-  the fetch unit drops stranded tokens by count, exact only when cycle-locked.
+  (`u4_track_a_2026-10-08.rst`, H6). Implemented 2026-10-08 for the
+  cycle-locked form (simulator; SystemC via the fork's clearable FIFO;
+  Catapult synthesises the clear; Vitis refuses by name); the self-timed
+  epoch form is a documented follow-up (`core_fixes_4_2026-10-08.rst`).
 
 **D-12, amended (2026-10-08): a port's latency is counted in the owner's own
 iterations on every link kind.** U4 found a read port with latency L

@@ -12,7 +12,7 @@ a list of ``{"what", "set": {dotted path: value}, "source"}``, one entry per
 quantity, provenance in ``source``; **overrides only** (a path the base lacks
 is refused); ``rtl_params.WB_W_*`` are ``W = unit latency + VPU_WB_STAGES``,
 the claim cycle, never the unit latency. Values come from
-``template/calendar.Calendar`` (derived from the bound units' declared
+``template/wb_calendar.Calendar`` (derived from the bound units' declared
 latencies, D-20); nothing here is a constant.
 
 This is the calendar half of the generator whose MXU half is the prototype in
@@ -184,7 +184,7 @@ def check_base(base, cal, version):
 
 
 def main(argv=None):
-    from examples.minitpu.template.calendar import Calendar
+    from examples.minitpu.template.wb_calendar import Calendar
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", required=True, help="MiniTPU isa/latency.json (master >= f1e978e)")

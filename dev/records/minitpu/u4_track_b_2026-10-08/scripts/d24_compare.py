@@ -176,7 +176,7 @@ def main():
     ap.add_argument("--out", default=os.path.join(ROOT, "dev", "records", "minitpu", "u4_track_b_2026-10-08", "logs"))
     a = ap.parse_args()
     from examples.minitpu.template import gen_isa_delta as G
-    from examples.minitpu.template.calendar import Calendar, Source
+    from examples.minitpu.template.wb_calendar import Calendar, Source
 
     print("A. claim timing in csim on vpu_writeback's traces (issue -> write-port mux, L; W = L + 2)")
     lat = {}

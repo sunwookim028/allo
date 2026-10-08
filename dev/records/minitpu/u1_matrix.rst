@@ -510,6 +510,24 @@ not a requirement). Issue audit recorded
 ``main``, prune the 13 merged branches, add the README naming paragraph
 (after the cleanup lands).
 
+**Checkpoint 30 (2026-10-08, core fixes 4 landed on u1-pilot).**
+``core-fixes-4`` (``3b3a6ab9``): D-14's lowering extended (unreset storage as
+a module member in every kernel kind; the DMA's unreset forms now
+UNIT-MATCH in csim), the D-12 latency rule (a read reaches its owner L
+iterations later as the pre-edge value on Stream and Wire links alike; the
+compensating registers in fetch, the DMA unit and the sequencer removed;
+``test_compose_port_latency.py``), D-25 for the cycle-locked form
+(``Stream[T, D, flush]``, ``allo.stream_flush``, the fork's ``AlloFifoClr``
+in SystemC; the T-5 trace that hung under the epoch form now
+CONTRACT-MATCH; self-timed epoch form deferred), S-2 fixed (the memory
+server answers every read port before waiting on a write; the RTL port
+order that hung now UNIT-MATCH). Emission hashes unchanged; 183 tests in
+the combined suite pass; gates equal. ``template/calendar.py`` renamed
+``wb_calendar.py`` (it shadowed the stdlib for ``run_u3e`` by path).
+``u1-pilot`` now carries ``allo/`` and ``mlir/`` changes over ``main``: the
+next regression is sync 6, in its own baseline worktree; ``main`` moves only
+on the owner's word.
+
 **Standing order (owner, 2026-10-08): the main checkout is frozen.** No
 command, build, test or fast-forward in ``/work/shared/users/phd/sk3463/allo``
 and no merge to ``main`` until the owner explicitly authorizes each merge.

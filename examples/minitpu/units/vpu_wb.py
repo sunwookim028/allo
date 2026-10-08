@@ -40,7 +40,7 @@ from __future__ import annotations
 import numpy as np
 
 from examples.minitpu.harness import rtl
-from examples.minitpu.template.calendar import Calendar
+from examples.minitpu.template.wb_calendar import Calendar
 from examples.minitpu.units import seq_issue as SI
 from examples.minitpu.units import vpu_writeback as P0
 
