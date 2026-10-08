@@ -24,6 +24,7 @@ import numpy as np
 
 import allo.dataflow as df
 from allo import MemPort, Port, RTLModule
+from allo.compose import Architecture, Channel, Memory, unit
 from allo.ir.types import Stream, int32
 
 try:  # a package import (examples.minitpu_rtl...) or a script beside it
@@ -111,8 +112,62 @@ def make_region(ip):
     return minitpu_rtl
 
 
-def build(tree: pathlib.Path, fifo_depth: int, **ip_options):
+# ---------------------------------------------------------------------------- the same region, composed
+# The same three kernels as compose units: compose checks each body against its declaration (channels,
+# memories, parameters -- the IP object is bound as the parameter CORE) and emits the region text.
+
+
+@unit(memories=("P",), writes=("cmd",), parameters=("NCMD",))
+def feed(p: int32[NCMD]):
+    for i in range(NCMD):
+        cmd.put(p[i])
+
+
+@unit(memories=("B0", "B1", "B2", "B3", "B4", "B5", "B6", "B7", "W", "R"), reads=("cmd",), writes=("st",),
+      parameters=("CORE", "BANK_WORDS", "DRAIN_BEATS", "DRAIN_WORDS"))
+def core(b0: int32[BANK_WORDS], b1: int32[BANK_WORDS], b2: int32[BANK_WORDS], b3: int32[BANK_WORDS],
+         b4: int32[BANK_WORDS], b5: int32[BANK_WORDS], b6: int32[BANK_WORDS], b7: int32[BANK_WORDS],
+         w: int32[2], r: int32[DRAIN_WORDS]):
+    CORE(cmd, st, b0, b1, b2, b3, b4, b5, b6, b7)
+    first: int32 = w[0]
+    count: int32 = w[1]
+    for j in range(DRAIN_BEATS):
+        if j < count:
+            r[j * 8 + 0] = b0[first + j]
+            r[j * 8 + 1] = b1[first + j]
+            r[j * 8 + 2] = b2[first + j]
+            r[j * 8 + 3] = b3[first + j]
+            r[j * 8 + 4] = b4[first + j]
+            r[j * 8 + 5] = b5[first + j]
+            r[j * 8 + 6] = b6[first + j]
+            r[j * 8 + 7] = b7[first + j]
+
+
+@unit(memories=("S",), reads=("st",), parameters=("NSTAT",))
+def sink(s: int32[NSTAT]):
+    for i in range(NSTAT):
+        s[i] = st.get()
+
+
+def architecture(ip, name="minitpu_rtl"):
+    banks = tuple(Memory(f"B{k}", "int32[BANK_WORDS]") for k in range(BANKS))
+    return Architecture(
+        name=name,
+        parameters={"CORE": ip, "NCMD": NCMD, "NSTAT": NSTAT, "BANK_WORDS": BANK_WORDS,
+                    "DRAIN_BEATS": DRAIN_BEATS, "DRAIN_WORDS": DRAIN_WORDS},
+        memories=(Memory("P", "int32[NCMD]"), *banks, Memory("W", "int32[2]"),
+                  Memory("R", "int32[DRAIN_WORDS]"), Memory("S", "int32[NSTAT]")),
+        channels=(Channel("cmd", "int32", "4", carries="feed -> core: the program, gen_shim.CMD words"),
+                  Channel("st", "int32", "4", carries="core -> sink: NSTAT status words per run")),
+        units=(feed, core, sink))
+
+
+def build(tree: pathlib.Path, fifo_depth: int, *, composed: bool = True, **ip_options):
+    """The region built for the simulator: composed by ``compose.Architecture`` (default) or the plain
+    ``@df.region`` above. Both are the same three kernels."""
     ip = make_ip(tree, fifo_depth, **ip_options)
+    if composed:
+        return architecture(ip).build(target="simulator"), ip
     return df.build(make_region(ip), target="simulator"), ip
 
 

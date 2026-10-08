@@ -122,7 +122,8 @@ def main() -> int:
         row = {
             "name": case.name, "staged_identical": staged, "halted": halted, "flags": status["flags"],
             "drain_sha256": digest, "tb_drain_sha256": tb["drain_sha256"],
-            "identical": digest == tb["drain_sha256"],
+            # A run that printed a $readmem warning ran with zeroed SFU tables: never a pass.
+            "identical": digest == tb["drain_sha256"] and not readmem,
             "cycles": status["perf_cnt_cycles"], "tb_cycles": tb["cycles"],
             "bundles": status["perf_cnt_instrs"], "tb_bundles": tb["bundles_issued"],
             "dma_err": status["dma_err"], "mem_errors": status["shim_mem_errors"],

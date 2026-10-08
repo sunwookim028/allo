@@ -15,7 +15,8 @@ groups to <= 32-bit stream or RAM pins:
   every 32-byte DM word. The shim serves the core's credit pipe (``dm_req_*``/``dm_rsp_*``) from them with the
   contract of ``u4_track_c_2026-10-08.rst`` section 10: requests in order, a load returns len+1 words with
   ``last`` on the final one, a store takes len+1 request beats and answers one ``last`` beat; one request in
-  flight (OUTSTANDING = 1, where the board's bridge has 2).
+  flight (OUTSTANDING = 1, where the board's bridge has 2). A request outside the 32 MiB window is answered
+  DECERR (``resp = 2'b11``) with zero data and no RAM access, as MiniTPU's ``axi4_mem_model`` does.
 * ``done``: high after ``END`` -- the end of the RTLModule call.
 
     python examples/minitpu-rtl/gen_shim.py            # rewrites rtl/minitpu_core_shim.sv
@@ -283,7 +284,7 @@ module minitpu_core_shim (
   assign dm_rsp_valid = ((ms_q == M_READ) && pend_q) || (ms_q == M_WRESP);
   assign dm_rsp_data  = ((ms_q == M_READ) && !err_q) ? {{{q_concat}}} : '0;
   assign dm_rsp_last  = (ms_q == M_WRESP) || (rd_ret_left_q == 9'd1);
-  assign dm_rsp_resp  = err_q ? 2'b10 : 2'b00;
+  assign dm_rsp_resp  = err_q ? 2'b11 : 2'b00;   // DECERR, as tb's axi4_mem_model answers outside its window
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin

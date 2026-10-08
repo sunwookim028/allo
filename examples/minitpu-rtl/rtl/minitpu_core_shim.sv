@@ -280,7 +280,7 @@ module minitpu_core_shim (
   assign dm_rsp_valid = ((ms_q == M_READ) && pend_q) || (ms_q == M_WRESP);
   assign dm_rsp_data  = ((ms_q == M_READ) && !err_q) ? {m7_q, m6_q, m5_q, m4_q, m3_q, m2_q, m1_q, m0_q} : '0;
   assign dm_rsp_last  = (ms_q == M_WRESP) || (rd_ret_left_q == 9'd1);
-  assign dm_rsp_resp  = err_q ? 2'b10 : 2'b00;
+  assign dm_rsp_resp  = err_q ? 2'b11 : 2'b00;   // DECERR, as tb's axi4_mem_model answers outside its window
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
