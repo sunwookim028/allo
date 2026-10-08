@@ -1,0 +1,251 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+##############################################################################
+u1-pilot sync 4: can ``u1-pilot`` (20937d9e) fast-forward ``main`` (552db66a)?
+##############################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-08.** zhang-21, 64 cores, load 20-33
+   from other sessions throughout (three U4 agents share the host), so wall
+   times are upper bounds. Branch: ``origin/u1-pilot`` at
+   ``20937d9e97e2ca60d74d476fc67f90edabcf4347`` in a throwaway detached
+   worktree (``scratch/wt-reg``) with its **own** ``mlir/build`` (Ninja,
+   gcc-toolset-13 13.3.1, ``LLVM_DIR``/``MLIR_DIR`` under
+   ``/work/shared/common/llvm-project-main/build-rhel8``, ``nice ninja -j16``,
+   336 steps, 88 s). Baseline: the main checkout at ``552db66a``, its existing
+   ``mlir/build``, used read-only (its three pytest output directories and
+   ``examples/tinytpu/.mutants`` from this run were deleted afterwards).
+   ``origin/main`` is an ancestor of ``origin/u1-pilot``, so the merge is a
+   fast-forward. ``TMPDIR`` on local disk (``/tmp``) for every run.
+   Scripts: ``u1_pilot_sync4_2026-10-08/scripts/``; raw summaries, verdict
+   lines and the pytest diff: ``u1_pilot_sync4_2026-10-08/results.txt``.
+
+REGRESS_RESULT: READY -- ``u1-pilot`` 20937d9e may fast-forward ``main``. Emissions byte-identical, every gate and every ``check.py`` verdict equal to the baseline, pytest 1010/78 vs 1004/78 with only additions (and one renamed test) differing. One new defect, not a regression of a gate as specified: ``examples/minitpu/harness/calendar.py`` shadows the stdlib ``calendar`` module when ``harness/check.py`` is run **as a script** (s.4).
+
+**Scope of the verdict.** ``origin/u1-pilot`` moved to ``d6836fb7`` while this
+ran (merges of ``u4-dma`` Track C and ``tinytpu-cosim-ld``: ``examples/minitpu/units/``,
+``examples/tinytpu/cosim.py`` linker choice and README, two ``tests/limits/`` repros;
+nothing under ``allo/``, ``mlir/`` or ``tests/`` proper). READY covers ``20937d9e``,
+which is an ancestor of both ``main``'s fast-forward target and the new head;
+``d6836fb7`` needs its own delta check (its ``cosim.py`` change is gate-relevant).
+
+What this batch adds over ``main``: merges of ``u4-phase0``, ``minitpu-rtl-m0``,
+``minitpu-rtl-mxu``, ``tinytpu-example``, ``tinytpu-instance``; README D-21
+bullet, D-23, D-24; records. Under ``allo/`` only ``allo/compose.py``
+changes (``Architecture(draft=True)``; ``with_options`` keeps the geometry
+record); nothing under ``mlir/``.
+
+1. Emission hashes
+==================
+
+``customize(tinytpu_isa); schedule(s); str(s.build(target=T))``, sha256 of the
+text (the method of the earlier syncs, ``scripts/gates.sh``).
+
+.. list-table::
+   :header-rows: 1
+
+   * - Target
+     - Baseline 552db66a
+     - Branch 20937d9e
+     - Bytes
+   * - ``vhls``
+     - ``6bc774bc9d97f0e7…``
+     - identical
+     - 166,563
+   * - ``catapult``
+     - ``ade1ab5dfd20d72a…``
+     - identical
+     - 170,812
+   * - ``systemc``
+     - ``06d365336c307ffc…``
+     - identical
+     - 267,151
+
+2. Gates
+========
+
+Both sides run in sequence (baseline 04:46-05:14, branch 05:14-05:32, reruns
+to 05:45). Wall times are baseline / branch.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Gate
+     - Baseline
+     - Branch
+     - Wall (s)
+   * - ``reproduce.sh --no-cosim`` (``cd -P``)
+     - not run (s.5)
+     - ``REPRODUCED (functional only)``; stress 492/492 at ``TPU_MAXDIM=16``
+     - -- / 137
+   * - ``gen_isa.py --check``
+     - ISA OK (9 consumers)
+     - same
+     - 72 / 61
+   * - ``lift_units.py --check``
+     - UNITS OK
+     - same
+     - 5 / 5
+   * - ``bench_isa.py``
+     - ALL EXACT
+     - same
+     - 15 / 14
+   * - ``stress_isa.py``
+     - STRESS OK 640/640
+     - same
+     - 240 / 229
+   * - ``act_compile.py --gate``
+     - ACT GATE OK 12/12
+     - same
+     - 7 / 7
+   * - ``mutate.py none``
+     - MUTATE OK (control passes)
+     - same
+     - 252 / 239
+   * - ``systemc_csim.py 3``
+     - SYSTEMC CSIM OK
+     - same
+     - 55 / 53
+   * - ``tests/dataflow/test_df_unit.py``
+     - Passed
+     - same
+     - 15 / 6
+   * - ``tests/dataflow/test_region_stateful.py``
+     - exit 0, no output (s.5)
+     - same
+     - 7 / 4
+   * - ``examples/eva/cosim_eva_systemc.py``
+     - PASS (bit-exact)
+     - same
+     - 20 / 18
+   * - ``examples/minitpu/run.py --quick``
+     - PASS
+     - same
+     - 204 / 166
+   * - ``template/run_u3e.py``
+     - U3E-GATE OK, 27 U3E-OK
+     - same (output identical but for paths and seconds)
+     - 67 / 59
+   * - ``check bf16_add``
+     - native DIFF 249907/251936, bits MATCH
+     - same
+     - 17 / 19
+   * - ``check vpu_regfile``
+     - 7 MATCH, 6 DIFF, 2 FAIL (D-11 shared)
+     - same
+     - 432 / 417
+   * - ``check sfu``
+     - bits, staged MATCH
+     - same
+     - 21 / 20
+   * - ``check mxu_pe``
+     - bits, unit MATCH
+     - same
+     - 68 / 65
+   * - ``check vpu_word_array --inst narrow``
+     - 6 MATCH, 2 DIFF, 4 FAIL (D-11 shared; no SRAM macro for ``narrow``)
+     - same
+     - 82 / 85
+
+``check.py`` verdict lines (counts and coverage numbers, timings stripped) are
+line-for-line equal between the two sides and equal to sync 3's branch side;
+the ``check`` exit 1 rows are the recorded verdicts (``native`` bf16 and the
+``wire``/``comb`` variants are known DIFF, ``shared`` is refused by D-11).
+Baseline ran ``harness/check.py`` as a script (sync 3's form); the branch
+verdicts are from ``python -m examples.minitpu.harness.check`` because the
+script form fails there (s.4).
+
+3. pytest
+=========
+
+``pytest -p no:cacheprovider -q tests/dataflow --ignore=tests/dataflow/aie
+tests/act tests/test_*.py --junitxml`` (``scripts/pytest.sh``; no
+``pytest-xdist`` in the env, so serial), both sides concurrently.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Side
+     - Passed
+     - Failed
+     - Skipped
+     - Wall
+   * - Baseline 552db66a
+     - 1004
+     - 78
+     - 10 + 1 xfail
+     - 2290 s
+   * - Branch 20937d9e
+     - 1010
+     - 78
+     - 10 + 1 xfail
+     - 2275 s
+
+Per-test diff (``jdiff.py``): no test changes outcome. Seven tests are new and
+pass on the branch -- ``tests/test_tinytpu_instance.py`` (6) and
+``test_tutorial::test_the_fused_instruction_patch_still_applies``, which is
+the renamed ``test_the_fused_instruction_patches_still_apply`` (pass on the
+baseline). The 78 failures are the same set on both sides and are the
+environment failures of sync 3 (Vitis builds, ``test_verify``,
+``test_systolic_array``, ...).
+
+``test_tutorial::test_the_walk_through_compiles_and_matches_pytorch`` fails in
+the full suite on **both** sides (and failed on both sides of sync 3):
+``cannot reshape array of size 4096 into shape (16,16)`` in ``isa_ref``. It
+is order pollution, not a branch defect: ``tests/act/test_tutorial.py`` alone
+gives 3 passed on both sides. The likely source is
+``tests/dataflow/test_stream_ports_tinytpu.py`` line 20,
+``os.environ.setdefault("TPU_MAXDIM", "16")`` at import, which leaks into
+every later module that reads ``TPU_MAXDIM``. So the brief's "test_tutorial
+(3) passes" holds in isolation, 2 of 3 in the full run.
+
+4. Finding: ``harness/calendar.py`` shadows the stdlib under the script form
+============================================================================
+
+``examples/minitpu/harness/calendar.py`` (``u4-phase0``, commits
+``4faf7e86`` / ``7784c950``) is run as ``python -m
+examples.minitpu.harness.calendar``. Running ``python
+examples/minitpu/harness/check.py <unit>`` -- the form sync 3 and
+``u2_comb_wire_impl_2026-10-02.rst`` use -- puts ``harness/`` first on
+``sys.path``, so ``import pandas`` -> ``_strptime`` imports this file as
+``calendar`` and every unit dies at import (``AttributeError: module
+'calendar' has no attribute 'day_abbr'``, 3-4 s, all five units). The
+``-m`` form used by most records is unaffected and gives
+the verdicts above. Fix: rename the module (e.g. ``wb_calendar.py``). Not a
+blocker for the fast-forward; to be filed as a fork defect.
+
+5. Notes
+========
+
+* **reproduce.sh on the baseline was not run.** It runs ``ninja -C
+  mlir/build -j $(getconf _NPROCESSORS_ONLN)`` and writes
+  ``examples/tinytpu/.scratch``, and ``ninja -n`` on the main checkout's build
+  reports 25 pending steps (archive relinks: ``libMLIRAlloConversion.a``
+  recorded older than its objects), so it would have written into the
+  baseline's build. Its five stages are the gates above, run individually
+  on both sides. The same perpetual relink shows on the fresh branch build
+  (31 relink steps on each ``reproduce.sh`` run, 22 still pending after): a
+  build-tree quirk, not a source change.
+* The first branch ``reproduce.sh`` attempt (exit 1, 59 s) was a wrapper
+  artefact: sourcing ``env-zhang21.sh`` puts Catapult's ``bin/`` (its own
+  python, no numpy) first, and the script's ``python`` resolved to it. Rerun
+  under the plain ``allo`` env as CLAUDE.md prescribes: pass.
+* ``python tests/dataflow/test_region_stateful.py`` has no ``__main__`` block,
+  so running it as a script executes no test (exit 0, no output, both sides).
+  Its 8 tests ran under pytest and pass on both sides. CLAUDE.md's golden-test
+  line for it checks nothing as written.
+* Vitis cosim is not counted: it does not link on this host (system ``ld``
+  2.30; ``tinytpu-instance`` finding F13).
+* The full ``mutate.py`` run was not repeated (optional; >480 s under load);
+  ``mutate.py none`` passes on both sides and the ``vadd_holds_stale_x``
+  anchor fix is in the branch.
+
+6. ``mvoutrelu.patch``
+======================
+
+In the branch worktree: ``git apply --check`` OK; ``git apply`` touches 14
+files (+230/-21); ``git apply -R`` restores all 14 byte-for-byte (sha256 of
+each before and after) and ``git status --porcelain`` is empty. Patch sha256
+``a313ddfd5d46750e…``.
