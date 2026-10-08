@@ -522,7 +522,11 @@ and no ``bitstreams`` entry until a board build exists (the runtime refuses an
 image on an unlisted bitstream). A board_package refactor is landing
 concurrently (code generation moving to ``compiler/``): on conflict, rebase
 onto master and rerun ``gen_isa_doc.py --write``; never hand-merge generated
-files. Opening the PR needs the owner's approval.
+files. A ``bitstreams`` entry (BUILD_ID) is added only after the image has
+been validated on a board: ``make identity`` reads that id with fault 0 and
+the board suite passes twice after programming (MiniTPU's CLAUDE.md rule);
+the entry's text cites the board, date and commit like the ``v1`` entries.
+Opening the PR needs the owner's approval.
 
 **Checkpoint 25 (2026-10-08, the pin is ``v1``; U4 B and C landed).**
 minitpu-comp confirmed track B's measurement: ``b3ba0a4d`` is ISA ``v1``,
