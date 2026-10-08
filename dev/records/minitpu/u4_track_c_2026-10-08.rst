@@ -1,0 +1,570 @@
+..  Copyright Allo authors. All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+
+##############################################################################
+U4 track C: the DMA -- ``dma_addr_gen``, ``dma_desc_adapter``, ``dma``, and
+the DMA closed on the VMEM DMA port
+##############################################################################
+
+.. note::
+
+   **Dated measurement record, 2026-10-08.** zhang-21, branch ``u4-dma``
+   from ``origin/u1-pilot`` at ``d1116048`` (D-23/D-24), worktree
+   ``scratch/wt-u4c`` with its own bindings (``mlir/build``: Ninja,
+   ``LLVM_DIR``/``MLIR_DIR`` under ``/work/shared/common/llvm-project-main/
+   build-rhel8``, gcc-toolset-13 (13.3.1), the ``allo`` env's python; 336
+   steps clean). MiniTPU at ``b3ba0a4d4fb69d39091c55f5f00d1f237082a4f1``,
+   read only. Verilator 5.052; SystemC 2.3.3 (Catapult 2024.2's, csim only).
+   Backends: the Allo simulator and SystemC csim (Catapult + DC is track D,
+   RTLGen/AMC track E). **Nothing under ``allo/`` or ``mlir/`` changed**;
+   every gap is a finding with its smallest proposed change (section 5). The
+   owner is away: every call below is *provisional* under D-9 (section 8).
+   Plan: ``u4_plan_2026-10-08.rst`` section 5, track C = D1, D2; hypotheses
+   H9, H10 (and H1, H8 for the DMA's share).
+
+Reproduce (``source examples/minitpu/harness/env-zhang21.sh`` first, from
+the worktree root; the Verilator caches of ``dma`` exist from Phase 0, the
+``u4_dma_vmem`` one builds in ~10 s)::
+
+   $ALLO_PYTHON -m examples.minitpu.harness.check dma_addr_gen --backend simulator --backend systemc
+   $ALLO_PYTHON -m examples.minitpu.harness.check dma_desc_adapter --backend simulator --backend systemc
+   for i in core o1 o4 bw; do   # OUTSTANDING 2 / 1 / 4 (LANDING_DEPTH 4) / tb_dma_bandwidth
+     $ALLO_PYTHON -m examples.minitpu.harness.check dma --inst $i --backend simulator --backend systemc; done
+   for i in core o1 o4; do
+     $ALLO_PYTHON -m examples.minitpu.harness.check dma_vmem --inst $i --backend simulator --backend systemc; done
+   $ALLO_PYTHON -m examples.minitpu.units.dma_params            # D-20 records, legality, derived timing
+   $ALLO_PYTHON -m examples.minitpu.units.dma_selftimed --inst core --inst o1 --inst o4 \
+       --backend simulator --backend systemc                     # H10 probe, contract verdicts
+   $ALLO_PYTHON tests/limits/new_systemc_reserved_local_names.py # C1
+   $ALLO_PYTHON tests/limits/new_systemc_local_array_stack.py    # C7
+
+Logs: ``u4_track_c_2026-10-08/check_*.log`` (the ``UNIT-MATCH`` lines are the
+verdicts), ``dma_params.log``, ``selftimed.log``.
+
+Files:
+
+* ``examples/minitpu/units/dma_addr_gen.py``: ``addr`` (plan C1, a function
+  the engine calls) and the ``bits`` variant.
+* ``examples/minitpu/units/dma_desc_adapter.py``: ``bits`` (plan A1).
+* ``examples/minitpu/units/dma.py``: ``bits``, ``bits_reset`` (D1 as one
+  kernel), ``streams``, ``streams_reset`` (D1 over Streams), ``WIDTH``.
+* ``examples/minitpu/units/dma_unit.py`` (new): the engine and its source,
+  sink and VMEM-side units as ``compose.unit``\ s; ``streams_architecture``
+  (D1) and ``vmem_architecture`` (D2).
+* ``examples/minitpu/units/dma_vmem.py`` (new unit): D2's oracle -- ``dma.sv``
+  closed on MiniTPU's VMEM DMA port (``units/rtl/u4_dma_vmem.sv``, no logic),
+  its closed-loop reference ``VmemDmaSide``, traces, and the variants ``d12``,
+  ``d12_reset``, ``d12_reset_r256``.
+* ``examples/minitpu/units/dma_params.py`` (new): ``DmaGeometry``, the README
+  D-20 record of the DMA (section 3).
+* ``examples/minitpu/units/dma_selftimed.py`` (new): the self-timed probe (H10).
+* ``tests/limits/new_systemc_reserved_local_names.py``,
+  ``tests/limits/new_systemc_local_array_stack.py`` (new repros).
+* ``harness/`` unchanged.
+
+1. Verdicts (matrix-ready)
+==========================
+
+Every ``UNIT-MATCH`` is on every defined slot of the joined Phase 0 trace set
+of that instance (directed + random + seeds), held to the RTL per cycle in
+the harness's token convention (simulator: order only; csim: per iteration,
+time unchecked; ``check.py``'s ``CYCLE_SEEN``). The RTL-vs-reference line of
+every run is all-defined-slots equal, as in Phase 0.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 15 21 21 19
+
+   * - unit:instance / variant
+     - defined slots (cycles)
+     - Allo simulator
+     - SystemC csim
+     - masked (allo == rtl on)
+   * - ``dma_addr_gen`` / ``bits``
+     - 200,700 vectors
+     - **match** 200,700/200,700
+     - **match** 200,700/200,700
+     - -- (comb)
+   * - ``dma_desc_adapter:base`` / ``bits``
+     - 180,495 (20,056)
+     - **match**
+     - **match**
+     - 9 before reset (3)
+   * - ``dma:core`` (OUTSTANDING 2, LANDING 8) / ``bits``
+     - 805,652 (39,718; 15 traces)
+     - **match**
+     - **refused** (D-14 on a non-Wire kernel, C2)
+     - 68,144: landing empty 68,122, power-up 22 (68,118)
+   * - ``dma:core`` / ``bits_reset``
+     - 805,652
+     - **match**
+     - **match**
+     - as above
+   * - ``dma:core`` / ``streams``
+     - 805,652
+     - **match**
+     - **refused** (C2)
+     - as above
+   * - ``dma:core`` / ``streams_reset``
+     - 805,652
+     - **match**
+     - **match**
+     - as above
+   * - ``dma:o1`` (OUTSTANDING 1) / all four
+     - 764,284 (37,906; 13)
+     - **match** x4
+     - **match** ``*_reset``; **refused** ``bits``, ``streams`` (C2)
+     - 69,648 (69,622)
+   * - ``dma:o4`` (OUTSTANDING 4, LANDING 4: the ``>=`` edge) / all four
+     - 317,520 (15,639; 13)
+     - **match** x4
+     - **match** ``*_reset``; **refused** (C2)
+     - 26,538 (26,511)
+   * - ``dma:bw`` (``tb_dma_bandwidth``'s build, its VCD seed included) / all four
+     - 394,464 (19,503; 11)
+     - **match** x4
+     - **match** ``*_reset``; **refused** (C2)
+     - 34,602 (34,576)
+   * - ``dma_vmem:core`` (D2) / ``d12``
+     - 138,855 (6,837; 8)
+     - **match**
+     - **refused** (C2)
+     - 11,559: landing empty 11,306, vmem uninit 231, power-up 22 (11,295)
+   * - ``dma_vmem:core`` / ``d12_reset``
+     - 138,855
+     - **match**
+     - **finding** C7: csim segfaults (VMEM 512 KB on the 64 KB thread stack)
+     - as above
+   * - ``dma_vmem:core`` / ``d12_reset_r256`` (C7's workaround)
+     - 138,855
+     - **match**
+     - **match**
+     - as above
+   * - ``dma_vmem:o1`` / ``d12``, ``d12_reset``, ``d12_reset_r256``
+     - 128,260 (6,405; 7)
+     - **match** x3
+     - refused (C2) / C7 / **match**
+     - 12,650 (11,033)
+   * - ``dma_vmem:o4`` / same
+     - 88,216 (4,343; 7)
+     - **match** x3
+     - refused (C2) / C7 / **match**
+     - 7,330 (6,711)
+
+Every variant matched the first time it built: no transcription error had
+to be found by the oracle. What cost time was the tools (C1, C2, C7, C10).
+
+The D2 oracle is new and was checked as Phase 0 checks one: ``dma.sv`` +
+``vpu_vmem_simd`` in Verilator against ``closed_trace`` (Phase 0's
+``DmaModel``, unchanged, closed on ``VmemDmaSide``) on every defined slot
+(138,855/138,855 core, 128,260/128,260 o1, 88,216/88,216 o4), and the
+reference has teeth: serving every store beat from the read pipe instead of
+the scatter register gives 284 differing slots, a VMEM DMA read latency of 3
+gives 896. 820 store beats are read on ``core`` (64 of them from words never
+written, masked).
+
+2. The forms
+============
+
+``dma_addr_gen`` / ``bits`` (C1)
+--------------------------------
+
+``addr(base, row, stride)``: the product formed at 46 bits, the sum
+truncated to 32 on return, as the RTL's ``assign``. The DMA engine calls the
+same function (``calls=("addr",)``), as ``dma.sv`` instantiates the module.
+
+``dma_desc_adapter`` / ``bits`` (A1)
+------------------------------------
+
+The two-state FSM; ``d_i`` (57 bits) snapshotted as the four fields the
+outputs read; words -> beats by shift (``{vmem_address, 2'b00}``,
+``{rows, 2'b11}``). A slice store bounded by closure names warned and widened
+to ``UInt(32)`` (C3); the shift is the same circuit and the warning is gone.
+
+``dma`` / ``bits`` and ``bits_reset`` (D1 as one kernel)
+---------------------------------------------------------
+
+``dma.sv``'s one ``always_ff`` transcribed in its order with non-blocking
+semantics: every register written goes to an ``n_*`` copy, reads see the old
+value, the last write wins, and the copies commit at the end of the
+iteration; the landing payload write (its own ``always_ff``) and the store
+data capture are applied after. Reset is asynchronous (a row with ``rst_n``
+low is sampled in reset). Ports: four lane arrays (``CIN``/``COUT`` scalar
+columns, ``DIN``/``DOUT`` 256-bit beats as 8 x 32-bit lanes; B6/S8, U3 P-8).
+Every mask and bound (``CRED_M``, ``TO_LAST``, ``PW_M1``, ...) is derived from
+``DmaGeometry`` (section 3), never typed. ``bits`` declares the landing
+payload ``@ Stateful(reset=False)`` (P-7, D-14); ``bits_reset`` declares it
+``@ Stateful`` -- reset storage, a recorded deviation (D-13's note), invisible
+on the defined slots because the RTL's payload is masked while the FIFO is
+empty.
+
+``dma`` / ``streams`` and ``streams_reset`` (D1 as the track states it)
+-----------------------------------------------------------------------
+
+``dma_unit.dma_engine`` is the same body with every port a token, between a
+source and a sink over Streams, one token per link per cycle (U3 track B's
+"cycle model in token time"). The interfaces it declares:
+
+* **descriptor interface** ``x_desc`` (valid, is_store, channel, vmem_row,
+  rows, cols) + ``x_base`` + ``x_stride``: ``dma_desc_adapter``'s outputs;
+  ``desc_accept`` comes back in ``y_stat``.
+* **credit pipe**: request ``y_req`` (valid, we, addr[29], len[8],
+  rsp_ready) + ``y_wd[8]``; response ``x_rsp`` (valid, last, resp) +
+  ``x_rspd[8]``; ``dm_req_ready`` in ``x_ctl``.
+* **VMEM DMA port**: ``y_vreq`` (rst_n, wr_en, rd_en, wr_ptr, rd_ptr) +
+  ``y_vwd[8]`` out, ``x_vrd[8]`` in -- taken by the engine *after* its
+  outputs are put, which is what lets D2 close it on a VMEM unit in the same
+  iteration without a cycle.
+
+``dma_vmem`` / ``d12`` (D2): the VMEM side as a D-12 port
+-----------------------------------------------------------
+
+``vmem`` is the U2 word array at the full geometry (4,096 x 1,024 b,
+``reset=False``), ports ``c`` (``rw``, latency 3) and ``d`` (``rw``, latency
+``VMEM_DMA_READ_LATENCY`` = 2, P-3), ``visible=1``, ``collision=
+"obligation"`` (MiniTPU #21). ``vmem_group`` owns ``vmem.d``: it is
+``minitpu_core.sv``'s select (write beat outranks read) + ``vpu_dma_group``
+(gather, commit on beat 3; fetch on beat 0, serve beats 1-3 from
+``scatter_q``) + ``vpu_vmem_simd``'s ``dma_rvalid_q``; ``vmem_compute_idle``
+owns ``vmem.c`` (one read of word 0 per cycle; U5 composes the real owner).
+The engine is D1's unit unchanged; the sink is an ``Instance`` of D1's sink
+bound to the group's forwarded VMEM outputs (D-17). One number,
+``DmaGeometry.VMEM_DMA_READ_LATENCY``, sets the port's declared latency, the
+group's rvalid depth and the engine's capture cycle; ``_p3_legality`` holds
+the three equal (and refuses otherwise, naming P-3) -- in the architecture
+builder, because no unit can state it (C6).
+
+Token time adds one register that is not hardware: the generated server
+puts, at iteration ``t``, the read issued at ``t - (L - 1)`` -- the word
+array's ``rdata`` *after* edge ``t`` (U2's post-edge row) -- while the group,
+like the DMA, samples *before* the edge; it holds the token one iteration
+(``hold``). C8 records the convention.
+
+3. The D-20 records (``dma_params.py``)
+=======================================
+
+``DmaGeometry`` declares ``CHANNELS``, ``OUTSTANDING``, ``LANDING_DEPTH``,
+``TIMEOUT_CYCLES``, the beat as ``LANES`` x ``LANE_BITS``, ``VMEM_BEAT_BITS``,
+``NUM_SUBLANES``, ``VMEM_ADDR_W``, ``DESC_WORD_ROWS_W``, ``ROW_BITS``,
+``VMEM_DMA_READ_LATENCY``, ``PAGE_BYTES``, ``DRAM_BEAT_ADDR_W``, ``LEN_BITS``;
+everything else is a property: ``BEAT_BITS``, ``STRB_W``, ``PAGE_WORDS``
+(128), ``SUBLANE_SEL_W``, ``DESC_BEAT_ROWS_W`` (14), ``VMEM_BEAT_ADDR_W``,
+``CHANNEL_SEL_BITS``, ``CRED_W``, ``OUT_PTR_W``, ``LND_PTR_W``,
+``LND_CNT_W``, ``LND_ENTRY_W``, ``TO_W``, and the bookings
+``ACCEPT_TO_REQUEST`` (2), ``LAST_BEAT_TO_DONE`` (2), ``STORE_BEAT_INTERVAL``
+(= read latency + 2 = 4). The four Phase 0 instances are ``GEOMETRIES``.
+
+Legality (one condition set, run when any variant is made), each naming the
+parameter and the consequence: ``OUTSTANDING >= 1`` (0 credits never
+issue); ``LANDING_DEPTH >= OUTSTANDING`` (``dma.sv:18``, a comment in the
+RTL); ``ROW_BITS == DESC_BEAT_ROWS_W`` (a narrower counter truncates the beat
+count silently; a lint rule in the RTL); ``BEAT_BITS == VMEM_BEAT_BITS`` (a
+gearbox otherwise, ``dma.sv:20``); ``PAGE_WORDS`` a power of two and ``<=
+2**LEN_BITS`` (every page-bounded burst a legal length);
+``VMEM_DMA_READ_LATENCY >= 1`` (``I_ST_RDW`` counts to L-1); ``LANE_BITS <=
+32`` (a tool constraint, S8, stated as one). Six wrong declarations are
+refused, each naming its parameter (``dma_params.log``). Derived against
+Phase 0's measurement by the cycle model on all four instances:
+**STORE_BEAT_INTERVAL 4 = measured [4]**, **ACCEPT_TO_REQUEST 2 = measured
+2** (a store's first request: + 1 + the read latency).
+
+4. Hypotheses
+=============
+
+* **H9** (D1 matches ``ref_ctrl_dma`` per cycle, four instances; the landing
+  payload ``reset=False``): **holds on the simulator** for both forms
+  (one kernel and Streams) on all four instances, the OUTSTANDING 1/2/4 sweep
+  and ``tb_dma_bandwidth``'s seed included. **SystemC refuses the declared
+  form** (C2): unreset storage is lowered only for an all-``Wire`` kernel.
+  With the payload declared reset (``*_reset``) csim matches everywhere. The
+  Catapult column (the per-cycle claim) is track D's.
+* **H10** (D2 meets the DMA contract, latencies reported, not equal to D1's):
+  split in two, because the track's D2 (the VMEM DMA port as a D-12
+  declaration) is cycle-locked and the plan's D2 (Streams + drain unit) is
+  self-timed. **Cycle-locked D2: holds, and better than the hypothesis** --
+  per cycle against a new closed-loop RTL oracle, so its latencies ARE D1's.
+  **Self-timed probe** (the plan's D2): **holds on the contract**, 18/18
+  (section 6), latencies not reported (untimed columns), and it exposes
+  three ways the self-timed form departs from the RTL by construction (C9,
+  C10, C11).
+* **H1** (the C1 function matches first time): **holds** (``addr`` on both
+  columns, 200,700 vectors).
+* **H8** (D-20 for the DMA): **holds**: ``DmaGeometry`` with seven legality
+  relations, six wrong declarations refused, two derived timings equal to
+  Phase 0's.
+
+5. Findings
+===========
+
+.. list-table::
+   :header-rows: 1
+   :widths: 5 16 12 37 30
+
+   * - #
+     - where
+     - class
+     - what
+     - smallest change (proposal; not applied)
+   * - C1
+     - SystemC emitter
+     - **bug**, loud
+     - A kernel-local named ``done`` (MiniTPU's ``dma_channel_done``
+       register) shadows the ``done`` port every emitted process has
+       (``SC_MODULE`` ports ``clk``, ``rst``, ``done``):
+       ``done.write(true)`` fails in g++ ("request for member 'write' in
+       'done', which is of non-class type"). The simulator runs it. Class of
+       item 20. Repro ``tests/limits/new_systemc_reserved_local_names.py``
+       (REPRODUCES). Workaround: ``cdone``.
+     - Rename user locals that collide with the process's generated members,
+       or prefix the generated ones (``__allo_done``).
+   * - C2
+     - SystemC emitter (D-14)
+     - **missing abstraction** (honest refusal)
+     - ``@ Stateful(reset=False)`` is refused in any kernel with a non-``Wire``
+       argument -- a boundary array (``bits``) or a Stream (``streams``, the
+       D1 engine unit, and so D2): "the write runs at every clock edge, which matches the
+       kernel's iterations only when every port is a Wire". P-7's declared
+       form therefore has no csim (nor Catapult) path in token time; the
+       ``*_reset`` forms (payload reset, a recorded deviation) are what csim
+       runs. Seen before on ``xlu_transpose`` (U3), now on Stream units.
+     - For a kernel whose ports are Streams (one iteration per token, not
+       per edge), lower unreset storage as a module member with no
+       assignment in the reset action -- the shape the emitter already uses
+       for reset ``Stateful`` members, minus the reset; the clock-edge
+       ``SC_METHOD`` stays the ``Wire`` kernels' lowering.
+   * - C3
+     - front end (D-17)
+     - **workaround** (silent widening, warned)
+     - In a plain ``@df.kernel``, a slice store whose bounds are closure
+       names (``vrow[SL:BW] = va_q``) warns "Cannot infer the bitwidth of the
+       slice, use UInt(32) as default" and widens; ``compose`` refuses the
+       same in a unit (D-17). It matched here (the destination truncates);
+       replaced by a shift.
+     - Fold closure integers into slice bounds (D-17's front-end form), or
+       refuse as ``compose`` does.
+   * - C4
+     - HLS driver message
+     - **workaround** (misleading text)
+     - Every emit refusal (C2's included) ends "Common issues: nested
+       functions with multi-dimensional arrays when wrap_io=False." -- not the
+       cause. Item 19's class.
+     - Print the emitter's diagnostic only.
+   * - C5
+     - simulator / csim TB (B6, S8)
+     - **workaround** (carried)
+     - A 256-bit port has no numpy dtype (B6) and a 64-bit lane is lost in
+       csim at >= 2**63 (S8): every beat crosses the region as 8 x 32-bit
+       lanes (U3 P-8), stated in ``DmaGeometry`` as ``LANE_BITS <= 32``.
+       Internal 1,024-bit words (the VMEM server's links) are fine on both
+       columns.
+     - As U2/U3: wide ports through a word-split file format.
+   * - C6
+     - ``compose`` (D-12, D-20)
+     - **missing abstraction**
+     - An owner cannot read its port's declared latency, and a unit's
+       ``legality`` sees only its own parameters. P-3 is one number used in
+       three places (``vmem.d``'s ``Port(latency=)``, the group's rvalid pipe,
+       the engine's capture cycle); the relation is checked in
+       ``vmem_architecture`` by hand. (A unit that declares a parameter only
+       for its legality is refused: "declares ['RDL_M1'] without using
+       them".)
+     - Bind ``<memory>_<port>_LATENCY`` into the owner's namespace, or an
+       ``Architecture(legality=)`` over the bound parameter set.
+   * - C7
+     - SystemC emitter
+     - **bug**, crash
+     - A plain kernel-local array is emitted as a local of ``run()``, on the
+       SC_THREAD's ~64 KB coroutine stack. ``compose``'s Stream-link lowering
+       of an unreset D-12 memory emits its storage as exactly such a local, so
+       VMEM (4,096 x 128 B) segfaults csim ("Simulation failed"). The emitter
+       already moves ``@ Stateful`` and constant arrays to members for this
+       reason (``EmitSystemC.cpp`` "Not locals in run()"). Repro
+       ``tests/limits/new_systemc_local_array_stack.py`` (4 KB fine, 1 MB
+       segfaults; the simulator runs both). Workaround: ``d12_reset_r256``
+       (256 rows; every D2 trace stays below word 256, asserted).
+     - Emit a local array above a size bound as a member with no reset
+       action (its initial value is undefined either way).
+   * - C8
+     - ``compose`` server (D-12), token time
+     - **semantic mismatch** (convention)
+     - The server's read token ``t`` is ``rdata`` after edge ``t`` (U2's
+       post row); a unit that samples its inputs before the edge (the DMA,
+       ``rtl.py``'s pre convention) needs the token of ``t - 1``: a ``hold``
+       register in the owner that is not hardware. Exact, but every
+       pre-sampling owner must know it.
+     - Say it in the D-12 docs; optionally a ``Port(sample="pre")`` that
+       makes the server deliver the pipe's last stage before its shift.
+   * - C9
+     - Stream (self-timed form)
+     - **semantic mismatch**
+     - The credit is the order Stream's capacity, but a Stream has no peek:
+       the response side must *take* the order token at a burst's first beat
+       (it needs the destination for every beat), which frees the credit
+       ``len`` beats early -- in flight is bounded by OUTSTANDING + 1 at the
+       acceptor (plus any FIFO slack a backend adds), not by OUTSTANDING as
+       in ``dma.sv``, which returns the credit on ``dm_rsp_last``.
+     - A peekable Stream (``front()``), the same gap as U2's ``vpu_fifo``
+       head register.
+   * - C10
+     - ``compose`` server (D-12), self-timed
+     - **semantic mismatch** (found by a deadlock)
+     - The server returns the read of access ``t`` only in exchange for
+       access ``t + L - 1``: the read pipe advances when the owner accesses.
+       The self-timed owner's last store beat was therefore withheld until
+       its next access, which blocked on the next (load) descriptor's landing
+       beat, which the issue unit -- waiting for that store beat -- had not
+       requested: store-then-load deadlocked (bisected, seed 0, descriptor
+       4). Cycle-locked owners access every cycle and never see it.
+       Workaround: one flush access after every store descriptor.
+     - Either document "an owner must keep accessing until its reads drain"
+       as part of D-12's server lowering, or give the server a free-running
+       pipe (its own iteration per cycle, independent of the owner's).
+   * - C11
+     - D-12 + blocking Streams (self-timed)
+     - **missing abstraction**
+     - ``dma.sv`` shares the one VMEM DMA port between load drains and store
+       reads, arbitrated per cycle (the drain outranks). A self-timed owner
+       with two blocking request Streams cannot arbitrate without a
+       non-blocking ``try_get`` (B7, S9, items 18/D: not reliable across
+       backends); the probe serves descriptors one after another at the port
+       (no load-drain/store-read overlap).
+     - A reliable ``try_get`` (or a two-input select primitive) on every
+       backend; until then the arbitration stays cycle-locked (D2).
+
+MiniTPU (FYI, P-10, not filed): nothing new. D2 re-measured Phase 0's F3
+contract per cycle in the RTL: the fetch-on-beat-0 / scatter-register read
+and the commit-on-beat-3 gather, both with unreset payload registers, so a
+store of a word a partial load left half-gathered reads undefined beats (the
+``vmem uninit`` masks).
+
+6. The self-timed probe (H10)
+=============================
+
+``dma_selftimed.py``: ``feed -> issue -> bridge -> land -> vowner`` over
+blocking Streams, with the credit as the order Stream's depth
+(``OUTSTANDING``), the landing FIFO as ``s_lnd``'s depth (``LANDING_DEPTH``;
+its back-pressure is ``dm_rsp_ready``), the device memory as a boundary array
+behind ``bridge`` (the D-21 shim's role), and ``vowner`` owning ``vmem.d``
+(``rw``, latency 2) one port access per iteration. Judged on the contract:
+the request stream ``(we, addr, len)`` equal to ``dma.sv``'s on the same
+descriptors (run on the RTL with Phase 0's program generator and bridge,
+single channel, waited between descriptors), the device memory after the
+program equal to a sequential reference (loads then stores of the same rows:
+a round trip through VMEM), and every descriptor completed (store
+completions counted at ``land`` on the last burst's B beat, load completions
+at ``vowner`` on the last beat drained).
+
+**CONTRACT-MATCH on all 18 runs**: instances ``core``, ``o1``, ``o4`` x
+three random programs (12 descriptors each: 58 to 201 requests, loads then
+stores of the loaded rows, strides 1, 2, 3 and 7, one base 5 words below a
+page) x both columns (``selftimed.log``). On every run the request stream
+equals ``dma.sv``'s, request for request (the RTL took 491 to 2,066 cycles
+for them; OUTSTANDING 1 is the slowest), the device memory after the program
+equals the sequential reference, and every descriptor completed. Simulator
+~4 s and csim ~10 s per run (build included); the probe's VMEM has 256 rows
+(C7). It found C10 by deadlocking before the flush was added.
+
+Latency is not reported: the simulator is untimed and csim here checks
+values, not time (``check.py``'s ``CYCLE_SEEN``); the per-cycle cost of the
+self-timed form is a Catapult question (track D). What the probe does show
+is where the self-timed form departs from the RTL's contract by
+construction: C9 (credits), C10 (the read pipe advances only with accesses),
+C11 (no per-cycle port arbitration without ``try_get``).
+
+7. Timings
+==========
+
+Wall times per ``check.py`` run (both columns, all variants of the unit,
+the Verilator trace run included), zhang-21, ``OMP_NUM_THREADS=8``:
+``dma`` core 95 s, o1 93 s, o4 63 s, bw 67 s; ``dma_vmem`` core 65 s, o1 77 s,
+o4 71 s; ``dma_desc_adapter`` ~15 s; ``dma_addr_gen`` ~15 s. Per variant
+(core): simulator build 2.5-3.6 s and run 0.8 s (one kernel) / 2.9 s
+(Streams); csim build 2.4-3.0 s, run 10 s (one kernel) / 46 s (Streams, 3
+processes and 26 links); D2 simulator build 5.5 s, run 2 s; csim (r256) 16 s.
+The ``u4_dma_vmem`` Verilator build ~10 s (cached per source hash).
+
+8. Provisional calls (D-9)
+==========================
+
+* **D1 is both forms.** The track statement asks for "the engine with its
+  credit pipe as Streams and the descriptor interface"; the plan's D1 is one
+  kernel. Both landed and both are held to the same oracle; the Stream form
+  is the one D2 composes. *Reason:* the one-kernel form is the transcription
+  reference, the unit form the composition.
+* **The payload's declared form is the default** (``bits``, ``streams``,
+  ``d12``: P-7), and the reset form is a separate variant, so the matrix
+  shows C2 instead of hiding it.
+* **D2's oracle is a new wrapper** (``u4_dma_vmem.sv``: ``dma`` +
+  ``vpu_vmem_simd`` wired as ``minitpu_core.sv`` wires them, no logic) rather
+  than a contract check, so D2 is held per cycle. Its reference closes Phase
+  0's ``DmaModel`` (unchanged) on a transcription of ``vpu_dma_group`` and
+  the word array's DMA port, verified against the wrapper and mutation
+  checked (section 1).
+* **The VMEM compute port is owned by an idle unit** in D2: a D-12 port must
+  have one owner, and the compute side is U5's.
+* **C7's workaround is a 256-row instance**, asserted against every D2 trace,
+  not a smaller VMEM in the default.
+* **The self-timed probe serves descriptors in order at the VMEM port**
+  (C11) and flushes after every store (C10).
+
+9. Proposed matrix rows (for the integrator's ``u4_matrix.rst``)
+================================================================
+
+``dma_addr_gen`` (comb)
+  RTL oracle **match** (Phase 0) | Allo simulator **match** ``bits``
+  200,700/200,700 | SystemC csim **match** 200,700/200,700 | Catapult + DC
+  **open** (D) | RTLGen/AMC **open** (E; H1: a ``comb`` port refused,
+  registered taken).
+
+``dma_desc_adapter``
+  RTL oracle **match** | simulator **match** ``bits`` 180,495/180,495 | csim
+  **match** | Catapult **open** (D) | RTLGen/AMC n/a | finding C3 (slice
+  bounds, worked around).
+
+``dma`` (D1; OUTSTANDING 1/2/4 + ``tb_dma_bandwidth``)
+  RTL oracle **match** | simulator **match** ``bits``/``streams`` (+
+  ``_reset``) on core 805,652, o1 764,284, o4 317,520, bw 394,464 defined
+  slots | csim **match** ``*_reset``; **refused** P-7's declared payload (C2)
+  | findings C1 (bug), C2 (missing abstraction), C4, C5 | Catapult **open**
+  (D: ``bits_reset`` or a Wire form; C2 blocks P-7) | RTLGen **open** (E).
+
+``dma_vmem`` (D2: the DMA on the VMEM DMA port, D-12 ``rw`` lat 2)
+  RTL oracle **match** (new wrapper, closed-loop reference, mutation
+  checked) | simulator **match** ``d12``/``d12_reset`` (core 138,855, o1
+  128,260, o4 88,216) | csim **finding** C7 (segfault at 4,096 rows), **match**
+  at 256 rows; **refused** P-7 (C2) | findings C6, C7, C8 | Catapult **open**
+  (D; H11: the ``rw`` port beside the compute port at II=1).
+
+``dma_selftimed`` (probe, H10)
+  contract verdicts above | findings C9, C10, C11.
+
+10. The memory-side contract (shared with the D-21 shim)
+========================================================
+
+The boundary ``dma_unit`` keeps is ``minitpu_core.sv``'s device-memory credit
+pipe, unchanged in fields, widths and order:
+
+1. Request ``{we, addr[28:0] (DM word, 32 B), len[7:0] (words - 1, never
+   across a 4 KiB page), wdata[255:0], wstrb all ones}``, valid offered
+   independently of ready, taken on ``valid & ready``; a store sends
+   ``len + 1`` W beats, the first carrying the burst's address and length.
+2. Responses in request order: a load returns ``len + 1`` words with
+   ``last`` on the final one, a store one beat after its last W beat with
+   ``last``; each carries ``resp[1:0]``; ``rsp_ready`` is the landing FIFO's
+   room, and is 1 with nothing outstanding (stale beats dropped).
+3. At most ``OUTSTANDING`` bursts between request and their ``last``
+   response (the credit), and the bridge must answer within
+   ``TIMEOUT_CYCLES`` of silence or the watchdog completes every channel
+   with ``dma_err`` (cause 2).
+
+Not done
+========
+
+* Catapult + DC (track D): every landed variant; C2 means P-7's declared
+  form cannot reach Catapult in token time; H11 (the ``rw`` DMA port beside
+  the compute port at II=1) has its unit now (``dma_vmem``).
+* RTLGen / AMC (track E).
+* The self-timed form with two channels in flight, SLVERR, the watchdog and
+  reset (the probe's contract omits them).
+* The adapter and the DMA composed (``dma_desc_adapter`` -> ``x_desc``): the
+  joint oracle is the sequencer's (track B).

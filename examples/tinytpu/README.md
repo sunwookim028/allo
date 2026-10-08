@@ -715,8 +715,8 @@ cd examples/tinytpu
 behaviour: it builds this checkout's bindings in-tree, then runs every
 functional gate against the shipped design and, without `--no-cosim`, Vitis
 cosim at the five published shapes. With `--no-cosim`, about 3 min once
-`mlir/build` is warm (each gate prints its verdict line; `reproduce.sh --help`
-lists what each one holds):
+`mlir/build` is warm; each gate prints its verdict line, and `reproduce.sh
+--help` says what each one holds:
 
 ```bash
 ./reproduce.sh --no-cosim
@@ -738,24 +738,81 @@ ACT GATE OK: 12/12 problems, every encodable mapping verified
 REPRODUCED (functional only)
 ```
 
-**The cosim cycle counts.** The published figures are `4x4x4=175`,
-`8x8x8=265`, `12x12x12=421`, `16x16x8=482` and `16x16x16=674` cycles at
-`TPU_MAXDIM=16`, measured by `cosim.py` with the default testbench; the full
-`reproduce.sh` (about 6 min) runs that cosim and exits nonzero if any number
-differs. For the model of section 1 the measurement is `make mlp-cosim
-MODEL=mlp_small`: one `csynth` of the shipped design, then one bounded cosim
-per layer, each checked bit-exact against `isa_ref`.
+**The cosim cycle counts.** The full `reproduce.sh` adds the last stage:
+`cosim.py` with the default testbench and every `TPU_*` knob unset but
+`TPU_MAXDIM=16` (where the published numbers were taken), one `csynth` and
+then one cosim per published shape, each checked bit-exact against `isa_ref`,
+and it exits nonzero if any count differs from the published
+`175 / 265 / 421 / 482 / 674`. About 11 min on this host, 8 of them Vitis:
 
-That run is not reproduced on this page: on the host this page was captured
-on, the cosim's testbench link fails (`/usr/bin/ld: unable to initialize
-decompress status for section .debug_info`: the system linker that
-`cosim.py`'s `-B/usr/bin` selects, 2.30 here, cannot read what Vitis
-2023.2's compiler emits; the fix was written on a host with 2.42, see
-`docs/source/backends/vitis.rst`). The published measurement of this model,
-taken with the same command (`workload_suite.rst`, "Per model"), is
-`mlp_small_l0` 1 636 and `mlp_small_l1` 1 145 cycles, **2 781** for the model
-against the cost model's 1 868, at the shipped `TPU_QD=16` and `DMA_WORDS=1`:
-the estimates on this page are known to sit about a third below the RTL.
+```bash
+./reproduce.sh
+```
+
+```text
+== building mlir/build (incremental)
+   allo -> /work/shared/users/phd/sk3463/scratch/wt-ttex-cosim/allo/__init__.py
+== gen_isa.py --check (the ISA spec and both its consumers)
+  ISA OK: the spec, its 2 generated artefacts and all 9 consumers agree
+== lift_units.py --check (units_isa.py against what ip/ composes to)
+  UNITS OK: units_isa.py is byte-identical to what ip/ composes to
+== bench_isa.py (published functional setup)
+  ALL EXACT
+== stress_isa.py (correctness gate)
+  STRESS OK: 492/492 runs exact (full: full-range/corner/boundary operands, prefilled C compared in full, GEMM at 64 shapes, vector and random programs)
+== act_compile.py --gate (every mapping the search accepts, verified)
+ACT GATE OK: 12/12 problems, every encodable mapping verified
+== cosim.py, default testbench (csynth once, then one cosim per shape)
+TinyTPU-isa: ONE build -- 4x4 array, MAXDIM=16; sweeping 5 shapes as data; testbench=default
+  synthesizing once ...
+   4x 4x 4  cycles=175   TB 4x4x4 mismatches = 0 / 16
+   8x 8x 8  cycles=265   TB 8x8x8 mismatches = 0 / 64
+  12x12x12  cycles=421   TB 12x12x12 mismatches = 0 / 144
+  16x16x 8  cycles=482   TB 16x16x8 mismatches = 0 / 128
+  16x16x16  cycles=674   TB 16x16x16 mismatches = 0 / 256
+
+  shape      cycles
+   4x 4x 4   175
+   8x 8x 8   265
+  12x12x12   421
+  16x16x 8   482
+  16x16x16   674
+  COSIM OK (testbench=default)
+   expected: 4x4x4=175 8x8x8=265 12x12x12=421 16x16x8=482 16x16x16=674
+   got:      4x4x4=175 8x8x8=265 12x12x12=421 16x16x8=482 16x16x16=674
+REPRODUCED
+```
+
+For the model of section 1 the measurement is `make mlp-cosim
+MODEL=mlp_small`: one `csynth` of the shipped design (about 2 min), then one
+bounded cosim per layer, the whole of `C` checked against `isa_ref`. About
+5 min. The estimate column is the cost model, the cosim column the RTL:
+
+```bash
+make mlp-cosim MODEL=mlp_small
+```
+
+```text
+python workloads/run.py --cosim mlp_small
+synthesizing once into /work/shared/users/phd/sk3463/scratch/wt-ttex-cosim/examples/tinytpu/workloads/workload.prj at DMA_WORDS=1 ...
+
+mlp_small  (DMA_WORDS=1)
+  layer             estimate   cosim    error   testbench
+  mlp_small_l0          1186    1636   -27.5%   TB mlp_small_l0 mismatches = 0 / 4096
+  mlp_small_l1           682    1145   -40.4%   TB mlp_small_l1 mismatches = 0 / 4096
+  mlp_small on RTL: 2781 cycles over 2 layers, summed with no fusion and no residency
+```
+
+Those are the published figures for this model (`workload_suite.rst`, "Per
+model": 1 636 + 1 145 = 2 781 at the shipped `TPU_QD=16`, `DMA_WORDS=1`),
+and they show what the estimates on this page are worth: the cost model sits
+28 to 40 per cent below the RTL on these two layers, so a difference it
+reports between two machines is a hint to measure, not a result. The
+cosim's testbench link needs a linker that can read Vitis's objects;
+`cosim.py` picks it per host (`linker_dir()`: the system `ld` when it is at
+least 2.37, else the `allo` env's binutils 2.44; `TPU_LD_DIR` overrides),
+which is what let this run happen on zhang-21 at all
+(`docs/source/backends/vitis.rst`).
 
 **Does the harness catch a broken design?** `reproduce.sh --with-mutants`
 adds `mutate.py` (about 15 min, one cosim among them; `--no-rtl` for the

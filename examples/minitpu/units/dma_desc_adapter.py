@@ -133,7 +133,120 @@ def probes(inst):
     return res
 
 
-VARIANTS = {}
+# ---------------------------------------------------------------------------
+# Allo variants (U4 track C, ``dev/records/minitpu/u4_track_c_2026-10-08.rst``).
+# Every variant is driven by the same per-cycle command trace as the RTL. The
+# region ports are two lane arrays (U3 P-8): ``IN: UInt(64)[n, 6]`` (the
+# ``INPUTS`` columns in order; ``d_i`` is 57 bits, below S8's 2**63) and
+# ``OUT: UInt(64)[n, 9]`` (the ``DESC_OUTS`` columns). "Cycle ``t``" is
+# iteration ``t``; the outputs of ``t`` are the state it starts in plus the
+# cycle's comb inputs (``rtl.py``'s ``pre`` sampling), then the edge.
+# ---------------------------------------------------------------------------
+
+import numpy as np  # noqa: E402
+
+import allo.dataflow as df  # noqa: E402
+from allo.ir.types import UInt, int32  # noqa: E402
+
+from examples.minitpu.units.dma_params import DmaGeometry  # noqa: E402
+
+GEOMETRY = DmaGeometry()
+OUT_NAMES = [p for p, _ in R.DESC_OUTS]
+
+
+def bits(n, w=0, inst="base"):
+    """Plan A1, cycle-locked: the two-state FSM transcribed. ``d_i`` is
+    snapshotted as the four fields the outputs read (``d_q`` whole is
+    equivalent: nothing else of it is observable); words -> beats is a
+    shift (``{vmem_address, 2'b00}``, ``{rows, 2'b11}``), the D-20
+    relation ``ROW_BITS == DESC_BEAT_ROWS_W`` is checked at make time."""
+    GEOMETRY.legality()
+    SL = GEOMETRY.SUBLANE_SEL_W
+    VA = GEOMETRY.VMEM_ADDR_W
+    RW = GEOMETRY.DESC_WORD_ROWS_W
+    BW = GEOMETRY.ROW_BITS
+
+    @df.region()
+    def top(IN: UInt(64)[n, 6], OUT: UInt(64)[n, 9]):
+        @df.kernel(mapping=[1], args=[IN, OUT])
+        def adapter(cin: UInt(64)[n, 6], cout: UInt(64)[n, 9]):
+            issue: int32 = 0
+            st_q: UInt(1) = 0
+            ch_q: UInt(1) = 0
+            va_q: UInt(VA) = 0
+            rows_q: UInt(RW) = 0
+            base_q: UInt(32) = 0
+            stride_q: UInt(32) = 0
+            for t in range(n):
+                rst: UInt(1) = cin[t, 0]  # S6: every port read unconditionally
+                start: UInt(1) = cin[t, 1]
+                d: UInt(64) = cin[t, 2]
+                sb: UInt(32) = cin[t, 3]
+                ss: UInt(32) = cin[t, 4]
+                acc: UInt(1) = cin[t, 5]
+                if rst == 0:  # asynchronous: the row is sampled in reset
+                    issue = 0
+                    st_q = 0
+                    ch_q = 0
+                    va_q = 0
+                    rows_q = 0
+                    base_q = 0
+                    stride_q = 0
+                # words -> beats by shift, not a slice store: a slice bounded
+                # by closure names widens to UInt(32) with a warning (D-17,
+                # finding C3); the shift is the same circuit
+                vrow: UInt(BW) = va_q
+                vrow = vrow << SL
+                brow: UInt(BW) = rows_q
+                brow = (brow << SL) | ((1 << SL) - 1)
+                done: UInt(1) = 0
+                if issue == 1:
+                    done = acc
+                cout[t, 0] = issue
+                cout[t, 1] = st_q
+                cout[t, 2] = ch_q
+                cout[t, 3] = vrow
+                cout[t, 4] = brow
+                cout[t, 5] = 0
+                cout[t, 6] = base_q
+                cout[t, 7] = stride_q
+                cout[t, 8] = done
+                if rst == 1:
+                    if issue == 0:
+                        if start == 1:
+                            # D_SLOT, LSB first: stride_sreg[0:2] base_sreg[2:4]
+                            # disp[4:28] has_disp[28] rows[29:41]
+                            # vmem_address[41:53] channel_sel[53:55] is_store[55]
+                            st_q = d[55]
+                            ch_q = d[53]  # channel_sel[0]: the narrowing drops bit 54
+                            va_q = d[41:53]
+                            rows_q = d[29:41]
+                            disp: UInt(32) = d[4:28]
+                            if d[27] == 1:
+                                disp[24:32] = 0xFF  # sign extension of the 24-bit disp
+                            if d[28] == 1:
+                                base_q = sb + disp
+                            else:
+                                base_q = sb
+                            stride_q = ss
+                            issue = 1
+                    elif acc == 1:
+                        issue = 0
+
+    return top
+
+
+def _run_bits(mod, cmd, n, w=0):
+    ins = np.zeros((n, 6), dtype=np.uint64)
+    for j, (p, _) in enumerate(INPUTS):
+        ins[:, j] = np.asarray([int(x) for x in cmd[p][:n]], dtype=np.uint64)
+    outs = np.zeros((n, 9), dtype=np.uint64)
+    mod(ins, outs)
+    return {p: [int(x) for x in outs[:, j]] for j, p in enumerate(OUT_NAMES)}
+
+
+WIDTH = {"base": 0}
+VARIANTS = {"bits": (bits, _run_bits)}
 
 if __name__ == "__main__":
     sys.exit(0)

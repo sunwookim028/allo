@@ -1,0 +1,3 @@
+RTL dma_addr_gen: 200700 vectors, latency [0] (declared 0), 0.1s
+UNIT-MATCH dma_addr_gen bits simulator 200700/200700 latency=untimed (rtl 0) (build 0.3s, run 0.1s)
+UNIT-MATCH dma_addr_gen bits systemc 200700/200700 latency=unchecked (rtl 0) (build 0.3s, run 8.2s)
