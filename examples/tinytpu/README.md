@@ -49,8 +49,7 @@ The `allo` conda environment with this checkout's own MLIR bindings, `torch`
 `LLVM_BUILD_DIR` set the way the host wants it. From the repository root:
 
 ```bash
-source $(conda info --base)/etc/profile.d/conda.sh && conda activate allo
-export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build   # ace-01 only; on zhang-21 the env sets it: don't override it there
+source $(conda info --base)/etc/profile.d/conda.sh && conda activate allo   # sets LLVM_BUILD_DIR on both hosts: don't override it
 export OMP_NUM_THREADS=8
 examples/tinytpu/reproduce.sh --no-cosim   # once per checkout: builds mlir/build, runs the gates (section 4)
 pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.0   # if the env has no torch

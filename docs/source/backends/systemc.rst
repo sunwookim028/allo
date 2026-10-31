@@ -45,9 +45,9 @@ Emission runs anywhere the ``allo`` env runs:
 
 .. code-block:: bash
 
-   # the env sets neither of these
+   # the env sets LLVM_BUILD_DIR, not OMP_NUM_THREADS
    source $(conda info --base)/etc/profile.d/conda.sh && conda activate allo
-   export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build OMP_NUM_THREADS=8
+   export OMP_NUM_THREADS=8   # LLVM_BUILD_DIR: set by the allo env (tools/llvm-allo)
 
    cd tests/systemc
    python pc_channel.py systemc      # print the generated SystemC

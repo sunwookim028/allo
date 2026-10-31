@@ -86,7 +86,7 @@ To run a repro from a checkout of this repository:
 .. code-block:: bash
 
    source $(conda info --base)/etc/profile.d/conda.sh && conda activate allo
-   export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build OMP_NUM_THREADS=8
+   export OMP_NUM_THREADS=8   # LLVM_BUILD_DIR: set by the allo env (tools/llvm-allo)
    cd tests/limits && python item04_math_exp.py      # -> [item 4] REPRODUCES: ...
 
 ``tests/limits/_worktree.py`` makes every repro test the tree it is committed

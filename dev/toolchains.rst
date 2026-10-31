@@ -30,16 +30,17 @@ the repository, and the ``allo`` conda environment sets none of them.
 Environment
 -----------
 
-``LLVM_BUILD_DIR`` is **not** set by the conda environment -- neither
-``conda activate allo`` nor ``conda run`` sets it (verified 2026-09-17) -- and
-the simulator asserts ``LLVM_BUILD_DIR is not set`` without it. Export it
-explicitly (see ``docs/source/developer/pitfalls.rst``).
+``LLVM_BUILD_DIR`` is set by the ``allo`` conda environment: both
+``conda activate allo`` and ``conda run -n allo`` set it to
+``~/tools/llvm-allo/build`` on this host (``conda env config vars``, since
+2026-10-31; before that the env set nothing and it had to be exported). The
+simulator asserts ``LLVM_BUILD_DIR is not set`` without it. Scripts that run
+outside the env fall back to ``$HOME/tools/llvm-allo/build``.
 
 
 .. code-block:: bash
 
-   conda activate allo
-   export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build   # the env does NOT set this
+   conda activate allo   # sets LLVM_BUILD_DIR
 
    # OMP_NUM_THREADS no longer has to exceed the kernel-instance count: the
    # simulator now sets the OpenMP team size to the section count itself.
@@ -55,7 +56,8 @@ explicitly (see ``docs/source/developer/pitfalls.rst``).
 
    ``/home/sk3463/allo/externals/llvm-project`` and
    ``/home/sk3463/llvm-allo-6b09f739`` are now **plain directories, not git
-   repositories**. The second was a git *worktree* of the first, so its
+   repositories** (the second has been superseded by ``~/tools/llvm-allo``,
+   below). The second was a git *worktree* of the first, so its
    ``.git`` pointer was removed before the history, and nothing dangles.
 
    What still works: the sources, and the build at ``LLVM_BUILD_DIR``
@@ -122,7 +124,7 @@ Golden test for dataflow simulator
 
    # `conda run` does not source the activate scripts, so export the env first.
    source $(conda info --base)/etc/profile.d/conda.sh && conda activate allo
-   export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build OMP_NUM_THREADS=8
+   export OMP_NUM_THREADS=8   # LLVM_BUILD_DIR: set by the allo env (tools/llvm-allo)
    python tests/dataflow/test_df_unit.py
    python tests/dataflow/test_region_stateful.py
 
@@ -490,10 +492,14 @@ LLVM/MLIR builds and worktrees
 One LLVM build, at the pinned revision
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Since 2026-09-19 there is **one** LLVM/MLIR build that matters:
-``/home/sk3463/llvm-allo-6b09f739/build`` (LLVM ``22.0.0git`` at ``6b09f739``), the
+There is **one** LLVM/MLIR build that matters:
+``~/tools/llvm-allo/build`` (LLVM ``22.0.0git`` at ``6b09f739``), the
 revision ``main`` pins for ``externals/llvm-project``. ``LLVM_BUILD_DIR`` points
-at it, and every worktree's ``mlir/build`` is configured against it. ``git
+at it, and every worktree's ``mlir/build`` is configured against it. It comes
+from ``sunwookim028/llvm-allo``, a recipe (pin, ``fetch.sh``, ``build.sh``,
+no source) that rebuilds it in about 7 minutes. From 2026-09-19 until its
+build directory was deleted on 2026-10-04 the build was
+``/home/sk3463/llvm-allo-6b09f739/build``, the same revision. ``git
 status`` on ``main`` is clean: the submodule checkout is at the pin.
 
 Before that date the submodule checkout was deliberately left at ``040a6419``
@@ -553,7 +559,7 @@ Rules:
 1. A worktree's ``allo/_mlir`` symlink target must be **relative** and must stay
    inside that worktree. ``main``'s is correct; copy that shape.
 2. Each worktree gets its own LLVM/MLIR build directory, or they share a
-   read-only external one (like ``llvm-allo-6b09f739``) that **neither** worktree's
+   read-only external one (like ``~/tools/llvm-allo/build``) that **neither** worktree's
    ``externals/`` can be checked out from under.
 3. Never run a build in worktree A that names a path under worktree B in
    ``LLVM_DIR``/``MLIR_DIR``. Checking out a branch in B then silently changes A's

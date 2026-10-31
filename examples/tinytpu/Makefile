@@ -14,8 +14,8 @@
 
 MODEL ?= mlp_small
 TOP   ?= 3
-# This host's LLVM build, used only if it exists: elsewhere, export your own.
-LLVM_BUILD_DIR  ?= $(wildcard /home/sk3463/llvm-allo-6b09f739/build)
+# The allo env sets this; else this host's build (tools/llvm-allo), if it exists.
+LLVM_BUILD_DIR  ?= $(wildcard $(HOME)/tools/llvm-allo/build)
 OMP_NUM_THREADS ?= 8
 export LLVM_BUILD_DIR OMP_NUM_THREADS
 

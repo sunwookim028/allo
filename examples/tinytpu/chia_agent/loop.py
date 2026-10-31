@@ -59,7 +59,7 @@ TEST_BASE_URL = os.environ.get("TINYTPU_OPENCODE_BASE_URL")
 ALLO_PYTHON = os.environ.get(
     "TINYTPU_ALLO_PYTHON", "/home/sk3463/miniconda3/envs/allo/bin/python")
 LLVM_BUILD_DIR = os.environ.get(
-    "LLVM_BUILD_DIR", "/home/sk3463/llvm-allo-6b09f739/build")
+    "LLVM_BUILD_DIR", os.path.expanduser("~/tools/llvm-allo/build"))
 #: Paths whose working-tree copy must equal HEAD before a search starts. The
 #: evaluator reads them from git anyway; this makes a dirty tree loud.
 FROZEN_PATHS = [

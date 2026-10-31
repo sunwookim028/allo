@@ -101,8 +101,8 @@ Checkouts on this host
 **One checkout, ``~/allo``, on ``main``.** It holds the repository (every
 worktree's ``.git`` points into it) and its own ``mlir/build``, rebuilt with
 ``ninja -C mlir/build`` after a pull that touches ``mlir/``. Other long-lived
-paths: ``~/llvm-allo-6b09f739`` (``LLVM_BUILD_DIR``) and ``~/chia-ortools``
-(``scripts/act-test-recipe.sh``). ``chia.env`` lives only in ``~/allo``
+paths: ``~/tools/llvm-allo/build`` (``LLVM_BUILD_DIR``, set by the ``allo``
+env) and ``~/chia-ortools`` (``scripts/act-test-recipe.sh``). ``chia.env`` lives only in ``~/allo``
 (gitignored, mode 600). Keep a backup of it outside the repository, never
 under a name ``.gitignore`` does not match.
 

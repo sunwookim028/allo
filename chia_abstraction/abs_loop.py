@@ -76,7 +76,7 @@ TEST_BASE_URL = os.environ.get("TINYTPU_OPENCODE_BASE_URL")
 ALLO_PYTHON = os.environ.get(
     "TINYTPU_ALLO_PYTHON", "/home/sk3463/miniconda3/envs/allo/bin/python")
 LLVM_BUILD_DIR = os.environ.get(
-    "LLVM_BUILD_DIR", "/home/sk3463/llvm-allo-6b09f739/build")
+    "LLVM_BUILD_DIR", os.path.expanduser("~/tools/llvm-allo/build"))
 DEFAULT_CALL_USD = 3.5
 RATE_LIMIT_RETRIES = 6
 RATE_LIMIT_BACKOFF = 45.0

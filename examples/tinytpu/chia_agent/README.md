@@ -74,8 +74,7 @@ Everything else is **per worktree** -- `mlir/build`, `node_modules`,
 From a clean checkout, three commands:
 
 ```bash
-conda activate allo
-export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build
+conda activate allo   # sets LLVM_BUILD_DIR (tools/llvm-allo)
 examples/tinytpu/reproduce.sh --no-cosim      # builds THIS checkout's mlir/build
                                               # (~8 min cold) and runs the gates
 examples/tinytpu/chia_agent/checkout_setup.sh # the checkout side, $0, idempotent
@@ -526,8 +525,7 @@ Environment (once): the `allo` conda env (py3.12) and `chia_env` (py3.10, see
 inside the tree:
 
 ```bash
-conda activate allo
-export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build
+conda activate allo   # sets LLVM_BUILD_DIR (tools/llvm-allo)
 cmake -G Ninja -S mlir -B mlir/build -DMLIR_DIR=$LLVM_BUILD_DIR/lib/cmake/mlir \
   -DPython3_EXECUTABLE=$(which python) -DPython_EXECUTABLE=$(which python) \
   -DMLIR_BINDINGS_PYTHON_NB_DOMAIN=allo

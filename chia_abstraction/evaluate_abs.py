@@ -138,7 +138,7 @@ MAIN_BASE = os.environ.get("CHIA_MAIN_BASE", design_eval.MAIN_BASE)
 ALLO_PYTHON = os.environ.get(
     "TINYTPU_ALLO_PYTHON", "/home/sk3463/miniconda3/envs/allo/bin/python")
 LLVM_BUILD_DIR = os.environ.get(
-    "LLVM_BUILD_DIR", "/home/sk3463/llvm-allo-6b09f739/build")
+    "LLVM_BUILD_DIR", os.path.expanduser("~/tools/llvm-allo/build"))
 VITIS_BIN = os.environ.get("CHIA_VITIS_BIN",
                            "/opt/xilinx/Vitis_HLS/2023.2/bin")
 BWRAP = shutil.which("bwrap")

@@ -61,7 +61,7 @@ Dev notes (not published):
 
 ## Quick pitfalls
 
-- **`LLVM_BUILD_DIR`** — on zhang-21, `conda activate allo` sets it to the shared build `/work/shared/common/llvm-project-main/build-rhel8` (the one the bindings link against): **don't override it there**; `/home/sk3463/llvm-allo-6b09f739` no longer exists on zhang-21, and pointing at it gives `Unknown function <top>` from the simulator. The `/home` export below is ace-01's. Where the env sets nothing, the simulator asserts `LLVM_BUILD_DIR is not set`. `dev/toolchains.rst`.
+- **`LLVM_BUILD_DIR`** — `conda activate allo` and `conda run -n allo` set it (ace-01: `conda env config vars`): on ace-01 to `~/tools/llvm-allo/build` (the `sunwookim028/llvm-allo` recipe, at the `externals/llvm-project` pin), on zhang-21 to the shared build `/work/shared/common/llvm-project-main/build-rhel8`. **Don't override it**: it must be the build this checkout's `mlir/build` links against, and a wrong one gives `Unknown function <top>` from the simulator. Where the env sets nothing, the simulator asserts `LLVM_BUILD_DIR is not set`. `dev/toolchains.rst`.
 - **Scalar `@df.region()` args** — bare `int32` in `args=[...]` is **rejected** (PR #577); use `int32[1]` → `m_axi`.
 - **Region arg-order reordering**, **OMP segfault at exit**, one-process-per-MLIR-dump: see `docs/source/developer/pitfalls.rst`.
 - **CHIA loop** (`examples/tinytpu/chia_agent/`) spends real money on GCP: read `docs/source/extensions/chia.rst` first; paid runs go through `preflight.py` (CHIA2026 only, `CHIA_TOTAL_CAP_USD`), never commit `chia.env`, and run `test_harness.py` ($0) before any paid run.
@@ -69,8 +69,7 @@ Dev notes (not published):
 ## Environment
 
 ```bash
-conda activate allo
-export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build   # ace-01 only; on zhang-21 the env sets it
+conda activate allo   # sets LLVM_BUILD_DIR
 export OMP_NUM_THREADS=8   # the simulator sizes its OpenMP team itself now (limitations item 11)
 ```
 
@@ -79,7 +78,7 @@ Golden test for the dataflow simulator:
 ```bash
 # `conda run` does not source the activate scripts, so export the env first.
 source $(conda info --base)/etc/profile.d/conda.sh && conda activate allo
-export OMP_NUM_THREADS=8   # + LLVM_BUILD_DIR on ace-01 only (above)
+export OMP_NUM_THREADS=8
 python tests/dataflow/test_df_unit.py
 python tests/dataflow/test_region_stateful.py
 ```

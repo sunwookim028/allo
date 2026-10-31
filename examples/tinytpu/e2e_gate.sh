@@ -74,7 +74,7 @@ done
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate allo
 set -u                       # after activate: its scripts read unset vars
-export LLVM_BUILD_DIR=${LLVM_BUILD_DIR:-/home/sk3463/llvm-allo-6b09f739/build}
+export LLVM_BUILD_DIR=${LLVM_BUILD_DIR:-$HOME/tools/llvm-allo/build}
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-8}
 export PYTHONPATH=$ROOT
 

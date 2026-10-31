@@ -268,7 +268,7 @@ Running it
 ``$0``, no model, before anything is spent::
 
     conda activate allo
-    export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build OMP_NUM_THREADS=8
+    export OMP_NUM_THREADS=8   # LLVM_BUILD_DIR: set by the allo env (tools/llvm-allo)
     examples/tinytpu/reproduce_codesign.sh mapspace   # ~2 s
     examples/tinytpu/reproduce_codesign.sh control    # ~3 min
     examples/tinytpu/chia_agent/test_codesign.py      # ~7 min

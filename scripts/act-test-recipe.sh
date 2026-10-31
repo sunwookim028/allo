@@ -70,7 +70,7 @@ fi
 #    dataflow simulator wants) or -DLLVM_DIR/-DMLIR_DIR.
 #      chia pin: externals/llvm-project 040a641988f6ed6f4fab250706ca2b620c1de2d8
 #      main pin: externals/llvm-project 6b09f739c4d085dc39eb9ff220c786bc3aa8c7fb
-#    The 11 GB Release build on this host ($HOME/llvm-allo-6b09f739) is main's
+#    The 11 GB Release build on this host ($HOME/tools/llvm-allo/build) is main's
 #    pin, so it is the wrong commit for this tree.
 LLVM_PIN=040a641988f6ed6f4fab250706ca2b620c1de2d8
 if [ -d "${LLVM_BASE_DIR:-/nonexistent}/lib/cmake/mlir" ]; then

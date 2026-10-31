@@ -53,8 +53,8 @@ One command takes a clean checkout to the published cycle counts:
    examples/tinytpu/reproduce.sh            # ~6 min, incl. a fresh mlir build
    examples/tinytpu/reproduce.sh --no-cosim # functional, ~1 min
 
-   # Or by hand, from examples/tinytpu (the env sets neither variable):
-   export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build OMP_NUM_THREADS=8
+   # Or by hand, from examples/tinytpu (the env sets only LLVM_BUILD_DIR):
+   export OMP_NUM_THREADS=8   # LLVM_BUILD_DIR: set by the allo env (tools/llvm-allo)
    python bench_isa.py                   # published functional setup: ALL EXACT
    python bench_isa.py 8 8 8             # one shape
    python stress_isa.py                  # correctness gate:          STRESS OK

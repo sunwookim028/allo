@@ -19,7 +19,7 @@ smallest possible program for one language feature each". See
 
 ```bash
 source $(conda info --base)/etc/profile.d/conda.sh && conda activate allo
-export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build OMP_NUM_THREADS=8
+export OMP_NUM_THREADS=8   # LLVM_BUILD_DIR: set by the allo env (tools/llvm-allo)
 
 pytest tests/systemc/test_emit.py       # every claim below, ~5 s, no Catapult
 python tests/systemc/pc_channel.py mlir      # the frontend MLIR

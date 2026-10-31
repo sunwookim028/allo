@@ -200,7 +200,7 @@ Rewritten, and why:
 
 ```bash
 conda activate allo
-export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build OMP_NUM_THREADS=8
+export OMP_NUM_THREADS=8   # LLVM_BUILD_DIR: set by the allo env (tools/llvm-allo)
 
 # 1. record the baselines (no patch), from inside the sandbox. ~8 min.
 python chia_abstraction/evaluate_abs.py --out .chia_scratch/baseline --record-baseline

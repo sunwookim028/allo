@@ -78,7 +78,7 @@ sys.path.insert(0, str(AGENT_DIR))
 ALLO_PYTHON = os.environ.setdefault(
     "TINYTPU_ALLO_PYTHON", "/home/sk3463/miniconda3/envs/allo/bin/python")
 LLVM_BUILD_DIR = os.environ.setdefault(
-    "LLVM_BUILD_DIR", "/home/sk3463/llvm-allo-6b09f739/build")
+    "LLVM_BUILD_DIR", os.path.expanduser("~/tools/llvm-allo/build"))
 os.environ.setdefault("OMP_NUM_THREADS", "8")
 os.environ["PATH"] = f"{AGENT_DIR / 'node_modules/.bin'}:{os.environ['PATH']}"
 # No path in this test may reach a paid model: drop every cloud credential

@@ -18,9 +18,9 @@ wrong** below.
 ## Quick start
 
 ```bash
-# the allo env sets neither of these (CLAUDE.md)
+# the allo env sets LLVM_BUILD_DIR, not OMP_NUM_THREADS (CLAUDE.md)
 source $(conda info --base)/etc/profile.d/conda.sh && conda activate allo
-export LLVM_BUILD_DIR=/home/sk3463/llvm-allo-6b09f739/build OMP_NUM_THREADS=8
+export OMP_NUM_THREADS=8   # LLVM_BUILD_DIR: set by the allo env (tools/llvm-allo)
 export PYTHONPATH=$PWD
 
 python examples/minitpu/run.py --quick    # one 16x16x16 shape, ~2 min
