@@ -1,0 +1,19 @@
+# allo env on ace-01. Create from the repo root:  conda env create -f envs/$(hostname -s).yml
+# Packages are the same on every host (pinned 2026-10-31 from ace-01); only variables differ.
+name: allo
+channels:
+  - defaults
+dependencies:
+  - python==3.12.13
+  - numpy==2.5.1
+  - pip==26.1.2
+  - setuptools==83.0.0
+  - wheel==0.47.0
+  - packaging==26.2
+  - mkl-service==2.7.2
+  - mkl_fft==2.2.0
+  - mkl_random==1.4.1
+  - pip:
+      - -r requirements.txt
+variables:
+  LLVM_BUILD_DIR: /home/sk3463/tools/llvm-allo/build   # sunwookim028/llvm-allo (fetch.sh && build.sh)

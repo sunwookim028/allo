@@ -143,3 +143,4 @@ tests/systemc/*.cpp
 tests/systemc/demos/*.cpp
 tests/systemc/csim_out/
 tests/systemc/csyn_out/
+!envs/requirements.txt

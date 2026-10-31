@@ -65,8 +65,8 @@ Two environments, both created once per host and shared by every checkout: the
 runs the loop:
 
 ```bash
-conda create -n chia_env python=3.10 -y                            # once per host
-conda run -n chia_env pip install -r examples/tinytpu/chia_agent/requirements.txt
+conda env create -f examples/tinytpu/chia_agent/environment.yml   # once per host (pinned)
+conda env create -f envs/$(hostname -s).yml                         # the allo env, see envs/README.md
 ```
 
 Everything else is **per worktree** -- `mlir/build`, `node_modules`,

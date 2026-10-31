@@ -1,0 +1,13 @@
+# chia_env: runs the CHIA agent loop. Same on every server. Create from the repo root:
+#   conda env create -f examples/tinytpu/chia_agent/environment.yml
+name: chia_env
+channels:
+  - defaults
+dependencies:
+  - python==3.10.19
+  - pip==26.2.1
+  - setuptools==83.0.0
+  - wheel==0.47.0
+  - packaging==26.3
+  - pip:
+      - -r requirements.txt
