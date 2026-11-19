@@ -1,7 +1,8 @@
 # allo-asic
 
 This directory contains the integrated hierarchical Allo flow, whose designs compile an Allo
-  design, emit a backend-neutral ASIC manifest, harden reusable subblocks into macros, and
+  design, emit a backend-neutral ASIC manifest, harden reusable subblocks intoopenai.chatgpt@26.1106.51428
+openai.codex-audio@26.1106.51428 macros, and
   assemble the full chip.
 
 Shared implementation nodes live under `nodes/`; integrated examples live
