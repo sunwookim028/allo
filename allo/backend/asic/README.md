@@ -1,7 +1,8 @@
 # allo-asic
 
 This directory contains the integrated hierarchical Allo flow, whose designs compile an Allo
-  design, emit a backend-neutral ASIC manifest, harden reusable subblocks into macros, and assemble the full chip.
+- design, emit a backend-neutral ASIC manifest, harden reusable subblocks into macros, and
+- assemble the full chip.
 
 Shared implementation nodes live under `nodes/`; integrated examples live
 under `designs/`. Generated mflowgen builds should be outside the importable
